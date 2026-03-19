@@ -68,9 +68,11 @@ export default function Index() {
   }
 
   return (
-    <div className="relative min-h-screen">
-      {!lightMode && <ThemedBackground theme={theme} />}
-      {lightMode && <div className="fixed inset-0 z-0 bg-background" />}
+    <div className="relative min-h-screen transition-colors duration-500">
+      <div className={`fixed inset-0 z-0 transition-opacity duration-700 ${lightMode ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
+        <ThemedBackground theme={theme} />
+      </div>
+      <div className={`fixed inset-0 z-0 bg-background transition-opacity duration-700 ${lightMode ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} />
       <HamburgerMenu whatsappNumber={waNumber} whatsappLink={waLink} lightMode={lightMode} onToggleMode={() => setLightMode(v => !v)} />
 
       <div className="relative z-10">
