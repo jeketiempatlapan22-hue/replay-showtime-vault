@@ -54,6 +54,17 @@ export default function Admin() {
 
   const showFeaturedMember = form.criteria === 'sts' || form.criteria === 'last_show';
 
+  // Check existing session on mount
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        supabase.from('user_roles').select('role').eq('user_id', session.user.id).eq('role', 'admin').maybeSingle().then(({ data }) => {
+          if (data) { setIsLoggedIn(true); }
+        });
+      }
+    });
+  }, []);
+
   useEffect(() => {
     if (isLoggedIn) refreshData();
   }, [isLoggedIn]);
