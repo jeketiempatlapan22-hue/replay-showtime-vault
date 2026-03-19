@@ -125,6 +125,13 @@ export default function Index() {
     localStorage.setItem('replaytime-mode', lightMode ? 'light' : 'dark');
   }, [lightMode]);
 
+  // Scroll-to-top visibility
+  useEffect(() => {
+    const handleScroll = () => setShowScrollTop(window.scrollY > 400);
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
   const grouped = useMemo(() => {
     let result = { ...allGrouped };
 
