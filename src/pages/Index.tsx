@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Search, X } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import ThemedBackground, { type ThemeType } from '@/components/ThemedBackground';
@@ -7,6 +7,7 @@ import ReplayCardComponent from '@/components/ReplayCardComponent';
 import YouTubePlayer from '@/components/YouTubePlayer';
 import { getReplaysByMonth, getSettings } from '@/lib/store';
 import { type ReplayRow } from '@/lib/store';
+import { supabase } from '@/integrations/supabase/client';
 
 const MONTH_NAMES: Record<string, string> = {
   '01': 'Januari', '02': 'Februari', '03': 'Maret', '04': 'April',
