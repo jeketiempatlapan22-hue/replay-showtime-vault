@@ -14,7 +14,69 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      master_passwords: {
+        Row: {
+          created_at: string
+          id: string
+          month: string
+          password: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          month: string
+          password: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          month?: string
+          password?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      replays: {
+        Row: {
+          created_at: string
+          criteria: string
+          date: string
+          id: string
+          image_url: string
+          lineup: string[]
+          password: string
+          title: string
+          updated_at: string
+          youtube_id: string
+        }
+        Insert: {
+          created_at?: string
+          criteria?: string
+          date: string
+          id?: string
+          image_url?: string
+          lineup?: string[]
+          password: string
+          title: string
+          updated_at?: string
+          youtube_id: string
+        }
+        Update: {
+          created_at?: string
+          criteria?: string
+          date?: string
+          id?: string
+          image_url?: string
+          lineup?: string[]
+          password?: string
+          title?: string
+          updated_at?: string
+          youtube_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
