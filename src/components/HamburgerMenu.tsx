@@ -25,7 +25,7 @@ export default function HamburgerMenu({ whatsappNumber, whatsappLink, lightMode,
         >
           <Menu className="w-6 h-6" />
         </Button>
-        <img src={logoImg} alt="RealTime48" className="w-10 h-10 rounded-full object-cover ring-2 ring-primary/50 shadow-lg shadow-primary/20 hover:ring-primary hover:scale-110 transition-all duration-300" />
+        <img src={logoImg} alt="RealTime48" className="w-8 h-8 rounded-full object-cover ring-2 ring-primary/50 shadow-lg shadow-primary/20 hover:ring-primary hover:scale-110 transition-all duration-300" />
       </div>
 
       {/* Overlay */}
