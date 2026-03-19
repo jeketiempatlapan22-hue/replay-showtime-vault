@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { Search, X, SlidersHorizontal, ArrowUpDown, Bookmark } from 'lucide-react';
+import { Search, X, SlidersHorizontal, ArrowUpDown, Bookmark, ArrowUp, Film } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
