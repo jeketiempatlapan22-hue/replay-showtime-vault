@@ -27,7 +27,8 @@ export async function getReplaysByMonth(): Promise<Record<string, ReplayRow[]>> 
 }
 
 export async function addReplay(replay: {
-  title: string; date: string; criteria: string; lineup: string[];
+  title: string; show_name: string; date: string; criteria: string;
+  featured_member: string; lineup: string[];
   password: string; youtube_id: string; image_url: string;
 }) {
   const { error } = await supabase.from('replays').insert(replay);
@@ -51,12 +52,7 @@ export async function getAllMasterPasswords(): Promise<MasterPasswordRow[]> {
 }
 
 export async function setMasterPassword(month: string, password: string) {
-  const { data: existing } = await supabase
-    .from('master_passwords')
-    .select('id')
-    .eq('month', month)
-    .maybeSingle();
-
+  const { data: existing } = await supabase.from('master_passwords').select('id').eq('month', month).maybeSingle();
   if (existing) {
     const { error } = await supabase.from('master_passwords').update({ password }).eq('id', existing.id);
     if (error) throw error;
@@ -67,28 +63,15 @@ export async function setMasterPassword(month: string, password: string) {
 }
 
 export async function verifyPassword(replayId: string, password: string): Promise<boolean> {
-  const { data: replay } = await supabase
-    .from('replays')
-    .select('password, date')
-    .eq('id', replayId)
-    .single();
-
+  const { data: replay } = await supabase.from('replays').select('password, date').eq('id', replayId).single();
   if (!replay) return false;
   if (replay.password === password) return true;
-
   const d = new Date(replay.date);
   const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-
-  const { data: master } = await supabase
-    .from('master_passwords')
-    .select('password')
-    .eq('month', monthKey)
-    .maybeSingle();
-
+  const { data: master } = await supabase.from('master_passwords').select('password').eq('month', monthKey).maybeSingle();
   return master?.password === password;
 }
 
-// Site settings
 export async function getSetting(key: string): Promise<string> {
   const { data } = await supabase.from('site_settings').select('value').eq('key', key).maybeSingle();
   return data?.value || '';
@@ -97,9 +80,7 @@ export async function getSetting(key: string): Promise<string> {
 export async function getSettings(): Promise<Record<string, string>> {
   const { data } = await supabase.from('site_settings').select('*');
   const map: Record<string, string> = {};
-  for (const row of data || []) {
-    map[row.key] = row.value;
-  }
+  for (const row of data || []) map[row.key] = row.value;
   return map;
 }
 
@@ -112,7 +93,6 @@ export async function setSetting(key: string, value: string) {
   }
 }
 
-// Image upload
 export async function uploadImage(file: File): Promise<string> {
   const ext = file.name.split('.').pop();
   const fileName = `${crypto.randomUUID()}.${ext}`;
