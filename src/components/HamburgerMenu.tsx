@@ -16,7 +16,7 @@ export default function HamburgerMenu({ whatsappNumber, whatsappLink, lightMode,
   return (
     <>
       {/* Top bar with hamburger + logo */}
-      <div className="fixed top-0 left-0 right-0 z-30 flex items-center gap-3 px-4 py-3">
+      <div className="fixed top-0 left-0 right-0 z-30 flex items-center justify-between px-4 py-3">
         <Button
           variant="ghost"
           size="icon"
@@ -25,7 +25,7 @@ export default function HamburgerMenu({ whatsappNumber, whatsappLink, lightMode,
         >
           <Menu className="w-6 h-6" />
         </Button>
-        <img src={logoImg} alt="RealTime48" className="w-9 h-9 rounded-full object-cover ring-2 ring-primary/40" />
+        <img src={logoImg} alt="RealTime48" className="w-10 h-10 rounded-full object-cover ring-2 ring-primary/50 shadow-lg shadow-primary/20 hover:ring-primary hover:scale-110 transition-all duration-300" />
       </div>
 
       {/* Overlay */}
