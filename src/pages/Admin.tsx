@@ -202,13 +202,20 @@ export default function Admin() {
           <CardHeader><CardTitle className="text-center font-sans">Admin Panel</CardTitle></CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <Label>Sandi Admin</Label>
-              <Input type="password" placeholder="Masukkan sandi admin..." value={loginPassword}
+              <Label>Email Admin</Label>
+              <Input type="email" placeholder="admin@email.com" value={loginEmail}
+                onChange={e => { setLoginEmail(e.target.value); setLoginError(''); }} />
+            </div>
+            <div>
+              <Label>Sandi</Label>
+              <Input type="password" placeholder="Masukkan sandi..." value={loginPassword}
                 onChange={e => { setLoginPassword(e.target.value); setLoginError(''); }}
                 onKeyDown={e => e.key === 'Enter' && handleLogin()} />
             </div>
             {loginError && <p className="text-sm text-destructive">{loginError}</p>}
-            <Button className="w-full" onClick={handleLogin}>Masuk</Button>
+            <Button className="w-full" onClick={handleLogin} disabled={loginLoading}>
+              {loginLoading ? 'Memproses...' : 'Masuk'}
+            </Button>
             <Button variant="ghost" className="w-full" onClick={() => navigate('/')}>
               <ArrowLeft className="w-4 h-4 mr-2" /> Kembali
             </Button>
@@ -226,8 +233,14 @@ export default function Admin() {
             <Button variant="ghost" size="icon" onClick={() => navigate('/')}><ArrowLeft className="w-5 h-5" /></Button>
             <h1 className="text-2xl font-bold font-sans text-foreground">Admin Panel</h1>
           </div>
-          <Button onClick={() => { resetForm(); setShowAddDialog(true); }}>
-            <Plus className="w-4 h-4 mr-2" /> Tambah Replay
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="icon" onClick={handleLogout} title="Logout">
+              <LogOut className="w-5 h-5" />
+            </Button>
+            <Button onClick={() => { resetForm(); setShowAddDialog(true); }}>
+              <Plus className="w-4 h-4 mr-2" /> Tambah Replay
+            </Button>
+          </div>
           </Button>
         </div>
 
