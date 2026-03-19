@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { Search, X, SlidersHorizontal, ArrowUpDown, Bookmark } from 'lucide-react';
+import { Search, X, SlidersHorizontal, ArrowUpDown, Bookmark, ArrowUp, Film } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -48,6 +48,7 @@ export default function Index() {
   const [sortMode, setSortMode] = useState<SortMode>('newest');
   const [showFilters, setShowFilters] = useState(false);
   const [showBookmarksOnly, setShowBookmarksOnly] = useState(false);
+  const [showScrollTop, setShowScrollTop] = useState(false);
 
   // Bookmarks
   const [bookmarks, setBookmarks] = useState<Set<string>>(() => {
@@ -123,6 +124,13 @@ export default function Index() {
     document.documentElement.classList.toggle('light', lightMode);
     localStorage.setItem('replaytime-mode', lightMode ? 'light' : 'dark');
   }, [lightMode]);
+
+  // Scroll-to-top visibility
+  useEffect(() => {
+    const handleScroll = () => setShowScrollTop(window.scrollY > 400);
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   const grouped = useMemo(() => {
     let result = { ...allGrouped };
@@ -287,10 +295,22 @@ export default function Index() {
           )}
 
           {!loading && sortedMonths.length === 0 && (
-            <div className="text-center py-20 animate-fade-up opacity-0" style={{ animationFillMode: 'forwards' }}>
-              <p className="text-muted-foreground text-lg">
-                {showBookmarksOnly ? 'Belum ada replay yang ditandai favorit.' : 'Belum ada replay yang cocok.'}
-              </p>
+            <div className="text-center py-20 animate-fade-up opacity-0 flex flex-col items-center gap-4" style={{ animationFillMode: 'forwards' }}>
+              <div className="w-24 h-24 rounded-full bg-card/80 border border-border flex items-center justify-center">
+                <Film className="w-12 h-12 text-muted-foreground/50" />
+              </div>
+              <div>
+                <p className="text-foreground text-xl font-semibold font-sans mb-1">
+                  {showBookmarksOnly ? 'Belum Ada Favorit' : searchQuery ? 'Tidak Ditemukan' : 'Belum Ada Replay'}
+                </p>
+                <p className="text-muted-foreground text-sm max-w-xs mx-auto">
+                  {showBookmarksOnly
+                    ? 'Tandai replay favoritmu dengan ikon bookmark di setiap kartu.'
+                    : searchQuery
+                    ? `Tidak ada replay yang cocok dengan "${searchQuery}". Coba kata kunci lain.`
+                    : 'Replay belum ditambahkan. Hubungi admin untuk informasi lebih lanjut.'}
+                </p>
+              </div>
             </div>
           )}
 
@@ -319,6 +339,7 @@ export default function Index() {
                       index={i}
                       isBookmarked={bookmarks.has(replay.id)}
                       onToggleBookmark={toggleBookmark}
+                      searchQuery={searchQuery}
                     />
                   ))}
                 </div>
@@ -327,6 +348,14 @@ export default function Index() {
           })}
         </main>
       </div>
+
+      {/* Scroll to top */}
+      <button
+        onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+        className={`fixed bottom-6 right-6 z-50 p-3 rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/20 transition-all duration-300 hover:scale-110 ${showScrollTop ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'}`}
+      >
+        <ArrowUp className="w-5 h-5" />
+      </button>
     </div>
   );
 }

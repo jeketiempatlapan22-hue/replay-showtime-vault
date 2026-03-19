@@ -18,9 +18,19 @@ interface Props {
   index?: number;
   isBookmarked?: boolean;
   onToggleBookmark?: (id: string) => void;
+  searchQuery?: string;
 }
 
-export default function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWatch, index = 0, isBookmarked, onToggleBookmark }: Props) {
+function highlightText(text: string, query: string) {
+  if (!query.trim()) return text;
+  const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+  const parts = text.split(regex);
+  return parts.map((part, i) =>
+    regex.test(part) ? <mark key={i} className="bg-primary/30 text-foreground rounded px-0.5">{part}</mark> : part
+  );
+}
+
+export default function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWatch, index = 0, isBookmarked, onToggleBookmark, searchQuery = '' }: Props) {
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -93,12 +103,12 @@ export default function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWa
         </div>
 
         <div className="p-4 space-y-3">
-          <h3 className="text-lg font-semibold text-foreground line-clamp-2 font-sans">{replay.title}</h3>
+          <h3 className="text-lg font-semibold text-foreground line-clamp-2 font-sans">{highlightText(replay.title, searchQuery)}</h3>
 
           {replay.show_name && (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Tv className="w-4 h-4 text-primary" />
-              <span>{replay.show_name}</span>
+              <span>{highlightText(replay.show_name, searchQuery)}</span>
             </div>
           )}
           
@@ -115,7 +125,7 @@ export default function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWa
           {replay.featured_member && (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Star className="w-4 h-4 text-primary" />
-              <span className="font-medium">{replay.featured_member}</span>
+              <span className="font-medium">{highlightText(replay.featured_member, searchQuery)}</span>
             </div>
           )}
 
@@ -123,7 +133,7 @@ export default function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWa
             <Users className="w-4 h-4 text-primary mt-0.5 shrink-0" />
             <div className="flex flex-wrap gap-1">
               {replay.lineup.map((member, i) => (
-                <Badge key={i} variant="secondary" className="text-xs">{member}</Badge>
+                <Badge key={i} variant="secondary" className="text-xs">{highlightText(member, searchQuery)}</Badge>
               ))}
             </div>
           </div>

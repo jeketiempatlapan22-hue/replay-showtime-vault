@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, Trash2, Edit2, Key, Save, Palette, MessageCircle } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Edit2, Key, Save, Palette, MessageCircle, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -12,8 +12,7 @@ import { addReplay, deleteReplay, updateReplay, getReplays, getAllMasterPassword
 import { THEME_OPTIONS, type ThemeType } from '@/components/ThemedBackground';
 import ImagePicker from '@/components/ImagePicker';
 import { toast } from '@/hooks/use-toast';
-
-const ADMIN_PASSWORD = 'dhatul01';
+import { supabase } from '@/integrations/supabase/client';
 
 const CRITERIA_OPTIONS = [
   { value: 'reguler', label: 'Reguler' },
@@ -32,8 +31,10 @@ const MONTH_OPTIONS = Array.from({ length: 12 }, (_, i) => {
 export default function Admin() {
   const navigate = useNavigate();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [loginError, setLoginError] = useState('');
+  const [loginLoading, setLoginLoading] = useState(false);
 
   const [replays, setReplays] = useState<ReplayRow[]>([]);
   const [masterPasswords, setMasterPasswords] = useState<MasterPasswordRow[]>([]);
@@ -53,6 +54,17 @@ export default function Admin() {
 
   const showFeaturedMember = form.criteria === 'sts' || form.criteria === 'last_show';
 
+  // Check existing session on mount
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        supabase.from('user_roles').select('role').eq('user_id', session.user.id).eq('role', 'admin').maybeSingle().then(({ data }) => {
+          if (data) { setIsLoggedIn(true); }
+        });
+      }
+    });
+  }, []);
+
   useEffect(() => {
     if (isLoggedIn) refreshData();
   }, [isLoggedIn]);
@@ -70,13 +82,33 @@ export default function Admin() {
     }
   };
 
-  const handleLogin = () => {
-    if (loginPassword === ADMIN_PASSWORD) {
-      setIsLoggedIn(true);
-      setLoginError('');
-    } else {
-      setLoginError('Sandi admin salah!');
+  const handleLogin = async () => {
+    setLoginLoading(true);
+    setLoginError('');
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: loginEmail,
+      password: loginPassword,
+    });
+    if (error) {
+      setLoginError('Email atau sandi salah!');
+      setLoginLoading(false);
+      return;
     }
+    // Check admin role
+    const { data: roleData } = await supabase.from('user_roles').select('role').eq('user_id', data.user.id).eq('role', 'admin').maybeSingle();
+    if (!roleData) {
+      setLoginError('Akun ini bukan admin.');
+      await supabase.auth.signOut();
+      setLoginLoading(false);
+      return;
+    }
+    setIsLoggedIn(true);
+    setLoginLoading(false);
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setIsLoggedIn(false);
   };
 
   const resetForm = () => {
@@ -170,13 +202,20 @@ export default function Admin() {
           <CardHeader><CardTitle className="text-center font-sans">Admin Panel</CardTitle></CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <Label>Sandi Admin</Label>
-              <Input type="password" placeholder="Masukkan sandi admin..." value={loginPassword}
+              <Label>Email Admin</Label>
+              <Input type="email" placeholder="admin@email.com" value={loginEmail}
+                onChange={e => { setLoginEmail(e.target.value); setLoginError(''); }} />
+            </div>
+            <div>
+              <Label>Sandi</Label>
+              <Input type="password" placeholder="Masukkan sandi..." value={loginPassword}
                 onChange={e => { setLoginPassword(e.target.value); setLoginError(''); }}
                 onKeyDown={e => e.key === 'Enter' && handleLogin()} />
             </div>
             {loginError && <p className="text-sm text-destructive">{loginError}</p>}
-            <Button className="w-full" onClick={handleLogin}>Masuk</Button>
+            <Button className="w-full" onClick={handleLogin} disabled={loginLoading}>
+              {loginLoading ? 'Memproses...' : 'Masuk'}
+            </Button>
             <Button variant="ghost" className="w-full" onClick={() => navigate('/')}>
               <ArrowLeft className="w-4 h-4 mr-2" /> Kembali
             </Button>
@@ -194,9 +233,14 @@ export default function Admin() {
             <Button variant="ghost" size="icon" onClick={() => navigate('/')}><ArrowLeft className="w-5 h-5" /></Button>
             <h1 className="text-2xl font-bold font-sans text-foreground">Admin Panel</h1>
           </div>
-          <Button onClick={() => { resetForm(); setShowAddDialog(true); }}>
-            <Plus className="w-4 h-4 mr-2" /> Tambah Replay
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="icon" onClick={handleLogout} title="Logout">
+              <LogOut className="w-5 h-5" />
+            </Button>
+            <Button onClick={() => { resetForm(); setShowAddDialog(true); }}>
+              <Plus className="w-4 h-4 mr-2" /> Tambah Replay
+            </Button>
+          </div>
         </div>
 
         {/* Theme */}
