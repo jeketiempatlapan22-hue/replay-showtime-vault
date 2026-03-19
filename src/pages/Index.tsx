@@ -41,7 +41,10 @@ export default function Index() {
     for (const [month, replays] of Object.entries(allGrouped)) {
       const matched = replays.filter(r =>
         r.title.toLowerCase().includes(q) ||
-        r.lineup.some(m => m.toLowerCase().includes(q))
+        r.lineup.some(m => m.toLowerCase().includes(q)) ||
+        r.criteria.toLowerCase().includes(q) ||
+        (r.show_name && r.show_name.toLowerCase().includes(q)) ||
+        (r.featured_member && r.featured_member.toLowerCase().includes(q))
       );
       if (matched.length > 0) filtered[month] = matched;
     }

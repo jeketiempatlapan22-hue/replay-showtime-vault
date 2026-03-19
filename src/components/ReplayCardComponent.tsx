@@ -1,10 +1,14 @@
 import { useState } from 'react';
-import { Lock, Unlock, Play, Calendar, Users, Tag } from 'lucide-react';
+import { Lock, Unlock, Play, Calendar, Users, Tag, Star, Tv } from 'lucide-react';
 import { type ReplayRow, verifyPassword } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+
+const CRITERIA_LABELS: Record<string, string> = {
+  reguler: 'Reguler', sts: 'STS', last_show: 'Last Show', aniv: 'Anniversary', special: 'Show Spesial',
+};
 
 interface Props {
   replay: ReplayRow;
@@ -37,6 +41,8 @@ export default function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWa
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
   });
 
+  const criteriaLabel = CRITERIA_LABELS[replay.criteria] || replay.criteria;
+
   return (
     <>
       <div className="group relative rounded-xl overflow-hidden border border-border bg-card/80 backdrop-blur-sm hover:border-primary/50 transition-all duration-300 hover:shadow-lg hover:shadow-primary/10">
@@ -60,10 +66,21 @@ export default function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWa
               </Badge>
             </div>
           )}
+          {/* Criteria badge */}
+          <div className="absolute top-2 left-2">
+            <Badge variant="secondary" className="text-xs">{criteriaLabel}</Badge>
+          </div>
         </div>
 
         <div className="p-4 space-y-3">
           <h3 className="text-lg font-semibold text-foreground line-clamp-2 font-sans">{replay.title}</h3>
+
+          {replay.show_name && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Tv className="w-4 h-4 text-primary" />
+              <span>{replay.show_name}</span>
+            </div>
+          )}
           
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Calendar className="w-4 h-4 text-primary" />
@@ -72,8 +89,15 @@ export default function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWa
 
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Tag className="w-4 h-4 text-primary" />
-            <span>{replay.criteria}</span>
+            <span>{criteriaLabel}</span>
           </div>
+
+          {replay.featured_member && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Star className="w-4 h-4 text-primary" />
+              <span className="font-medium">{replay.featured_member}</span>
+            </div>
+          )}
 
           <div className="flex items-start gap-2 text-sm text-muted-foreground">
             <Users className="w-4 h-4 text-primary mt-0.5 shrink-0" />
@@ -103,13 +127,9 @@ export default function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWa
           </DialogHeader>
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">Masukkan sandi satuan atau sandi master untuk membuka replay ini.</p>
-            <Input
-              type="password"
-              placeholder="Masukkan sandi..."
-              value={password}
+            <Input type="password" placeholder="Masukkan sandi..." value={password}
               onChange={e => { setPassword(e.target.value); setError(''); }}
-              onKeyDown={e => e.key === 'Enter' && handleSubmitPassword()}
-            />
+              onKeyDown={e => e.key === 'Enter' && handleSubmitPassword()} />
             {error && <p className="text-sm text-destructive">{error}</p>}
             <Button className="w-full" onClick={handleSubmitPassword} disabled={checking}>
               {checking ? 'Memeriksa...' : 'Buka Replay'}
