@@ -36,6 +36,11 @@ export default function Index() {
     });
   }, []);
 
+  useEffect(() => {
+    document.documentElement.classList.toggle('light', lightMode);
+    localStorage.setItem('replaytime-mode', lightMode ? 'light' : 'dark');
+  }, [lightMode]);
+
   const grouped = useMemo(() => {
     if (!searchQuery.trim()) return allGrouped;
     const q = searchQuery.toLowerCase();
