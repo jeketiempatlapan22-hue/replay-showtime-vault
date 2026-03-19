@@ -1,13 +1,12 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Settings, Search, X } from 'lucide-react';
+import { Search, X } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import { useNavigate } from 'react-router-dom';
-import RamadhanBackground from '@/components/RamadhanBackground';
+import ThemedBackground, { type ThemeType } from '@/components/ThemedBackground';
+import HamburgerMenu from '@/components/HamburgerMenu';
 import ReplayCardComponent from '@/components/ReplayCardComponent';
 import YouTubePlayer from '@/components/YouTubePlayer';
-import { getReplaysByMonth } from '@/lib/store';
+import { getReplaysByMonth, getSettings } from '@/lib/store';
 import { type ReplayRow } from '@/lib/store';
-import { Button } from '@/components/ui/button';
 
 const MONTH_NAMES: Record<string, string> = {
   '01': 'Januari', '02': 'Februari', '03': 'Maret', '04': 'April',
@@ -16,16 +15,21 @@ const MONTH_NAMES: Record<string, string> = {
 };
 
 export default function Index() {
-  const navigate = useNavigate();
   const [unlockedIds, setUnlockedIds] = useState<Set<string>>(new Set());
   const [watchingReplay, setWatchingReplay] = useState<ReplayRow | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [allGrouped, setAllGrouped] = useState<Record<string, ReplayRow[]>>({});
   const [loading, setLoading] = useState(true);
+  const [theme, setTheme] = useState<ThemeType>('ramadhan');
+  const [waNumber, setWaNumber] = useState('');
+  const [waLink, setWaLink] = useState('');
 
   useEffect(() => {
-    getReplaysByMonth().then(data => {
+    Promise.all([getReplaysByMonth(), getSettings()]).then(([data, settings]) => {
       setAllGrouped(data);
+      setTheme((settings.theme as ThemeType) || 'ramadhan');
+      setWaNumber(settings.whatsapp_number || '');
+      setWaLink(settings.whatsapp_link || '');
       setLoading(false);
     });
   }, []);
@@ -56,7 +60,8 @@ export default function Index() {
 
   return (
     <div className="relative min-h-screen">
-      <RamadhanBackground />
+      <ThemedBackground theme={theme} />
+      <HamburgerMenu whatsappNumber={waNumber} whatsappLink={waLink} />
 
       <div className="relative z-10">
         <header className="text-center py-10 md:py-16 px-4">
@@ -78,14 +83,6 @@ export default function Index() {
               </button>
             )}
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="absolute top-4 right-4 text-muted-foreground hover:text-primary"
-            onClick={() => navigate('/panel-kontrol-x7k9m')}
-          >
-            <Settings className="w-5 h-5" />
-          </Button>
         </header>
 
         <main className="max-w-7xl mx-auto px-4 pb-20">

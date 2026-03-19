@@ -3,6 +3,7 @@ import type { Tables } from '@/integrations/supabase/types';
 
 export type ReplayRow = Tables<'replays'>;
 export type MasterPasswordRow = Tables<'master_passwords'>;
+export type SiteSettingRow = Tables<'site_settings'>;
 
 export async function getReplays(): Promise<ReplayRow[]> {
   const { data, error } = await supabase
@@ -85,4 +86,46 @@ export async function verifyPassword(replayId: string, password: string): Promis
     .maybeSingle();
 
   return master?.password === password;
+}
+
+// Site settings
+export async function getSetting(key: string): Promise<string> {
+  const { data } = await supabase.from('site_settings').select('value').eq('key', key).maybeSingle();
+  return data?.value || '';
+}
+
+export async function getSettings(): Promise<Record<string, string>> {
+  const { data } = await supabase.from('site_settings').select('*');
+  const map: Record<string, string> = {};
+  for (const row of data || []) {
+    map[row.key] = row.value;
+  }
+  return map;
+}
+
+export async function setSetting(key: string, value: string) {
+  const { data: existing } = await supabase.from('site_settings').select('id').eq('key', key).maybeSingle();
+  if (existing) {
+    await supabase.from('site_settings').update({ value }).eq('id', existing.id);
+  } else {
+    await supabase.from('site_settings').insert({ key, value });
+  }
+}
+
+// Image upload
+export async function uploadImage(file: File): Promise<string> {
+  const ext = file.name.split('.').pop();
+  const fileName = `${crypto.randomUUID()}.${ext}`;
+  const { error } = await supabase.storage.from('card-images').upload(fileName, file);
+  if (error) throw error;
+  const { data } = supabase.storage.from('card-images').getPublicUrl(fileName);
+  return data.publicUrl;
+}
+
+export async function getGalleryImages(): Promise<string[]> {
+  const { data, error } = await supabase.storage.from('card-images').list('', { limit: 100, sortBy: { column: 'created_at', order: 'desc' } });
+  if (error) throw error;
+  return (data || [])
+    .filter(f => f.name !== '.emptyFolderPlaceholder')
+    .map(f => supabase.storage.from('card-images').getPublicUrl(f.name).data.publicUrl);
 }
