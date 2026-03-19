@@ -82,13 +82,33 @@ export default function Admin() {
     }
   };
 
-  const handleLogin = () => {
-    if (loginPassword === ADMIN_PASSWORD) {
-      setIsLoggedIn(true);
-      setLoginError('');
-    } else {
-      setLoginError('Sandi admin salah!');
+  const handleLogin = async () => {
+    setLoginLoading(true);
+    setLoginError('');
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: loginEmail,
+      password: loginPassword,
+    });
+    if (error) {
+      setLoginError('Email atau sandi salah!');
+      setLoginLoading(false);
+      return;
     }
+    // Check admin role
+    const { data: roleData } = await supabase.from('user_roles').select('role').eq('user_id', data.user.id).eq('role', 'admin').maybeSingle();
+    if (!roleData) {
+      setLoginError('Akun ini bukan admin.');
+      await supabase.auth.signOut();
+      setLoginLoading(false);
+      return;
+    }
+    setIsLoggedIn(true);
+    setLoginLoading(false);
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setIsLoggedIn(false);
   };
 
   const resetForm = () => {
