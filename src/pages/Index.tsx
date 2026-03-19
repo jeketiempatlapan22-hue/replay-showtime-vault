@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
-import { Settings } from 'lucide-react';
+import { Settings, Search, X } from 'lucide-react';
+import { Input } from '@/components/ui/input';
 import { useNavigate } from 'react-router-dom';
 import RamadhanBackground from '@/components/RamadhanBackground';
 import ReplayCardComponent from '@/components/ReplayCardComponent';
