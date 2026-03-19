@@ -161,25 +161,149 @@
   animation: fade-up 0.5s ease-out;
 }
 
-/* Light mode overrides */
+/* Light mode base */
 .light {
-  --background: 0 0% 98%;
+  --background: 40 30% 95%;
   --foreground: 220 20% 15%;
-  --card: 0 0% 100%;
+  --card: 40 20% 98%;
   --card-foreground: 220 20% 15%;
-  --popover: 0 0% 100%;
+  --popover: 40 20% 98%;
   --popover-foreground: 220 20% 15%;
   --primary: 45 80% 45%;
   --primary-foreground: 0 0% 100%;
-  --secondary: 220 15% 92%;
+  --secondary: 40 15% 90%;
   --secondary-foreground: 220 20% 20%;
-  --muted: 220 15% 95%;
+  --muted: 40 15% 92%;
   --muted-foreground: 220 10% 45%;
   --accent: 200 60% 45%;
   --accent-foreground: 0 0% 100%;
   --destructive: 0 84% 55%;
   --destructive-foreground: 0 0% 100%;
-  --border: 220 15% 85%;
-  --input: 220 15% 85%;
+  --border: 40 15% 82%;
+  --input: 40 15% 82%;
   --ring: 45 80% 45%;
+}
+
+/* Theme-specific light modes */
+.light.theme-ramadhan {
+  --background: 40 30% 95%;
+  --card: 40 25% 97%;
+  --primary: 45 80% 42%;
+  --secondary: 40 20% 88%;
+  --muted: 40 18% 90%;
+  --border: 40 18% 80%;
+  --input: 40 18% 80%;
+  --accent: 200 50% 42%;
+}
+
+.light.theme-space {
+  --background: 250 25% 94%;
+  --card: 250 20% 97%;
+  --primary: 260 60% 55%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 250 18% 88%;
+  --muted: 250 15% 90%;
+  --muted-foreground: 250 15% 45%;
+  --border: 250 15% 82%;
+  --input: 250 15% 82%;
+  --ring: 260 60% 55%;
+  --accent: 200 70% 50%;
+}
+
+.light.theme-ocean {
+  --background: 195 30% 93%;
+  --card: 195 25% 97%;
+  --primary: 195 70% 38%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 195 20% 87%;
+  --muted: 195 15% 90%;
+  --muted-foreground: 195 15% 42%;
+  --border: 195 18% 80%;
+  --input: 195 18% 80%;
+  --ring: 195 70% 38%;
+  --accent: 170 60% 40%;
+}
+
+.light.theme-sunset {
+  --background: 25 35% 94%;
+  --card: 25 30% 97%;
+  --primary: 20 75% 50%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 25 20% 88%;
+  --muted: 25 18% 90%;
+  --muted-foreground: 20 15% 42%;
+  --border: 25 18% 80%;
+  --input: 25 18% 80%;
+  --ring: 20 75% 50%;
+  --accent: 340 55% 50%;
+}
+
+.light.theme-forest {
+  --background: 140 25% 93%;
+  --card: 140 20% 97%;
+  --primary: 140 55% 35%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 140 18% 87%;
+  --muted: 140 15% 90%;
+  --muted-foreground: 140 15% 40%;
+  --border: 140 15% 80%;
+  --input: 140 15% 80%;
+  --ring: 140 55% 35%;
+  --accent: 80 50% 42%;
+}
+
+.light.theme-sunrise {
+  --background: 35 40% 95%;
+  --card: 35 30% 97%;
+  --primary: 30 80% 50%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 35 22% 89%;
+  --muted: 35 18% 91%;
+  --muted-foreground: 30 15% 42%;
+  --border: 35 18% 82%;
+  --input: 35 18% 82%;
+  --ring: 30 80% 50%;
+  --accent: 340 50% 52%;
+}
+
+.light.theme-winter {
+  --background: 210 25% 95%;
+  --card: 210 20% 98%;
+  --primary: 210 50% 45%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 210 18% 90%;
+  --muted: 210 15% 93%;
+  --muted-foreground: 210 12% 45%;
+  --border: 210 15% 84%;
+  --input: 210 15% 84%;
+  --ring: 210 50% 45%;
+  --accent: 195 45% 48%;
+}
+
+.light.theme-spring {
+  --background: 340 25% 95%;
+  --card: 340 18% 98%;
+  --primary: 340 60% 55%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 340 18% 90%;
+  --muted: 340 15% 92%;
+  --muted-foreground: 340 12% 42%;
+  --border: 340 15% 83%;
+  --input: 340 15% 83%;
+  --ring: 340 60% 55%;
+  --accent: 140 45% 42%;
+}
+
+.light.theme-aurora {
+  --background: 160 22% 94%;
+  --card: 160 18% 97%;
+  --primary: 160 60% 38%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 160 18% 88%;
+  --muted: 160 15% 91%;
+  --muted-foreground: 160 12% 42%;
+  --border: 160 15% 82%;
+  --input: 160 15% 82%;
+  --ring: 160 60% 38%;
+  --accent: 280 50% 52%;
 }
