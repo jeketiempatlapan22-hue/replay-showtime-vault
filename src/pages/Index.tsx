@@ -22,6 +22,7 @@ export default function Index() {
   const [allGrouped, setAllGrouped] = useState<Record<string, ReplayRow[]>>({});
   const [loading, setLoading] = useState(true);
   const [theme, setTheme] = useState<ThemeType>('ramadhan');
+  const [lightMode, setLightMode] = useState(() => localStorage.getItem('replaytime-mode') === 'light');
   const [waNumber, setWaNumber] = useState('');
   const [waLink, setWaLink] = useState('');
 
