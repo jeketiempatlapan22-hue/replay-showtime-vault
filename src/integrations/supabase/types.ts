@@ -14,6 +14,38 @@ export type Database = {
   }
   public: {
     Tables: {
+      comments: {
+        Row: {
+          created_at: string
+          id: string
+          message: string
+          name: string
+          replay_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          message: string
+          name?: string
+          replay_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          message?: string
+          name?: string
+          replay_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comments_replay_id_fkey"
+            columns: ["replay_id"]
+            isOneToOne: false
+            referencedRelation: "replays"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       master_passwords: {
         Row: {
           created_at: string
@@ -38,6 +70,38 @@ export type Database = {
         }
         Relationships: []
       }
+      ratings: {
+        Row: {
+          browser_id: string
+          created_at: string
+          id: string
+          rating: number
+          replay_id: string
+        }
+        Insert: {
+          browser_id: string
+          created_at?: string
+          id?: string
+          rating: number
+          replay_id: string
+        }
+        Update: {
+          browser_id?: string
+          created_at?: string
+          id?: string
+          rating?: number
+          replay_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ratings_replay_id_fkey"
+            columns: ["replay_id"]
+            isOneToOne: false
+            referencedRelation: "replays"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       replays: {
         Row: {
           created_at: string
@@ -51,6 +115,7 @@ export type Database = {
           show_name: string
           title: string
           updated_at: string
+          view_count: number
           youtube_id: string
         }
         Insert: {
@@ -65,6 +130,7 @@ export type Database = {
           show_name?: string
           title: string
           updated_at?: string
+          view_count?: number
           youtube_id: string
         }
         Update: {
@@ -79,6 +145,7 @@ export type Database = {
           show_name?: string
           title?: string
           updated_at?: string
+          view_count?: number
           youtube_id?: string
         }
         Relationships: []
