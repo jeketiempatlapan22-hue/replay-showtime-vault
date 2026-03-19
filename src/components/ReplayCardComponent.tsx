@@ -133,7 +133,7 @@ export default function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWa
             <Users className="w-4 h-4 text-primary mt-0.5 shrink-0" />
             <div className="flex flex-wrap gap-1">
               {replay.lineup.map((member, i) => (
-                <Badge key={i} variant="secondary" className="text-xs">{member}</Badge>
+                <Badge key={i} variant="secondary" className="text-xs">{highlightText(member, searchQuery)}</Badge>
               ))}
             </div>
           </div>
