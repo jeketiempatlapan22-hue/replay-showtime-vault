@@ -7,8 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { addReplay, deleteReplay, updateReplay, getReplays, getAllMasterPasswords, setMasterPassword } from '@/lib/store';
-import { ReplayCard, MasterPassword } from '@/lib/types';
+import { addReplay, deleteReplay, updateReplay, getReplays, getAllMasterPasswords, setMasterPassword, type ReplayRow, type MasterPasswordRow } from '@/lib/store';
 import { toast } from '@/hooks/use-toast';
 
 const ADMIN_PASSWORD = 'dhatul01';
@@ -25,28 +24,29 @@ export default function Admin() {
   const [loginPassword, setLoginPassword] = useState('');
   const [loginError, setLoginError] = useState('');
 
-  const [replays, setReplays] = useState<ReplayCard[]>([]);
-  const [masterPasswords, setMasterPasswords] = useState<MasterPassword[]>([]);
+  const [replays, setReplays] = useState<ReplayRow[]>([]);
+  const [masterPasswords, setMasterPasswords] = useState<MasterPasswordRow[]>([]);
   const [showAddDialog, setShowAddDialog] = useState(false);
-  const [editingReplay, setEditingReplay] = useState<ReplayCard | null>(null);
+  const [editingReplay, setEditingReplay] = useState<ReplayRow | null>(null);
 
-  // Form state
   const [form, setForm] = useState({ title: '', date: '', criteria: '', lineup: '', password: '', youtubeId: '', imageUrl: '' });
 
-  // Master password form
   const [mpYear, setMpYear] = useState(String(new Date().getFullYear()));
   const [mpMonth, setMpMonth] = useState(String(new Date().getMonth() + 1).padStart(2, '0'));
   const [mpPassword, setMpPassword] = useState('');
 
   useEffect(() => {
-    if (isLoggedIn) {
-      refreshData();
-    }
+    if (isLoggedIn) refreshData();
   }, [isLoggedIn]);
 
-  const refreshData = () => {
-    setReplays(getReplays());
-    setMasterPasswords(getAllMasterPasswords());
+  const refreshData = async () => {
+    try {
+      const [r, m] = await Promise.all([getReplays(), getAllMasterPasswords()]);
+      setReplays(r);
+      setMasterPasswords(m);
+    } catch (e) {
+      toast({ title: 'Error', description: 'Gagal memuat data.', variant: 'destructive' });
+    }
   };
 
   const handleLogin = () => {
@@ -63,7 +63,7 @@ export default function Admin() {
     setEditingReplay(null);
   };
 
-  const handleSaveReplay = () => {
+  const handleSaveReplay = async () => {
     if (!form.title || !form.date || !form.youtubeId || !form.password) {
       toast({ title: 'Error', description: 'Judul, tanggal, YouTube ID, dan sandi wajib diisi!', variant: 'destructive' });
       return;
@@ -71,48 +71,59 @@ export default function Admin() {
 
     const lineupArr = form.lineup.split(',').map(s => s.trim()).filter(Boolean);
 
-    if (editingReplay) {
-      updateReplay(editingReplay.id, {
-        title: form.title, date: form.date, criteria: form.criteria,
-        lineup: lineupArr, password: form.password, youtubeId: form.youtubeId, imageUrl: form.imageUrl,
-      });
-      toast({ title: 'Berhasil', description: 'Replay berhasil diperbarui!' });
-    } else {
-      addReplay({
-        id: crypto.randomUUID(),
-        title: form.title, date: form.date, criteria: form.criteria,
-        lineup: lineupArr, password: form.password, youtubeId: form.youtubeId, imageUrl: form.imageUrl,
-      });
-      toast({ title: 'Berhasil', description: 'Replay baru berhasil ditambahkan!' });
-    }
+    try {
+      if (editingReplay) {
+        await updateReplay(editingReplay.id, {
+          title: form.title, date: form.date, criteria: form.criteria,
+          lineup: lineupArr, password: form.password, youtube_id: form.youtubeId, image_url: form.imageUrl,
+        });
+        toast({ title: 'Berhasil', description: 'Replay berhasil diperbarui!' });
+      } else {
+        await addReplay({
+          title: form.title, date: form.date, criteria: form.criteria,
+          lineup: lineupArr, password: form.password, youtube_id: form.youtubeId, image_url: form.imageUrl,
+        });
+        toast({ title: 'Berhasil', description: 'Replay baru berhasil ditambahkan!' });
+      }
 
-    resetForm();
-    setShowAddDialog(false);
-    refreshData();
+      resetForm();
+      setShowAddDialog(false);
+      await refreshData();
+    } catch (e) {
+      toast({ title: 'Error', description: 'Gagal menyimpan replay.', variant: 'destructive' });
+    }
   };
 
-  const handleEditReplay = (r: ReplayCard) => {
+  const handleEditReplay = (r: ReplayRow) => {
     setEditingReplay(r);
     setForm({
       title: r.title, date: r.date, criteria: r.criteria,
-      lineup: r.lineup.join(', '), password: r.password, youtubeId: r.youtubeId, imageUrl: r.imageUrl,
+      lineup: r.lineup.join(', '), password: r.password, youtubeId: r.youtube_id, imageUrl: r.image_url,
     });
     setShowAddDialog(true);
   };
 
-  const handleDeleteReplay = (id: string) => {
-    deleteReplay(id);
-    toast({ title: 'Dihapus', description: 'Replay berhasil dihapus.' });
-    refreshData();
+  const handleDeleteReplay = async (id: string) => {
+    try {
+      await deleteReplay(id);
+      toast({ title: 'Dihapus', description: 'Replay berhasil dihapus.' });
+      await refreshData();
+    } catch (e) {
+      toast({ title: 'Error', description: 'Gagal menghapus replay.', variant: 'destructive' });
+    }
   };
 
-  const handleSaveMasterPassword = () => {
+  const handleSaveMasterPassword = async () => {
     if (!mpPassword) return;
     const key = `${mpYear}-${mpMonth}`;
-    setMasterPassword(key, mpPassword);
-    toast({ title: 'Berhasil', description: `Sandi master untuk ${mpMonth}/${mpYear} berhasil disimpan!` });
-    setMpPassword('');
-    refreshData();
+    try {
+      await setMasterPassword(key, mpPassword);
+      toast({ title: 'Berhasil', description: `Sandi master untuk ${mpMonth}/${mpYear} berhasil disimpan!` });
+      setMpPassword('');
+      await refreshData();
+    } catch (e) {
+      toast({ title: 'Error', description: 'Gagal menyimpan sandi master.', variant: 'destructive' });
+    }
   };
 
   if (!isLoggedIn) {
@@ -145,7 +156,6 @@ export default function Admin() {
   return (
     <div className="min-h-screen bg-background p-4 md:p-8">
       <div className="max-w-5xl mx-auto space-y-8">
-        {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
@@ -158,7 +168,6 @@ export default function Admin() {
           </Button>
         </div>
 
-        {/* Master Password Section */}
         <Card>
           <CardHeader>
             <CardTitle className="font-sans flex items-center gap-2">
@@ -197,7 +206,6 @@ export default function Admin() {
           </CardContent>
         </Card>
 
-        {/* Replay List */}
         <Card>
           <CardHeader>
             <CardTitle className="font-sans">Daftar Replay ({replays.length})</CardTitle>
@@ -209,13 +217,13 @@ export default function Admin() {
               <div className="space-y-3">
                 {replays.map(r => (
                   <div key={r.id} className="flex items-center gap-4 p-3 rounded-lg bg-secondary/50 border border-border">
-                    {r.imageUrl && (
-                      <img src={r.imageUrl} alt="" className="w-16 h-10 rounded object-cover shrink-0" />
+                    {r.image_url && (
+                      <img src={r.image_url} alt="" className="w-16 h-10 rounded object-cover shrink-0" />
                     )}
                     <div className="flex-1 min-w-0">
                       <p className="font-medium truncate">{r.title}</p>
                       <p className="text-sm text-muted-foreground">
-                        {new Date(r.date).toLocaleDateString('id-ID')} · {r.criteria} · YT: {r.youtubeId}
+                        {new Date(r.date).toLocaleDateString('id-ID')} · {r.criteria} · YT: {r.youtube_id}
                       </p>
                     </div>
                     <div className="flex gap-2 shrink-0">
@@ -234,7 +242,6 @@ export default function Admin() {
         </Card>
       </div>
 
-      {/* Add/Edit Dialog */}
       <Dialog open={showAddDialog} onOpenChange={v => { if (!v) resetForm(); setShowAddDialog(v); }}>
         <DialogContent className="bg-card border-border max-h-[90vh] overflow-y-auto">
           <DialogHeader>
