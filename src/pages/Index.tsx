@@ -19,12 +19,24 @@ export default function Index() {
   const navigate = useNavigate();
   const [unlockedIds, setUnlockedIds] = useState<Set<string>>(new Set());
   const [watchingReplay, setWatchingReplay] = useState<ReplayCard | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
   const [, forceUpdate] = useState(0);
 
   const grouped = useMemo(() => {
-    forceUpdate; // dependency trick
-    return getReplaysByMonth();
-  }, [forceUpdate]);
+    forceUpdate;
+    const all = getReplaysByMonth();
+    if (!searchQuery.trim()) return all;
+    const q = searchQuery.toLowerCase();
+    const filtered: Record<string, ReplayCard[]> = {};
+    for (const [month, replays] of Object.entries(all)) {
+      const matched = replays.filter(r =>
+        r.title.toLowerCase().includes(q) ||
+        r.lineup.some(m => m.toLowerCase().includes(q))
+      );
+      if (matched.length > 0) filtered[month] = matched;
+    }
+    return filtered;
+  }, [forceUpdate, searchQuery]);
 
   const sortedMonths = Object.keys(grouped).sort((a, b) => b.localeCompare(a));
 
