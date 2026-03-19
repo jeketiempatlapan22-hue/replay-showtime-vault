@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Search, X } from 'lucide-react';
+import { Search, X, Sun, Moon } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import ThemedBackground, { type ThemeType } from '@/components/ThemedBackground';
 import HamburgerMenu from '@/components/HamburgerMenu';
 import ReplayCardComponent from '@/components/ReplayCardComponent';
@@ -21,6 +22,7 @@ export default function Index() {
   const [allGrouped, setAllGrouped] = useState<Record<string, ReplayRow[]>>({});
   const [loading, setLoading] = useState(true);
   const [theme, setTheme] = useState<ThemeType>('ramadhan');
+  const [lightMode, setLightMode] = useState(() => localStorage.getItem('replaytime-mode') === 'light');
   const [waNumber, setWaNumber] = useState('');
   const [waLink, setWaLink] = useState('');
 
@@ -33,6 +35,11 @@ export default function Index() {
       setLoading(false);
     });
   }, []);
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('light', lightMode);
+    localStorage.setItem('replaytime-mode', lightMode ? 'light' : 'dark');
+  }, [lightMode]);
 
   const grouped = useMemo(() => {
     if (!searchQuery.trim()) return allGrouped;
@@ -63,8 +70,16 @@ export default function Index() {
 
   return (
     <div className="relative min-h-screen">
-      <ThemedBackground theme={theme} />
+      {!lightMode && <ThemedBackground theme={theme} />}
+      {lightMode && <div className="fixed inset-0 z-0 bg-background" />}
       <HamburgerMenu whatsappNumber={waNumber} whatsappLink={waLink} />
+      {/* Light/Dark toggle */}
+      <div className="fixed top-4 right-4 z-50">
+        <Button variant="ghost" size="icon" onClick={() => setLightMode(v => !v)}
+          className="bg-card/60 backdrop-blur border border-border hover:bg-card/80 rounded-full w-10 h-10">
+          {lightMode ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
+        </Button>
+      </div>
 
       <div className="relative z-10">
         <header className="text-center py-10 md:py-16 px-4">
