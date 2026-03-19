@@ -1,12 +1,12 @@
-import { useState, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Settings, Search, X } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useNavigate } from 'react-router-dom';
 import RamadhanBackground from '@/components/RamadhanBackground';
 import ReplayCardComponent from '@/components/ReplayCardComponent';
 import YouTubePlayer from '@/components/YouTubePlayer';
-import { getReplaysByMonth, getMasterPassword, verifyPassword } from '@/lib/store';
-import { ReplayCard } from '@/lib/types';
+import { getReplaysByMonth } from '@/lib/store';
+import { type ReplayRow } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 
 const MONTH_NAMES: Record<string, string> = {
@@ -18,17 +18,23 @@ const MONTH_NAMES: Record<string, string> = {
 export default function Index() {
   const navigate = useNavigate();
   const [unlockedIds, setUnlockedIds] = useState<Set<string>>(new Set());
-  const [watchingReplay, setWatchingReplay] = useState<ReplayCard | null>(null);
+  const [watchingReplay, setWatchingReplay] = useState<ReplayRow | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [, forceUpdate] = useState(0);
+  const [allGrouped, setAllGrouped] = useState<Record<string, ReplayRow[]>>({});
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    getReplaysByMonth().then(data => {
+      setAllGrouped(data);
+      setLoading(false);
+    });
+  }, []);
 
   const grouped = useMemo(() => {
-    forceUpdate;
-    const all = getReplaysByMonth();
-    if (!searchQuery.trim()) return all;
+    if (!searchQuery.trim()) return allGrouped;
     const q = searchQuery.toLowerCase();
-    const filtered: Record<string, ReplayCard[]> = {};
-    for (const [month, replays] of Object.entries(all)) {
+    const filtered: Record<string, ReplayRow[]> = {};
+    for (const [month, replays] of Object.entries(allGrouped)) {
       const matched = replays.filter(r =>
         r.title.toLowerCase().includes(q) ||
         r.lineup.some(m => m.toLowerCase().includes(q))
@@ -36,7 +42,7 @@ export default function Index() {
       if (matched.length > 0) filtered[month] = matched;
     }
     return filtered;
-  }, [forceUpdate, searchQuery]);
+  }, [allGrouped, searchQuery]);
 
   const sortedMonths = Object.keys(grouped).sort((a, b) => b.localeCompare(a));
 
@@ -53,7 +59,6 @@ export default function Index() {
       <RamadhanBackground />
 
       <div className="relative z-10">
-        {/* Header */}
         <header className="text-center py-10 md:py-16 px-4">
           <h1 className="text-4xl md:text-6xl font-bold text-primary drop-shadow-lg">
             ✦ ReplayTime ✦
@@ -77,15 +82,20 @@ export default function Index() {
             variant="ghost"
             size="icon"
             className="absolute top-4 right-4 text-muted-foreground hover:text-primary"
-            onClick={() => navigate('/admin')}
+            onClick={() => navigate('/panel-kontrol-x7k9m')}
           >
             <Settings className="w-5 h-5" />
           </Button>
         </header>
 
-        {/* Content */}
         <main className="max-w-7xl mx-auto px-4 pb-20">
-          {sortedMonths.length === 0 && (
+          {loading && (
+            <div className="text-center py-20">
+              <p className="text-muted-foreground text-lg">Memuat replay...</p>
+            </div>
+          )}
+
+          {!loading && sortedMonths.length === 0 && (
             <div className="text-center py-20">
               <p className="text-muted-foreground text-lg">Belum ada replay. Tambahkan melalui Admin Panel.</p>
             </div>
