@@ -267,6 +267,7 @@ export default function Admin() {
                       <p className="text-sm text-muted-foreground">
                         {new Date(r.date).toLocaleDateString('id-ID')} · {r.show_name || '-'} · {getCriteriaLabel(r.criteria)}
                         {r.featured_member && ` · ⭐ ${r.featured_member}`}
+                        {' · '} 👁 {r.view_count || 0} views
                       </p>
                     </div>
                     <div className="flex gap-2 shrink-0">
