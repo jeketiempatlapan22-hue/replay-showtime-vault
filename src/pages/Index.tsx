@@ -121,9 +121,15 @@ export default function Index() {
   }, [refreshReplays]);
 
   useEffect(() => {
-    document.documentElement.classList.toggle('light', lightMode);
+    const root = document.documentElement;
+    root.classList.toggle('light', lightMode);
+    // Remove old theme-light classes and add current
+    root.className = root.className.replace(/\btheme-\S+/g, '');
+    if (lightMode) {
+      root.classList.add(`theme-${theme}`);
+    }
     localStorage.setItem('replaytime-mode', lightMode ? 'light' : 'dark');
-  }, [lightMode]);
+  }, [lightMode, theme]);
 
   // Scroll-to-top visibility
   useEffect(() => {
