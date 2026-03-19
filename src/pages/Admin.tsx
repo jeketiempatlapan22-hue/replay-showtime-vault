@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, Trash2, Edit2, Key, Save } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Edit2, Key, Save, Palette, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { addReplay, deleteReplay, updateReplay, getReplays, getAllMasterPasswords, setMasterPassword, type ReplayRow, type MasterPasswordRow } from '@/lib/store';
+import { addReplay, deleteReplay, updateReplay, getReplays, getAllMasterPasswords, setMasterPassword, getSettings, setSetting, type ReplayRow, type MasterPasswordRow } from '@/lib/store';
+import { THEME_OPTIONS, type ThemeType } from '@/components/ThemedBackground';
+import ImagePicker from '@/components/ImagePicker';
 import { toast } from '@/hooks/use-toast';
 
 const ADMIN_PASSWORD = 'dhatul01';
@@ -35,16 +37,24 @@ export default function Admin() {
   const [mpMonth, setMpMonth] = useState(String(new Date().getMonth() + 1).padStart(2, '0'));
   const [mpPassword, setMpPassword] = useState('');
 
+  // Settings
+  const [currentTheme, setCurrentTheme] = useState<ThemeType>('ramadhan');
+  const [waNumber, setWaNumber] = useState('');
+  const [waLink, setWaLink] = useState('');
+
   useEffect(() => {
     if (isLoggedIn) refreshData();
   }, [isLoggedIn]);
 
   const refreshData = async () => {
     try {
-      const [r, m] = await Promise.all([getReplays(), getAllMasterPasswords()]);
+      const [r, m, settings] = await Promise.all([getReplays(), getAllMasterPasswords(), getSettings()]);
       setReplays(r);
       setMasterPasswords(m);
-    } catch (e) {
+      setCurrentTheme((settings.theme as ThemeType) || 'ramadhan');
+      setWaNumber(settings.whatsapp_number || '');
+      setWaLink(settings.whatsapp_link || '');
+    } catch {
       toast({ title: 'Error', description: 'Gagal memuat data.', variant: 'destructive' });
     }
   };
@@ -68,9 +78,7 @@ export default function Admin() {
       toast({ title: 'Error', description: 'Judul, tanggal, YouTube ID, dan sandi wajib diisi!', variant: 'destructive' });
       return;
     }
-
     const lineupArr = form.lineup.split(',').map(s => s.trim()).filter(Boolean);
-
     try {
       if (editingReplay) {
         await updateReplay(editingReplay.id, {
@@ -85,11 +93,10 @@ export default function Admin() {
         });
         toast({ title: 'Berhasil', description: 'Replay baru berhasil ditambahkan!' });
       }
-
       resetForm();
       setShowAddDialog(false);
       await refreshData();
-    } catch (e) {
+    } catch {
       toast({ title: 'Error', description: 'Gagal menyimpan replay.', variant: 'destructive' });
     }
   };
@@ -108,7 +115,7 @@ export default function Admin() {
       await deleteReplay(id);
       toast({ title: 'Dihapus', description: 'Replay berhasil dihapus.' });
       await refreshData();
-    } catch (e) {
+    } catch {
       toast({ title: 'Error', description: 'Gagal menghapus replay.', variant: 'destructive' });
     }
   };
@@ -121,8 +128,26 @@ export default function Admin() {
       toast({ title: 'Berhasil', description: `Sandi master untuk ${mpMonth}/${mpYear} berhasil disimpan!` });
       setMpPassword('');
       await refreshData();
-    } catch (e) {
+    } catch {
       toast({ title: 'Error', description: 'Gagal menyimpan sandi master.', variant: 'destructive' });
+    }
+  };
+
+  const handleSaveTheme = async (theme: ThemeType) => {
+    setCurrentTheme(theme);
+    await setSetting('theme', theme);
+    toast({ title: 'Berhasil', description: 'Tema berhasil diubah!' });
+  };
+
+  const handleSaveWhatsApp = async () => {
+    try {
+      await Promise.all([
+        setSetting('whatsapp_number', waNumber),
+        setSetting('whatsapp_link', waLink),
+      ]);
+      toast({ title: 'Berhasil', description: 'Info WhatsApp berhasil disimpan!' });
+    } catch {
+      toast({ title: 'Error', description: 'Gagal menyimpan info WhatsApp.', variant: 'destructive' });
     }
   };
 
@@ -156,6 +181,7 @@ export default function Admin() {
   return (
     <div className="min-h-screen bg-background p-4 md:p-8">
       <div className="max-w-5xl mx-auto space-y-8">
+        {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
@@ -168,6 +194,50 @@ export default function Admin() {
           </Button>
         </div>
 
+        {/* Theme Selection */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="font-sans flex items-center gap-2">
+              <Palette className="w-5 h-5 text-primary" /> Tema & Background
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {THEME_OPTIONS.map(t => (
+                <button
+                  key={t.value}
+                  className={`p-4 rounded-lg border-2 text-center transition-all ${currentTheme === t.value ? 'border-primary bg-primary/10' : 'border-border hover:border-primary/50'}`}
+                  onClick={() => handleSaveTheme(t.value)}
+                >
+                  <span className="text-2xl block mb-1">{t.emoji}</span>
+                  <span className="text-sm font-medium">{t.label}</span>
+                </button>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* WhatsApp Settings */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="font-sans flex items-center gap-2">
+              <MessageCircle className="w-5 h-5 text-primary" /> Info WhatsApp
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <Label>Nomor HP WhatsApp Admin</Label>
+              <Input placeholder="Contoh: 628123456789" value={waNumber} onChange={e => setWaNumber(e.target.value)} />
+            </div>
+            <div>
+              <Label>Link Saluran WhatsApp</Label>
+              <Input placeholder="https://whatsapp.com/channel/..." value={waLink} onChange={e => setWaLink(e.target.value)} />
+            </div>
+            <Button onClick={handleSaveWhatsApp}><Save className="w-4 h-4 mr-2" /> Simpan WhatsApp</Button>
+          </CardContent>
+        </Card>
+
+        {/* Master Passwords */}
         <Card>
           <CardHeader>
             <CardTitle className="font-sans flex items-center gap-2">
@@ -193,7 +263,6 @@ export default function Admin() {
               </div>
               <Button onClick={handleSaveMasterPassword}><Save className="w-4 h-4 mr-2" /> Simpan</Button>
             </div>
-
             {masterPasswords.length > 0 && (
               <div className="flex flex-wrap gap-2 mt-4">
                 {masterPasswords.map(mp => (
@@ -206,6 +275,7 @@ export default function Admin() {
           </CardContent>
         </Card>
 
+        {/* Replay List */}
         <Card>
           <CardHeader>
             <CardTitle className="font-sans">Daftar Replay ({replays.length})</CardTitle>
@@ -242,6 +312,7 @@ export default function Admin() {
         </Card>
       </div>
 
+      {/* Add/Edit Dialog */}
       <Dialog open={showAddDialog} onOpenChange={v => { if (!v) resetForm(); setShowAddDialog(v); }}>
         <DialogContent className="bg-card border-border max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -253,7 +324,10 @@ export default function Admin() {
             <div><Label>Kriteria Show</Label><Input placeholder="Contoh: Pajama Drive" value={form.criteria} onChange={e => setForm(f => ({ ...f, criteria: e.target.value }))} /></div>
             <div><Label>Lineup Member (pisahkan dengan koma)</Label><Input placeholder="Member 1, Member 2, ..." value={form.lineup} onChange={e => setForm(f => ({ ...f, lineup: e.target.value }))} /></div>
             <div><Label>YouTube Embed ID *</Label><Input placeholder="Contoh: dQw4w9WgXcQ" value={form.youtubeId} onChange={e => setForm(f => ({ ...f, youtubeId: e.target.value }))} /></div>
-            <div><Label>Link Gambar</Label><Input placeholder="https://example.com/image.jpg" value={form.imageUrl} onChange={e => setForm(f => ({ ...f, imageUrl: e.target.value }))} /></div>
+            <div>
+              <Label>Foto Kartu</Label>
+              <ImagePicker value={form.imageUrl} onChange={url => setForm(f => ({ ...f, imageUrl: url }))} />
+            </div>
             <div><Label>Sandi Satuan *</Label><Input placeholder="Sandi untuk membuka replay ini" value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} /></div>
             <Button className="w-full" onClick={handleSaveReplay}>
               <Save className="w-4 h-4 mr-2" /> {editingReplay ? 'Simpan Perubahan' : 'Tambah Replay'}
