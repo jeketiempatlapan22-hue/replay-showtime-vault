@@ -31,8 +31,10 @@ const MONTH_OPTIONS = Array.from({ length: 12 }, (_, i) => {
 export default function Admin() {
   const navigate = useNavigate();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [loginError, setLoginError] = useState('');
+  const [loginLoading, setLoginLoading] = useState(false);
 
   const [replays, setReplays] = useState<ReplayRow[]>([]);
   const [masterPasswords, setMasterPasswords] = useState<MasterPasswordRow[]>([]);
