@@ -103,12 +103,12 @@ export default function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWa
         </div>
 
         <div className="p-4 space-y-3">
-          <h3 className="text-lg font-semibold text-foreground line-clamp-2 font-sans">{replay.title}</h3>
+          <h3 className="text-lg font-semibold text-foreground line-clamp-2 font-sans">{highlightText(replay.title, searchQuery)}</h3>
 
           {replay.show_name && (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Tv className="w-4 h-4 text-primary" />
-              <span>{replay.show_name}</span>
+              <span>{highlightText(replay.show_name, searchQuery)}</span>
             </div>
           )}
           
