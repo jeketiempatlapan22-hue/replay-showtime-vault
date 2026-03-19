@@ -18,9 +18,19 @@ interface Props {
   index?: number;
   isBookmarked?: boolean;
   onToggleBookmark?: (id: string) => void;
+  searchQuery?: string;
 }
 
-export default function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWatch, index = 0, isBookmarked, onToggleBookmark }: Props) {
+function highlightText(text: string, query: string) {
+  if (!query.trim()) return text;
+  const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+  const parts = text.split(regex);
+  return parts.map((part, i) =>
+    regex.test(part) ? <mark key={i} className="bg-primary/30 text-foreground rounded px-0.5">{part}</mark> : part
+  );
+}
+
+export default function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWatch, index = 0, isBookmarked, onToggleBookmark, searchQuery = '' }: Props) {
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
