@@ -241,7 +241,6 @@ export default function Admin() {
               <Plus className="w-4 h-4 mr-2" /> Tambah Replay
             </Button>
           </div>
-          </Button>
         </div>
 
         {/* Theme */}
