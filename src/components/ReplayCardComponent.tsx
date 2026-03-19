@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Lock, Unlock, Play, Calendar, Users, Tag, Star, Tv } from 'lucide-react';
+import { Lock, Unlock, Play, Calendar, Users, Tag, Star, Tv, Bookmark, BookmarkCheck } from 'lucide-react';
 import { type ReplayRow, verifyPassword } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,9 +15,12 @@ interface Props {
   isUnlocked: boolean;
   onUnlock: (id: string) => void;
   onWatch: (replay: ReplayRow) => void;
+  index?: number;
+  isBookmarked?: boolean;
+  onToggleBookmark?: (id: string) => void;
 }
 
-export default function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWatch }: Props) {
+export default function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWatch, index = 0, isBookmarked, onToggleBookmark }: Props) {
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -42,16 +45,24 @@ export default function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWa
   });
 
   const criteriaLabel = CRITERIA_LABELS[replay.criteria] || replay.criteria;
+  const thumbnailUrl = `https://img.youtube.com/vi/${replay.youtube_id}/mqdefault.jpg`;
 
   return (
     <>
-      <div className="group relative rounded-xl overflow-hidden border border-border bg-card/80 backdrop-blur-sm hover:border-primary/50 transition-all duration-300 hover:shadow-lg hover:shadow-primary/10">
+      <div
+        className="group relative rounded-xl overflow-hidden border border-border bg-card/80 backdrop-blur-sm hover:border-primary/50 transition-all duration-300 hover:shadow-lg hover:shadow-primary/10 hover:-translate-y-1 animate-fade-up opacity-0"
+        style={{ animationDelay: `${index * 80}ms`, animationFillMode: 'forwards' }}
+      >
         <div className="relative aspect-video overflow-hidden">
           {replay.image_url ? (
-            <img src={replay.image_url} alt={replay.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+            <>
+              <img src={replay.image_url} alt={replay.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+              {/* YouTube thumbnail on hover */}
+              <img src={thumbnailUrl} alt="" className="absolute inset-0 w-full h-full object-cover opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+            </>
           ) : (
             <div className="w-full h-full bg-secondary flex items-center justify-center">
-              <Play className="w-12 h-12 text-muted-foreground" />
+              <img src={thumbnailUrl} alt={replay.title} className="w-full h-full object-cover" />
             </div>
           )}
           {!isUnlocked && (
@@ -70,6 +81,15 @@ export default function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWa
           <div className="absolute top-2 left-2">
             <Badge variant="secondary" className="text-xs">{criteriaLabel}</Badge>
           </div>
+          {/* Bookmark button */}
+          {onToggleBookmark && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onToggleBookmark(replay.id); }}
+              className={`absolute bottom-2 right-2 p-1.5 rounded-full transition-all duration-200 ${isBookmarked ? 'bg-primary text-primary-foreground' : 'bg-background/60 backdrop-blur text-muted-foreground hover:text-primary'}`}
+            >
+              {isBookmarked ? <BookmarkCheck className="w-4 h-4" /> : <Bookmark className="w-4 h-4" />}
+            </button>
+          )}
         </div>
 
         <div className="p-4 space-y-3">
