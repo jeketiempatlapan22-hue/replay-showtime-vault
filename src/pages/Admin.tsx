@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, Trash2, Edit2, Key, Save, Palette, MessageCircle } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Edit2, Key, Save, Palette, MessageCircle, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -12,8 +12,7 @@ import { addReplay, deleteReplay, updateReplay, getReplays, getAllMasterPassword
 import { THEME_OPTIONS, type ThemeType } from '@/components/ThemedBackground';
 import ImagePicker from '@/components/ImagePicker';
 import { toast } from '@/hooks/use-toast';
-
-const ADMIN_PASSWORD = 'dhatul01';
+import { supabase } from '@/integrations/supabase/client';
 
 const CRITERIA_OPTIONS = [
   { value: 'reguler', label: 'Reguler' },
