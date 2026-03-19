@@ -125,7 +125,7 @@ export default function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWa
           {replay.featured_member && (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Star className="w-4 h-4 text-primary" />
-              <span className="font-medium">{replay.featured_member}</span>
+              <span className="font-medium">{highlightText(replay.featured_member, searchQuery)}</span>
             </div>
           )}
 
