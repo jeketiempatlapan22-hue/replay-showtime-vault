@@ -26,6 +26,10 @@ export default function Index() {
   const [waNumber, setWaNumber] = useState('');
   const [waLink, setWaLink] = useState('');
 
+  const refreshReplays = useCallback(() => {
+    getReplaysByMonth().then(setAllGrouped);
+  }, []);
+
   useEffect(() => {
     Promise.all([getReplaysByMonth(), getSettings()]).then(([data, settings]) => {
       setAllGrouped(data);
@@ -34,7 +38,16 @@ export default function Index() {
       setWaLink(settings.whatsapp_link || '');
       setLoading(false);
     });
-  }, []);
+
+    const channel = supabase
+      .channel('replays-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'replays' }, () => {
+        refreshReplays();
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [refreshReplays]);
 
   useEffect(() => {
     document.documentElement.classList.toggle('light', lightMode);
