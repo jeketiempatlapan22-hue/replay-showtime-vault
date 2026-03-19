@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
-import { Settings } from 'lucide-react';
+import { Settings, Search, X } from 'lucide-react';
+import { Input } from '@/components/ui/input';
 import { useNavigate } from 'react-router-dom';
 import RamadhanBackground from '@/components/RamadhanBackground';
 import ReplayCardComponent from '@/components/ReplayCardComponent';
@@ -18,12 +19,24 @@ export default function Index() {
   const navigate = useNavigate();
   const [unlockedIds, setUnlockedIds] = useState<Set<string>>(new Set());
   const [watchingReplay, setWatchingReplay] = useState<ReplayCard | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
   const [, forceUpdate] = useState(0);
 
   const grouped = useMemo(() => {
-    forceUpdate; // dependency trick
-    return getReplaysByMonth();
-  }, [forceUpdate]);
+    forceUpdate;
+    const all = getReplaysByMonth();
+    if (!searchQuery.trim()) return all;
+    const q = searchQuery.toLowerCase();
+    const filtered: Record<string, ReplayCard[]> = {};
+    for (const [month, replays] of Object.entries(all)) {
+      const matched = replays.filter(r =>
+        r.title.toLowerCase().includes(q) ||
+        r.lineup.some(m => m.toLowerCase().includes(q))
+      );
+      if (matched.length > 0) filtered[month] = matched;
+    }
+    return filtered;
+  }, [forceUpdate, searchQuery]);
 
   const sortedMonths = Object.keys(grouped).sort((a, b) => b.localeCompare(a));
 
@@ -46,6 +59,20 @@ export default function Index() {
             ✦ ReplayTime ✦
           </h1>
           <p className="mt-3 text-muted-foreground text-lg md:text-xl">Koleksi Replay Show Terlengkap</p>
+          <div className="mt-6 max-w-md mx-auto relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Cari judul atau nama member..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="pl-10 pr-10 bg-card/60 backdrop-blur border-border"
+            />
+            {searchQuery && (
+              <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
           <Button
             variant="ghost"
             size="icon"
