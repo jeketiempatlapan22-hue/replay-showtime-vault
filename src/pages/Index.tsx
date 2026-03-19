@@ -95,14 +95,28 @@ export default function Index() {
       setLoading(false);
     });
 
-    const channel = supabase
+    const replayChannel = supabase
       .channel('replays-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'replays' }, () => {
         refreshReplays();
       })
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    // Realtime theme sync
+    const settingsChannel = supabase
+      .channel('settings-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'site_settings' }, (payload) => {
+        const row = payload.new as { key: string; value: string };
+        if (row.key === 'theme') setTheme(row.value as ThemeType);
+        if (row.key === 'whatsapp_number') setWaNumber(row.value);
+        if (row.key === 'whatsapp_link') setWaLink(row.value);
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(replayChannel);
+      supabase.removeChannel(settingsChannel);
+    };
   }, [refreshReplays]);
 
   useEffect(() => {
