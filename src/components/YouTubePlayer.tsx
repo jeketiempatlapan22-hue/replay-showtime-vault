@@ -1,7 +1,10 @@
-import { ArrowLeft, Maximize, Minimize } from 'lucide-react';
-import { useState, useRef, useCallback } from 'react';
+import { ArrowLeft, Maximize, Minimize, Eye } from 'lucide-react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { type ReplayRow } from '@/lib/store';
+import { supabase } from '@/integrations/supabase/client';
+import RatingStars from '@/components/RatingStars';
+import CommentSection from '@/components/CommentSection';
 
 interface Props {
   replay: ReplayRow;
@@ -10,7 +13,26 @@ interface Props {
 
 export default function YouTubePlayer({ replay, onBack }: Props) {
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [viewCount, setViewCount] = useState(replay.view_count || 0);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Increment view count on mount
+  useEffect(() => {
+    const incrementView = async () => {
+      const { data } = await supabase
+        .from('replays')
+        .select('view_count')
+        .eq('id', replay.id)
+        .single();
+      const current = data?.view_count || 0;
+      await supabase
+        .from('replays')
+        .update({ view_count: current + 1 })
+        .eq('id', replay.id);
+      setViewCount(current + 1);
+    };
+    incrementView();
+  }, [replay.id]);
 
   const toggleFullscreen = useCallback(() => {
     if (!containerRef.current) return;
@@ -48,14 +70,30 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
             allowFullScreen
           />
         </div>
-        <div className="mt-6 space-y-3">
+
+        <div className="mt-6 space-y-4">
+          {/* View count + Rating */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Eye className="w-4 h-4" />
+              <span>{viewCount} kali ditonton</span>
+            </div>
+            <RatingStars replayId={replay.id} />
+          </div>
+
           <p className="text-muted-foreground text-sm">
             {new Date(replay.date).toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
           </p>
+
           <div className="flex flex-wrap gap-2">
             {replay.lineup.map((m, i) => (
               <span key={i} className="px-3 py-1 rounded-full bg-secondary text-secondary-foreground text-sm">{m}</span>
             ))}
+          </div>
+
+          {/* Comments */}
+          <div className="mt-8 pt-6 border-t border-border">
+            <CommentSection replayId={replay.id} />
           </div>
         </div>
       </div>

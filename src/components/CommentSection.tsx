@@ -1,0 +1,119 @@
+import { useState, useEffect } from 'react';
+import { Send, MessageCircle } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { supabase } from '@/integrations/supabase/client';
+
+interface Comment {
+  id: string;
+  name: string;
+  message: string;
+  created_at: string;
+}
+
+interface CommentSectionProps {
+  replayId: string;
+}
+
+export default function CommentSection({ replayId }: CommentSectionProps) {
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [name, setName] = useState(() => localStorage.getItem('replaytime-name') || '');
+  const [message, setMessage] = useState('');
+  const [sending, setSending] = useState(false);
+
+  const fetchComments = async () => {
+    const { data } = await supabase
+      .from('comments')
+      .select('*')
+      .eq('replay_id', replayId)
+      .order('created_at', { ascending: true });
+    if (data) setComments(data);
+  };
+
+  useEffect(() => {
+    fetchComments();
+
+    const channel = supabase
+      .channel(`comments-${replayId}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'comments', filter: `replay_id=eq.${replayId}` }, (payload) => {
+        setComments(prev => [...prev, payload.new as Comment]);
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [replayId]);
+
+  const handleSend = async () => {
+    if (!message.trim()) return;
+    setSending(true);
+    const displayName = name.trim() || 'Anonim';
+    localStorage.setItem('replaytime-name', displayName);
+
+    await supabase.from('comments').insert({
+      replay_id: replayId,
+      name: displayName,
+      message: message.trim(),
+    });
+
+    setMessage('');
+    setSending(false);
+  };
+
+  const timeAgo = (dateStr: string) => {
+    const diff = Date.now() - new Date(dateStr).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'Baru saja';
+    if (mins < 60) return `${mins} menit lalu`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours} jam lalu`;
+    const days = Math.floor(hours / 24);
+    return `${days} hari lalu`;
+  };
+
+  return (
+    <div className="space-y-4">
+      <h3 className="flex items-center gap-2 text-lg font-semibold font-sans text-foreground">
+        <MessageCircle className="w-5 h-5 text-primary" />
+        Komentar ({comments.length})
+      </h3>
+
+      {/* Comment list */}
+      <div className="space-y-3 max-h-64 overflow-y-auto">
+        {comments.length === 0 && (
+          <p className="text-sm text-muted-foreground text-center py-4">Belum ada komentar. Jadilah yang pertama!</p>
+        )}
+        {comments.map(c => (
+          <div key={c.id} className="p-3 rounded-lg bg-secondary/50 border border-border animate-fade-up" style={{ animationFillMode: 'forwards' }}>
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-sm font-medium text-foreground">{c.name}</span>
+              <span className="text-xs text-muted-foreground">{timeAgo(c.created_at)}</span>
+            </div>
+            <p className="text-sm text-muted-foreground">{c.message}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Input */}
+      <div className="space-y-2">
+        <Input
+          placeholder="Nama kamu (opsional)"
+          value={name}
+          onChange={e => setName(e.target.value)}
+          className="bg-card/60 border-border text-sm"
+        />
+        <div className="flex gap-2">
+          <Input
+            placeholder="Tulis komentar..."
+            value={message}
+            onChange={e => setMessage(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleSend()}
+            className="bg-card/60 border-border"
+          />
+          <Button size="icon" onClick={handleSend} disabled={sending || !message.trim()}>
+            <Send className="w-4 h-4" />
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
