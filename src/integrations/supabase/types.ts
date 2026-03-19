@@ -43,10 +43,12 @@ export type Database = {
           created_at: string
           criteria: string
           date: string
+          featured_member: string
           id: string
           image_url: string
           lineup: string[]
           password: string
+          show_name: string
           title: string
           updated_at: string
           youtube_id: string
@@ -55,10 +57,12 @@ export type Database = {
           created_at?: string
           criteria?: string
           date: string
+          featured_member?: string
           id?: string
           image_url?: string
           lineup?: string[]
           password: string
+          show_name?: string
           title: string
           updated_at?: string
           youtube_id: string
@@ -67,10 +71,12 @@ export type Database = {
           created_at?: string
           criteria?: string
           date?: string
+          featured_member?: string
           id?: string
           image_url?: string
           lineup?: string[]
           password?: string
+          show_name?: string
           title?: string
           updated_at?: string
           youtube_id?: string
