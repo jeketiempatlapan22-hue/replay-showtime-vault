@@ -107,17 +107,6 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
                 style={{ border: 0 }}
               />
             </div>
-            {/* Fallback link in case embed is blocked */}
-            <div className="mt-2 text-center">
-              <a
-                href={watchUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-xs text-muted-foreground hover:text-primary transition-colors underline"
-              >
-                Embed tidak muncul? Tonton langsung di YouTube →
-              </a>
-            </div>
           </>
         )}
 
