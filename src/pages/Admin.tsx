@@ -124,7 +124,7 @@ export default function Admin() {
     const lineupArr = form.lineup.split(',').map(s => s.trim()).filter(Boolean);
     try {
       const payload = {
-        title: form.title, show_name: form.showName, date: form.date, criteria: form.criteria,
+        title: form.title, show_name: form.showName, date: form.date, show_time: form.showTime + ':00', criteria: form.criteria,
         featured_member: showFeaturedMember ? form.featuredMember : '',
         lineup: lineupArr, password: form.password, youtube_id: form.youtubeId, image_url: form.imageUrl,
       };
