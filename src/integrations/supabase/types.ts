@@ -201,6 +201,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      increment_view_count: { Args: { _replay_id: string }; Returns: number }
     }
     Enums: {
       app_role: "admin" | "user"
