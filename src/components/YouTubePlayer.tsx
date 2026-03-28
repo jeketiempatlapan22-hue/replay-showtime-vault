@@ -120,7 +120,6 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
             </div>
           </>
         )}
-        </div>
 
         <div className="mt-6 space-y-4">
           {/* View count + Rating */}
