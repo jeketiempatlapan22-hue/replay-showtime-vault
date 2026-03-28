@@ -178,14 +178,20 @@ export default function Index() {
       result = filtered;
     }
 
-    // Sort within each month
+    // Sort within each month (default: newest first by date+time)
+    const getDateTime = (r: ReplayRow) => `${r.date}T${(r as any).show_time || '19:00:00'}`;
     if (sortMode === 'oldest') {
       for (const key of Object.keys(result)) {
-        result[key] = [...result[key]].sort((a, b) => a.date.localeCompare(b.date));
+        result[key] = [...result[key]].sort((a, b) => getDateTime(a).localeCompare(getDateTime(b)));
       }
     } else if (sortMode === 'title') {
       for (const key of Object.keys(result)) {
         result[key] = [...result[key]].sort((a, b) => a.title.localeCompare(b.title));
+      }
+    } else {
+      // newest first
+      for (const key of Object.keys(result)) {
+        result[key] = [...result[key]].sort((a, b) => getDateTime(b).localeCompare(getDateTime(a)));
       }
     }
 

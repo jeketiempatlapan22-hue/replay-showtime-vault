@@ -42,7 +42,7 @@ export default function Admin() {
   const [editingReplay, setEditingReplay] = useState<ReplayRow | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ReplayRow | null>(null);
 
-  const [form, setForm] = useState({ title: '', showName: '', date: '', criteria: 'reguler', featuredMember: '', lineup: '', password: '', youtubeId: '', imageUrl: '' });
+  const [form, setForm] = useState({ title: '', showName: '', date: '', showTime: '19:00', criteria: 'reguler', featuredMember: '', lineup: '', password: '', youtubeId: '', imageUrl: '' });
 
   const [mpYear, setMpYear] = useState(String(new Date().getFullYear()));
   const [mpMonth, setMpMonth] = useState(String(new Date().getMonth() + 1).padStart(2, '0'));
@@ -112,7 +112,7 @@ export default function Admin() {
   };
 
   const resetForm = () => {
-    setForm({ title: '', showName: '', date: '', criteria: 'reguler', featuredMember: '', lineup: '', password: '', youtubeId: '', imageUrl: '' });
+    setForm({ title: '', showName: '', date: '', showTime: '19:00', criteria: 'reguler', featuredMember: '', lineup: '', password: '', youtubeId: '', imageUrl: '' });
     setEditingReplay(null);
   };
 
@@ -124,7 +124,7 @@ export default function Admin() {
     const lineupArr = form.lineup.split(',').map(s => s.trim()).filter(Boolean);
     try {
       const payload = {
-        title: form.title, show_name: form.showName, date: form.date, criteria: form.criteria,
+        title: form.title, show_name: form.showName, date: form.date, show_time: form.showTime + ':00', criteria: form.criteria,
         featured_member: showFeaturedMember ? form.featuredMember : '',
         lineup: lineupArr, password: form.password, youtube_id: form.youtubeId, image_url: form.imageUrl,
       };
@@ -146,7 +146,7 @@ export default function Admin() {
   const handleEditReplay = (r: ReplayRow) => {
     setEditingReplay(r);
     setForm({
-      title: r.title, showName: r.show_name, date: r.date, criteria: r.criteria,
+      title: r.title, showName: r.show_name, date: r.date, showTime: ((r as any).show_time || '19:00:00').slice(0, 5), criteria: r.criteria,
       featuredMember: r.featured_member,
       lineup: r.lineup.join(', '), password: r.password, youtubeId: r.youtube_id, imageUrl: r.image_url,
     });
@@ -362,7 +362,10 @@ export default function Admin() {
             {showFeaturedMember && (
               <div><Label>Member yang Bersangkutan (STS/Last Show)</Label><Input placeholder="Nama member..." value={form.featuredMember} onChange={e => setForm(f => ({ ...f, featuredMember: e.target.value }))} /></div>
             )}
-            <div><Label>Tanggal *</Label><Input type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} /></div>
+            <div className="grid grid-cols-2 gap-4">
+              <div><Label>Tanggal *</Label><Input type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} /></div>
+              <div><Label>Jam Show</Label><Input type="time" value={form.showTime} onChange={e => setForm(f => ({ ...f, showTime: e.target.value }))} /></div>
+            </div>
             <div><Label>Lineup Member (pisahkan dengan koma)</Label><Input placeholder="Member 1, Member 2, ..." value={form.lineup} onChange={e => setForm(f => ({ ...f, lineup: e.target.value }))} /></div>
             <div><Label>YouTube Embed ID *</Label><Input placeholder="Contoh: dQw4w9WgXcQ" value={form.youtubeId} onChange={e => setForm(f => ({ ...f, youtubeId: e.target.value }))} /></div>
             <div><Label>Foto Kartu</Label><ImagePicker value={form.imageUrl} onChange={url => setForm(f => ({ ...f, imageUrl: url }))} /></div>

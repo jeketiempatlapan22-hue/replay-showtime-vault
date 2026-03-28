@@ -113,6 +113,7 @@ export type Database = {
           lineup: string[]
           password: string
           show_name: string
+          show_time: string | null
           title: string
           updated_at: string
           view_count: number
@@ -128,6 +129,7 @@ export type Database = {
           lineup?: string[]
           password: string
           show_name?: string
+          show_time?: string | null
           title: string
           updated_at?: string
           view_count?: number
@@ -143,6 +145,7 @@ export type Database = {
           lineup?: string[]
           password?: string
           show_name?: string
+          show_time?: string | null
           title?: string
           updated_at?: string
           view_count?: number

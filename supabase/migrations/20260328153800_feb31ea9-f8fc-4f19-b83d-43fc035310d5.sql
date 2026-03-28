@@ -1,0 +1,1 @@
+ALTER TABLE public.replays ADD COLUMN show_time time DEFAULT '19:00:00';
