@@ -8,10 +8,10 @@ export type SiteSettingRow = Tables<'site_settings'>;
 export async function getReplays(): Promise<ReplayRow[]> {
   const { data, error } = await supabase
     .from('replays')
-    .select('*')
+    .select('id, title, show_name, date, criteria, featured_member, lineup, youtube_id, image_url, view_count, created_at, updated_at')
     .order('date', { ascending: false });
   if (error) throw error;
-  return data || [];
+  return (data || []) as unknown as ReplayRow[];
 }
 
 export async function getReplaysByMonth(): Promise<Record<string, ReplayRow[]>> {
@@ -63,13 +63,15 @@ export async function setMasterPassword(month: string, password: string) {
 }
 
 export async function verifyPassword(replayId: string, password: string): Promise<boolean> {
-  const { data: replay } = await supabase.from('replays').select('password, date').eq('id', replayId).single();
-  if (!replay) return false;
-  if (replay.password === password) return true;
-  const d = new Date(replay.date);
-  const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-  const { data: master } = await supabase.from('master_passwords').select('password').eq('month', monthKey).maybeSingle();
-  return master?.password === password;
+  try {
+    const { data, error } = await supabase.functions.invoke('verify-password', {
+      body: { replay_id: replayId, password },
+    });
+    if (error) return false;
+    return data?.valid === true;
+  } catch {
+    return false;
+  }
 }
 
 export async function getSetting(key: string): Promise<string> {
