@@ -8,10 +8,10 @@ export type SiteSettingRow = Tables<'site_settings'>;
 export async function getReplays(): Promise<ReplayRow[]> {
   const { data, error } = await supabase
     .from('replays')
-    .select('*')
+    .select('id, title, show_name, date, criteria, featured_member, lineup, youtube_id, image_url, view_count, created_at, updated_at')
     .order('date', { ascending: false });
   if (error) throw error;
-  return data || [];
+  return (data || []) as unknown as ReplayRow[];
 }
 
 export async function getReplaysByMonth(): Promise<Record<string, ReplayRow[]>> {
