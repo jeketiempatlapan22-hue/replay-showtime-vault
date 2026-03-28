@@ -63,7 +63,16 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
     }
   }, []);
 
-  const embedUrl = `https://www.youtube.com/embed/${replay.youtube_id}?rel=0&modestbranding=1&playsinline=1`;
+  // Extract clean 11-char video ID from youtube_id (could be full URL or just ID)
+  const rawId = replay.youtube_id || '';
+  const extractedId = (
+    rawId.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([A-Za-z0-9_-]{11})/)?.[1]
+    || rawId.trim()
+  ).slice(0, 11);
+  const isValidId = /^[A-Za-z0-9_-]{11}$/.test(extractedId);
+
+  const embedUrl = `https://www.youtube-nocookie.com/embed/${extractedId}?rel=0&modestbranding=1&playsinline=1&autoplay=0`;
+  const watchUrl = `https://www.youtube.com/watch?v=${extractedId}`;
 
   return (
     <div className="min-h-screen bg-background relative z-10">
@@ -81,17 +90,36 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
       </div>
 
       <div ref={containerRef} className="w-full max-w-5xl mx-auto p-4">
-        <div className="relative w-full overflow-hidden rounded-xl bg-black" style={{ paddingBottom: '56.25%' }}>
-          <iframe
-            className="absolute inset-0 w-full h-full"
-            src={embedUrl}
-            title={replay.title}
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
-            allowFullScreen
-            frameBorder="0"
-            style={{ border: 0 }}
-          />
-        </div>
+        {!isValidId ? (
+          <div className="rounded-xl bg-destructive/10 border border-destructive/30 p-6 text-center">
+            <p className="text-destructive font-medium">Video YouTube tidak valid</p>
+          </div>
+        ) : (
+          <>
+            <div className="relative w-full overflow-hidden rounded-xl bg-black" style={{ paddingBottom: '56.25%' }}>
+              <iframe
+                className="absolute inset-0 w-full h-full"
+                src={embedUrl}
+                title={replay.title}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
+                allowFullScreen
+                referrerPolicy="strict-origin-when-cross-origin"
+                style={{ border: 0 }}
+              />
+            </div>
+            {/* Fallback link in case embed is blocked */}
+            <div className="mt-2 text-center">
+              <a
+                href={watchUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-muted-foreground hover:text-primary transition-colors underline"
+              >
+                Embed tidak muncul? Tonton langsung di YouTube →
+              </a>
+            </div>
+          </>
+        )}
 
         <div className="mt-6 space-y-4">
           {/* View count + Rating */}
