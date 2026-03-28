@@ -112,7 +112,7 @@ export default function Admin() {
   };
 
   const resetForm = () => {
-    setForm({ title: '', showName: '', date: '', criteria: 'reguler', featuredMember: '', lineup: '', password: '', youtubeId: '', imageUrl: '' });
+    setForm({ title: '', showName: '', date: '', showTime: '19:00', criteria: 'reguler', featuredMember: '', lineup: '', password: '', youtubeId: '', imageUrl: '' });
     setEditingReplay(null);
   };
 
