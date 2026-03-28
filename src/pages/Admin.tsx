@@ -146,7 +146,7 @@ export default function Admin() {
   const handleEditReplay = (r: ReplayRow) => {
     setEditingReplay(r);
     setForm({
-      title: r.title, showName: r.show_name, date: r.date, criteria: r.criteria,
+      title: r.title, showName: r.show_name, date: r.date, showTime: ((r as any).show_time || '19:00:00').slice(0, 5), criteria: r.criteria,
       featuredMember: r.featured_member,
       lineup: r.lineup.join(', '), password: r.password, youtubeId: r.youtube_id, imageUrl: r.image_url,
     });
