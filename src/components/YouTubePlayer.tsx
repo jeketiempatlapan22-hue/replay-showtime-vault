@@ -16,34 +16,55 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
   const [viewCount, setViewCount] = useState(replay.view_count || 0);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Increment view count on mount
+  // Increment view count on mount using RPC
   useEffect(() => {
     const incrementView = async () => {
-      const { data } = await supabase
-        .from('replays')
-        .select('view_count')
-        .eq('id', replay.id)
-        .single();
-      const current = data?.view_count || 0;
-      await supabase
-        .from('replays')
-        .update({ view_count: current + 1 })
-        .eq('id', replay.id);
-      setViewCount(current + 1);
+      try {
+        const { data } = await supabase.rpc('increment_view_count', {
+          _replay_id: replay.id,
+        });
+        if (typeof data === 'number') setViewCount(data);
+      } catch {
+        // silently fail
+      }
     };
     incrementView();
+  }, [replay.id]);
+
+  // Realtime view count sync
+  useEffect(() => {
+    const channel = supabase
+      .channel(`replay-views-${replay.id}`)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'replays',
+        filter: `id=eq.${replay.id}`,
+      }, (payload) => {
+        const newRow = payload.new as { view_count?: number };
+        if (typeof newRow.view_count === 'number') {
+          setViewCount(newRow.view_count);
+        }
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
   }, [replay.id]);
 
   const toggleFullscreen = useCallback(() => {
     if (!containerRef.current) return;
     if (!document.fullscreenElement) {
-      containerRef.current.requestFullscreen();
+      containerRef.current.requestFullscreen?.() ||
+        (containerRef.current as any).webkitRequestFullscreen?.();
       setIsFullscreen(true);
     } else {
-      document.exitFullscreen();
+      document.exitFullscreen?.() || (document as any).webkitExitFullscreen?.();
       setIsFullscreen(false);
     }
   }, []);
+
+  // Build embed URL with maximum compatibility
+  const embedUrl = `https://www.youtube.com/embed/${replay.youtube_id}?rel=0&modestbranding=1&playsinline=1&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`;
 
   return (
     <div className="min-h-screen bg-background relative z-10">
@@ -61,13 +82,17 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
       </div>
 
       <div ref={containerRef} className="w-full max-w-5xl mx-auto p-4">
-        <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
+        <div className="relative w-full overflow-hidden rounded-xl bg-black" style={{ paddingBottom: '56.25%' }}>
           <iframe
-            className="absolute inset-0 w-full h-full rounded-xl"
-            src={`https://www.youtube.com/embed/${replay.youtube_id}?rel=0&modestbranding=1`}
+            className="absolute inset-0 w-full h-full"
+            src={embedUrl}
             title={replay.title}
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
             allowFullScreen
+            referrerPolicy="strict-origin-when-cross-origin"
+            loading="lazy"
+            sandbox="allow-scripts allow-same-origin allow-popups allow-presentation allow-popups-to-escape-sandbox"
+            style={{ border: 0 }}
           />
         </div>
 
