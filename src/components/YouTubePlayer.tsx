@@ -63,8 +63,7 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
     }
   }, []);
 
-  // Build embed URL with maximum compatibility
-  const embedUrl = `https://www.youtube.com/embed/${replay.youtube_id}?rel=0&modestbranding=1&playsinline=1&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`;
+  const embedUrl = `https://www.youtube.com/embed/${replay.youtube_id}?rel=0&modestbranding=1&playsinline=1`;
 
   return (
     <div className="min-h-screen bg-background relative z-10">
@@ -89,9 +88,7 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
             title={replay.title}
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
             allowFullScreen
-            referrerPolicy="strict-origin-when-cross-origin"
-            loading="lazy"
-            sandbox="allow-scripts allow-same-origin allow-popups allow-presentation allow-popups-to-escape-sandbox"
+            frameBorder="0"
             style={{ border: 0 }}
           />
         </div>
