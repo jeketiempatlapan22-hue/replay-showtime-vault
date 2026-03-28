@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Send, MessageCircle } from 'lucide-react';
+import { Send, MessageCircle, Trash2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
@@ -20,6 +20,21 @@ export default function CommentSection({ replayId }: CommentSectionProps) {
   const [name, setName] = useState(() => localStorage.getItem('replaytime-name') || '');
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  // Check if current user is admin
+  useEffect(() => {
+    const checkAdmin = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const { data } = await supabase.rpc('has_role', {
+        _user_id: session.user.id,
+        _role: 'admin',
+      });
+      setIsAdmin(data === true);
+    };
+    checkAdmin();
+  }, []);
 
   const fetchComments = async () => {
     const { data } = await supabase
@@ -37,6 +52,10 @@ export default function CommentSection({ replayId }: CommentSectionProps) {
       .channel(`comments-${replayId}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'comments', filter: `replay_id=eq.${replayId}` }, (payload) => {
         setComments(prev => [...prev, payload.new as Comment]);
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'comments', filter: `replay_id=eq.${replayId}` }, (payload) => {
+        const deletedId = (payload.old as { id?: string }).id;
+        if (deletedId) setComments(prev => prev.filter(c => c.id !== deletedId));
       })
       .subscribe();
 
@@ -57,6 +76,11 @@ export default function CommentSection({ replayId }: CommentSectionProps) {
 
     setMessage('');
     setSending(false);
+  };
+
+  const handleDelete = async (commentId: string) => {
+    await supabase.from('comments').delete().eq('id', commentId);
+    setComments(prev => prev.filter(c => c.id !== commentId));
   };
 
   const timeAgo = (dateStr: string) => {
@@ -83,10 +107,21 @@ export default function CommentSection({ replayId }: CommentSectionProps) {
           <p className="text-sm text-muted-foreground text-center py-4">Belum ada komentar. Jadilah yang pertama!</p>
         )}
         {comments.map(c => (
-          <div key={c.id} className="p-3 rounded-lg bg-secondary/50 border border-border animate-fade-up" style={{ animationFillMode: 'forwards' }}>
+          <div key={c.id} className="p-3 rounded-lg bg-secondary/50 border border-border animate-fade-up group" style={{ animationFillMode: 'forwards' }}>
             <div className="flex items-center justify-between mb-1">
               <span className="text-sm font-medium text-foreground">{c.name}</span>
-              <span className="text-xs text-muted-foreground">{timeAgo(c.created_at)}</span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">{timeAgo(c.created_at)}</span>
+                {isAdmin && (
+                  <button
+                    onClick={() => handleDelete(c.id)}
+                    className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-destructive/20 text-destructive"
+                    title="Hapus komentar"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
             </div>
             <p className="text-sm text-muted-foreground">{c.message}</p>
           </div>
