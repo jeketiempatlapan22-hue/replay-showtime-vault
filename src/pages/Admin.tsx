@@ -362,7 +362,10 @@ export default function Admin() {
             {showFeaturedMember && (
               <div><Label>Member yang Bersangkutan (STS/Last Show)</Label><Input placeholder="Nama member..." value={form.featuredMember} onChange={e => setForm(f => ({ ...f, featuredMember: e.target.value }))} /></div>
             )}
-            <div><Label>Tanggal *</Label><Input type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} /></div>
+            <div className="grid grid-cols-2 gap-4">
+              <div><Label>Tanggal *</Label><Input type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} /></div>
+              <div><Label>Jam Show</Label><Input type="time" value={form.showTime} onChange={e => setForm(f => ({ ...f, showTime: e.target.value }))} /></div>
+            </div>
             <div><Label>Lineup Member (pisahkan dengan koma)</Label><Input placeholder="Member 1, Member 2, ..." value={form.lineup} onChange={e => setForm(f => ({ ...f, lineup: e.target.value }))} /></div>
             <div><Label>YouTube Embed ID *</Label><Input placeholder="Contoh: dQw4w9WgXcQ" value={form.youtubeId} onChange={e => setForm(f => ({ ...f, youtubeId: e.target.value }))} /></div>
             <div><Label>Foto Kartu</Label><ImagePicker value={form.imageUrl} onChange={url => setForm(f => ({ ...f, imageUrl: url }))} /></div>
