@@ -147,25 +147,25 @@ export default function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWa
             </Button>
           )}
         </div>
-      </div>
 
-      <Dialog open={showPasswordDialog} onOpenChange={setShowPasswordDialog}>
-        <DialogContent className="bg-card border-border">
-          <DialogHeader>
-            <DialogTitle className="font-sans">Masukkan Sandi</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">Masukkan sandi satuan atau sandi master untuk membuka replay ini.</p>
-            <Input type="password" placeholder="Masukkan sandi..." value={password}
-              onChange={e => { setPassword(e.target.value); setError(''); }}
-              onKeyDown={e => e.key === 'Enter' && handleSubmitPassword()} />
-            {error && <p className="text-sm text-destructive">{error}</p>}
-            <Button className="w-full" onClick={handleSubmitPassword} disabled={checking}>
-              {checking ? 'Memeriksa...' : 'Buka Replay'}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-    </>
+        <Dialog open={showPasswordDialog} onOpenChange={setShowPasswordDialog}>
+          <DialogContent className="bg-card border-border">
+            <DialogHeader>
+              <DialogTitle className="font-sans">Masukkan Sandi</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">Masukkan sandi satuan atau sandi master untuk membuka replay ini.</p>
+              <Input type="password" placeholder="Masukkan sandi..." value={password}
+                onChange={e => { setPassword(e.target.value); setError(''); }}
+                onKeyDown={e => e.key === 'Enter' && handleSubmitPassword()} />
+              {error && <p className="text-sm text-destructive">{error}</p>}
+              <Button className="w-full" onClick={handleSubmitPassword} disabled={checking}>
+                {checking ? 'Memeriksa...' : 'Buka Replay'}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </div>
+    </div>
   );
 }
