@@ -207,13 +207,16 @@ export default function Index() {
   };
 
   return (
-    <>
-      {watchingReplay && (
-        <div className="fixed inset-0 z-[100] bg-background overflow-y-auto">
+    <div className="relative">
+      {/* Player overlay - always in DOM, toggled via display */}
+      <div style={{ display: watchingReplay ? 'block' : 'none' }} className="fixed inset-0 z-[100] bg-background overflow-y-auto">
+        {watchingReplay && (
           <YouTubePlayer key={watchingReplay.id} replay={watchingReplay} onBack={() => setWatchingReplay(null)} />
-        </div>
-      )}
-    <div className="relative min-h-screen transition-colors duration-500">
+        )}
+      </div>
+
+      {/* Main content - always in DOM, hidden when watching */}
+      <div style={{ display: watchingReplay ? 'none' : 'block' }} className="relative min-h-screen transition-colors duration-500">
       <div className={`fixed inset-0 z-0 transition-opacity duration-700 ${lightMode ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
         <ThemedBackground theme={theme} />
       </div>
@@ -370,7 +373,7 @@ export default function Index() {
       >
         <ArrowUp className="w-5 h-5" />
       </button>
+      </div>
     </div>
-    </>
   );
 }
