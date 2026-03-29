@@ -58,11 +58,10 @@ export default function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWa
   const thumbnailUrl = `https://img.youtube.com/vi/${replay.youtube_id}/mqdefault.jpg`;
 
   return (
-    <>
-      <div
-        className="group relative rounded-xl overflow-hidden border border-border bg-card/80 backdrop-blur-sm hover:border-primary/50 transition-all duration-300 hover:shadow-lg hover:shadow-primary/10 hover:-translate-y-1 animate-fade-up opacity-0"
-        style={{ animationDelay: `${index * 80}ms`, animationFillMode: 'forwards' }}
-      >
+    <div
+      className="group relative rounded-xl overflow-hidden border border-border bg-card/80 backdrop-blur-sm hover:border-primary/50 transition-all duration-300 hover:shadow-lg hover:shadow-primary/10 hover:-translate-y-1 animate-fade-up opacity-0"
+      style={{ animationDelay: `${index * 80}ms`, animationFillMode: 'forwards' }}
+    >
         <div className="relative aspect-video overflow-hidden">
           {replay.image_url ? (
             <>
