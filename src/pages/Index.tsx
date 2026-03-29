@@ -206,11 +206,13 @@ export default function Index() {
     setUnlockedIds(prev => new Set(prev).add(id));
   };
 
-  if (watchingReplay) {
-    return <YouTubePlayer key={watchingReplay.id} replay={watchingReplay} onBack={() => setWatchingReplay(null)} />;
-  }
-
   return (
+    <>
+      {watchingReplay && (
+        <div className="fixed inset-0 z-[100] bg-background overflow-y-auto">
+          <YouTubePlayer key={watchingReplay.id} replay={watchingReplay} onBack={() => setWatchingReplay(null)} />
+        </div>
+      )}
     <div className="relative min-h-screen transition-colors duration-500">
       <div className={`fixed inset-0 z-0 transition-opacity duration-700 ${lightMode ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
         <ThemedBackground theme={theme} />
@@ -369,5 +371,6 @@ export default function Index() {
         <ArrowUp className="w-5 h-5" />
       </button>
     </div>
+    </>
   );
 }
