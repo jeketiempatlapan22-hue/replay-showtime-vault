@@ -14,6 +14,11 @@ interface Props {
 export default function YouTubePlayer({ replay, onBack }: Props) {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [viewCount, setViewCount] = useState(replay.view_count ?? 0);
+
+  // Sync view count when replay changes
+  useEffect(() => {
+    setViewCount(replay.view_count ?? 0);
+  }, [replay.id, replay.view_count]);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {

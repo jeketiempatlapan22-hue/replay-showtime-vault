@@ -34,6 +34,7 @@ type SortMode = 'newest' | 'oldest' | 'title';
 export default function Index() {
   const [unlockedIds, setUnlockedIds] = useState<Set<string>>(new Set());
   const [watchingReplay, setWatchingReplay] = useState<ReplayRow | null>(null);
+  const [displayedReplay, setDisplayedReplay] = useState<ReplayRow | null>(null);
   const [playerVisible, setPlayerVisible] = useState(false);
   const closingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -210,33 +211,36 @@ export default function Index() {
 
   const handleOpenPlayer = useCallback((replay: ReplayRow) => {
     if (closingTimerRef.current) clearTimeout(closingTimerRef.current);
+    setDisplayedReplay(replay);
     setWatchingReplay(replay);
-    // Trigger animation on next frame
-    requestAnimationFrame(() => setPlayerVisible(true));
+    requestAnimationFrame(() => requestAnimationFrame(() => setPlayerVisible(true)));
   }, []);
 
   const handleClosePlayer = useCallback(() => {
     setPlayerVisible(false);
+    setWatchingReplay(null);
     closingTimerRef.current = setTimeout(() => {
-      setWatchingReplay(null);
-    }, 300); // match transition duration
+      setDisplayedReplay(null);
+    }, 350);
   }, []);
 
   return (
     <div className="relative">
-      {/* Player overlay with smooth transition */}
+      {/* Player overlay - always stable in DOM, visibility via CSS only */}
       <div
         className={`fixed inset-0 z-[100] bg-background overflow-y-auto transition-all duration-300 ease-out ${
           playerVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'
         }`}
       >
-        {watchingReplay && (
-          <YouTubePlayer key={watchingReplay.id} replay={watchingReplay} onBack={handleClosePlayer} />
-        )}
+        <div className={displayedReplay ? 'block' : 'hidden'}>
+          {displayedReplay && (
+            <YouTubePlayer replay={displayedReplay} onBack={handleClosePlayer} />
+          )}
+        </div>
       </div>
 
-      {/* Main content */}
-      <div className="relative min-h-screen transition-colors duration-500">
+      {/* Main content - always in DOM */}
+      <div className={`relative min-h-screen transition-colors duration-500 ${watchingReplay ? 'invisible' : 'visible'}`}>
       <div className={`fixed inset-0 z-0 transition-opacity duration-700 ${lightMode ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
         <ThemedBackground theme={theme} />
       </div>
