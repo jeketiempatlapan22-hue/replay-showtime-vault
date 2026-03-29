@@ -208,8 +208,12 @@ export default function Index() {
 
   return (
     <div className="relative">
-      {/* Player overlay - always in DOM, toggled via display */}
-      <div style={{ display: watchingReplay ? 'block' : 'none' }} className="fixed inset-0 z-[100] bg-background overflow-y-auto">
+      {/* Player overlay with smooth transition */}
+      <div
+        className={`fixed inset-0 z-[100] bg-background overflow-y-auto transition-all duration-300 ease-out ${
+          watchingReplay ? 'opacity-100 scale-100 pointer-events-auto' : 'opacity-0 scale-[1.02] pointer-events-none'
+        }`}
+      >
         {watchingReplay && (
           <YouTubePlayer key={watchingReplay.id} replay={watchingReplay} onBack={() => setWatchingReplay(null)} />
         )}
