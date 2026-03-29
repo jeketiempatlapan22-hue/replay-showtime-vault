@@ -58,7 +58,7 @@ export default function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWa
   const thumbnailUrl = `https://img.youtube.com/vi/${replay.youtube_id}/mqdefault.jpg`;
 
   return (
-    <>
+    <div>
       <div
         className="group relative rounded-xl overflow-hidden border border-border bg-card/80 backdrop-blur-sm hover:border-primary/50 transition-all duration-300 hover:shadow-lg hover:shadow-primary/10 hover:-translate-y-1 animate-fade-up opacity-0"
         style={{ animationDelay: `${index * 80}ms`, animationFillMode: 'forwards' }}
@@ -67,7 +67,6 @@ export default function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWa
           {replay.image_url ? (
             <>
               <img src={replay.image_url} alt={replay.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-              {/* YouTube thumbnail on hover */}
               <img src={thumbnailUrl} alt="" className="absolute inset-0 w-full h-full object-cover opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
             </>
           ) : (
@@ -87,11 +86,9 @@ export default function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWa
               </Badge>
             </div>
           )}
-          {/* Criteria badge */}
           <div className="absolute top-2 left-2">
             <Badge variant="secondary" className="text-xs">{criteriaLabel}</Badge>
           </div>
-          {/* Bookmark button */}
           {onToggleBookmark && (
             <button
               onClick={(e) => { e.stopPropagation(); onToggleBookmark(replay.id); }}
@@ -167,6 +164,6 @@ export default function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWa
           </div>
         </DialogContent>
       </Dialog>
-    </>
+    </div>
   );
 }

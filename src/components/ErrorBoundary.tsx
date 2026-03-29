@@ -13,6 +13,11 @@ export default class ErrorBoundary extends React.Component<{ children: React.Rea
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
     console.error('ErrorBoundary caught:', error, info);
+    // Auto-recover from DOM reconciliation errors instead of showing error screen
+    if (error.message?.includes('insertBefore') || error.message?.includes('removeChild') || error.message?.includes('appendChild')) {
+      console.warn('DOM reconciliation error detected, auto-recovering...');
+      this.setState({ hasError: false });
+    }
   }
 
   render() {
