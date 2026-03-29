@@ -34,6 +34,7 @@ type SortMode = 'newest' | 'oldest' | 'title';
 export default function Index() {
   const [unlockedIds, setUnlockedIds] = useState<Set<string>>(new Set());
   const [watchingReplay, setWatchingReplay] = useState<ReplayRow | null>(null);
+  const [displayedReplay, setDisplayedReplay] = useState<ReplayRow | null>(null);
   const [playerVisible, setPlayerVisible] = useState(false);
   const closingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
