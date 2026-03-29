@@ -34,6 +34,8 @@ type SortMode = 'newest' | 'oldest' | 'title';
 export default function Index() {
   const [unlockedIds, setUnlockedIds] = useState<Set<string>>(new Set());
   const [watchingReplay, setWatchingReplay] = useState<ReplayRow | null>(null);
+  const [playerVisible, setPlayerVisible] = useState(false);
+  const closingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [allGrouped, setAllGrouped] = useState<Record<string, ReplayRow[]>>({});
   const [allReplays, setAllReplays] = useState<ReplayRow[]>([]);
@@ -206,17 +208,35 @@ export default function Index() {
     setUnlockedIds(prev => new Set(prev).add(id));
   };
 
+  const handleOpenPlayer = useCallback((replay: ReplayRow) => {
+    if (closingTimerRef.current) clearTimeout(closingTimerRef.current);
+    setWatchingReplay(replay);
+    // Trigger animation on next frame
+    requestAnimationFrame(() => setPlayerVisible(true));
+  }, []);
+
+  const handleClosePlayer = useCallback(() => {
+    setPlayerVisible(false);
+    closingTimerRef.current = setTimeout(() => {
+      setWatchingReplay(null);
+    }, 300); // match transition duration
+  }, []);
+
   return (
     <div className="relative">
-      {/* Player overlay - always in DOM, toggled via display */}
-      <div style={{ display: watchingReplay ? 'block' : 'none' }} className="fixed inset-0 z-[100] bg-background overflow-y-auto">
+      {/* Player overlay with smooth transition */}
+      <div
+        className={`fixed inset-0 z-[100] bg-background overflow-y-auto transition-all duration-300 ease-out ${
+          playerVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'
+        }`}
+      >
         {watchingReplay && (
-          <YouTubePlayer key={watchingReplay.id} replay={watchingReplay} onBack={() => setWatchingReplay(null)} />
+          <YouTubePlayer key={watchingReplay.id} replay={watchingReplay} onBack={handleClosePlayer} />
         )}
       </div>
 
-      {/* Main content - always in DOM, hidden when watching */}
-      <div style={{ display: watchingReplay ? 'none' : 'block' }} className="relative min-h-screen transition-colors duration-500">
+      {/* Main content */}
+      <div className="relative min-h-screen transition-colors duration-500">
       <div className={`fixed inset-0 z-0 transition-opacity duration-700 ${lightMode ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
         <ThemedBackground theme={theme} />
       </div>
@@ -352,7 +372,7 @@ export default function Index() {
                       replay={replay}
                       isUnlocked={unlockedIds.has(replay.id)}
                       onUnlock={handleUnlock}
-                      onWatch={setWatchingReplay}
+                      onWatch={handleOpenPlayer}
                       index={i}
                       isBookmarked={bookmarks.has(replay.id)}
                       onToggleBookmark={toggleBookmark}
