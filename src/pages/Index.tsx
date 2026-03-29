@@ -208,21 +208,35 @@ export default function Index() {
     setUnlockedIds(prev => new Set(prev).add(id));
   };
 
+  const handleOpenPlayer = useCallback((replay: ReplayRow) => {
+    if (closingTimerRef.current) clearTimeout(closingTimerRef.current);
+    setWatchingReplay(replay);
+    // Trigger animation on next frame
+    requestAnimationFrame(() => setPlayerVisible(true));
+  }, []);
+
+  const handleClosePlayer = useCallback(() => {
+    setPlayerVisible(false);
+    closingTimerRef.current = setTimeout(() => {
+      setWatchingReplay(null);
+    }, 300); // match transition duration
+  }, []);
+
   return (
     <div className="relative">
       {/* Player overlay with smooth transition */}
       <div
         className={`fixed inset-0 z-[100] bg-background overflow-y-auto transition-all duration-300 ease-out ${
-          watchingReplay ? 'opacity-100 scale-100 pointer-events-auto' : 'opacity-0 scale-[1.02] pointer-events-none'
+          playerVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'
         }`}
       >
         {watchingReplay && (
-          <YouTubePlayer key={watchingReplay.id} replay={watchingReplay} onBack={() => setWatchingReplay(null)} />
+          <YouTubePlayer key={watchingReplay.id} replay={watchingReplay} onBack={handleClosePlayer} />
         )}
       </div>
 
-      {/* Main content - always in DOM, hidden when watching */}
-      <div style={{ display: watchingReplay ? 'none' : 'block' }} className="relative min-h-screen transition-colors duration-500">
+      {/* Main content */}
+      <div className="relative min-h-screen transition-colors duration-500">
       <div className={`fixed inset-0 z-0 transition-opacity duration-700 ${lightMode ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
         <ThemedBackground theme={theme} />
       </div>
