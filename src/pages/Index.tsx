@@ -207,7 +207,7 @@ export default function Index() {
   };
 
   if (watchingReplay) {
-    return <YouTubePlayer replay={watchingReplay} onBack={() => setWatchingReplay(null)} />;
+    return <YouTubePlayer key={watchingReplay.id} replay={watchingReplay} onBack={() => setWatchingReplay(null)} />;
   }
 
   return (
