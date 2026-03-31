@@ -42,10 +42,15 @@ export default function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWa
     const valid = await verifyPassword(replay.id, password);
     setChecking(false);
     if (valid) {
-      onUnlock(replay.id);
       setShowPasswordDialog(false);
       setPassword('');
       setError('');
+      // Atomically unlock AND open player to prevent Chrome race condition
+      if (onUnlockAndWatch) {
+        onUnlockAndWatch(replay);
+      } else {
+        onUnlock(replay.id);
+      }
     } else {
       setError('Sandi salah! Coba lagi.');
     }
