@@ -386,6 +386,7 @@ export default function Index() {
                       isUnlocked={unlockedIds.has(replay.id)}
                       onUnlock={handleUnlock}
                       onWatch={handleOpenPlayer}
+                      onUnlockAndWatch={handleUnlockAndWatch}
                       index={i}
                       isBookmarked={bookmarks.has(replay.id)}
                       onToggleBookmark={toggleBookmark}
