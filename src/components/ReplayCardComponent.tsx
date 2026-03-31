@@ -15,6 +15,7 @@ interface Props {
   isUnlocked: boolean;
   onUnlock: (id: string) => void;
   onWatch: (replay: ReplayRow) => void;
+  onUnlockAndWatch?: (replay: ReplayRow) => void;
   index?: number;
   isBookmarked?: boolean;
   onToggleBookmark?: (id: string) => void;
