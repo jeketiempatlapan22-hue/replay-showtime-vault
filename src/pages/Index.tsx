@@ -205,9 +205,18 @@ export default function Index() {
     sortMode === 'oldest' ? a.localeCompare(b) : b.localeCompare(a)
   );
 
-  const handleUnlock = (id: string) => {
+  const handleUnlock = useCallback((id: string) => {
     setUnlockedIds(prev => new Set(prev).add(id));
-  };
+  }, []);
+
+  // Atomic unlock + open player (prevents Chrome race condition)
+  const handleUnlockAndWatch = useCallback((replay: ReplayRow) => {
+    setUnlockedIds(prev => new Set(prev).add(replay.id));
+    if (closingTimerRef.current) clearTimeout(closingTimerRef.current);
+    setDisplayedReplay(replay);
+    setWatchingReplay(replay);
+    requestAnimationFrame(() => setPlayerVisible(true));
+  }, []);
 
   const handleOpenPlayer = useCallback((replay: ReplayRow) => {
     if (closingTimerRef.current) clearTimeout(closingTimerRef.current);
@@ -377,6 +386,7 @@ export default function Index() {
                       isUnlocked={unlockedIds.has(replay.id)}
                       onUnlock={handleUnlock}
                       onWatch={handleOpenPlayer}
+                      onUnlockAndWatch={handleUnlockAndWatch}
                       index={i}
                       isBookmarked={bookmarks.has(replay.id)}
                       onToggleBookmark={toggleBookmark}

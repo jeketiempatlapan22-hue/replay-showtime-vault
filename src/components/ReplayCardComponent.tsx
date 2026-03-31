@@ -15,6 +15,7 @@ interface Props {
   isUnlocked: boolean;
   onUnlock: (id: string) => void;
   onWatch: (replay: ReplayRow) => void;
+  onUnlockAndWatch?: (replay: ReplayRow) => void;
   index?: number;
   isBookmarked?: boolean;
   onToggleBookmark?: (id: string) => void;
@@ -30,7 +31,7 @@ function highlightText(text: string, query: string) {
   );
 }
 
-export default function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWatch, index = 0, isBookmarked, onToggleBookmark, searchQuery = '' }: Props) {
+export default function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWatch, onUnlockAndWatch, index = 0, isBookmarked, onToggleBookmark, searchQuery = '' }: Props) {
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -41,10 +42,15 @@ export default function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWa
     const valid = await verifyPassword(replay.id, password);
     setChecking(false);
     if (valid) {
-      onUnlock(replay.id);
       setShowPasswordDialog(false);
       setPassword('');
       setError('');
+      // Atomically unlock AND open player to prevent Chrome race condition
+      if (onUnlockAndWatch) {
+        onUnlockAndWatch(replay);
+      } else {
+        onUnlock(replay.id);
+      }
     } else {
       setError('Sandi salah! Coba lagi.');
     }
