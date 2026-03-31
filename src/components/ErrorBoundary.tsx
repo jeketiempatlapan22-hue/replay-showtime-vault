@@ -2,23 +2,65 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { AlertTriangle } from 'lucide-react';
 
+const DOM_ERROR_PATTERNS = [
+  'insertBefore',
+  'removeChild',
+  'appendChild',
+  'replaceChild',
+  'NotFoundError',
+  'not a child of this node',
+  'Failed to execute',
+];
+
+function isDomReconciliationError(error: Error | string): boolean {
+  const msg = typeof error === 'string' ? error : error?.message || '';
+  return DOM_ERROR_PATTERNS.some(p => msg.includes(p));
+}
+
 interface State { hasError: boolean; error?: Error }
 
 export default class ErrorBoundary extends React.Component<{ children: React.ReactNode }, State> {
   state: State = { hasError: false };
+  private recovering = false;
 
-  static getDerivedStateFromError(error: Error): State {
+  static getDerivedStateFromError(error: Error): State | null {
+    // For DOM reconciliation errors, don't show error UI - we'll auto-recover
+    if (isDomReconciliationError(error)) {
+      return null; // Don't update state, let componentDidCatch handle it
+    }
     return { hasError: true, error };
   }
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
     console.error('ErrorBoundary caught:', error, info);
-    // Auto-recover from DOM reconciliation errors instead of showing error screen
-    if (error.message?.includes('insertBefore') || error.message?.includes('removeChild') || error.message?.includes('appendChild')) {
-      console.warn('DOM reconciliation error detected, auto-recovering...');
-      this.setState({ hasError: false });
+    
+    if (isDomReconciliationError(error) && !this.recovering) {
+      this.recovering = true;
+      console.warn('DOM reconciliation error detected, forcing recovery...');
+      // Schedule a clean re-render after the current cycle
+      setTimeout(() => {
+        this.recovering = false;
+        this.forceUpdate();
+      }, 100);
     }
   }
+
+  componentDidMount() {
+    // Global handler to suppress DOM reconciliation errors from crashing Chrome
+    window.addEventListener('error', this.handleGlobalError);
+  }
+
+  componentWillUnmount() {
+    window.removeEventListener('error', this.handleGlobalError);
+  }
+
+  private handleGlobalError = (event: ErrorEvent) => {
+    if (isDomReconciliationError(event.error || event.message)) {
+      console.warn('Suppressed DOM reconciliation error:', event.message);
+      event.preventDefault();
+      event.stopPropagation();
+    }
+  };
 
   render() {
     if (this.state.hasError) {
