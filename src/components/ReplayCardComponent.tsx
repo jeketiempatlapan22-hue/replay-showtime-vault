@@ -38,8 +38,16 @@ export default function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWa
   const [checking, setChecking] = useState(false);
 
   const handleSubmitPassword = async () => {
+    if (checking) return;
+
+    const trimmedPassword = password.trim();
+    if (!trimmedPassword) {
+      setError('Sandi wajib diisi.');
+      return;
+    }
+
     setChecking(true);
-    const valid = await verifyPassword(replay.id, password);
+    const valid = await verifyPassword(replay.id, trimmedPassword);
     setChecking(false);
     if (valid) {
       setShowPasswordDialog(false);
@@ -97,6 +105,7 @@ export default function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWa
           </div>
           {onToggleBookmark && (
             <button
+              type="button"
               onClick={(e) => { e.stopPropagation(); onToggleBookmark(replay.id); }}
               className={`absolute bottom-2 right-2 p-1.5 rounded-full transition-all duration-200 ${isBookmarked ? 'bg-primary text-primary-foreground' : 'bg-background/60 backdrop-blur text-muted-foreground hover:text-primary'}`}
             >
@@ -142,11 +151,11 @@ export default function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWa
           </div>
 
           {isUnlocked ? (
-            <Button className="w-full mt-2" onClick={() => onWatch(replay)}>
+            <Button type="button" className="w-full mt-2" onClick={() => onWatch(replay)}>
               <Play className="w-4 h-4 mr-2" /> Tonton Sekarang
             </Button>
           ) : (
-            <Button variant="outline" className="w-full mt-2 border-primary/50 text-primary hover:bg-primary hover:text-primary-foreground" onClick={() => setShowPasswordDialog(true)}>
+            <Button type="button" variant="outline" className="w-full mt-2 border-primary/50 text-primary hover:bg-primary hover:text-primary-foreground" onClick={() => setShowPasswordDialog(true)}>
               <Lock className="w-4 h-4 mr-2" /> Buka dengan Sandi
             </Button>
           )}
@@ -164,7 +173,7 @@ export default function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWa
               onChange={e => { setPassword(e.target.value); setError(''); }}
               onKeyDown={e => e.key === 'Enter' && handleSubmitPassword()} />
             {error && <p className="text-sm text-destructive">{error}</p>}
-            <Button className="w-full" onClick={handleSubmitPassword} disabled={checking}>
+            <Button type="button" className="w-full" onClick={handleSubmitPassword} disabled={checking}>
               {checking ? 'Memeriksa...' : 'Buka Replay'}
             </Button>
           </div>

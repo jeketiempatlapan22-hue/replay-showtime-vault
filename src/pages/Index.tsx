@@ -31,8 +31,23 @@ const CRITERIA_FILTERS = [
 
 type SortMode = 'newest' | 'oldest' | 'title';
 
+const UNLOCKED_STORAGE_KEY = 'replaytime-unlocked-replays';
+const ACTIVE_REPLAY_STORAGE_KEY = 'replaytime-active-replay';
+
+function readSessionSet(key: string): Set<string> {
+  if (typeof window === 'undefined') return new Set();
+  try {
+    const value = sessionStorage.getItem(key);
+    if (!value) return new Set();
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? new Set(parsed.filter((item): item is string => typeof item === 'string')) : new Set();
+  } catch {
+    return new Set();
+  }
+}
+
 export default function Index() {
-  const [unlockedIds, setUnlockedIds] = useState<Set<string>>(new Set());
+  const [unlockedIds, setUnlockedIds] = useState<Set<string>>(() => readSessionSet(UNLOCKED_STORAGE_KEY));
   const [watchingReplay, setWatchingReplay] = useState<ReplayRow | null>(null);
   const [displayedReplay, setDisplayedReplay] = useState<ReplayRow | null>(null);
   const [playerVisible, setPlayerVisible] = useState(false);
@@ -134,6 +149,41 @@ export default function Index() {
     localStorage.setItem('replaytime-mode', lightMode ? 'light' : 'dark');
   }, [lightMode, theme]);
 
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(UNLOCKED_STORAGE_KEY, JSON.stringify([...unlockedIds]));
+    } catch {
+      // ignore storage failures
+    }
+  }, [unlockedIds]);
+
+  useEffect(() => {
+    if (loading || allReplays.length === 0 || displayedReplay) return;
+
+    try {
+      const activeReplayId = sessionStorage.getItem(ACTIVE_REPLAY_STORAGE_KEY);
+      if (!activeReplayId) return;
+
+      const matchedReplay = allReplays.find((replay) => replay.id === activeReplayId);
+      if (!matchedReplay) {
+        sessionStorage.removeItem(ACTIVE_REPLAY_STORAGE_KEY);
+        return;
+      }
+
+      setUnlockedIds((prev) => {
+        if (prev.has(activeReplayId)) return prev;
+        const next = new Set(prev);
+        next.add(activeReplayId);
+        return next;
+      });
+      setDisplayedReplay(matchedReplay);
+      setWatchingReplay(matchedReplay);
+      requestAnimationFrame(() => requestAnimationFrame(() => setPlayerVisible(true)));
+    } catch {
+      // ignore storage failures
+    }
+  }, [allReplays, displayedReplay, loading]);
+
   // Scroll-to-top visibility
   useEffect(() => {
     const handleScroll = () => setShowScrollTop(window.scrollY > 400);
@@ -211,14 +261,24 @@ export default function Index() {
 
   // Atomic unlock + open player (prevents Chrome race condition)
   const handleUnlockAndWatch = useCallback((replay: ReplayRow) => {
+    try {
+      sessionStorage.setItem(ACTIVE_REPLAY_STORAGE_KEY, replay.id);
+    } catch {
+      // ignore storage failures
+    }
     setUnlockedIds(prev => new Set(prev).add(replay.id));
     if (closingTimerRef.current) clearTimeout(closingTimerRef.current);
     setDisplayedReplay(replay);
     setWatchingReplay(replay);
-    requestAnimationFrame(() => setPlayerVisible(true));
+    requestAnimationFrame(() => requestAnimationFrame(() => setPlayerVisible(true)));
   }, []);
 
   const handleOpenPlayer = useCallback((replay: ReplayRow) => {
+    try {
+      sessionStorage.setItem(ACTIVE_REPLAY_STORAGE_KEY, replay.id);
+    } catch {
+      // ignore storage failures
+    }
     if (closingTimerRef.current) clearTimeout(closingTimerRef.current);
     setDisplayedReplay(replay);
     setWatchingReplay(replay);
@@ -226,11 +286,20 @@ export default function Index() {
   }, []);
 
   const handleClosePlayer = useCallback(() => {
+    try {
+      sessionStorage.removeItem(ACTIVE_REPLAY_STORAGE_KEY);
+    } catch {
+      // ignore storage failures
+    }
     setPlayerVisible(false);
     setWatchingReplay(null);
     closingTimerRef.current = setTimeout(() => {
       setDisplayedReplay(null);
     }, 350);
+  }, []);
+
+  useEffect(() => () => {
+    if (closingTimerRef.current) clearTimeout(closingTimerRef.current);
   }, []);
 
   return (

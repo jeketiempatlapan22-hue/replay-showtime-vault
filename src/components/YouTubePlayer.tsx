@@ -73,7 +73,7 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
   ).slice(0, 11);
   const isValidId = /^[A-Za-z0-9_-]{11}$/.test(extractedId);
 
-  const embedUrl = `https://www.youtube.com/embed/${extractedId}?rel=0&modestbranding=1&playsinline=1&autoplay=0&origin=${encodeURIComponent(window.location.origin)}`;
+  const embedUrl = `https://www.youtube-nocookie.com/embed/${extractedId}?rel=0&modestbranding=1&playsinline=1&autoplay=0&iv_load_policy=3&origin=${encodeURIComponent(window.location.origin)}`;
 
   const lineup = replay.lineup || [];
 
@@ -100,6 +100,7 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
         ) : (
           <div className="relative w-full overflow-hidden rounded-xl bg-black" style={{ paddingBottom: '56.25%' }}>
             <iframe
+              key={replay.id}
               className="absolute inset-0 w-full h-full"
               src={embedUrl}
               title={replay.title}
