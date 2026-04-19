@@ -50,10 +50,13 @@ export default function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWa
     const valid = await verifyPassword(replay.id, trimmedPassword);
     setChecking(false);
     if (valid) {
+      // Persist password for this replay so the player can fetch the source
+      try {
+        sessionStorage.setItem(`replaytime-pw-${replay.id}`, trimmedPassword);
+      } catch { /* ignore */ }
       setShowPasswordDialog(false);
       setPassword('');
       setError('');
-      // Atomically unlock AND open player to prevent Chrome race condition
       if (onUnlockAndWatch) {
         onUnlockAndWatch(replay);
       } else {
@@ -69,10 +72,9 @@ export default function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWa
   });
 
   const criteriaLabel = CRITERIA_LABELS[replay.criteria] || replay.criteria;
-  const sourceType = (replay as any).source_type || 'youtube';
-  const thumbnailUrl = sourceType === 'youtube' && replay.youtube_id
-    ? `https://img.youtube.com/vi/${replay.youtube_id}/mqdefault.jpg`
-    : replay.image_url || '/placeholder.svg';
+  // SECURITY: thumbnail uses uploaded image only — youtube_id is hidden
+  // from the client until the user enters the correct password.
+  const thumbnailUrl = replay.image_url || '/placeholder.svg';
 
   return (
     <div>
