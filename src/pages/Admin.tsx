@@ -116,13 +116,14 @@ export default function Admin() {
   const handleLogout = async () => { await supabase.auth.signOut(); setIsLoggedIn(false); };
 
   const resetForm = () => {
-    setForm({ title: '', showName: '', date: '', showTime: '19:00', criteria: 'reguler', featuredMember: '', lineup: '', password: '', youtubeId: '', imageUrl: '' });
+    setForm({ title: '', showName: '', date: '', showTime: '19:00', criteria: 'reguler', featuredMember: '', lineup: '', password: '', youtubeId: '', imageUrl: '', sourceType: 'youtube', m3u8Url: '' });
     setEditingReplay(null);
   };
 
   const handleSaveReplay = async () => {
-    if (!form.title || !form.date || !form.youtubeId || !form.password) {
-      toast({ title: 'Error', description: 'Judul, tanggal, YouTube ID, dan sandi wajib diisi!', variant: 'destructive' });
+    const isYoutube = form.sourceType === 'youtube';
+    if (!form.title || !form.date || !form.password || (isYoutube ? !form.youtubeId : !form.m3u8Url)) {
+      toast({ title: 'Error', description: `Judul, tanggal, sandi, dan ${isYoutube ? 'YouTube ID' : 'link M3U8'} wajib diisi!`, variant: 'destructive' });
       return;
     }
     const lineupArr = form.lineup.split(',').map(s => s.trim()).filter(Boolean);
@@ -130,7 +131,11 @@ export default function Admin() {
       const payload = {
         title: form.title, show_name: form.showName, date: form.date, show_time: form.showTime + ':00', criteria: form.criteria,
         featured_member: showFeaturedMember ? form.featuredMember : '',
-        lineup: lineupArr, password: form.password, youtube_id: form.youtubeId, image_url: form.imageUrl,
+        lineup: lineupArr, password: form.password,
+        youtube_id: isYoutube ? form.youtubeId : '',
+        image_url: form.imageUrl,
+        source_type: form.sourceType,
+        m3u8_url: isYoutube ? '' : form.m3u8Url,
       };
       if (editingReplay) {
         await updateReplay(editingReplay.id, payload);
@@ -152,6 +157,7 @@ export default function Admin() {
     setForm({
       title: r.title, showName: r.show_name, date: r.date, showTime: (r.show_time || '19:00:00').slice(0, 5), criteria: r.criteria,
       featuredMember: r.featured_member, lineup: r.lineup.join(', '), password: r.password, youtubeId: r.youtube_id, imageUrl: r.image_url,
+      sourceType: (r as any).source_type || 'youtube', m3u8Url: (r as any).m3u8_url || '',
     });
     setShowAddDialog(true);
   };
