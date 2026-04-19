@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { addReplay, deleteReplay, updateReplay, getReplays, getAllMasterPasswords, setMasterPassword, getSettings, setSetting, type ReplayRow, type MasterPasswordRow } from '@/lib/store';
+import { addReplay, deleteReplay, updateReplay, getReplaysAdmin, getAllMasterPasswords, setMasterPassword, getSettings, setSetting, type ReplayRow, type MasterPasswordRow } from '@/lib/store';
 import { THEME_OPTIONS, type ThemeType } from '@/components/ThemedBackground';
 import ImagePicker from '@/components/ImagePicker';
 import { toast } from '@/hooks/use-toast';
@@ -101,7 +101,7 @@ export default function Admin() {
 
   const refreshData = async () => {
     try {
-      const [r, m, settings] = await Promise.all([getReplays(), getAllMasterPasswords(), getSettings()]);
+      const [r, m, settings] = await Promise.all([getReplaysAdmin(), getAllMasterPasswords(), getSettings()]);
       setReplays(r);
       setMasterPasswords(m);
       setCurrentTheme((settings.theme as ThemeType) || 'ramadhan');

@@ -6,13 +6,51 @@ export type MasterPasswordRow = Tables<'master_passwords'>;
 export type SiteSettingRow = Tables<'site_settings'>;
 
 export async function getReplays(): Promise<ReplayRow[]> {
+  // SECURITY: never expose youtube_id, m3u8_url, password to public client.
+  // Source video is fetched on-demand via the `get-replay-source` edge function
+  // after the user enters the correct password.
   const { data, error } = await supabase
     .from('replays')
-    .select('id, title, show_name, date, criteria, featured_member, lineup, youtube_id, image_url, view_count, show_time, created_at, updated_at, source_type, m3u8_url')
+    .select('id, title, show_name, date, criteria, featured_member, lineup, image_url, view_count, show_time, created_at, updated_at, source_type')
     .order('date', { ascending: false })
     .order('show_time', { ascending: false });
   if (error) throw error;
   return (data || []) as unknown as ReplayRow[];
+}
+
+// Admin-only: returns all columns including secrets. RLS does not block public
+// SELECT, so this is purely a convenience for admin UI — never call from
+// public/user-facing components.
+export async function getReplaysAdmin(): Promise<ReplayRow[]> {
+  const { data, error } = await supabase
+    .from('replays')
+    .select('*')
+    .order('date', { ascending: false })
+    .order('show_time', { ascending: false });
+  if (error) throw error;
+  return (data || []) as unknown as ReplayRow[];
+}
+
+export interface ReplaySource {
+  youtube_id: string;
+  m3u8_url: string;
+  source_type: string;
+}
+
+export async function getReplaySource(replayId: string, password: string): Promise<ReplaySource | null> {
+  try {
+    const { data, error } = await supabase.functions.invoke('get-replay-source', {
+      body: { replay_id: replayId, password },
+    });
+    if (error || !data?.valid) return null;
+    return {
+      youtube_id: data.youtube_id || '',
+      m3u8_url: data.m3u8_url || '',
+      source_type: data.source_type || 'youtube',
+    };
+  } catch {
+    return null;
+  }
 }
 
 export async function getReplaysByMonth(): Promise<Record<string, ReplayRow[]>> {

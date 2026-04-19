@@ -1,7 +1,7 @@
-import { ArrowLeft, Maximize, Minimize, Eye } from 'lucide-react';
+import { ArrowLeft, Maximize, Minimize, Eye, Loader2 } from 'lucide-react';
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { type ReplayRow } from '@/lib/store';
+import { type ReplayRow, getReplaySource, type ReplaySource } from '@/lib/store';
 import { supabase } from '@/integrations/supabase/client';
 import RatingStars from '@/components/RatingStars';
 import CommentSection from '@/components/CommentSection';
@@ -16,11 +16,47 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [viewCount, setViewCount] = useState(replay.view_count ?? 0);
   const [hlsFailed, setHlsFailed] = useState(false);
+  const [source, setSource] = useState<ReplaySource | null>(null);
+  const [sourceLoading, setSourceLoading] = useState(true);
+  const [sourceError, setSourceError] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
 
   useEffect(() => {
     setViewCount(replay.view_count ?? 0);
   }, [replay.id, replay.view_count]);
+
+  // Fetch source server-side via edge function (uses sandi from sessionStorage)
+  useEffect(() => {
+    let cancelled = false;
+    setSource(null);
+    setSourceLoading(true);
+    setSourceError(null);
+    setHlsFailed(false);
+
+    const password = (() => {
+      try { return sessionStorage.getItem(`replaytime-pw-${replay.id}`) || ''; } catch { return ''; }
+    })();
+
+    if (!password) {
+      setSourceLoading(false);
+      setSourceError('Sesi sandi telah kedaluwarsa. Silakan buka kartu kembali.');
+      return;
+    }
+
+    getReplaySource(replay.id, password).then((src) => {
+      if (cancelled) return;
+      if (!src) {
+        setSourceError('Tidak dapat memuat video. Coba buka ulang.');
+        setSourceLoading(false);
+        return;
+      }
+      setSource(src);
+      setSourceLoading(false);
+    });
+
+    return () => { cancelled = true; };
+  }, [replay.id]);
 
   useEffect(() => {
     const incrementView = async () => {
@@ -57,22 +93,23 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
     }
   }, []);
 
-  const m3u8Url = (((replay as any).m3u8_url as string) || '').trim();
-
-  const rawId = (replay.youtube_id || '').trim();
+  const m3u8Url = (source?.m3u8_url || '').trim();
+  const rawId = (source?.youtube_id || '').trim();
   const matchedId = rawId.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/|v\/))([A-Za-z0-9_-]{11})/)?.[1];
   const fallbackId = rawId.match(/([A-Za-z0-9_-]{11})/)?.[1];
   const extractedId = (matchedId || fallbackId || '').slice(0, 11);
   const isValidYoutube = /^[A-Za-z0-9_-]{11}$/.test(extractedId);
 
-  // Reset HLS failure flag when replay changes
-  useEffect(() => { setHlsFailed(false); }, [replay.id]);
-
   // Priority: M3U8 first if present and not failed → otherwise YouTube
   const useM3u8 = !!m3u8Url && !hlsFailed;
   const useYoutube = !useM3u8 && isValidYoutube;
 
-  const embedUrl = `https://www.youtube-nocookie.com/embed/${extractedId}?rel=0&modestbranding=1&playsinline=1&autoplay=0&iv_load_policy=3&origin=${encodeURIComponent(window.location.origin)}`;
+  // Set iframe src via JS after mount so YouTube ID is not in initial HTML.
+  useEffect(() => {
+    if (!useYoutube || !iframeRef.current) return;
+    const url = `https://www.youtube-nocookie.com/embed/${extractedId}?rel=0&modestbranding=1&playsinline=1&autoplay=0&iv_load_policy=3&enablejsapi=0&origin=${encodeURIComponent(window.location.origin)}`;
+    iframeRef.current.src = url;
+  }, [useYoutube, extractedId, replay.id]);
 
   const lineup = replay.lineup || [];
 
@@ -93,8 +130,23 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
         )}
       </div>
 
-      <div ref={containerRef} className="w-full max-w-5xl mx-auto px-2 sm:px-4 py-4">
-        {useM3u8 ? (
+      <div
+        ref={containerRef}
+        className="w-full max-w-5xl mx-auto px-2 sm:px-4 py-4 select-none"
+        style={{ WebkitUserSelect: 'none', userSelect: 'none' }}
+        onContextMenu={(e) => e.preventDefault()}
+      >
+        {sourceLoading ? (
+          <div className="relative w-full overflow-hidden rounded-xl bg-black flex items-center justify-center" style={{ paddingBottom: '56.25%' }}>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <Loader2 className="w-10 h-10 text-primary animate-spin" />
+            </div>
+          </div>
+        ) : sourceError ? (
+          <div className="rounded-xl bg-destructive/10 border border-destructive/30 p-6 text-center">
+            <p className="text-destructive font-medium">{sourceError}</p>
+          </div>
+        ) : useM3u8 ? (
           <HlsPlayer
             src={m3u8Url}
             title={replay.title}
@@ -103,9 +155,9 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
         ) : useYoutube ? (
           <div className="relative w-full overflow-hidden rounded-xl bg-black" style={{ paddingBottom: '56.25%' }}>
             <iframe
+              ref={iframeRef}
               key={replay.id}
               className="absolute inset-0 w-full h-full"
-              src={embedUrl}
               title={replay.title}
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
               allowFullScreen
