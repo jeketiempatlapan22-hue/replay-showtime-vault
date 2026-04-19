@@ -69,7 +69,10 @@ export default function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWa
   });
 
   const criteriaLabel = CRITERIA_LABELS[replay.criteria] || replay.criteria;
-  const thumbnailUrl = `https://img.youtube.com/vi/${replay.youtube_id}/mqdefault.jpg`;
+  const sourceType = (replay as any).source_type || 'youtube';
+  const thumbnailUrl = sourceType === 'youtube' && replay.youtube_id
+    ? `https://img.youtube.com/vi/${replay.youtube_id}/mqdefault.jpg`
+    : replay.image_url || '/placeholder.svg';
 
   return (
     <div>

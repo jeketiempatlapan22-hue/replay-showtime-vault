@@ -5,6 +5,7 @@ import { type ReplayRow } from '@/lib/store';
 import { supabase } from '@/integrations/supabase/client';
 import RatingStars from '@/components/RatingStars';
 import CommentSection from '@/components/CommentSection';
+import HlsPlayer from '@/components/HlsPlayer';
 
 interface Props {
   replay: ReplayRow;
@@ -14,23 +15,18 @@ interface Props {
 export default function YouTubePlayer({ replay, onBack }: Props) {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [viewCount, setViewCount] = useState(replay.view_count ?? 0);
+  const containerRef = useRef<HTMLDivElement>(null);
 
-  // Sync view count when replay changes
   useEffect(() => {
     setViewCount(replay.view_count ?? 0);
   }, [replay.id, replay.view_count]);
-  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const incrementView = async () => {
       try {
-        const { data } = await supabase.rpc('increment_view_count', {
-          _replay_id: replay.id,
-        });
+        const { data } = await supabase.rpc('increment_view_count', { _replay_id: replay.id });
         if (typeof data === 'number') setViewCount(data);
-      } catch {
-        // silently fail
-      }
+      } catch { /* ignore */ }
     };
     incrementView();
   }, [replay.id]);
@@ -39,18 +35,12 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
     const channel = supabase
       .channel(`replay-views-${replay.id}`)
       .on('postgres_changes', {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'replays',
-        filter: `id=eq.${replay.id}`,
+        event: 'UPDATE', schema: 'public', table: 'replays', filter: `id=eq.${replay.id}`,
       }, (payload) => {
         const newRow = payload.new as { view_count?: number };
-        if (typeof newRow.view_count === 'number') {
-          setViewCount(newRow.view_count);
-        }
+        if (typeof newRow.view_count === 'number') setViewCount(newRow.view_count);
       })
       .subscribe();
-
     return () => { supabase.removeChannel(channel); };
   }, [replay.id]);
 
@@ -66,13 +56,15 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
     }
   }, []);
 
+  const sourceType = (replay as any).source_type || 'youtube';
+  const m3u8Url = (replay as any).m3u8_url || '';
+
   const rawId = replay.youtube_id || '';
   const extractedId = (
     rawId.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([A-Za-z0-9_-]{11})/)?.[1]
     || rawId.trim()
   ).slice(0, 11);
-  const isValidId = /^[A-Za-z0-9_-]{11}$/.test(extractedId);
-
+  const isValidYoutube = /^[A-Za-z0-9_-]{11}$/.test(extractedId);
   const embedUrl = `https://www.youtube-nocookie.com/embed/${extractedId}?rel=0&modestbranding=1&playsinline=1&autoplay=0&iv_load_policy=3&origin=${encodeURIComponent(window.location.origin)}`;
 
   const lineup = replay.lineup || [];
@@ -87,13 +79,23 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
           <h1 className="text-base sm:text-lg font-semibold truncate font-sans">{replay.title}</h1>
           <p className="text-xs sm:text-sm text-muted-foreground">{replay.criteria}</p>
         </div>
-        <Button variant="ghost" size="icon" onClick={toggleFullscreen} className="shrink-0">
-          {isFullscreen ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
-        </Button>
+        {sourceType === 'youtube' && (
+          <Button variant="ghost" size="icon" onClick={toggleFullscreen} className="shrink-0">
+            {isFullscreen ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
+          </Button>
+        )}
       </div>
 
       <div ref={containerRef} className="w-full max-w-5xl mx-auto px-2 sm:px-4 py-4">
-        {!isValidId ? (
+        {sourceType === 'm3u8' ? (
+          m3u8Url ? (
+            <HlsPlayer src={m3u8Url} title={replay.title} />
+          ) : (
+            <div className="rounded-xl bg-destructive/10 border border-destructive/30 p-6 text-center">
+              <p className="text-destructive font-medium">Link M3U8 belum disetel</p>
+            </div>
+          )
+        ) : !isValidYoutube ? (
           <div className="rounded-xl bg-destructive/10 border border-destructive/30 p-6 text-center">
             <p className="text-destructive font-medium">Video YouTube tidak valid</p>
           </div>

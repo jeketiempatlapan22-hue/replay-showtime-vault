@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, Trash2, Edit2, Key, Save, Palette, MessageCircle, LogOut, Eye, Send, LayoutGrid, List, Settings } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Edit2, Key, Save, Palette, MessageCircle, LogOut, Eye, Send, List, Settings, ShieldCheck, Unlock as UnlockIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -51,7 +51,7 @@ export default function Admin() {
   const [editingReplay, setEditingReplay] = useState<ReplayRow | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ReplayRow | null>(null);
 
-  const [form, setForm] = useState({ title: '', showName: '', date: '', showTime: '19:00', criteria: 'reguler', featuredMember: '', lineup: '', password: '', youtubeId: '', imageUrl: '' });
+  const [form, setForm] = useState({ title: '', showName: '', date: '', showTime: '19:00', criteria: 'reguler', featuredMember: '', lineup: '', password: '', youtubeId: '', imageUrl: '', sourceType: 'youtube', m3u8Url: '' });
 
   const [mpYear, setMpYear] = useState(String(new Date().getFullYear()));
   const [mpMonth, setMpMonth] = useState(String(new Date().getMonth() + 1).padStart(2, '0'));
@@ -70,6 +70,9 @@ export default function Admin() {
   // Preview state
   const [previewReplay, setPreviewReplay] = useState<ReplayRow | null>(null);
 
+  // Blocked browsers
+  const [blockedBrowsers, setBlockedBrowsers] = useState<Array<{ id: string; browser_id: string; reason: string; unblocked: boolean; created_at: string }>>([]);
+
   const showFeaturedMember = form.criteria === 'sts' || form.criteria === 'last_show';
 
   useEffect(() => {
@@ -83,7 +86,17 @@ export default function Admin() {
   }, []);
 
   useEffect(() => {
-    if (isLoggedIn) refreshData();
+    if (!isLoggedIn) return;
+    refreshData();
+    const channel = supabase
+      .channel('admin-blocked-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'blocked_browsers' }, () => {
+        supabase.from('blocked_browsers').select('*').order('created_at', { ascending: false }).then(({ data }) => {
+          if (data) setBlockedBrowsers(data as any);
+        });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
   }, [isLoggedIn]);
 
   const refreshData = async () => {
@@ -94,11 +107,31 @@ export default function Admin() {
       setCurrentTheme((settings.theme as ThemeType) || 'ramadhan');
       setWaNumber(settings.whatsapp_number || '');
       setWaLink(settings.whatsapp_link || '');
-      // Fetch all comments
       const { data: comments } = await supabase.from('comments').select('*').order('created_at', { ascending: false });
       if (comments) setAllComments(comments);
+      const { data: blocks } = await supabase.from('blocked_browsers').select('*').order('created_at', { ascending: false });
+      if (blocks) setBlockedBrowsers(blocks as any);
     } catch {
       toast({ title: 'Error', description: 'Gagal memuat data.', variant: 'destructive' });
+    }
+  };
+
+  const handleUnblockBrowser = async (id: string) => {
+    const { error } = await supabase.from('blocked_browsers').update({ unblocked: true }).eq('id', id);
+    if (error) {
+      toast({ title: 'Error', description: 'Gagal membuka blokir.', variant: 'destructive' });
+    } else {
+      toast({ title: 'Berhasil', description: 'Akses user dibuka kembali.' });
+      await refreshData();
+    }
+  };
+
+  const handleDeleteBlock = async (id: string) => {
+    const { error } = await supabase.from('blocked_browsers').delete().eq('id', id);
+    if (error) {
+      toast({ title: 'Error', description: 'Gagal menghapus.', variant: 'destructive' });
+    } else {
+      await refreshData();
     }
   };
 
@@ -116,13 +149,14 @@ export default function Admin() {
   const handleLogout = async () => { await supabase.auth.signOut(); setIsLoggedIn(false); };
 
   const resetForm = () => {
-    setForm({ title: '', showName: '', date: '', showTime: '19:00', criteria: 'reguler', featuredMember: '', lineup: '', password: '', youtubeId: '', imageUrl: '' });
+    setForm({ title: '', showName: '', date: '', showTime: '19:00', criteria: 'reguler', featuredMember: '', lineup: '', password: '', youtubeId: '', imageUrl: '', sourceType: 'youtube', m3u8Url: '' });
     setEditingReplay(null);
   };
 
   const handleSaveReplay = async () => {
-    if (!form.title || !form.date || !form.youtubeId || !form.password) {
-      toast({ title: 'Error', description: 'Judul, tanggal, YouTube ID, dan sandi wajib diisi!', variant: 'destructive' });
+    const isYoutube = form.sourceType === 'youtube';
+    if (!form.title || !form.date || !form.password || (isYoutube ? !form.youtubeId : !form.m3u8Url)) {
+      toast({ title: 'Error', description: `Judul, tanggal, sandi, dan ${isYoutube ? 'YouTube ID' : 'link M3U8'} wajib diisi!`, variant: 'destructive' });
       return;
     }
     const lineupArr = form.lineup.split(',').map(s => s.trim()).filter(Boolean);
@@ -130,7 +164,11 @@ export default function Admin() {
       const payload = {
         title: form.title, show_name: form.showName, date: form.date, show_time: form.showTime + ':00', criteria: form.criteria,
         featured_member: showFeaturedMember ? form.featuredMember : '',
-        lineup: lineupArr, password: form.password, youtube_id: form.youtubeId, image_url: form.imageUrl,
+        lineup: lineupArr, password: form.password,
+        youtube_id: isYoutube ? form.youtubeId : '',
+        image_url: form.imageUrl,
+        source_type: form.sourceType,
+        m3u8_url: isYoutube ? '' : form.m3u8Url,
       };
       if (editingReplay) {
         await updateReplay(editingReplay.id, payload);
@@ -152,6 +190,7 @@ export default function Admin() {
     setForm({
       title: r.title, showName: r.show_name, date: r.date, showTime: (r.show_time || '19:00:00').slice(0, 5), criteria: r.criteria,
       featuredMember: r.featured_member, lineup: r.lineup.join(', '), password: r.password, youtubeId: r.youtube_id, imageUrl: r.image_url,
+      sourceType: (r as any).source_type || 'youtube', m3u8Url: (r as any).m3u8_url || '',
     });
     setShowAddDialog(true);
   };
@@ -274,11 +313,12 @@ export default function Admin() {
       {/* Tabs */}
       <div className="max-w-6xl mx-auto px-2 sm:px-4 py-4">
         <Tabs defaultValue="replays" className="w-full">
-          <TabsList className="grid w-full grid-cols-4 mb-4">
-            <TabsTrigger value="replays" className="text-xs sm:text-sm gap-1"><List className="w-3.5 h-3.5 hidden sm:block" />Replay</TabsTrigger>
-            <TabsTrigger value="preview" className="text-xs sm:text-sm gap-1"><Eye className="w-3.5 h-3.5 hidden sm:block" />Preview</TabsTrigger>
-            <TabsTrigger value="comments" className="text-xs sm:text-sm gap-1"><MessageCircle className="w-3.5 h-3.5 hidden sm:block" />Komentar</TabsTrigger>
-            <TabsTrigger value="settings" className="text-xs sm:text-sm gap-1"><Settings className="w-3.5 h-3.5 hidden sm:block" />Setelan</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-5 mb-4">
+            <TabsTrigger value="replays" className="text-[10px] sm:text-sm gap-1"><List className="w-3.5 h-3.5 hidden sm:block" />Replay</TabsTrigger>
+            <TabsTrigger value="preview" className="text-[10px] sm:text-sm gap-1"><Eye className="w-3.5 h-3.5 hidden sm:block" />Preview</TabsTrigger>
+            <TabsTrigger value="comments" className="text-[10px] sm:text-sm gap-1"><MessageCircle className="w-3.5 h-3.5 hidden sm:block" />Komentar</TabsTrigger>
+            <TabsTrigger value="security" className="text-[10px] sm:text-sm gap-1"><ShieldCheck className="w-3.5 h-3.5 hidden sm:block" />Blokir</TabsTrigger>
+            <TabsTrigger value="settings" className="text-[10px] sm:text-sm gap-1"><Settings className="w-3.5 h-3.5 hidden sm:block" />Setelan</TabsTrigger>
           </TabsList>
 
           {/* ===== REPLAYS TAB ===== */}
@@ -394,7 +434,55 @@ export default function Admin() {
             </Card>
           </TabsContent>
 
-          {/* ===== SETTINGS TAB ===== */}
+          {/* ===== SECURITY / BLOCKED BROWSERS TAB ===== */}
+          <TabsContent value="security">
+            <Card>
+              <CardHeader>
+                <CardTitle className="font-sans text-base sm:text-lg flex items-center gap-2">
+                  <ShieldCheck className="w-5 h-5 text-primary" />
+                  Browser Diblokir ({blockedBrowsers.filter(b => !b.unblocked).length} aktif / {blockedBrowsers.length} total)
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-xs text-muted-foreground mb-3">
+                  User yang terdeteksi membuka DevTools/Inspect Element akan masuk ke daftar ini dan kehilangan akses. Klik "Buka Akses" untuk memulihkan, atau "Hapus" untuk menghapus catatan.
+                </p>
+                {blockedBrowsers.length === 0 ? (
+                  <p className="text-muted-foreground text-center py-8">Belum ada browser yang diblokir.</p>
+                ) : (
+                  <div className="space-y-2 max-h-[70vh] overflow-y-auto">
+                    {blockedBrowsers.map(b => (
+                      <div key={b.id} className="p-3 rounded-lg bg-secondary/50 border border-border">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <Badge variant={b.unblocked ? 'secondary' : 'destructive'} className="text-[10px]">
+                                {b.unblocked ? '✓ Dibuka' : '🚫 Diblokir'}
+                              </Badge>
+                              <span className="text-[10px] text-muted-foreground">{timeAgo(b.created_at)}</span>
+                            </div>
+                            <code className="block text-[11px] font-mono text-foreground mt-1 break-all">{b.browser_id}</code>
+                            <p className="text-[11px] text-muted-foreground mt-0.5">Alasan: {b.reason}</p>
+                          </div>
+                          <div className="flex gap-1 shrink-0">
+                            {!b.unblocked && (
+                              <Button variant="default" size="sm" className="h-7 text-xs" onClick={() => handleUnblockBrowser(b.id)}>
+                                <UnlockIcon className="w-3 h-3 mr-1" />Buka
+                              </Button>
+                            )}
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleDeleteBlock(b.id)}>
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
           <TabsContent value="settings" className="space-y-4">
             {/* Theme */}
             <Card>
@@ -546,7 +634,30 @@ export default function Admin() {
               <div><Label>Jam Show</Label><Input type="time" value={form.showTime} onChange={e => setForm(f => ({ ...f, showTime: e.target.value }))} /></div>
             </div>
             <div><Label>Lineup (koma)</Label><Input placeholder="Member 1, Member 2, ..." value={form.lineup} onChange={e => setForm(f => ({ ...f, lineup: e.target.value }))} /></div>
-            <div><Label>YouTube ID *</Label><Input placeholder="dQw4w9WgXcQ" value={form.youtubeId} onChange={e => setForm(f => ({ ...f, youtubeId: e.target.value }))} /></div>
+            <div>
+              <Label>Sumber Video</Label>
+              <div className="grid grid-cols-2 gap-2 mt-1">
+                <button
+                  type="button"
+                  onClick={() => setForm(f => ({ ...f, sourceType: 'youtube' }))}
+                  className={`p-2 rounded-md border-2 text-sm font-medium transition-all ${form.sourceType === 'youtube' ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground'}`}
+                >
+                  📺 YouTube
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setForm(f => ({ ...f, sourceType: 'm3u8' }))}
+                  className={`p-2 rounded-md border-2 text-sm font-medium transition-all ${form.sourceType === 'm3u8' ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground'}`}
+                >
+                  🎬 M3U8 (HLS)
+                </button>
+              </div>
+            </div>
+            {form.sourceType === 'youtube' ? (
+              <div><Label>YouTube ID *</Label><Input placeholder="dQw4w9WgXcQ" value={form.youtubeId} onChange={e => setForm(f => ({ ...f, youtubeId: e.target.value }))} /></div>
+            ) : (
+              <div><Label>Link M3U8 *</Label><Input placeholder="https://stream.mux.com/xxx.m3u8" value={form.m3u8Url} onChange={e => setForm(f => ({ ...f, m3u8Url: e.target.value }))} /></div>
+            )}
             <div><Label>Foto Kartu</Label><ImagePicker value={form.imageUrl} onChange={url => setForm(f => ({ ...f, imageUrl: url }))} /></div>
             <div><Label>Sandi *</Label><Input placeholder="Sandi untuk replay ini" value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} /></div>
             <Button className="w-full" onClick={handleSaveReplay}>
