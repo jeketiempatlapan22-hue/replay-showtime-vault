@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import Hls from 'hls.js';
-import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, RotateCcw, RotateCw, Loader2 } from 'lucide-react';
+import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, RotateCcw, RotateCw, Loader2, Settings, Check } from 'lucide-react';
 
 interface Props {
   src: string;
@@ -14,10 +14,18 @@ function formatTime(seconds: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
+interface QualityLevel {
+  index: number; // -1 = auto
+  label: string;
+  height?: number;
+  bitrate?: number;
+}
+
 export default function HlsPlayer({ src, title }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const hideControlsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hlsRef = useRef<Hls | null>(null);
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -28,6 +36,10 @@ export default function HlsPlayer({ src, title }: Props) {
   const [showControls, setShowControls] = useState(true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [qualities, setQualities] = useState<QualityLevel[]>([]);
+  const [currentQuality, setCurrentQuality] = useState<number>(-1);
+  const [autoActiveLabel, setAutoActiveLabel] = useState<string>('');
+  const [showQualityMenu, setShowQualityMenu] = useState(false);
 
   // Setup HLS
   useEffect(() => {
@@ -36,13 +48,33 @@ export default function HlsPlayer({ src, title }: Props) {
 
     setLoading(true);
     setError(null);
+    setQualities([]);
+    setCurrentQuality(-1);
+    setAutoActiveLabel('');
     let hls: Hls | null = null;
 
     if (Hls.isSupported()) {
       hls = new Hls({ enableWorker: true, lowLatencyMode: false });
+      hlsRef.current = hls;
       hls.loadSource(src);
       hls.attachMedia(video);
-      hls.on(Hls.Events.MANIFEST_PARSED, () => setLoading(false));
+      hls.on(Hls.Events.MANIFEST_PARSED, (_, data) => {
+        setLoading(false);
+        const levels: QualityLevel[] = (data.levels || []).map((lvl, i) => ({
+          index: i,
+          label: lvl.height ? `${lvl.height}p` : `${Math.round((lvl.bitrate || 0) / 1000)}kbps`,
+          height: lvl.height,
+          bitrate: lvl.bitrate,
+        }));
+        levels.sort((a, b) => (b.height || 0) - (a.height || 0));
+        setQualities([{ index: -1, label: 'Auto' }, ...levels]);
+      });
+      hls.on(Hls.Events.LEVEL_SWITCHED, (_, data) => {
+        if (hls && hls.autoLevelEnabled) {
+          const lvl = hls.levels[data.level];
+          setAutoActiveLabel(lvl?.height ? `${lvl.height}p` : '');
+        }
+      });
       hls.on(Hls.Events.ERROR, (_, data) => {
         if (data.fatal) {
           setError('Gagal memuat video. Periksa link M3U8.');
@@ -50,7 +82,6 @@ export default function HlsPlayer({ src, title }: Props) {
         }
       });
     } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-      // Safari native HLS
       video.src = src;
       video.addEventListener('loadedmetadata', () => setLoading(false), { once: true });
     } else {
@@ -60,8 +91,16 @@ export default function HlsPlayer({ src, title }: Props) {
 
     return () => {
       if (hls) hls.destroy();
+      hlsRef.current = null;
     };
   }, [src]);
+
+  const selectQuality = (levelIndex: number) => {
+    if (!hlsRef.current) return;
+    hlsRef.current.currentLevel = levelIndex;
+    setCurrentQuality(levelIndex);
+    setShowQualityMenu(false);
+  };
 
   // Video event listeners
   useEffect(() => {
@@ -292,6 +331,53 @@ export default function HlsPlayer({ src, title }: Props) {
             </div>
 
             <div className="flex-1" />
+
+            {qualities.length > 0 && (
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setShowQualityMenu(v => !v)}
+                  className="p-2 text-white hover:text-primary transition-colors flex items-center gap-1"
+                  aria-label="Kualitas video"
+                  title="Kualitas video"
+                >
+                  <Settings className="w-5 h-5" />
+                  <span className="text-[10px] font-medium hidden sm:inline">
+                    {currentQuality === -1
+                      ? `Auto${autoActiveLabel ? ` · ${autoActiveLabel}` : ''}`
+                      : qualities.find(q => q.index === currentQuality)?.label || ''}
+                  </span>
+                </button>
+                {showQualityMenu && (
+                  <div className="absolute bottom-full right-0 mb-2 min-w-[140px] rounded-lg bg-card/95 backdrop-blur border border-border shadow-xl overflow-hidden z-30">
+                    <div className="px-3 py-2 text-[10px] font-semibold uppercase text-muted-foreground border-b border-border">
+                      Kualitas Video
+                    </div>
+                    {qualities.map(q => {
+                      const active = currentQuality === q.index;
+                      return (
+                        <button
+                          key={q.index}
+                          type="button"
+                          onClick={() => selectQuality(q.index)}
+                          className={`w-full flex items-center justify-between gap-2 px-3 py-2 text-xs text-left transition-colors ${
+                            active ? 'bg-primary/15 text-primary font-medium' : 'text-foreground hover:bg-secondary/60'
+                          }`}
+                        >
+                          <span>
+                            {q.label}
+                            {q.index === -1 && autoActiveLabel && (
+                              <span className="text-muted-foreground ml-1">({autoActiveLabel})</span>
+                            )}
+                          </span>
+                          {active && <Check className="w-3.5 h-3.5" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
 
             <button
               type="button"
