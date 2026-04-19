@@ -18,6 +18,19 @@ export async function getReplays(): Promise<ReplayRow[]> {
   return (data || []) as unknown as ReplayRow[];
 }
 
+// Admin-only: returns all columns including secrets. RLS does not block public
+// SELECT, so this is purely a convenience for admin UI — never call from
+// public/user-facing components.
+export async function getReplaysAdmin(): Promise<ReplayRow[]> {
+  const { data, error } = await supabase
+    .from('replays')
+    .select('*')
+    .order('date', { ascending: false })
+    .order('show_time', { ascending: false });
+  if (error) throw error;
+  return (data || []) as unknown as ReplayRow[];
+}
+
 export interface ReplaySource {
   youtube_id: string;
   m3u8_url: string;
