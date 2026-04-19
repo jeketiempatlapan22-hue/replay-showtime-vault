@@ -56,15 +56,21 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
     }
   }, []);
 
-  const sourceType = (replay as any).source_type || 'youtube';
-  const m3u8Url = (replay as any).m3u8_url || '';
+  const rawSourceType = (replay as any).source_type || 'youtube';
+  const m3u8Url = ((replay as any).m3u8_url || '').trim();
 
-  const rawId = replay.youtube_id || '';
-  const extractedId = (
-    rawId.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([A-Za-z0-9_-]{11})/)?.[1]
-    || rawId.trim()
-  ).slice(0, 11);
+  const rawId = (replay.youtube_id || '').trim();
+  // Accept full URLs OR raw 11-char IDs (with possible extra chars)
+  const matchedId = rawId.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/|v\/))([A-Za-z0-9_-]{11})/)?.[1];
+  const fallbackId = rawId.match(/([A-Za-z0-9_-]{11})/)?.[1];
+  const extractedId = (matchedId || fallbackId || '').slice(0, 11);
   const isValidYoutube = /^[A-Za-z0-9_-]{11}$/.test(extractedId);
+
+  // Effective source: fallback to the other source if chosen one is empty
+  const sourceType: 'youtube' | 'm3u8' =
+    rawSourceType === 'm3u8'
+      ? (m3u8Url ? 'm3u8' : (isValidYoutube ? 'youtube' : 'm3u8'))
+      : (isValidYoutube ? 'youtube' : (m3u8Url ? 'm3u8' : 'youtube'));
   const embedUrl = `https://www.youtube-nocookie.com/embed/${extractedId}?rel=0&modestbranding=1&playsinline=1&autoplay=0&iv_load_policy=3&origin=${encodeURIComponent(window.location.origin)}`;
 
   const lineup = replay.lineup || [];
