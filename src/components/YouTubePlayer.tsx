@@ -20,6 +20,10 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
   const [source, setSource] = useState<ReplaySource | null>(null);
   const [sourceLoading, setSourceLoading] = useState(true);
   const [sourceError, setSourceError] = useState<string | null>(null);
+  const [needsPassword, setNeedsPassword] = useState(false);
+  const [pwInput, setPwInput] = useState('');
+  const [pwError, setPwError] = useState('');
+  const [pwChecking, setPwChecking] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
@@ -34,6 +38,9 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
     setSourceLoading(true);
     setSourceError(null);
     setHlsFailed(false);
+    setNeedsPassword(false);
+    setPwInput('');
+    setPwError('');
 
     const password = (() => {
       try { return sessionStorage.getItem(`replaytime-pw-${replay.id}`) || ''; } catch { return ''; }
@@ -41,15 +48,16 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
 
     if (!password) {
       setSourceLoading(false);
-      setSourceError('Sesi sandi telah kedaluwarsa. Silakan buka kartu kembali.');
+      setNeedsPassword(true);
       return;
     }
 
     getReplaySource(replay.id, password).then((src) => {
       if (cancelled) return;
       if (!src) {
-        setSourceError('Tidak dapat memuat video. Coba buka ulang.');
+        try { sessionStorage.removeItem(`replaytime-pw-${replay.id}`); } catch { /* ignore */ }
         setSourceLoading(false);
+        setNeedsPassword(true);
         return;
       }
       setSource(src);
@@ -58,6 +66,27 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
 
     return () => { cancelled = true; };
   }, [replay.id]);
+
+  const handleSubmitPassword = async () => {
+    const trimmed = pwInput.trim();
+    if (!trimmed) {
+      setPwError('Sandi wajib diisi.');
+      return;
+    }
+    setPwChecking(true);
+    setPwError('');
+    const src = await getReplaySource(replay.id, trimmed);
+    setPwChecking(false);
+    if (src) {
+      try { sessionStorage.setItem(`replaytime-pw-${replay.id}`, trimmed); } catch { /* ignore */ }
+      setSource(src);
+      setNeedsPassword(false);
+      setPwInput('');
+    } else {
+      setPwError('Sandi salah. Coba lagi.');
+    }
+  };
+
 
   useEffect(() => {
     const incrementView = async () => {
