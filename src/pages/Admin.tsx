@@ -624,7 +624,30 @@ export default function Admin() {
               <div><Label>Jam Show</Label><Input type="time" value={form.showTime} onChange={e => setForm(f => ({ ...f, showTime: e.target.value }))} /></div>
             </div>
             <div><Label>Lineup (koma)</Label><Input placeholder="Member 1, Member 2, ..." value={form.lineup} onChange={e => setForm(f => ({ ...f, lineup: e.target.value }))} /></div>
-            <div><Label>YouTube ID *</Label><Input placeholder="dQw4w9WgXcQ" value={form.youtubeId} onChange={e => setForm(f => ({ ...f, youtubeId: e.target.value }))} /></div>
+            <div>
+              <Label>Sumber Video</Label>
+              <div className="grid grid-cols-2 gap-2 mt-1">
+                <button
+                  type="button"
+                  onClick={() => setForm(f => ({ ...f, sourceType: 'youtube' }))}
+                  className={`p-2 rounded-md border-2 text-sm font-medium transition-all ${form.sourceType === 'youtube' ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground'}`}
+                >
+                  📺 YouTube
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setForm(f => ({ ...f, sourceType: 'm3u8' }))}
+                  className={`p-2 rounded-md border-2 text-sm font-medium transition-all ${form.sourceType === 'm3u8' ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground'}`}
+                >
+                  🎬 M3U8 (HLS)
+                </button>
+              </div>
+            </div>
+            {form.sourceType === 'youtube' ? (
+              <div><Label>YouTube ID *</Label><Input placeholder="dQw4w9WgXcQ" value={form.youtubeId} onChange={e => setForm(f => ({ ...f, youtubeId: e.target.value }))} /></div>
+            ) : (
+              <div><Label>Link M3U8 *</Label><Input placeholder="https://stream.mux.com/xxx.m3u8" value={form.m3u8Url} onChange={e => setForm(f => ({ ...f, m3u8Url: e.target.value }))} /></div>
+            )}
             <div><Label>Foto Kartu</Label><ImagePicker value={form.imageUrl} onChange={url => setForm(f => ({ ...f, imageUrl: url }))} /></div>
             <div><Label>Sandi *</Label><Input placeholder="Sandi untuk replay ini" value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} /></div>
             <Button className="w-full" onClick={handleSaveReplay}>
