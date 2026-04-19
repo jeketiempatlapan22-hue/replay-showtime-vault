@@ -86,7 +86,17 @@ export default function Admin() {
   }, []);
 
   useEffect(() => {
-    if (isLoggedIn) refreshData();
+    if (!isLoggedIn) return;
+    refreshData();
+    const channel = supabase
+      .channel('admin-blocked-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'blocked_browsers' }, () => {
+        supabase.from('blocked_browsers').select('*').order('created_at', { ascending: false }).then(({ data }) => {
+          if (data) setBlockedBrowsers(data as any);
+        });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
   }, [isLoggedIn]);
 
   const refreshData = async () => {
