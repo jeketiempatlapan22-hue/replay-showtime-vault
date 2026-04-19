@@ -332,6 +332,53 @@ export default function HlsPlayer({ src, title }: Props) {
 
             <div className="flex-1" />
 
+            {qualities.length > 0 && (
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setShowQualityMenu(v => !v)}
+                  className="p-2 text-white hover:text-primary transition-colors flex items-center gap-1"
+                  aria-label="Kualitas video"
+                  title="Kualitas video"
+                >
+                  <Settings className="w-5 h-5" />
+                  <span className="text-[10px] font-medium hidden sm:inline">
+                    {currentQuality === -1
+                      ? `Auto${autoActiveLabel ? ` · ${autoActiveLabel}` : ''}`
+                      : qualities.find(q => q.index === currentQuality)?.label || ''}
+                  </span>
+                </button>
+                {showQualityMenu && (
+                  <div className="absolute bottom-full right-0 mb-2 min-w-[140px] rounded-lg bg-card/95 backdrop-blur border border-border shadow-xl overflow-hidden z-30">
+                    <div className="px-3 py-2 text-[10px] font-semibold uppercase text-muted-foreground border-b border-border">
+                      Kualitas Video
+                    </div>
+                    {qualities.map(q => {
+                      const active = currentQuality === q.index;
+                      return (
+                        <button
+                          key={q.index}
+                          type="button"
+                          onClick={() => selectQuality(q.index)}
+                          className={`w-full flex items-center justify-between gap-2 px-3 py-2 text-xs text-left transition-colors ${
+                            active ? 'bg-primary/15 text-primary font-medium' : 'text-foreground hover:bg-secondary/60'
+                          }`}
+                        >
+                          <span>
+                            {q.label}
+                            {q.index === -1 && autoActiveLabel && (
+                              <span className="text-muted-foreground ml-1">({autoActiveLabel})</span>
+                            )}
+                          </span>
+                          {active && <Check className="w-3.5 h-3.5" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
             <button
               type="button"
               onClick={toggleFullscreen}
