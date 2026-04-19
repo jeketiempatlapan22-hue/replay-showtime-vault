@@ -15,6 +15,7 @@ interface Props {
 export default function YouTubePlayer({ replay, onBack }: Props) {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [viewCount, setViewCount] = useState(replay.view_count ?? 0);
+  const [hlsFailed, setHlsFailed] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -56,21 +57,21 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
     }
   }, []);
 
-  const rawSourceType = (replay as any).source_type || 'youtube';
-  const m3u8Url = ((replay as any).m3u8_url || '').trim();
+  const m3u8Url = (((replay as any).m3u8_url as string) || '').trim();
 
   const rawId = (replay.youtube_id || '').trim();
-  // Accept full URLs OR raw 11-char IDs (with possible extra chars)
   const matchedId = rawId.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/|v\/))([A-Za-z0-9_-]{11})/)?.[1];
   const fallbackId = rawId.match(/([A-Za-z0-9_-]{11})/)?.[1];
   const extractedId = (matchedId || fallbackId || '').slice(0, 11);
   const isValidYoutube = /^[A-Za-z0-9_-]{11}$/.test(extractedId);
 
-  // Effective source: fallback to the other source if chosen one is empty
-  const sourceType: 'youtube' | 'm3u8' =
-    rawSourceType === 'm3u8'
-      ? (m3u8Url ? 'm3u8' : (isValidYoutube ? 'youtube' : 'm3u8'))
-      : (isValidYoutube ? 'youtube' : (m3u8Url ? 'm3u8' : 'youtube'));
+  // Reset HLS failure flag when replay changes
+  useEffect(() => { setHlsFailed(false); }, [replay.id]);
+
+  // Priority: M3U8 first if present and not failed → otherwise YouTube
+  const useM3u8 = !!m3u8Url && !hlsFailed;
+  const useYoutube = !useM3u8 && isValidYoutube;
+
   const embedUrl = `https://www.youtube-nocookie.com/embed/${extractedId}?rel=0&modestbranding=1&playsinline=1&autoplay=0&iv_load_policy=3&origin=${encodeURIComponent(window.location.origin)}`;
 
   const lineup = replay.lineup || [];
@@ -85,7 +86,7 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
           <h1 className="text-base sm:text-lg font-semibold truncate font-sans">{replay.title}</h1>
           <p className="text-xs sm:text-sm text-muted-foreground">{replay.criteria}</p>
         </div>
-        {sourceType === 'youtube' && (
+        {useYoutube && (
           <Button variant="ghost" size="icon" onClick={toggleFullscreen} className="shrink-0">
             {isFullscreen ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
           </Button>
@@ -93,19 +94,13 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
       </div>
 
       <div ref={containerRef} className="w-full max-w-5xl mx-auto px-2 sm:px-4 py-4">
-        {sourceType === 'm3u8' ? (
-          m3u8Url ? (
-            <HlsPlayer src={m3u8Url} title={replay.title} />
-          ) : (
-            <div className="rounded-xl bg-destructive/10 border border-destructive/30 p-6 text-center">
-              <p className="text-destructive font-medium">Link M3U8 belum disetel</p>
-            </div>
-          )
-        ) : !isValidYoutube ? (
-          <div className="rounded-xl bg-destructive/10 border border-destructive/30 p-6 text-center">
-            <p className="text-destructive font-medium">Video YouTube tidak valid</p>
-          </div>
-        ) : (
+        {useM3u8 ? (
+          <HlsPlayer
+            src={m3u8Url}
+            title={replay.title}
+            onFatalError={() => { if (isValidYoutube) setHlsFailed(true); }}
+          />
+        ) : useYoutube ? (
           <div className="relative w-full overflow-hidden rounded-xl bg-black" style={{ paddingBottom: '56.25%' }}>
             <iframe
               key={replay.id}
@@ -118,6 +113,10 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
               loading="lazy"
               style={{ border: 0 }}
             />
+          </div>
+        ) : (
+          <div className="rounded-xl bg-destructive/10 border border-destructive/30 p-6 text-center">
+            <p className="text-destructive font-medium">Video belum tersedia. Hubungi admin.</p>
           </div>
         )}
 
