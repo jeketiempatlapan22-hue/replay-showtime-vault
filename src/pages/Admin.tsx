@@ -101,7 +101,7 @@ export default function Admin() {
 
   const refreshData = async () => {
     try {
-      const [r, m, settings] = await Promise.all([getReplays(), getAllMasterPasswords(), getSettings()]);
+      const [r, m, settings] = await Promise.all([getReplaysAdmin(), getAllMasterPasswords(), getSettings()]);
       setReplays(r);
       setMasterPasswords(m);
       setCurrentTheme((settings.theme as ThemeType) || 'ramadhan');
