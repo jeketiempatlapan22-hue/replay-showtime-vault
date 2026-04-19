@@ -14,10 +14,18 @@ function formatTime(seconds: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
+interface QualityLevel {
+  index: number; // -1 = auto
+  label: string;
+  height?: number;
+  bitrate?: number;
+}
+
 export default function HlsPlayer({ src, title }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const hideControlsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hlsRef = useRef<Hls | null>(null);
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -28,6 +36,10 @@ export default function HlsPlayer({ src, title }: Props) {
   const [showControls, setShowControls] = useState(true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [qualities, setQualities] = useState<QualityLevel[]>([]);
+  const [currentQuality, setCurrentQuality] = useState<number>(-1);
+  const [autoActiveLabel, setAutoActiveLabel] = useState<string>('');
+  const [showQualityMenu, setShowQualityMenu] = useState(false);
 
   // Setup HLS
   useEffect(() => {
@@ -36,13 +48,33 @@ export default function HlsPlayer({ src, title }: Props) {
 
     setLoading(true);
     setError(null);
+    setQualities([]);
+    setCurrentQuality(-1);
+    setAutoActiveLabel('');
     let hls: Hls | null = null;
 
     if (Hls.isSupported()) {
       hls = new Hls({ enableWorker: true, lowLatencyMode: false });
+      hlsRef.current = hls;
       hls.loadSource(src);
       hls.attachMedia(video);
-      hls.on(Hls.Events.MANIFEST_PARSED, () => setLoading(false));
+      hls.on(Hls.Events.MANIFEST_PARSED, (_, data) => {
+        setLoading(false);
+        const levels: QualityLevel[] = (data.levels || []).map((lvl, i) => ({
+          index: i,
+          label: lvl.height ? `${lvl.height}p` : `${Math.round((lvl.bitrate || 0) / 1000)}kbps`,
+          height: lvl.height,
+          bitrate: lvl.bitrate,
+        }));
+        levels.sort((a, b) => (b.height || 0) - (a.height || 0));
+        setQualities([{ index: -1, label: 'Auto' }, ...levels]);
+      });
+      hls.on(Hls.Events.LEVEL_SWITCHED, (_, data) => {
+        if (hls && hls.autoLevelEnabled) {
+          const lvl = hls.levels[data.level];
+          setAutoActiveLabel(lvl?.height ? `${lvl.height}p` : '');
+        }
+      });
       hls.on(Hls.Events.ERROR, (_, data) => {
         if (data.fatal) {
           setError('Gagal memuat video. Periksa link M3U8.');
@@ -50,7 +82,6 @@ export default function HlsPlayer({ src, title }: Props) {
         }
       });
     } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-      // Safari native HLS
       video.src = src;
       video.addEventListener('loadedmetadata', () => setLoading(false), { once: true });
     } else {
@@ -60,8 +91,16 @@ export default function HlsPlayer({ src, title }: Props) {
 
     return () => {
       if (hls) hls.destroy();
+      hlsRef.current = null;
     };
   }, [src]);
+
+  const selectQuality = (levelIndex: number) => {
+    if (!hlsRef.current) return;
+    hlsRef.current.currentLevel = levelIndex;
+    setCurrentQuality(levelIndex);
+    setShowQualityMenu(false);
+  };
 
   // Video event listeners
   useEffect(() => {
