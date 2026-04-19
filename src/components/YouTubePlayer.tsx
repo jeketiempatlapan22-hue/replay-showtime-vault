@@ -73,7 +73,6 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
   const useYoutube = !useM3u8 && isValidYoutube;
 
   const embedUrl = `https://www.youtube-nocookie.com/embed/${extractedId}?rel=0&modestbranding=1&playsinline=1&autoplay=0&iv_load_policy=3&origin=${encodeURIComponent(window.location.origin)}`;
-  const embedUrl = `https://www.youtube-nocookie.com/embed/${extractedId}?rel=0&modestbranding=1&playsinline=1&autoplay=0&iv_load_policy=3&origin=${encodeURIComponent(window.location.origin)}`;
 
   const lineup = replay.lineup || [];
 
@@ -87,7 +86,7 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
           <h1 className="text-base sm:text-lg font-semibold truncate font-sans">{replay.title}</h1>
           <p className="text-xs sm:text-sm text-muted-foreground">{replay.criteria}</p>
         </div>
-        {sourceType === 'youtube' && (
+        {useYoutube && (
           <Button variant="ghost" size="icon" onClick={toggleFullscreen} className="shrink-0">
             {isFullscreen ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
           </Button>
@@ -95,19 +94,13 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
       </div>
 
       <div ref={containerRef} className="w-full max-w-5xl mx-auto px-2 sm:px-4 py-4">
-        {sourceType === 'm3u8' ? (
-          m3u8Url ? (
-            <HlsPlayer src={m3u8Url} title={replay.title} />
-          ) : (
-            <div className="rounded-xl bg-destructive/10 border border-destructive/30 p-6 text-center">
-              <p className="text-destructive font-medium">Link M3U8 belum disetel</p>
-            </div>
-          )
-        ) : !isValidYoutube ? (
-          <div className="rounded-xl bg-destructive/10 border border-destructive/30 p-6 text-center">
-            <p className="text-destructive font-medium">Video YouTube tidak valid</p>
-          </div>
-        ) : (
+        {useM3u8 ? (
+          <HlsPlayer
+            src={m3u8Url}
+            title={replay.title}
+            onFatalError={() => { if (isValidYoutube) setHlsFailed(true); }}
+          />
+        ) : useYoutube ? (
           <div className="relative w-full overflow-hidden rounded-xl bg-black" style={{ paddingBottom: '56.25%' }}>
             <iframe
               key={replay.id}
@@ -120,6 +113,10 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
               loading="lazy"
               style={{ border: 0 }}
             />
+          </div>
+        ) : (
+          <div className="rounded-xl bg-destructive/10 border border-destructive/30 p-6 text-center">
+            <p className="text-destructive font-medium">Video belum tersedia. Hubungi admin.</p>
           </div>
         )}
 
