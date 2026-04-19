@@ -303,11 +303,12 @@ export default function Admin() {
       {/* Tabs */}
       <div className="max-w-6xl mx-auto px-2 sm:px-4 py-4">
         <Tabs defaultValue="replays" className="w-full">
-          <TabsList className="grid w-full grid-cols-4 mb-4">
-            <TabsTrigger value="replays" className="text-xs sm:text-sm gap-1"><List className="w-3.5 h-3.5 hidden sm:block" />Replay</TabsTrigger>
-            <TabsTrigger value="preview" className="text-xs sm:text-sm gap-1"><Eye className="w-3.5 h-3.5 hidden sm:block" />Preview</TabsTrigger>
-            <TabsTrigger value="comments" className="text-xs sm:text-sm gap-1"><MessageCircle className="w-3.5 h-3.5 hidden sm:block" />Komentar</TabsTrigger>
-            <TabsTrigger value="settings" className="text-xs sm:text-sm gap-1"><Settings className="w-3.5 h-3.5 hidden sm:block" />Setelan</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-5 mb-4">
+            <TabsTrigger value="replays" className="text-[10px] sm:text-sm gap-1"><List className="w-3.5 h-3.5 hidden sm:block" />Replay</TabsTrigger>
+            <TabsTrigger value="preview" className="text-[10px] sm:text-sm gap-1"><Eye className="w-3.5 h-3.5 hidden sm:block" />Preview</TabsTrigger>
+            <TabsTrigger value="comments" className="text-[10px] sm:text-sm gap-1"><MessageCircle className="w-3.5 h-3.5 hidden sm:block" />Komentar</TabsTrigger>
+            <TabsTrigger value="security" className="text-[10px] sm:text-sm gap-1"><ShieldCheck className="w-3.5 h-3.5 hidden sm:block" />Blokir</TabsTrigger>
+            <TabsTrigger value="settings" className="text-[10px] sm:text-sm gap-1"><Settings className="w-3.5 h-3.5 hidden sm:block" />Setelan</TabsTrigger>
           </TabsList>
 
           {/* ===== REPLAYS TAB ===== */}
