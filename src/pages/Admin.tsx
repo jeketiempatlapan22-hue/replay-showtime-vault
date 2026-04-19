@@ -94,11 +94,31 @@ export default function Admin() {
       setCurrentTheme((settings.theme as ThemeType) || 'ramadhan');
       setWaNumber(settings.whatsapp_number || '');
       setWaLink(settings.whatsapp_link || '');
-      // Fetch all comments
       const { data: comments } = await supabase.from('comments').select('*').order('created_at', { ascending: false });
       if (comments) setAllComments(comments);
+      const { data: blocks } = await supabase.from('blocked_browsers').select('*').order('created_at', { ascending: false });
+      if (blocks) setBlockedBrowsers(blocks as any);
     } catch {
       toast({ title: 'Error', description: 'Gagal memuat data.', variant: 'destructive' });
+    }
+  };
+
+  const handleUnblockBrowser = async (id: string) => {
+    const { error } = await supabase.from('blocked_browsers').update({ unblocked: true }).eq('id', id);
+    if (error) {
+      toast({ title: 'Error', description: 'Gagal membuka blokir.', variant: 'destructive' });
+    } else {
+      toast({ title: 'Berhasil', description: 'Akses user dibuka kembali.' });
+      await refreshData();
+    }
+  };
+
+  const handleDeleteBlock = async (id: string) => {
+    const { error } = await supabase.from('blocked_browsers').delete().eq('id', id);
+    if (error) {
+      toast({ title: 'Error', description: 'Gagal menghapus.', variant: 'destructive' });
+    } else {
+      await refreshData();
     }
   };
 
