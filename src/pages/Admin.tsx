@@ -424,7 +424,55 @@ export default function Admin() {
             </Card>
           </TabsContent>
 
-          {/* ===== SETTINGS TAB ===== */}
+          {/* ===== SECURITY / BLOCKED BROWSERS TAB ===== */}
+          <TabsContent value="security">
+            <Card>
+              <CardHeader>
+                <CardTitle className="font-sans text-base sm:text-lg flex items-center gap-2">
+                  <ShieldCheck className="w-5 h-5 text-primary" />
+                  Browser Diblokir ({blockedBrowsers.filter(b => !b.unblocked).length} aktif / {blockedBrowsers.length} total)
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-xs text-muted-foreground mb-3">
+                  User yang terdeteksi membuka DevTools/Inspect Element akan masuk ke daftar ini dan kehilangan akses. Klik "Buka Akses" untuk memulihkan, atau "Hapus" untuk menghapus catatan.
+                </p>
+                {blockedBrowsers.length === 0 ? (
+                  <p className="text-muted-foreground text-center py-8">Belum ada browser yang diblokir.</p>
+                ) : (
+                  <div className="space-y-2 max-h-[70vh] overflow-y-auto">
+                    {blockedBrowsers.map(b => (
+                      <div key={b.id} className="p-3 rounded-lg bg-secondary/50 border border-border">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <Badge variant={b.unblocked ? 'secondary' : 'destructive'} className="text-[10px]">
+                                {b.unblocked ? '✓ Dibuka' : '🚫 Diblokir'}
+                              </Badge>
+                              <span className="text-[10px] text-muted-foreground">{timeAgo(b.created_at)}</span>
+                            </div>
+                            <code className="block text-[11px] font-mono text-foreground mt-1 break-all">{b.browser_id}</code>
+                            <p className="text-[11px] text-muted-foreground mt-0.5">Alasan: {b.reason}</p>
+                          </div>
+                          <div className="flex gap-1 shrink-0">
+                            {!b.unblocked && (
+                              <Button variant="default" size="sm" className="h-7 text-xs" onClick={() => handleUnblockBrowser(b.id)}>
+                                <UnlockIcon className="w-3 h-3 mr-1" />Buka
+                              </Button>
+                            )}
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleDeleteBlock(b.id)}>
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
           <TabsContent value="settings" className="space-y-4">
             {/* Theme */}
             <Card>
