@@ -5,6 +5,7 @@ import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, RotateCcw, RotateCw,
 interface Props {
   src: string;
   title: string;
+  onFatalError?: () => void;
 }
 
 function formatTime(seconds: number): string {
@@ -21,7 +22,7 @@ interface QualityLevel {
   bitrate?: number;
 }
 
-export default function HlsPlayer({ src, title }: Props) {
+export default function HlsPlayer({ src, title, onFatalError }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const hideControlsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -77,23 +78,30 @@ export default function HlsPlayer({ src, title }: Props) {
       });
       hls.on(Hls.Events.ERROR, (_, data) => {
         if (data.fatal) {
-          setError('Gagal memuat video. Periksa link M3U8.');
+          setError('Gagal memuat video.');
           setLoading(false);
+          onFatalError?.();
         }
       });
     } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
       video.src = src;
       video.addEventListener('loadedmetadata', () => setLoading(false), { once: true });
+      video.addEventListener('error', () => {
+        setError('Gagal memuat video.');
+        setLoading(false);
+        onFatalError?.();
+      }, { once: true });
     } else {
       setError('Browser ini tidak mendukung pemutaran HLS.');
       setLoading(false);
+      onFatalError?.();
     }
 
     return () => {
       if (hls) hls.destroy();
       hlsRef.current = null;
     };
-  }, [src]);
+  }, [src, onFatalError]);
 
   const selectQuality = (levelIndex: number) => {
     if (!hlsRef.current) return;
