@@ -14,6 +14,33 @@ export type Database = {
   }
   public: {
     Tables: {
+      blocked_browsers: {
+        Row: {
+          browser_id: string
+          created_at: string
+          id: string
+          reason: string
+          unblocked: boolean
+          updated_at: string
+        }
+        Insert: {
+          browser_id: string
+          created_at?: string
+          id?: string
+          reason?: string
+          unblocked?: boolean
+          updated_at?: string
+        }
+        Update: {
+          browser_id?: string
+          created_at?: string
+          id?: string
+          reason?: string
+          unblocked?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
       comments: {
         Row: {
           created_at: string
@@ -111,9 +138,11 @@ export type Database = {
           id: string
           image_url: string
           lineup: string[]
+          m3u8_url: string
           password: string
           show_name: string
           show_time: string | null
+          source_type: string
           title: string
           updated_at: string
           view_count: number
@@ -127,13 +156,15 @@ export type Database = {
           id?: string
           image_url?: string
           lineup?: string[]
+          m3u8_url?: string
           password: string
           show_name?: string
           show_time?: string | null
+          source_type?: string
           title: string
           updated_at?: string
           view_count?: number
-          youtube_id: string
+          youtube_id?: string
         }
         Update: {
           created_at?: string
@@ -143,9 +174,11 @@ export type Database = {
           id?: string
           image_url?: string
           lineup?: string[]
+          m3u8_url?: string
           password?: string
           show_name?: string
           show_time?: string | null
+          source_type?: string
           title?: string
           updated_at?: string
           view_count?: number
