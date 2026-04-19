@@ -8,7 +8,7 @@ export type SiteSettingRow = Tables<'site_settings'>;
 export async function getReplays(): Promise<ReplayRow[]> {
   const { data, error } = await supabase
     .from('replays')
-    .select('id, title, show_name, date, criteria, featured_member, lineup, youtube_id, image_url, view_count, show_time, created_at, updated_at')
+    .select('id, title, show_name, date, criteria, featured_member, lineup, youtube_id, image_url, view_count, show_time, created_at, updated_at, source_type, m3u8_url')
     .order('date', { ascending: false })
     .order('show_time', { ascending: false });
   if (error) throw error;
@@ -31,6 +31,7 @@ export async function addReplay(replay: {
   title: string; show_name: string; date: string; criteria: string;
   featured_member: string; lineup: string[];
   password: string; youtube_id: string; image_url: string;
+  source_type?: string; m3u8_url?: string; show_time?: string;
 }) {
   const { error } = await supabase.from('replays').insert(replay);
   if (error) throw error;
