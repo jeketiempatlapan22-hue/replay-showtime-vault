@@ -1,6 +1,7 @@
-import { ArrowLeft, Maximize, Minimize, Eye, Loader2 } from 'lucide-react';
+import { ArrowLeft, Maximize, Minimize, Eye, Loader2, Lock } from 'lucide-react';
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { type ReplayRow, getReplaySource, type ReplaySource } from '@/lib/store';
 import { supabase } from '@/integrations/supabase/client';
 import RatingStars from '@/components/RatingStars';
@@ -19,6 +20,10 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
   const [source, setSource] = useState<ReplaySource | null>(null);
   const [sourceLoading, setSourceLoading] = useState(true);
   const [sourceError, setSourceError] = useState<string | null>(null);
+  const [needsPassword, setNeedsPassword] = useState(false);
+  const [pwInput, setPwInput] = useState('');
+  const [pwError, setPwError] = useState('');
+  const [pwChecking, setPwChecking] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
@@ -33,6 +38,9 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
     setSourceLoading(true);
     setSourceError(null);
     setHlsFailed(false);
+    setNeedsPassword(false);
+    setPwInput('');
+    setPwError('');
 
     const password = (() => {
       try { return sessionStorage.getItem(`replaytime-pw-${replay.id}`) || ''; } catch { return ''; }
@@ -40,15 +48,16 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
 
     if (!password) {
       setSourceLoading(false);
-      setSourceError('Sesi sandi telah kedaluwarsa. Silakan buka kartu kembali.');
+      setNeedsPassword(true);
       return;
     }
 
     getReplaySource(replay.id, password).then((src) => {
       if (cancelled) return;
       if (!src) {
-        setSourceError('Tidak dapat memuat video. Coba buka ulang.');
+        try { sessionStorage.removeItem(`replaytime-pw-${replay.id}`); } catch { /* ignore */ }
         setSourceLoading(false);
+        setNeedsPassword(true);
         return;
       }
       setSource(src);
@@ -57,6 +66,27 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
 
     return () => { cancelled = true; };
   }, [replay.id]);
+
+  const handleSubmitPassword = async () => {
+    const trimmed = pwInput.trim();
+    if (!trimmed) {
+      setPwError('Sandi wajib diisi.');
+      return;
+    }
+    setPwChecking(true);
+    setPwError('');
+    const src = await getReplaySource(replay.id, trimmed);
+    setPwChecking(false);
+    if (src) {
+      try { sessionStorage.setItem(`replaytime-pw-${replay.id}`, trimmed); } catch { /* ignore */ }
+      setSource(src);
+      setNeedsPassword(false);
+      setPwInput('');
+    } else {
+      setPwError('Sandi salah. Coba lagi.');
+    }
+  };
+
 
   useEffect(() => {
     const incrementView = async () => {
@@ -140,6 +170,30 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
           <div className="relative w-full overflow-hidden rounded-xl bg-black flex items-center justify-center" style={{ paddingBottom: '56.25%' }}>
             <div className="absolute inset-0 flex items-center justify-center">
               <Loader2 className="w-10 h-10 text-primary animate-spin" />
+            </div>
+          </div>
+        ) : needsPassword ? (
+          <div className="rounded-xl bg-card/80 border border-border p-6 text-center space-y-4">
+            <div className="mx-auto w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+              <Lock className="w-6 h-6 text-primary" />
+            </div>
+            <div>
+              <p className="text-foreground font-semibold mb-1">Masukkan Sandi</p>
+              <p className="text-sm text-muted-foreground">Sesi sandi tidak ditemukan. Masukkan ulang untuk menonton.</p>
+            </div>
+            <div className="max-w-xs mx-auto space-y-2">
+              <Input
+                type="password"
+                placeholder="Sandi replay..."
+                value={pwInput}
+                onChange={(e) => { setPwInput(e.target.value); setPwError(''); }}
+                onKeyDown={(e) => e.key === 'Enter' && handleSubmitPassword()}
+                autoFocus
+              />
+              {pwError && <p className="text-xs text-destructive">{pwError}</p>}
+              <Button className="w-full" onClick={handleSubmitPassword} disabled={pwChecking}>
+                {pwChecking ? 'Memeriksa...' : 'Buka Replay'}
+              </Button>
             </div>
           </div>
         ) : sourceError ? (
