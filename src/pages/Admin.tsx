@@ -70,6 +70,9 @@ export default function Admin() {
   // Preview state
   const [previewReplay, setPreviewReplay] = useState<ReplayRow | null>(null);
 
+  // Blocked browsers
+  const [blockedBrowsers, setBlockedBrowsers] = useState<Array<{ id: string; browser_id: string; reason: string; unblocked: boolean; created_at: string }>>([]);
+
   const showFeaturedMember = form.criteria === 'sts' || form.criteria === 'last_show';
 
   useEffect(() => {
