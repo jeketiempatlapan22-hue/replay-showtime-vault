@@ -172,6 +172,30 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
               <Loader2 className="w-10 h-10 text-primary animate-spin" />
             </div>
           </div>
+        ) : needsPassword ? (
+          <div className="rounded-xl bg-card/80 border border-border p-6 text-center space-y-4">
+            <div className="mx-auto w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+              <Lock className="w-6 h-6 text-primary" />
+            </div>
+            <div>
+              <p className="text-foreground font-semibold mb-1">Masukkan Sandi</p>
+              <p className="text-sm text-muted-foreground">Sesi sandi tidak ditemukan. Masukkan ulang untuk menonton.</p>
+            </div>
+            <div className="max-w-xs mx-auto space-y-2">
+              <Input
+                type="password"
+                placeholder="Sandi replay..."
+                value={pwInput}
+                onChange={(e) => { setPwInput(e.target.value); setPwError(''); }}
+                onKeyDown={(e) => e.key === 'Enter' && handleSubmitPassword()}
+                autoFocus
+              />
+              {pwError && <p className="text-xs text-destructive">{pwError}</p>}
+              <Button className="w-full" onClick={handleSubmitPassword} disabled={pwChecking}>
+                {pwChecking ? 'Memeriksa...' : 'Buka Replay'}
+              </Button>
+            </div>
+          </div>
         ) : sourceError ? (
           <div className="rounded-xl bg-destructive/10 border border-destructive/30 p-6 text-center">
             <p className="text-destructive font-medium">{sourceError}</p>
