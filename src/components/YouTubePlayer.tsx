@@ -1,4 +1,4 @@
-import { ArrowLeft, Maximize, Minimize, Eye, Loader2, Lock } from 'lucide-react';
+import { ArrowLeft, Maximize, Minimize, Eye, Loader2, Lock, PictureInPicture2 } from 'lucide-react';
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,7 +6,7 @@ import { type ReplayRow, getReplaySource, type ReplaySource } from '@/lib/store'
 import { supabase } from '@/integrations/supabase/client';
 import RatingStars from '@/components/RatingStars';
 import CommentSection from '@/components/CommentSection';
-import HlsPlayer from '@/components/HlsPlayer';
+import HlsPlayer, { type HlsPlayerHandle } from '@/components/HlsPlayer';
 
 interface Props {
   replay: ReplayRow;
