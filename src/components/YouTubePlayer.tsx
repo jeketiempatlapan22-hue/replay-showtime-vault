@@ -26,6 +26,9 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
   const [pwChecking, setPwChecking] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const hlsPlayerRef = useRef<HlsPlayerHandle>(null);
+  const [pipActive, setPipActive] = useState(false);
+  const pipSupported = typeof document !== 'undefined' && !!document.pictureInPictureEnabled;
 
   useEffect(() => {
     setViewCount(replay.view_count ?? 0);
