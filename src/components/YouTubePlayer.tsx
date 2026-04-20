@@ -237,7 +237,32 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
               <Eye className="w-4 h-4" />
               <span>{viewCount} kali ditonton</span>
             </div>
-            <RatingStars replayId={replay.id} />
+            <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-4 w-full sm:w-auto">
+              <RatingStars replayId={replay.id} />
+              {useM3u8 && pipSupported && (
+                <div className="flex flex-col items-end">
+                  <Button
+                    type="button"
+                    variant={pipActive ? 'default' : 'outline'}
+                    size="sm"
+                    className="gap-1.5 h-8 px-2.5"
+                    onClick={async () => {
+                      if (!hlsPlayerRef.current) return;
+                      if (pipActive) await hlsPlayerRef.current.exitPip();
+                      else await hlsPlayerRef.current.requestPip();
+                    }}
+                    title="Picture-in-Picture: tonton video di jendela kecil mengambang"
+                    aria-label="Picture in Picture"
+                  >
+                    <PictureInPicture2 className="w-4 h-4" />
+                    <span className="text-xs font-medium">{pipActive ? 'Tutup PiP' : 'PiP'}</span>
+                  </Button>
+                  <p className="mt-1 text-[10px] text-muted-foreground text-right max-w-[180px] leading-tight">
+                    Tonton di jendela kecil mengambang sambil membuka tab/aplikasi lain
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
 
           <p className="text-muted-foreground text-sm">
