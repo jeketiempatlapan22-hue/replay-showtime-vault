@@ -205,9 +205,11 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
           </div>
         ) : useM3u8 ? (
           <HlsPlayer
+            ref={hlsPlayerRef}
             src={m3u8Url}
             title={replay.title}
             onFatalError={() => { if (isValidYoutube) setHlsFailed(true); }}
+            onPipChange={setPipActive}
           />
         ) : useYoutube ? (
           <div className="relative w-full overflow-hidden rounded-xl bg-black" style={{ paddingBottom: '56.25%' }}>
