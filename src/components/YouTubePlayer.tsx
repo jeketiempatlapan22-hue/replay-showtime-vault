@@ -1,4 +1,4 @@
-import { ArrowLeft, Maximize, Minimize, Eye, Loader2, Lock } from 'lucide-react';
+import { ArrowLeft, Maximize, Minimize, Eye, Loader2, Lock, PictureInPicture2 } from 'lucide-react';
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,7 +6,7 @@ import { type ReplayRow, getReplaySource, type ReplaySource } from '@/lib/store'
 import { supabase } from '@/integrations/supabase/client';
 import RatingStars from '@/components/RatingStars';
 import CommentSection from '@/components/CommentSection';
-import HlsPlayer from '@/components/HlsPlayer';
+import HlsPlayer, { type HlsPlayerHandle } from '@/components/HlsPlayer';
 
 interface Props {
   replay: ReplayRow;
@@ -26,6 +26,9 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
   const [pwChecking, setPwChecking] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const hlsPlayerRef = useRef<HlsPlayerHandle>(null);
+  const [pipActive, setPipActive] = useState(false);
+  const pipSupported = typeof document !== 'undefined' && !!document.pictureInPictureEnabled;
 
   useEffect(() => {
     setViewCount(replay.view_count ?? 0);
@@ -202,9 +205,11 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
           </div>
         ) : useM3u8 ? (
           <HlsPlayer
+            ref={hlsPlayerRef}
             src={m3u8Url}
             title={replay.title}
             onFatalError={() => { if (isValidYoutube) setHlsFailed(true); }}
+            onPipChange={setPipActive}
           />
         ) : useYoutube ? (
           <div className="relative w-full overflow-hidden rounded-xl bg-black" style={{ paddingBottom: '56.25%' }}>
@@ -232,7 +237,32 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
               <Eye className="w-4 h-4" />
               <span>{viewCount} kali ditonton</span>
             </div>
-            <RatingStars replayId={replay.id} />
+            <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-4 w-full sm:w-auto">
+              <RatingStars replayId={replay.id} />
+              {useM3u8 && pipSupported && (
+                <div className="flex flex-col items-end">
+                  <Button
+                    type="button"
+                    variant={pipActive ? 'default' : 'outline'}
+                    size="sm"
+                    className="gap-1.5 h-8 px-2.5"
+                    onClick={async () => {
+                      if (!hlsPlayerRef.current) return;
+                      if (pipActive) await hlsPlayerRef.current.exitPip();
+                      else await hlsPlayerRef.current.requestPip();
+                    }}
+                    title="Picture-in-Picture: tonton video di jendela kecil mengambang"
+                    aria-label="Picture in Picture"
+                  >
+                    <PictureInPicture2 className="w-4 h-4" />
+                    <span className="text-xs font-medium">{pipActive ? 'Tutup PiP' : 'PiP'}</span>
+                  </Button>
+                  <p className="mt-1 text-[10px] text-muted-foreground text-right max-w-[180px] leading-tight">
+                    Tonton di jendela kecil mengambang sambil membuka tab/aplikasi lain
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
 
           <p className="text-muted-foreground text-sm">

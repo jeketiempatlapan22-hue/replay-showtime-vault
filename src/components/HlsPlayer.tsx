@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHandle } from 'react';
 import Hls from 'hls.js';
 import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, RotateCcw, RotateCw, Loader2, Settings, Check } from 'lucide-react';
 
@@ -6,6 +6,13 @@ interface Props {
   src: string;
   title: string;
   onFatalError?: () => void;
+  onPipChange?: (active: boolean) => void;
+}
+
+export interface HlsPlayerHandle {
+  requestPip: () => Promise<void>;
+  exitPip: () => Promise<void>;
+  isPipSupported: () => boolean;
 }
 
 function formatTime(seconds: number): string {
@@ -16,17 +23,18 @@ function formatTime(seconds: number): string {
 }
 
 interface QualityLevel {
-  index: number; // -1 = auto
+  index: number;
   label: string;
   height?: number;
   bitrate?: number;
 }
 
-export default function HlsPlayer({ src, title, onFatalError }: Props) {
+const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, onFatalError, onPipChange }, ref) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const hideControlsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hlsRef = useRef<Hls | null>(null);
+  const recoveryAttemptsRef = useRef(0);
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -35,27 +43,80 @@ export default function HlsPlayer({ src, title, onFatalError }: Props) {
   const [muted, setMuted] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showControls, setShowControls] = useState(true);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true); // initial connect
+  const [buffering, setBuffering] = useState(false); // mid-play stall
   const [error, setError] = useState<string | null>(null);
   const [qualities, setQualities] = useState<QualityLevel[]>([]);
   const [currentQuality, setCurrentQuality] = useState<number>(-1);
   const [autoActiveLabel, setAutoActiveLabel] = useState<string>('');
   const [showQualityMenu, setShowQualityMenu] = useState(false);
 
-  // Setup HLS
+  // Expose PiP API to parent
+  useImperativeHandle(ref, () => ({
+    requestPip: async () => {
+      const video = videoRef.current;
+      if (!video) return;
+      try {
+        if (document.pictureInPictureElement === video) return;
+        await video.requestPictureInPicture();
+      } catch (e) { /* ignore */ }
+    },
+    exitPip: async () => {
+      try {
+        if (document.pictureInPictureElement) await document.exitPictureInPicture();
+      } catch (e) { /* ignore */ }
+    },
+    isPipSupported: () => {
+      return typeof document !== 'undefined' && !!document.pictureInPictureEnabled;
+    },
+  }), []);
+
+  // PiP enter/leave events
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    const onEnter = () => onPipChange?.(true);
+    const onLeave = () => onPipChange?.(false);
+    video.addEventListener('enterpictureinpicture', onEnter);
+    video.addEventListener('leavepictureinpicture', onLeave);
+    return () => {
+      video.removeEventListener('enterpictureinpicture', onEnter);
+      video.removeEventListener('leavepictureinpicture', onLeave);
+    };
+  }, [onPipChange]);
+
+  // Setup HLS with optimized config
   useEffect(() => {
     const video = videoRef.current;
     if (!video || !src) return;
 
     setLoading(true);
+    setBuffering(false);
     setError(null);
     setQualities([]);
     setCurrentQuality(-1);
     setAutoActiveLabel('');
+    recoveryAttemptsRef.current = 0;
     let hls: Hls | null = null;
 
     if (Hls.isSupported()) {
-      hls = new Hls({ enableWorker: true, lowLatencyMode: false });
+      hls = new Hls({
+        enableWorker: true,
+        lowLatencyMode: false,
+        backBufferLength: 30,
+        maxBufferLength: 60,
+        maxMaxBufferLength: 120,
+        maxBufferSize: 60 * 1000 * 1000,
+        maxBufferHole: 0.5,
+        highBufferWatchdogPeriod: 2,
+        nudgeOffset: 0.1,
+        nudgeMaxRetry: 5,
+        abrEwmaDefaultEstimate: 500_000,
+        startLevel: -1,
+        manifestLoadingMaxRetry: 4,
+        levelLoadingMaxRetry: 4,
+        fragLoadingMaxRetry: 6,
+      });
       hlsRef.current = hls;
       hls.loadSource(src);
       hls.attachMedia(video);
@@ -77,11 +138,20 @@ export default function HlsPlayer({ src, title, onFatalError }: Props) {
         }
       });
       hls.on(Hls.Events.ERROR, (_, data) => {
-        if (data.fatal) {
-          setError('Gagal memuat video.');
-          setLoading(false);
-          onFatalError?.();
+        if (!data.fatal) return;
+        // Try to recover before escalating
+        if (recoveryAttemptsRef.current < 3) {
+          recoveryAttemptsRef.current += 1;
+          if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+            try { hls?.startLoad(); return; } catch { /* ignore */ }
+          } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+            try { hls?.recoverMediaError(); return; } catch { /* ignore */ }
+          }
         }
+        setError('Gagal memuat video.');
+        setLoading(false);
+        setBuffering(false);
+        onFatalError?.();
       });
     } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
       video.src = src;
@@ -119,8 +189,15 @@ export default function HlsPlayer({ src, title, onFatalError }: Props) {
     const onPause = () => setIsPlaying(false);
     const onTimeUpdate = () => setCurrentTime(video.currentTime);
     const onDurationChange = () => setDuration(video.duration);
-    const onWaiting = () => setLoading(true);
-    const onPlaying = () => setLoading(false);
+    const onWaiting = () => {
+      // mid-play stall (not initial)
+      if (!loading) setBuffering(true);
+    };
+    const onPlaying = () => {
+      setLoading(false);
+      setBuffering(false);
+    };
+    const onCanPlay = () => setBuffering(false);
     const onVolumeChange = () => {
       setVolume(video.volume);
       setMuted(video.muted);
@@ -132,6 +209,7 @@ export default function HlsPlayer({ src, title, onFatalError }: Props) {
     video.addEventListener('durationchange', onDurationChange);
     video.addEventListener('waiting', onWaiting);
     video.addEventListener('playing', onPlaying);
+    video.addEventListener('canplay', onCanPlay);
     video.addEventListener('volumechange', onVolumeChange);
 
     return () => {
@@ -141,9 +219,10 @@ export default function HlsPlayer({ src, title, onFatalError }: Props) {
       video.removeEventListener('durationchange', onDurationChange);
       video.removeEventListener('waiting', onWaiting);
       video.removeEventListener('playing', onPlaying);
+      video.removeEventListener('canplay', onCanPlay);
       video.removeEventListener('volumechange', onVolumeChange);
     };
-  }, []);
+  }, [loading]);
 
   // Fullscreen tracking
   useEffect(() => {
@@ -152,7 +231,6 @@ export default function HlsPlayer({ src, title, onFatalError }: Props) {
     return () => document.removeEventListener('fullscreenchange', onChange);
   }, []);
 
-  // Auto-hide controls
   const resetHideTimer = useCallback(() => {
     setShowControls(true);
     if (hideControlsTimerRef.current) clearTimeout(hideControlsTimerRef.current);
@@ -234,9 +312,19 @@ export default function HlsPlayer({ src, title, onFatalError }: Props) {
         title={title}
       />
 
+      {/* Initial loading overlay */}
       {loading && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none bg-black/40 backdrop-blur-sm animate-fade-in">
           <Loader2 className="w-12 h-12 text-primary animate-spin" />
+          <p className="mt-3 text-sm font-medium text-white/90 animate-pulse">Menghubungkan ke server...</p>
+        </div>
+      )}
+
+      {/* Mid-play buffering indicator (subtle, top-right) */}
+      {!loading && buffering && (
+        <div className="absolute top-3 right-3 z-20 flex items-center gap-2 rounded-full bg-black/60 backdrop-blur px-3 py-1.5 pointer-events-none animate-fade-in">
+          <Loader2 className="w-3.5 h-3.5 text-primary animate-spin" />
+          <span className="text-xs font-medium text-white/90">Memuat...</span>
         </div>
       )}
 
@@ -249,7 +337,6 @@ export default function HlsPlayer({ src, title, onFatalError }: Props) {
           background: 'linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 50%, rgba(0,0,0,0.3) 100%)',
         }}
       >
-        {/* Center play button */}
         <button
           type="button"
           onClick={togglePlay}
@@ -263,9 +350,7 @@ export default function HlsPlayer({ src, title, onFatalError }: Props) {
           )}
         </button>
 
-        {/* Bottom controls */}
         <div className="relative z-10 px-3 sm:px-4 pb-3 sm:pb-4 space-y-2" onClick={(e) => e.stopPropagation()}>
-          {/* Progress bar */}
           <div className="flex items-center gap-2 text-white text-xs">
             <span className="tabular-nums">{formatTime(currentTime)}</span>
             <input
@@ -287,44 +372,19 @@ export default function HlsPlayer({ src, title, onFatalError }: Props) {
             <span className="tabular-nums">{formatTime(duration)}</span>
           </div>
 
-          {/* Buttons row */}
           <div className="flex items-center gap-1 sm:gap-2">
-            <button
-              type="button"
-              onClick={togglePlay}
-              className="p-2 text-white hover:text-primary transition-colors"
-              aria-label={isPlaying ? 'Pause' : 'Play'}
-            >
+            <button type="button" onClick={togglePlay} className="p-2 text-white hover:text-primary transition-colors" aria-label={isPlaying ? 'Pause' : 'Play'}>
               {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
             </button>
-
-            <button
-              type="button"
-              onClick={() => seek(-10)}
-              className="p-2 text-white hover:text-primary transition-colors"
-              aria-label="Mundur 10 detik"
-              title="Mundur 10 detik"
-            >
+            <button type="button" onClick={() => seek(-10)} className="p-2 text-white hover:text-primary transition-colors" aria-label="Mundur 10 detik" title="Mundur 10 detik">
               <RotateCcw className="w-5 h-5" />
             </button>
-
-            <button
-              type="button"
-              onClick={() => seek(10)}
-              className="p-2 text-white hover:text-primary transition-colors"
-              aria-label="Maju 10 detik"
-              title="Maju 10 detik"
-            >
+            <button type="button" onClick={() => seek(10)} className="p-2 text-white hover:text-primary transition-colors" aria-label="Maju 10 detik" title="Maju 10 detik">
               <RotateCw className="w-5 h-5" />
             </button>
 
             <div className="flex items-center gap-1 group/volume">
-              <button
-                type="button"
-                onClick={toggleMute}
-                className="p-2 text-white hover:text-primary transition-colors"
-                aria-label={muted ? 'Unmute' : 'Mute'}
-              >
+              <button type="button" onClick={toggleMute} className="p-2 text-white hover:text-primary transition-colors" aria-label={muted ? 'Unmute' : 'Mute'}>
                 {muted || volume === 0 ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
               </button>
               <input
@@ -387,12 +447,7 @@ export default function HlsPlayer({ src, title, onFatalError }: Props) {
               </div>
             )}
 
-            <button
-              type="button"
-              onClick={toggleFullscreen}
-              className="p-2 text-white hover:text-primary transition-colors"
-              aria-label="Fullscreen"
-            >
+            <button type="button" onClick={toggleFullscreen} className="p-2 text-white hover:text-primary transition-colors" aria-label="Fullscreen">
               {isFullscreen ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
             </button>
           </div>
@@ -400,4 +455,8 @@ export default function HlsPlayer({ src, title, onFatalError }: Props) {
       </div>
     </div>
   );
-}
+});
+
+HlsPlayer.displayName = 'HlsPlayer';
+
+export default HlsPlayer;
