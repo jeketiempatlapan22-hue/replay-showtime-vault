@@ -103,19 +103,39 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, onFatalError
       hls = new Hls({
         enableWorker: true,
         lowLatencyMode: false,
+        // Buffer tuning untuk playback halus
         backBufferLength: 30,
-        maxBufferLength: 60,
-        maxMaxBufferLength: 120,
+        maxBufferLength: 30,
+        maxMaxBufferLength: 60,
         maxBufferSize: 60 * 1000 * 1000,
         maxBufferHole: 0.5,
         highBufferWatchdogPeriod: 2,
         nudgeOffset: 0.1,
         nudgeMaxRetry: 5,
-        abrEwmaDefaultEstimate: 500_000,
+        // ABR: mulai dari kualitas terendah supaya cepat play, lalu naikkan
         startLevel: -1,
+        autoStartLoad: true,
+        abrEwmaDefaultEstimate: 1_000_000,
+        abrBandWidthFactor: 0.9,
+        abrBandWidthUpFactor: 0.7,
+        abrMaxWithRealBitrate: true,
+        testBandwidth: true,
+        // Retry agresif tapi cepat untuk segment fragments
+        manifestLoadingTimeOut: 10_000,
         manifestLoadingMaxRetry: 4,
+        manifestLoadingRetryDelay: 500,
+        levelLoadingTimeOut: 10_000,
         levelLoadingMaxRetry: 4,
+        levelLoadingRetryDelay: 500,
+        fragLoadingTimeOut: 20_000,
         fragLoadingMaxRetry: 6,
+        fragLoadingRetryDelay: 500,
+        // Stall detection
+        maxStarvationDelay: 4,
+        maxLoadingDelay: 4,
+        // Hindari buffering ulang berlebihan
+        appendErrorMaxRetry: 3,
+        liveSyncDurationCount: 3,
       });
       hlsRef.current = hls;
       hls.loadSource(src);
