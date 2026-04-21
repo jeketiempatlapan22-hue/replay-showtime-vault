@@ -126,6 +126,10 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
     }
   }, []);
 
+  const handleHlsFatalError = useCallback(() => {
+    if (isValidYoutube) setHlsFailed(true);
+  }, [isValidYoutube]);
+
   const m3u8Url = (source?.m3u8_url || '').trim();
   const rawId = (source?.youtube_id || '').trim();
   const matchedId = rawId.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/|v\/))([A-Za-z0-9_-]{11})/)?.[1];
