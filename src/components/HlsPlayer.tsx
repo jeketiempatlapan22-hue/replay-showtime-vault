@@ -239,6 +239,8 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, onFatalError
     const onPlaying = () => {
       setLoading(false);
       setBuffering(false);
+      // Reset recovery counter on successful playback so future hiccups can recover too
+      recoveryAttemptsRef.current = 0;
     };
     const onCanPlay = () => setBuffering(false);
     const onVolumeChange = () => {
