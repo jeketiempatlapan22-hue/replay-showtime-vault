@@ -132,6 +132,9 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
   const fallbackId = rawId.match(/([A-Za-z0-9_-]{11})/)?.[1];
   const extractedId = (matchedId || fallbackId || '').slice(0, 11);
   const isValidYoutube = /^[A-Za-z0-9_-]{11}$/.test(extractedId);
+  const handleHlsFatalError = useCallback(() => {
+    if (isValidYoutube) setHlsFailed(true);
+  }, [isValidYoutube]);
 
   // Priority: M3U8 first if present and not failed → otherwise YouTube
   const useM3u8 = !!m3u8Url && !hlsFailed;
@@ -208,7 +211,7 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
             ref={hlsPlayerRef}
             src={m3u8Url}
             title={replay.title}
-            onFatalError={() => { if (isValidYoutube) setHlsFailed(true); }}
+            onFatalError={handleHlsFatalError}
             onPipChange={setPipActive}
           />
         ) : useYoutube ? (

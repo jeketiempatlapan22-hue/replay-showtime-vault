@@ -35,6 +35,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, onFatalError
   const hideControlsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hlsRef = useRef<Hls | null>(null);
   const recoveryAttemptsRef = useRef(0);
+  const onFatalErrorRef = useRef(onFatalError);
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -84,6 +85,10 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, onFatalError
       video.removeEventListener('leavepictureinpicture', onLeave);
     };
   }, [onPipChange]);
+
+  useEffect(() => {
+    onFatalErrorRef.current = onFatalError;
+  }, [onFatalError]);
 
   // Setup HLS with optimized config
   useEffect(() => {
@@ -194,7 +199,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, onFatalError
         setError('Gagal memuat video.');
         setLoading(false);
         setBuffering(false);
-        onFatalError?.();
+        onFatalErrorRef.current?.();
       });
     } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
       video.src = src;
@@ -202,19 +207,19 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, onFatalError
       video.addEventListener('error', () => {
         setError('Gagal memuat video.');
         setLoading(false);
-        onFatalError?.();
+        onFatalErrorRef.current?.();
       }, { once: true });
     } else {
       setError('Browser ini tidak mendukung pemutaran HLS.');
       setLoading(false);
-      onFatalError?.();
+      onFatalErrorRef.current?.();
     }
 
     return () => {
       if (hls) hls.destroy();
       hlsRef.current = null;
     };
-  }, [src, onFatalError]);
+  }, [src]);
 
   const selectQuality = (levelIndex: number) => {
     if (!hlsRef.current) return;
