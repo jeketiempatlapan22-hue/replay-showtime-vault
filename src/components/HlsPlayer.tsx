@@ -158,14 +158,37 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, onFatalError
         }
       });
       hls.on(Hls.Events.ERROR, (_, data) => {
+        // Non-fatal errors: log only, hls.js handles internal retries.
+        // Do NOT call startLoad() on non-fatal — it would restart from position 0.
         if (!data.fatal) return;
-        // Try to recover before escalating
+
+        // Fatal: try to recover IN-PLACE, preserving currentTime.
         if (recoveryAttemptsRef.current < 3) {
           recoveryAttemptsRef.current += 1;
+          const resumeTime = video.currentTime;
+          const wasPlaying = !video.paused;
+
           if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-            try { hls?.startLoad(); return; } catch { /* ignore */ }
+            try {
+              // startLoad(resumeTime) keeps the playhead instead of restarting at 0
+              hls?.startLoad(resumeTime);
+              if (wasPlaying) video.play().catch(() => {});
+              return;
+            } catch { /* ignore */ }
           } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
-            try { hls?.recoverMediaError(); return; } catch { /* ignore */ }
+            try {
+              hls?.recoverMediaError();
+              // recoverMediaError preserves position; just resume play state
+              if (wasPlaying) {
+                const onReady = () => {
+                  video.currentTime = resumeTime;
+                  video.play().catch(() => {});
+                  video.removeEventListener('loadedmetadata', onReady);
+                };
+                video.addEventListener('loadedmetadata', onReady, { once: true });
+              }
+              return;
+            } catch { /* ignore */ }
           }
         }
         setError('Gagal memuat video.');
@@ -216,6 +239,8 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, onFatalError
     const onPlaying = () => {
       setLoading(false);
       setBuffering(false);
+      // Reset recovery counter on successful playback so future hiccups can recover too
+      recoveryAttemptsRef.current = 0;
     };
     const onCanPlay = () => setBuffering(false);
     const onVolumeChange = () => {
