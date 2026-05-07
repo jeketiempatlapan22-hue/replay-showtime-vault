@@ -215,9 +215,10 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, onFatalError
       hls.attachMedia(video);
       hls.on(Hls.Events.MANIFEST_PARSED, (_, data) => {
         setLoading(false);
-        isLiveRef.current = (data.levels || []).some((level: any) => level.details?.live) || false;
+        const manifestLevels = (data.levels || []) as Array<{ details?: { live?: boolean }; height?: number; bitrate?: number }>;
+        isLiveRef.current = manifestLevels.some(level => level.details?.live) || false;
         setIsLiveStream(isLiveRef.current);
-        const levels: QualityLevel[] = (data.levels || []).map((lvl, i) => ({
+        const levels: QualityLevel[] = manifestLevels.map((lvl, i) => ({
           index: i,
           label: lvl.height ? `${lvl.height}p` : `${Math.round((lvl.bitrate || 0) / 1000)}kbps`,
           height: lvl.height,
