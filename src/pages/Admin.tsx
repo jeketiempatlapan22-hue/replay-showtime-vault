@@ -62,6 +62,7 @@ export default function Admin() {
   const [currentTheme, setCurrentTheme] = useState<ThemeType>('ramadhan');
   const [waNumber, setWaNumber] = useState('');
   const [waLink, setWaLink] = useState('');
+  const [adminUsername, setAdminUsername] = useState('');
 
   // Comments state
   const [allComments, setAllComments] = useState<Comment[]>([]);
