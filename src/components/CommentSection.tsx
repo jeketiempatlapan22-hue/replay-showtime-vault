@@ -81,15 +81,16 @@ export default function CommentSection({ replayId }: CommentSectionProps) {
   }, [replayId]);
 
   const handleSend = async () => {
-    if (!message.trim()) return;
+    const cleanMessage = message.trim().slice(0, 500);
+    if (!cleanMessage || sending || !chatEnabled) return;
     setSending(true);
-    const displayName = name.trim() || 'Anonim';
+    const displayName = (name.trim() || 'Anonim').slice(0, 40);
     localStorage.setItem('replaytime-name', displayName);
 
     await supabase.from('comments').insert({
       replay_id: replayId,
       name: displayName,
-      message: message.trim(),
+      message: cleanMessage,
     });
 
     setMessage('');
@@ -159,7 +160,7 @@ export default function CommentSection({ replayId }: CommentSectionProps) {
             <Input
               placeholder="Tulis komentar..."
               value={message}
-              onChange={e => setMessage(e.target.value)}
+              onChange={e => setMessage(e.target.value.slice(0, 500))}
               onKeyDown={e => e.key === 'Enter' && handleSend()}
               className="bg-card/60 border-border"
             />
