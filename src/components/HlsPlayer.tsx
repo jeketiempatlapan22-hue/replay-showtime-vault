@@ -359,6 +359,21 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, onFatalError
     hlsRef.current.currentLevel = levelIndex;
     setCurrentQuality(levelIndex);
     setShowQualityMenu(false);
+    if (levelIndex === -1) {
+      // Auto: re-enable adaptive
+      hlsRef.current.autoLevelCapping = -1;
+      hlsRef.current.capLevelToPlayerSize = true;
+      userQualityRef.current = null;
+      try { localStorage.removeItem('replaytime-quality-height'); } catch { /* ignore */ }
+    } else {
+      const lvl = hlsRef.current.levels[levelIndex];
+      const h = lvl?.height || null;
+      // Lock the level so ABR/cap doesn't override user's choice
+      hlsRef.current.autoLevelCapping = levelIndex;
+      hlsRef.current.capLevelToPlayerSize = false;
+      userQualityRef.current = h;
+      if (h) try { localStorage.setItem('replaytime-quality-height', String(h)); } catch { /* ignore */ }
+    }
   };
 
   // Video event listeners
