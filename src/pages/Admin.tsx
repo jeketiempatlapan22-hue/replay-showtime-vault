@@ -140,7 +140,7 @@ export default function Admin() {
       ]);
       if (cfgRes.data?.config) {
         const c = cfgRes.data.config;
-        setLiveCfg({ enabled: !!c.enabled, title: c.title || 'Live', type: c.type || 'm3u8', url: c.url || '', password: c.password || '', require_password: c.require_password !== false });
+        setLiveCfg({ enabled: !!c.enabled, title: c.title || 'Live', type: c.type || 'm3u8', url: c.url || '', password: c.password || '', require_password: c.require_password !== false, sources: Array.isArray(c.sources) ? c.sources : [] });
       }
       if (tokRes.data?.tokens) setLiveTokens(tokRes.data.tokens);
     } catch { /* ignore */ }
