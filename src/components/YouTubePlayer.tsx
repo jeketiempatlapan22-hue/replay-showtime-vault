@@ -198,19 +198,19 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
     }
   }, [activeSource, sources]);
 
-  // Build YouTube embed URL with autoplay+mute
+  // Build YouTube embed URL with autoplay+mute and full controls (play/pause + resolution)
   const ytEmbedUrl = useMemo(() => {
     if (!activeSource || activeSource.type !== 'youtube') return '';
     const id = extractYoutubeId(activeSource.url);
     if (!/^[A-Za-z0-9_-]{11}$/.test(id)) return '';
-    return `https://www.youtube-nocookie.com/embed/${id}?rel=0&modestbranding=1&playsinline=1&autoplay=1&mute=1&iv_load_policy=3&enablejsapi=0&origin=${encodeURIComponent(window.location.origin)}`;
+    return `https://www.youtube-nocookie.com/embed/${id}?rel=0&modestbranding=1&playsinline=1&autoplay=1&mute=1&controls=1&fs=1&iv_load_policy=3&enablejsapi=0&origin=${encodeURIComponent(window.location.origin)}`;
   }, [activeSource]);
 
   const cfEmbedUrl = useMemo(() => {
     if (!activeSource || activeSource.type !== 'cloudflare') return '';
     const uid = extractCloudflareUid(activeSource.url);
     if (!uid) return '';
-    return `https://iframe.videodelivery.net/${uid}?autoplay=true&muted=true`;
+    return `https://iframe.videodelivery.net/${uid}?autoplay=true&muted=true&controls=true&preload=auto`;
   }, [activeSource]);
 
   // Set iframe src after mount
