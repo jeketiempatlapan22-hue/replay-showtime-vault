@@ -31,26 +31,47 @@ export async function getReplaysAdmin(): Promise<ReplayRow[]> {
   return (data || []) as unknown as ReplayRow[];
 }
 
+export type PlaylistSourceType = 'youtube' | 'm3u8' | 'cloudflare';
+
+export interface PlaylistSource {
+  id: string;
+  label: string;
+  type: PlaylistSourceType;
+  url: string;
+  is_default?: boolean;
+}
+
 export interface ReplaySource {
   youtube_id: string;
   m3u8_url: string;
   source_type: string;
+  sources: PlaylistSource[];
 }
 
-export async function getReplaySource(replayId: string, password: string): Promise<ReplaySource | null> {
+export async function getReplaySource(
+  replayId: string,
+  opts: { password?: string; accessToken?: string },
+): Promise<ReplaySource | null> {
   try {
-    const { data, error } = await supabase.functions.invoke('get-replay-source', {
-      body: { replay_id: replayId, password },
-    });
+    const body: Record<string, string> = { replay_id: replayId };
+    if (opts.password) body.password = opts.password;
+    if (opts.accessToken) body.access_token = opts.accessToken;
+    const { data, error } = await supabase.functions.invoke('get-replay-source', { body });
     if (error || !data?.valid) return null;
     return {
       youtube_id: data.youtube_id || '',
       m3u8_url: data.m3u8_url || '',
       source_type: data.source_type || 'youtube',
+      sources: Array.isArray(data.sources) ? data.sources : [],
     };
   } catch {
     return null;
   }
+}
+
+export async function setReplayAccessToken(id: string, token: string | null) {
+  const { error } = await supabase.from('replays').update({ access_token: token } as any).eq('id', id);
+  if (error) throw error;
 }
 
 export async function getReplaysByMonth(): Promise<Record<string, ReplayRow[]>> {
