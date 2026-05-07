@@ -147,26 +147,33 @@ export default function CommentSection({ replayId }: CommentSectionProps) {
       </div>
 
       {/* Input */}
-      <div className="space-y-2">
-        <Input
-          placeholder="Nama kamu (opsional)"
-          value={name}
-          onChange={e => setName(e.target.value)}
-          className="bg-card/60 border-border text-sm"
-        />
-        <div className="flex gap-2">
+      {chatEnabled ? (
+        <div className="space-y-2">
           <Input
-            placeholder="Tulis komentar..."
-            value={message}
-            onChange={e => setMessage(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && handleSend()}
-            className="bg-card/60 border-border"
+            placeholder="Nama kamu (opsional)"
+            value={name}
+            onChange={e => setName(e.target.value)}
+            className="bg-card/60 border-border text-sm"
           />
-          <Button size="icon" onClick={handleSend} disabled={sending || !message.trim()}>
-            <Send className="w-4 h-4" />
-          </Button>
+          <div className="flex gap-2">
+            <Input
+              placeholder="Tulis komentar..."
+              value={message}
+              onChange={e => setMessage(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleSend()}
+              className="bg-card/60 border-border"
+            />
+            <Button size="icon" onClick={handleSend} disabled={sending || !message.trim()}>
+              <Send className="w-4 h-4" />
+            </Button>
+          </div>
+          <p className="text-[10px] text-muted-foreground">Hanya 30 pesan terakhir yang disimpan.</p>
         </div>
-      </div>
+      ) : (
+        <div className="rounded-lg border border-border bg-secondary/40 p-3 text-center text-sm text-muted-foreground">
+          🔒 Live chat sedang dinonaktifkan oleh admin.
+        </div>
+      )}
     </div>
   );
 }
