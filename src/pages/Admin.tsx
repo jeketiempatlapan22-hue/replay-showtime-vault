@@ -563,8 +563,9 @@ export default function Admin() {
       {/* Tabs */}
       <div className="max-w-6xl mx-auto px-2 sm:px-4 py-4">
         <Tabs defaultValue="replays" className="w-full">
-          <TabsList className="grid w-full grid-cols-4 sm:grid-cols-7 mb-4">
+          <TabsList className="grid w-full grid-cols-4 sm:grid-cols-8 mb-4">
             <TabsTrigger value="replays" className="text-[10px] sm:text-sm gap-1"><List className="w-3.5 h-3.5 hidden sm:block" />Replay</TabsTrigger>
+            <TabsTrigger value="shows" className="text-[10px] sm:text-sm gap-1"><Sparkles className="w-3.5 h-3.5 hidden sm:block" />Show</TabsTrigger>
             <TabsTrigger value="live" className="text-[10px] sm:text-sm gap-1"><Radio className="w-3.5 h-3.5 hidden sm:block" />Live</TabsTrigger>
             <TabsTrigger value="members" className="text-[10px] sm:text-sm gap-1"><Users className="w-3.5 h-3.5 hidden sm:block" />Member</TabsTrigger>
             <TabsTrigger value="preview" className="text-[10px] sm:text-sm gap-1"><Eye className="w-3.5 h-3.5 hidden sm:block" />Preview</TabsTrigger>
