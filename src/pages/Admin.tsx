@@ -575,6 +575,22 @@ export default function Admin() {
               </CardContent>
             </Card>
 
+            {/* Live Chat Toggle */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="font-sans text-base sm:text-lg flex items-center gap-2">
+                  <MessageCircle className="w-5 h-5 text-primary" />Live Chat
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="flex items-center justify-between gap-3">
+                <div className="space-y-0.5">
+                  <Label className="text-sm">Aktifkan Live Chat</Label>
+                  <p className="text-xs text-muted-foreground">Saat dimatikan, user tidak bisa mengirim pesan baru. Hanya 30 pesan terakhir per replay yang disimpan.</p>
+                </div>
+                <Switch checked={liveChatEnabled} onCheckedChange={handleToggleLiveChat} />
+              </CardContent>
+            </Card>
+
             {/* WhatsApp */}
             <Card>
               <CardHeader><CardTitle className="font-sans text-base sm:text-lg flex items-center gap-2"><MessageCircle className="w-5 h-5 text-primary" />WhatsApp</CardTitle></CardHeader>
