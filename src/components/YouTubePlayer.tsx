@@ -147,10 +147,10 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
   const toggleFullscreen = useCallback(() => {
     if (!containerRef.current) return;
     if (!document.fullscreenElement) {
-      containerRef.current.requestFullscreen?.() || (containerRef.current as any).webkitRequestFullscreen?.();
+      void containerRef.current.requestFullscreen?.();
       setIsFullscreen(true);
     } else {
-      document.exitFullscreen?.() || (document as any).webkitExitFullscreen?.();
+      void document.exitFullscreen?.();
       setIsFullscreen(false);
     }
   }, []);
