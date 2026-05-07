@@ -21,12 +21,13 @@ Deno.serve(async (req) => {
 
     if (!token && !password) return json({ valid: false, reason: "password_or_token_required" });
 
-    // Token path (device-locked)
+    const enabled = !!cfg.enabled;
+
+    // Token path (device-locked) — token can be validated regardless of enabled state
     if (token) {
       const { data: t } = await supabase.from("live_tokens").select("*").eq("token", token).maybeSingle();
       if (!t || t.revoked) return json({ valid: false, reason: "revoked" });
       if (!browser_id) return json({ valid: false, reason: "no_device" });
-      if (!cfg.enabled) return json({ valid: false, reason: "off" });
 
       const { data: existing } = await supabase
         .from("live_token_devices").select("id").eq("token_id", t.id).eq("browser_id", browser_id).maybeSingle();
@@ -44,18 +45,17 @@ Deno.serve(async (req) => {
       }
       const last4 = String(token).slice(-4).toUpperCase();
       return json({
-        valid: true, title: cfg.title, type: cfg.type, url: cfg.url,
+        valid: true, enabled, title: cfg.title, type: cfg.type, url: cfg.url,
         sources: Array.isArray(cfg.sources) ? cfg.sources : [],
         watermark: `RT-${last4}`,
       });
     }
 
-    // Password path
+    // Password path — allowed even when live is offline
     if (password) {
       if (!cfg.password || cfg.password !== password) return json({ valid: false, reason: "bad_password" });
-      if (!cfg.enabled) return json({ valid: false, reason: "off" });
       return json({
-        valid: true, title: cfg.title, type: cfg.type, url: cfg.url,
+        valid: true, enabled, title: cfg.title, type: cfg.type, url: cfg.url,
         sources: Array.isArray(cfg.sources) ? cfg.sources : [],
         watermark: "RT-PWD",
       });
