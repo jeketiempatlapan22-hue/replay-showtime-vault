@@ -77,8 +77,9 @@ export default function Admin() {
   const [blockedBrowsers, setBlockedBrowsers] = useState<Array<{ id: string; browser_id: string; reason: string; unblocked: boolean; created_at: string }>>([]);
 
   // Live state
-  const [liveCfg, setLiveCfg] = useState<{ enabled: boolean; title: string; type: string; url: string; password: string; require_password: boolean }>({
-    enabled: false, title: 'Live', type: 'm3u8', url: '', password: '', require_password: true,
+  type LiveSrc = { label: string; type: 'm3u8' | 'youtube' | 'cloudflare'; url: string };
+  const [liveCfg, setLiveCfg] = useState<{ enabled: boolean; title: string; type: string; url: string; password: string; require_password: boolean; sources: LiveSrc[] }>({
+    enabled: false, title: 'Live', type: 'm3u8', url: '', password: '', require_password: true, sources: [],
   });
   const [liveTokens, setLiveTokens] = useState<Array<{ id: string; token: string; label: string; max_devices: number; revoked: boolean; devices_used: number }>>([]);
   const [newTokenLabel, setNewTokenLabel] = useState('');
