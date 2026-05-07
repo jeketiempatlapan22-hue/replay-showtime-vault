@@ -35,6 +35,10 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, onFatalError
   const hideControlsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hlsRef = useRef<Hls | null>(null);
   const recoveryAttemptsRef = useRef(0);
+  const loadingRef = useRef(true);
+  const isLiveRef = useRef(false);
+  const stallWatchdogRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lastProgressRef = useRef({ time: 0, checkedAt: Date.now(), recoveries: 0 });
   const onFatalErrorRef = useRef(onFatalError);
 
   const [isPlaying, setIsPlaying] = useState(false);
@@ -51,6 +55,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, onFatalError
   const [currentQuality, setCurrentQuality] = useState<number>(-1);
   const [autoActiveLabel, setAutoActiveLabel] = useState<string>('');
   const [showQualityMenu, setShowQualityMenu] = useState(false);
+  const [isLiveStream, setIsLiveStream] = useState(false);
 
   // Expose PiP API to parent
   useImperativeHandle(ref, () => ({
@@ -90,6 +95,10 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, onFatalError
     onFatalErrorRef.current = onFatalError;
   }, [onFatalError]);
 
+  useEffect(() => {
+    loadingRef.current = loading;
+  }, [loading]);
+
   // Setup HLS with optimized config
   useEffect(() => {
     const video = videoRef.current;
@@ -101,53 +110,115 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, onFatalError
     setQualities([]);
     setCurrentQuality(-1);
     setAutoActiveLabel('');
+    setIsLiveStream(false);
     recoveryAttemptsRef.current = 0;
+    isLiveRef.current = false;
+    lastProgressRef.current = { time: 0, checkedAt: Date.now(), recoveries: 0 };
+    if (stallWatchdogRef.current) clearInterval(stallWatchdogRef.current);
     let hls: Hls | null = null;
+    let nativeLoadedHandler: (() => void) | null = null;
+    let nativeErrorHandler: (() => void) | null = null;
+
+    video.preload = 'auto';
+    video.autoplay = true;
+    video.muted = true;
+    video.setAttribute('playsinline', 'true');
+
+    const safePlay = () => {
+      try {
+        const p = video.play();
+        if (p && typeof p.catch === 'function') p.catch(() => {});
+      } catch { /* ignore */ }
+    };
+
+    const resumePosition = () => {
+      const current = video.currentTime;
+      return Number.isFinite(current) && current > 0 ? current : -1;
+    };
+
+    const startStallWatchdog = () => {
+      if (stallWatchdogRef.current) clearInterval(stallWatchdogRef.current);
+      stallWatchdogRef.current = setInterval(() => {
+        if (!video || video.paused || video.ended || loadingRef.current) return;
+        const now = Date.now();
+        const last = lastProgressRef.current;
+        const current = video.currentTime;
+        if (Math.abs(current - last.time) > 0.25) {
+          lastProgressRef.current = { time: current, checkedAt: now, recoveries: 0 };
+          return;
+        }
+        if (now - last.checkedAt < 8000) return;
+
+        setBuffering(true);
+        lastProgressRef.current = { time: current, checkedAt: now, recoveries: last.recoveries + 1 };
+
+        const hlsInstance = hlsRef.current;
+        if (hlsInstance) {
+          const liveTarget = isLiveRef.current ? hlsInstance.liveSyncPosition : null;
+          if (typeof liveTarget === 'number' && Number.isFinite(liveTarget) && liveTarget > 0 && current < liveTarget - 18) {
+            video.currentTime = liveTarget;
+          }
+          hlsInstance.startLoad(isLiveRef.current ? -1 : resumePosition());
+          if (last.recoveries >= 2) hlsInstance.recoverMediaError();
+        } else {
+          video.load();
+        }
+        safePlay();
+      }, 3000);
+    };
 
     if (Hls.isSupported()) {
       hls = new Hls({
         enableWorker: true,
-        lowLatencyMode: false,
+        lowLatencyMode: src.includes('.live') || src.includes('live'),
         // Buffer tuning untuk playback halus
-        backBufferLength: 30,
-        maxBufferLength: 30,
-        maxMaxBufferLength: 60,
-        maxBufferSize: 60 * 1000 * 1000,
-        maxBufferHole: 0.5,
+        backBufferLength: 90,
+        maxBufferLength: 90,
+        maxMaxBufferLength: 180,
+        maxBufferSize: 120 * 1000 * 1000,
+        maxBufferHole: 0.75,
         highBufferWatchdogPeriod: 2,
         nudgeOffset: 0.1,
-        nudgeMaxRetry: 5,
+        nudgeMaxRetry: 8,
         // ABR: mulai dari kualitas terendah supaya cepat play, lalu naikkan
         startLevel: -1,
         autoStartLoad: true,
-        abrEwmaDefaultEstimate: 1_000_000,
-        abrBandWidthFactor: 0.9,
-        abrBandWidthUpFactor: 0.7,
+        abrEwmaDefaultEstimate: 700_000,
+        abrBandWidthFactor: 0.75,
+        abrBandWidthUpFactor: 0.55,
         abrMaxWithRealBitrate: true,
         testBandwidth: true,
-        // Retry agresif tapi cepat untuk segment fragments
-        manifestLoadingTimeOut: 10_000,
-        manifestLoadingMaxRetry: 4,
-        manifestLoadingRetryDelay: 500,
-        levelLoadingTimeOut: 10_000,
-        levelLoadingMaxRetry: 4,
-        levelLoadingRetryDelay: 500,
-        fragLoadingTimeOut: 20_000,
-        fragLoadingMaxRetry: 6,
-        fragLoadingRetryDelay: 500,
+        capLevelToPlayerSize: true,
+        // Retry stabil untuk sesi panjang dan penonton ramai
+        manifestLoadingTimeOut: 18_000,
+        manifestLoadingMaxRetry: 8,
+        manifestLoadingRetryDelay: 800,
+        manifestLoadingMaxRetryTimeout: 8_000,
+        levelLoadingTimeOut: 18_000,
+        levelLoadingMaxRetry: 8,
+        levelLoadingRetryDelay: 800,
+        levelLoadingMaxRetryTimeout: 8_000,
+        fragLoadingTimeOut: 30_000,
+        fragLoadingMaxRetry: 10,
+        fragLoadingRetryDelay: 800,
+        fragLoadingMaxRetryTimeout: 10_000,
         // Stall detection
-        maxStarvationDelay: 4,
-        maxLoadingDelay: 4,
+        maxStarvationDelay: 8,
+        maxLoadingDelay: 8,
         // Hindari buffering ulang berlebihan
-        appendErrorMaxRetry: 3,
-        liveSyncDurationCount: 3,
+        appendErrorMaxRetry: 5,
+        liveSyncDurationCount: 4,
+        liveMaxLatencyDurationCount: 12,
       });
       hlsRef.current = hls;
       hls.loadSource(src);
       hls.attachMedia(video);
       hls.on(Hls.Events.MANIFEST_PARSED, (_, data) => {
         setLoading(false);
-        const levels: QualityLevel[] = (data.levels || []).map((lvl, i) => ({
+        const manifestLevels = (data.levels || []) as Array<{ details?: { live?: boolean }; height?: number; bitrate?: number }>;
+        isLiveRef.current = manifestLevels.some(level => level.details?.live) || false;
+        setIsLiveStream(isLiveRef.current);
+        const levels: QualityLevel[] = manifestLevels.map((lvl, i) => ({
           index: i,
           label: lvl.height ? `${lvl.height}p` : `${Math.round((lvl.bitrate || 0) / 1000)}kbps`,
           height: lvl.height,
@@ -156,11 +227,11 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, onFatalError
         levels.sort((a, b) => (b.height || 0) - (a.height || 0));
         setQualities([{ index: -1, label: 'Auto' }, ...levels]);
         // Autoplay (muted to satisfy browser policy). User can unmute manually.
-        try {
-          video.muted = true;
-          const p = video.play();
-          if (p && typeof p.catch === 'function') p.catch(() => {});
-        } catch { /* ignore */ }
+        safePlay();
+      });
+      hls.on(Hls.Events.LEVEL_LOADED, (_, data) => {
+        isLiveRef.current = !!data.details?.live;
+        setIsLiveStream(!!data.details?.live);
       });
       hls.on(Hls.Events.LEVEL_SWITCHED, (_, data) => {
         if (hls && hls.autoLevelEnabled) {
@@ -170,8 +241,13 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, onFatalError
       });
       hls.on(Hls.Events.ERROR, (_, data) => {
         // Non-fatal errors: log only, hls.js handles internal retries.
-        // Do NOT call startLoad() on non-fatal — it would restart from position 0.
-        if (!data.fatal) return;
+        if (!data.fatal) {
+          if (data.type === Hls.ErrorTypes.MEDIA_ERROR && recoveryAttemptsRef.current < 2) {
+            recoveryAttemptsRef.current += 1;
+            try { hls?.recoverMediaError(); safePlay(); } catch { /* ignore */ }
+          }
+          return;
+        }
 
         // Fatal: try to recover IN-PLACE, preserving currentTime.
         if (recoveryAttemptsRef.current < 3) {
@@ -181,8 +257,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, onFatalError
 
           if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
             try {
-              // startLoad(resumeTime) keeps the playhead instead of restarting at 0
-              hls?.startLoad(resumeTime);
+              hls?.startLoad(isLiveRef.current ? -1 : resumeTime);
               if (wasPlaying) video.play().catch(() => {});
               return;
             } catch { /* ignore */ }
@@ -207,17 +282,21 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, onFatalError
         setBuffering(false);
         onFatalErrorRef.current?.();
       });
+      startStallWatchdog();
     } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
       video.src = src;
-      video.addEventListener('loadedmetadata', () => {
+      nativeLoadedHandler = () => {
         setLoading(false);
-        try { video.muted = true; video.play()?.catch(() => {}); } catch { /* ignore */ }
-      }, { once: true });
-      video.addEventListener('error', () => {
+        safePlay();
+      };
+      nativeErrorHandler = () => {
         setError('Gagal memuat video.');
         setLoading(false);
         onFatalErrorRef.current?.();
-      }, { once: true });
+      };
+      video.addEventListener('loadedmetadata', nativeLoadedHandler, { once: true });
+      video.addEventListener('error', nativeErrorHandler, { once: true });
+      startStallWatchdog();
     } else {
       setError('Browser ini tidak mendukung pemutaran HLS.');
       setLoading(false);
@@ -225,6 +304,10 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, onFatalError
     }
 
     return () => {
+      if (stallWatchdogRef.current) clearInterval(stallWatchdogRef.current);
+      stallWatchdogRef.current = null;
+      if (nativeLoadedHandler) video.removeEventListener('loadedmetadata', nativeLoadedHandler);
+      if (nativeErrorHandler) video.removeEventListener('error', nativeErrorHandler);
       if (hls) hls.destroy();
       hlsRef.current = null;
     };
@@ -248,7 +331,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, onFatalError
     const onDurationChange = () => setDuration(video.duration);
     const onWaiting = () => {
       // mid-play stall (not initial)
-      if (!loading) setBuffering(true);
+      if (!loadingRef.current) setBuffering(true);
     };
     const onPlaying = () => {
       setLoading(false);
@@ -257,6 +340,9 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, onFatalError
       recoveryAttemptsRef.current = 0;
     };
     const onCanPlay = () => setBuffering(false);
+    const onProgress = () => {
+      lastProgressRef.current = { time: video.currentTime, checkedAt: Date.now(), recoveries: 0 };
+    };
     const onVolumeChange = () => {
       setVolume(video.volume);
       setMuted(video.muted);
@@ -269,6 +355,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, onFatalError
     video.addEventListener('waiting', onWaiting);
     video.addEventListener('playing', onPlaying);
     video.addEventListener('canplay', onCanPlay);
+    video.addEventListener('progress', onProgress);
     video.addEventListener('volumechange', onVolumeChange);
 
     return () => {
@@ -279,9 +366,10 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, onFatalError
       video.removeEventListener('waiting', onWaiting);
       video.removeEventListener('playing', onPlaying);
       video.removeEventListener('canplay', onCanPlay);
+      video.removeEventListener('progress', onProgress);
       video.removeEventListener('volumechange', onVolumeChange);
     };
-  }, [loading]);
+  }, []);
 
   // Fullscreen tracking
   useEffect(() => {
@@ -314,13 +402,13 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, onFatalError
 
   const seek = (delta: number) => {
     const video = videoRef.current;
-    if (!video) return;
+    if (!video || isLiveStream) return;
     video.currentTime = Math.max(0, Math.min(video.duration || 0, video.currentTime + delta));
   };
 
   const seekTo = (e: React.ChangeEvent<HTMLInputElement>) => {
     const video = videoRef.current;
-    if (!video) return;
+    if (!video || isLiveStream) return;
     video.currentTime = Number(e.target.value);
   };
 
@@ -411,34 +499,37 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, onFatalError
 
         <div className="relative z-10 px-3 sm:px-4 pb-3 sm:pb-4 space-y-2" onClick={(e) => e.stopPropagation()}>
           <div className="flex items-center gap-2 text-white text-xs">
-            <span className="tabular-nums">{formatTime(currentTime)}</span>
+            <span className="tabular-nums">{isLiveStream ? 'LIVE' : formatTime(currentTime)}</span>
             <input
               type="range"
               min={0}
               max={duration || 0}
               step={0.1}
-              value={currentTime}
+              value={isLiveStream ? 0 : currentTime}
               onChange={seekTo}
-              className="flex-1 h-1.5 accent-primary cursor-pointer"
+              disabled={isLiveStream}
+              className="flex-1 h-1.5 accent-primary cursor-pointer disabled:cursor-default disabled:opacity-70"
               style={{
-                background: `linear-gradient(to right, hsl(var(--primary)) 0%, hsl(var(--primary)) ${
-                  duration ? (currentTime / duration) * 100 : 0
-                }%, rgba(255,255,255,0.3) ${duration ? (currentTime / duration) * 100 : 0}%, rgba(255,255,255,0.3) 100%)`,
+                background: isLiveStream
+                  ? 'linear-gradient(to right, hsl(var(--primary)) 0%, hsl(var(--primary)) 100%)'
+                  : `linear-gradient(to right, hsl(var(--primary)) 0%, hsl(var(--primary)) ${
+                    duration ? (currentTime / duration) * 100 : 0
+                  }%, rgba(255,255,255,0.3) ${duration ? (currentTime / duration) * 100 : 0}%, rgba(255,255,255,0.3) 100%)`,
                 borderRadius: '999px',
                 appearance: 'none',
               }}
             />
-            <span className="tabular-nums">{formatTime(duration)}</span>
+            <span className="tabular-nums">{isLiveStream ? 'ON AIR' : formatTime(duration)}</span>
           </div>
 
           <div className="flex items-center gap-1 sm:gap-2">
             <button type="button" onClick={togglePlay} className="p-2 text-white hover:text-primary transition-colors" aria-label={isPlaying ? 'Pause' : 'Play'}>
               {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
             </button>
-            <button type="button" onClick={() => seek(-10)} className="p-2 text-white hover:text-primary transition-colors" aria-label="Mundur 10 detik" title="Mundur 10 detik">
+            <button type="button" onClick={() => seek(-10)} disabled={isLiveStream} className="p-2 text-white hover:text-primary transition-colors disabled:opacity-40 disabled:hover:text-current" aria-label="Mundur 10 detik" title="Mundur 10 detik">
               <RotateCcw className="w-5 h-5" />
             </button>
-            <button type="button" onClick={() => seek(10)} className="p-2 text-white hover:text-primary transition-colors" aria-label="Maju 10 detik" title="Maju 10 detik">
+            <button type="button" onClick={() => seek(10)} disabled={isLiveStream} className="p-2 text-white hover:text-primary transition-colors disabled:opacity-40 disabled:hover:text-current" aria-label="Maju 10 detik" title="Maju 10 detik">
               <RotateCw className="w-5 h-5" />
             </button>
 

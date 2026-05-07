@@ -116,7 +116,10 @@ export default function Index() {
 
     const replayChannel = supabase
       .channel('replays-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'replays' }, () => {
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'replays' }, () => {
+        refreshReplays();
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'replays' }, () => {
         refreshReplays();
       })
       .subscribe();
@@ -253,7 +256,7 @@ export default function Index() {
     }
 
     // Sort within each month (default: newest first by date+time)
-    const getDateTime = (r: ReplayRow) => `${r.date}T${(r as any).show_time || '19:00:00'}`;
+    const getDateTime = (r: ReplayRow) => `${r.date}T${r.show_time || '19:00:00'}`;
     if (sortMode === 'oldest') {
       for (const key of Object.keys(result)) {
         result[key] = [...result[key]].sort((a, b) => getDateTime(a).localeCompare(getDateTime(b)));
