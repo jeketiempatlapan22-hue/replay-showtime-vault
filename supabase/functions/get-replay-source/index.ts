@@ -49,10 +49,10 @@ Deno.serve(async (req) => {
         const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
         const { data: master } = await supabase
           .from("master_passwords")
-          .select("password")
+          .select("password, paused")
           .eq("month", monthKey)
           .maybeSingle();
-        valid = master?.password === password;
+        valid = !!master && master.paused !== true && master.password === password;
       }
     }
 
