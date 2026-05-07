@@ -993,6 +993,9 @@ export default function Admin() {
             </Card>
           </TabsContent>
         </Tabs>
+        <datalist id="member-names">
+          {members.map(m => <option key={m.id} value={m.name} />)}
+        </datalist>
       </div>
 
       {/* Reply Dialog */}
