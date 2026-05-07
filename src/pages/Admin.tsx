@@ -191,6 +191,7 @@ export default function Admin() {
       const { data: blocks } = await supabase.from('blocked_browsers').select('*').order('created_at', { ascending: false });
       if (blocks) setBlockedBrowsers(blocks as any);
       void refreshLive();
+      void refreshActiveShows();
     } catch {
       toast({ title: 'Error', description: 'Gagal memuat data.', variant: 'destructive' });
     }
