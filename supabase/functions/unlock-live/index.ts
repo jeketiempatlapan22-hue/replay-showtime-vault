@@ -5,46 +5,63 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+const json = (b: unknown, status = 200) =>
+  new Response(JSON.stringify(b), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   try {
-    const { token, browser_id } = await req.json().catch(() => ({}));
+    const { token, password, browser_id } = await req.json().catch(() => ({} as any));
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
     const { data: cfg } = await supabase.from("live_config_private").select("*").limit(1).maybeSingle();
-    if (!cfg || !cfg.enabled) {
-      return new Response(JSON.stringify({ valid: false, reason: "off" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-    // Token-only access (password access removed for security)
-    if (!token) {
-      return new Response(JSON.stringify({ valid: false, reason: "token_required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-    let valid = false;
-    const { data: t } = await supabase.from("live_tokens").select("*").eq("token", token).maybeSingle();
-    if (t && !t.revoked) {
-      if (!browser_id) {
-        return new Response(JSON.stringify({ valid: false, reason: "no_device" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      }
-      const { data: existing } = await supabase.from("live_token_devices").select("id").eq("token_id", t.id).eq("browser_id", browser_id).maybeSingle();
-      if (existing) {
-        valid = true;
-      } else {
-        const { count } = await supabase.from("live_token_devices").select("id", { count: "exact", head: true }).eq("token_id", t.id);
-        if ((count || 0) < t.max_devices) {
-          await supabase.from("live_token_devices").insert({ token_id: t.id, browser_id });
-          valid = true;
-        } else {
-          return new Response(JSON.stringify({ valid: false, reason: "device_limit" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    if (!cfg || !cfg.enabled) return json({ valid: false, reason: "off" }, 403);
+
+    if (!token && !password) return json({ valid: false, reason: "password_or_token_required" }, 400);
+
+    // Token path (device-locked)
+    if (token) {
+      const { data: t } = await supabase.from("live_tokens").select("*").eq("token", token).maybeSingle();
+      if (!t || t.revoked) return json({ valid: false, reason: "revoked" }, 403);
+      if (!browser_id) return json({ valid: false, reason: "no_device" }, 400);
+
+      const { data: existing } = await supabase
+        .from("live_token_devices").select("id").eq("token_id", t.id).eq("browser_id", browser_id).maybeSingle();
+      if (!existing) {
+        const { count } = await supabase
+          .from("live_token_devices").select("id", { count: "exact", head: true }).eq("token_id", t.id);
+        if ((count || 0) >= t.max_devices) return json({ valid: false, reason: "device_limit" }, 403);
+        const { error: insErr } = await supabase
+          .from("live_token_devices").insert({ token_id: t.id, browser_id });
+        if (insErr) {
+          // Could be unique-constraint race — re-check
+          const { data: re } = await supabase
+            .from("live_token_devices").select("id").eq("token_id", t.id).eq("browser_id", browser_id).maybeSingle();
+          if (!re) return json({ valid: false, reason: "device_limit" }, 403);
         }
       }
+      const last4 = String(token).slice(-4).toUpperCase();
+      return json({
+        valid: true, title: cfg.title, type: cfg.type, url: cfg.url,
+        sources: Array.isArray(cfg.sources) ? cfg.sources : [],
+        watermark: `RT-${last4}`,
+      });
     }
-    if (!valid) {
-      return new Response(JSON.stringify({ valid: false }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
+    // Password path
+    if (password) {
+      if (!cfg.password || cfg.password !== password) return json({ valid: false, reason: "bad_password" }, 403);
+      return json({
+        valid: true, title: cfg.title, type: cfg.type, url: cfg.url,
+        sources: Array.isArray(cfg.sources) ? cfg.sources : [],
+        watermark: "RT-PWD",
+      });
     }
-    return new Response(JSON.stringify({ valid: true, title: cfg.title, type: cfg.type, url: cfg.url, sources: Array.isArray(cfg.sources) ? cfg.sources : [] }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
+    return json({ valid: false }, 403);
   } catch {
-    return new Response(JSON.stringify({ valid: false }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    return json({ valid: false }, 500);
   }
 });
