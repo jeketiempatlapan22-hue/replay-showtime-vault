@@ -35,6 +35,10 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, onFatalError
   const hideControlsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hlsRef = useRef<Hls | null>(null);
   const recoveryAttemptsRef = useRef(0);
+  const loadingRef = useRef(true);
+  const isLiveRef = useRef(false);
+  const stallWatchdogRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lastProgressRef = useRef({ time: 0, checkedAt: Date.now(), recoveries: 0 });
   const onFatalErrorRef = useRef(onFatalError);
 
   const [isPlaying, setIsPlaying] = useState(false);
@@ -90,6 +94,10 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, onFatalError
     onFatalErrorRef.current = onFatalError;
   }, [onFatalError]);
 
+  useEffect(() => {
+    loadingRef.current = loading;
+  }, [loading]);
+
   // Setup HLS with optimized config
   useEffect(() => {
     const video = videoRef.current;
@@ -102,7 +110,60 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, onFatalError
     setCurrentQuality(-1);
     setAutoActiveLabel('');
     recoveryAttemptsRef.current = 0;
+    isLiveRef.current = false;
+    lastProgressRef.current = { time: 0, checkedAt: Date.now(), recoveries: 0 };
+    if (stallWatchdogRef.current) clearInterval(stallWatchdogRef.current);
     let hls: Hls | null = null;
+    let nativeLoadedHandler: (() => void) | null = null;
+    let nativeErrorHandler: (() => void) | null = null;
+
+    video.preload = 'auto';
+    video.autoplay = true;
+    video.muted = true;
+    video.setAttribute('playsinline', 'true');
+
+    const safePlay = () => {
+      try {
+        const p = video.play();
+        if (p && typeof p.catch === 'function') p.catch(() => {});
+      } catch { /* ignore */ }
+    };
+
+    const resumePosition = () => {
+      const current = video.currentTime;
+      return Number.isFinite(current) && current > 0 ? current : -1;
+    };
+
+    const startStallWatchdog = () => {
+      if (stallWatchdogRef.current) clearInterval(stallWatchdogRef.current);
+      stallWatchdogRef.current = setInterval(() => {
+        if (!video || video.paused || video.ended || loadingRef.current) return;
+        const now = Date.now();
+        const last = lastProgressRef.current;
+        const current = video.currentTime;
+        if (Math.abs(current - last.time) > 0.25) {
+          lastProgressRef.current = { time: current, checkedAt: now, recoveries: 0 };
+          return;
+        }
+        if (now - last.checkedAt < 8000) return;
+
+        setBuffering(true);
+        lastProgressRef.current = { time: current, checkedAt: now, recoveries: last.recoveries + 1 };
+
+        const hlsInstance = hlsRef.current;
+        if (hlsInstance) {
+          const liveTarget = isLiveRef.current ? hlsInstance.liveSyncPosition : null;
+          if (typeof liveTarget === 'number' && Number.isFinite(liveTarget) && liveTarget > 0 && current < liveTarget - 18) {
+            video.currentTime = liveTarget;
+          }
+          hlsInstance.startLoad(isLiveRef.current ? -1 : resumePosition());
+          if (last.recoveries >= 2) hlsInstance.recoverMediaError();
+        } else {
+          video.load();
+        }
+        safePlay();
+      }, 3000);
+    };
 
     if (Hls.isSupported()) {
       hls = new Hls({
