@@ -227,6 +227,26 @@ export default function Admin() {
     }
   };
 
+  const handleToggleMasterPaused = async (month: string, paused: boolean) => {
+    try {
+      await setMasterPasswordPaused(month, paused);
+      toast({ title: 'Berhasil', description: paused ? `Sandi master ${month} dijeda.` : `Sandi master ${month} diaktifkan kembali.` });
+      await refreshData();
+    } catch {
+      toast({ title: 'Error', description: 'Gagal mengubah status sandi master.', variant: 'destructive' });
+    }
+  };
+
+  const handleDeleteMasterPassword = async (month: string) => {
+    try {
+      await deleteMasterPassword(month);
+      toast({ title: 'Berhasil', description: `Sandi master ${month} dihapus.` });
+      await refreshData();
+    } catch {
+      toast({ title: 'Error', description: 'Gagal menghapus sandi master.', variant: 'destructive' });
+    }
+  };
+
   const handleSaveTheme = async (theme: ThemeType) => {
     setCurrentTheme(theme);
     await setSetting('theme', theme);
