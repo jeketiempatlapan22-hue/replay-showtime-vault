@@ -125,10 +125,17 @@ export default function CommentSection({ replayId }: CommentSectionProps) {
         {comments.length === 0 && (
           <p className="text-sm text-muted-foreground text-center py-4">Belum ada komentar. Jadilah yang pertama!</p>
         )}
-        {comments.map(c => (
-          <div key={c.id} className="p-3 rounded-lg bg-secondary/50 border border-border animate-fade-up group" style={{ animationFillMode: 'forwards' }}>
+        {comments.map(c => {
+          const isAdminComment = c.name.startsWith('🛡️') || c.name.startsWith('🛡');
+          return (
+          <div key={c.id} className={`p-3 rounded-lg border animate-fade-up group ${isAdminComment ? 'bg-primary/10 border-primary/40 ring-1 ring-primary/30' : 'bg-secondary/50 border-border'}`} style={{ animationFillMode: 'forwards' }}>
             <div className="flex items-center justify-between mb-1">
-              <span className="text-sm font-medium text-foreground">{c.name}</span>
+              <span className={`text-sm font-medium flex items-center gap-1.5 ${isAdminComment ? 'text-primary' : 'text-foreground'}`}>
+                {c.name}
+                {isAdminComment && (
+                  <span className="text-[9px] uppercase tracking-wide bg-primary text-primary-foreground px-1.5 py-0.5 rounded font-bold">Admin</span>
+                )}
+              </span>
               <div className="flex items-center gap-2">
                 <span className="text-xs text-muted-foreground">{timeAgo(c.created_at)}</span>
                 {isAdmin && (
@@ -142,9 +149,10 @@ export default function CommentSection({ replayId }: CommentSectionProps) {
                 )}
               </div>
             </div>
-            <p className="text-sm text-muted-foreground">{c.message}</p>
+            <p className={`text-sm ${isAdminComment ? 'text-foreground' : 'text-muted-foreground'}`}>{c.message}</p>
           </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Input */}

@@ -62,6 +62,7 @@ export default function Admin() {
   const [currentTheme, setCurrentTheme] = useState<ThemeType>('ramadhan');
   const [waNumber, setWaNumber] = useState('');
   const [waLink, setWaLink] = useState('');
+  const [adminUsername, setAdminUsername] = useState('');
 
   // Comments state
   const [allComments, setAllComments] = useState<Comment[]>([]);
@@ -110,6 +111,7 @@ export default function Admin() {
       setWaNumber(settings.whatsapp_number || '');
       setWaLink(settings.whatsapp_link || '');
       setLiveChatEnabled((settings.live_chat_enabled ?? 'true') !== 'false');
+      setAdminUsername(settings.admin_username || 'Admin');
       const { data: comments } = await supabase.from('comments').select('*').order('created_at', { ascending: false });
       if (comments) setAllComments(comments);
       const { data: blocks } = await supabase.from('blocked_browsers').select('*').order('created_at', { ascending: false });
@@ -272,6 +274,20 @@ export default function Admin() {
     }
   };
 
+  const handleSaveAdminUsername = async () => {
+    const name = (adminUsername || '').trim();
+    if (!name) {
+      toast({ title: 'Error', description: 'Username admin tidak boleh kosong.', variant: 'destructive' });
+      return;
+    }
+    try {
+      await setSetting('admin_username', name);
+      toast({ title: 'Berhasil', description: `Username admin disimpan: ${name}` });
+    } catch {
+      toast({ title: 'Error', description: 'Gagal menyimpan username admin.', variant: 'destructive' });
+    }
+  };
+
   const handleGenerateToken = async (r: ReplayRow) => {
     const token = (crypto as any).randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2) + Date.now().toString(36);
     try {
@@ -322,7 +338,7 @@ export default function Admin() {
     setSendingReply(true);
     const { error } = await supabase.from('comments').insert({
       replay_id: replyingTo.replay_id,
-      name: '🛡️ Admin',
+      name: `🛡️ ${(adminUsername || 'Admin').trim()}`,
       message: replyText.trim(),
     });
     if (error) {
@@ -610,6 +626,23 @@ export default function Admin() {
                   <p className="text-xs text-muted-foreground">Saat dimatikan, user tidak bisa mengirim pesan baru. Hanya 30 pesan terakhir per replay yang disimpan.</p>
                 </div>
                 <Switch checked={liveChatEnabled} onCheckedChange={handleToggleLiveChat} />
+              </CardContent>
+            </Card>
+
+            {/* Admin Username */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="font-sans text-base sm:text-lg flex items-center gap-2">
+                  <ShieldCheck className="w-5 h-5 text-primary" />Username Admin
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <p className="text-xs text-muted-foreground">Nama ini akan ditampilkan sebagai penanda saat admin berkomentar di kartu replay (otomatis diawali ikon 🛡️).</p>
+                <div className="flex gap-2">
+                  <Input placeholder="cth: AdminDhy" value={adminUsername} onChange={e => setAdminUsername(e.target.value.slice(0, 30))} />
+                  <Button onClick={handleSaveAdminUsername} size="sm" className="h-10 shrink-0"><Save className="w-4 h-4 mr-1" />Simpan</Button>
+                </div>
+                <p className="text-[11px] text-muted-foreground">Pratinjau: <span className="font-medium text-foreground">🛡️ {(adminUsername || 'Admin').trim()}</span></p>
               </CardContent>
             </Card>
 
