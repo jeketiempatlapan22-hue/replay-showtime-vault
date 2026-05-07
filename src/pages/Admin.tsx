@@ -713,6 +713,55 @@ export default function Admin() {
           </TabsContent>
 
           {/* ===== PREVIEW TAB ===== */}
+          {/* ===== MEMBERS TAB ===== */}
+          <TabsContent value="members">
+            <Card>
+              <CardHeader><CardTitle className="font-sans text-base sm:text-lg flex items-center gap-2"><Users className="w-5 h-5 text-primary" />Daftar Member ({members.length})</CardTitle></CardHeader>
+              <CardContent className="space-y-4">
+                <div className="p-3 rounded-lg border border-border bg-secondary/40 space-y-2">
+                  <div className="flex items-start gap-3">
+                    <div className="w-16 h-16 rounded-full overflow-hidden border border-border bg-card shrink-0 flex items-center justify-center">
+                      {memberForm.photo_url ? (
+                        <img src={memberForm.photo_url} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <Users className="w-6 h-6 text-muted-foreground" />
+                      )}
+                    </div>
+                    <div className="flex-1 space-y-2">
+                      <Input placeholder="Nama member (cth: Alya)" value={memberForm.name} onChange={e => setMemberForm(f => ({ ...f, name: e.target.value }))} />
+                      <div className="flex gap-2">
+                        <input type="file" accept="image/*" id="mph" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleMemberPhotoUpload(f); }} />
+                        <Button variant="outline" size="sm" onClick={() => document.getElementById('mph')?.click()} disabled={memberUploading}>
+                          <Upload className="w-3.5 h-3.5 mr-1" />{memberUploading ? 'Upload...' : 'Foto'}
+                        </Button>
+                        <Button size="sm" onClick={handleSaveMember}><Save className="w-3.5 h-3.5 mr-1" />{memberForm.id ? 'Update' : 'Tambah'}</Button>
+                        {memberForm.id && <Button variant="ghost" size="sm" onClick={() => setMemberForm({ name: '', photo_url: '' })}>Batal</Button>}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                {members.length === 0 ? (
+                  <p className="text-muted-foreground text-center py-6 text-sm">Belum ada member.</p>
+                ) : (
+                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
+                    {members.map(m => (
+                      <div key={m.id} className="text-center space-y-1 group relative">
+                        <div className="w-full aspect-square rounded-full overflow-hidden border-2 border-border bg-secondary mx-auto">
+                          {m.photo_url ? <img src={m.photo_url} alt={m.name} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-xs">{m.name.slice(0,2)}</div>}
+                        </div>
+                        <p className="text-xs font-medium truncate">{m.name}</p>
+                        <div className="flex justify-center gap-1 opacity-0 group-hover:opacity-100 transition">
+                          <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => setMemberForm({ id: m.id, name: m.name, photo_url: m.photo_url })}><Edit2 className="w-3 h-3" /></Button>
+                          <Button size="icon" variant="ghost" className="h-6 w-6 text-destructive" onClick={() => handleDeleteMember(m.id)}><Trash2 className="w-3 h-3" /></Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
           <TabsContent value="preview">
             <div className="space-y-4">
               <p className="text-sm text-muted-foreground">Pilih replay untuk melihat tampilan kartu:</p>
