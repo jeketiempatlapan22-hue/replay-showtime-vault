@@ -473,13 +473,17 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, onFatalError
     if (!video) return;
     const v = Number(e.target.value);
     video.volume = v;
-    if (v > 0 && video.muted) video.muted = false;
+    if (v > 0 && video.muted) { video.muted = false; setNeedsUnmute(false); }
+    try { localStorage.setItem('replaytime-volume', String(v)); } catch { /* ignore */ }
+    try { localStorage.setItem('replaytime-muted', video.muted ? '1' : '0'); } catch { /* ignore */ }
   };
 
   const toggleMute = () => {
     const video = videoRef.current;
     if (!video) return;
     video.muted = !video.muted;
+    if (!video.muted) setNeedsUnmute(false);
+    try { localStorage.setItem('replaytime-muted', video.muted ? '1' : '0'); } catch { /* ignore */ }
   };
 
   const toggleFullscreen = () => {
