@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import Index from "./pages/Index";
 import Admin from "./pages/Admin";
 import Live from "./pages/Live";
+import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -22,7 +23,7 @@ function ProtectedShell({ children }: { children: React.ReactNode }) {
   const [checking, setChecking] = useState(true);
 
   // Skip protection on admin route
-  const isAdminRoute = location.pathname.startsWith('/adpan');
+  const isAdminRoute = location.pathname.startsWith('/adpan') || location.pathname.startsWith('/auth');
 
   // Check existing block status on mount
   useEffect(() => {
@@ -59,6 +60,7 @@ const App = () => (
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/live" element={<Live />} />
+              <Route path="/auth" element={<Auth />} />
               <Route path="/adpan" element={<Admin />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
