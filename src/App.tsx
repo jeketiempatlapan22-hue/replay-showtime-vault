@@ -11,6 +11,7 @@ import { getBrowserId } from "@/lib/browserId";
 import { supabase } from "@/integrations/supabase/client";
 import Index from "./pages/Index";
 import Admin from "./pages/Admin";
+import Live from "./pages/Live";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -57,6 +58,7 @@ const App = () => (
           <ProtectedShell>
             <Routes>
               <Route path="/" element={<Index />} />
+              <Route path="/live" element={<Live />} />
               <Route path="/adpan" element={<Admin />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
