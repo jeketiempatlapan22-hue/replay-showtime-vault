@@ -111,6 +111,7 @@ export default function Admin() {
       setWaNumber(settings.whatsapp_number || '');
       setWaLink(settings.whatsapp_link || '');
       setLiveChatEnabled((settings.live_chat_enabled ?? 'true') !== 'false');
+      setAdminUsername(settings.admin_username || 'Admin');
       const { data: comments } = await supabase.from('comments').select('*').order('created_at', { ascending: false });
       if (comments) setAllComments(comments);
       const { data: blocks } = await supabase.from('blocked_browsers').select('*').order('created_at', { ascending: false });
