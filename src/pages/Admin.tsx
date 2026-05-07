@@ -240,6 +240,51 @@ export default function Admin() {
     }
   };
 
+  const handleToggleLiveChat = async (enabled: boolean) => {
+    setLiveChatEnabled(enabled);
+    try {
+      await setSetting('live_chat_enabled', enabled ? 'true' : 'false');
+      toast({ title: 'Berhasil', description: `Live chat ${enabled ? 'diaktifkan' : 'dinonaktifkan'}.` });
+    } catch {
+      toast({ title: 'Error', description: 'Gagal menyimpan setelan.', variant: 'destructive' });
+    }
+  };
+
+  const handleGenerateToken = async (r: ReplayRow) => {
+    const token = (crypto as any).randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2) + Date.now().toString(36);
+    try {
+      await setReplayAccessToken(r.id, token);
+      const url = `${window.location.origin}/?token=${token}&replay=${r.id}`;
+      try { await navigator.clipboard.writeText(url); } catch { /* ignore */ }
+      toast({ title: 'Token dibuat', description: 'Link akses telah disalin ke clipboard.' });
+      await refreshData();
+    } catch {
+      toast({ title: 'Error', description: 'Gagal membuat token.', variant: 'destructive' });
+    }
+  };
+
+  const handleRevokeToken = async (r: ReplayRow) => {
+    try {
+      await setReplayAccessToken(r.id, null);
+      toast({ title: 'Dihapus', description: 'Token akses telah dicabut.' });
+      await refreshData();
+    } catch {
+      toast({ title: 'Error', description: 'Gagal mencabut token.', variant: 'destructive' });
+    }
+  };
+
+  const copyTokenUrl = async (r: ReplayRow) => {
+    const tk = (r as any).access_token;
+    if (!tk) return;
+    const url = `${window.location.origin}/?token=${tk}&replay=${r.id}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      toast({ title: 'Tersalin', description: 'Link akses disalin ke clipboard.' });
+    } catch {
+      toast({ title: 'Error', description: 'Gagal menyalin.', variant: 'destructive' });
+    }
+  };
+
   const handleDeleteComment = async (commentId: string) => {
     const { error } = await supabase.from('comments').delete().eq('id', commentId);
     if (error) {
