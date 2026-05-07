@@ -125,9 +125,62 @@ export default function Admin() {
       if (comments) setAllComments(comments);
       const { data: blocks } = await supabase.from('blocked_browsers').select('*').order('created_at', { ascending: false });
       if (blocks) setBlockedBrowsers(blocks as any);
+      void refreshLive();
     } catch {
       toast({ title: 'Error', description: 'Gagal memuat data.', variant: 'destructive' });
     }
+  };
+
+  const refreshLive = async () => {
+    try {
+      const [cfgRes, tokRes] = await Promise.all([
+        supabase.functions.invoke('manage-live', { body: { action: 'get_config' } }),
+        supabase.functions.invoke('manage-live', { body: { action: 'list_tokens' } }),
+      ]);
+      if (cfgRes.data?.config) {
+        const c = cfgRes.data.config;
+        setLiveCfg({ enabled: !!c.enabled, title: c.title || 'Live', type: c.type || 'm3u8', url: c.url || '', password: c.password || '', require_password: c.require_password !== false });
+      }
+      if (tokRes.data?.tokens) setLiveTokens(tokRes.data.tokens);
+    } catch { /* ignore */ }
+  };
+
+  const handleSaveLive = async () => {
+    setLiveSaving(true);
+    try {
+      await supabase.functions.invoke('manage-live', { body: { action: 'set_config', ...liveCfg } });
+      toast({ title: 'Berhasil', description: `Live ${liveCfg.enabled ? 'diaktifkan' : 'dinonaktifkan'}.` });
+      await refreshLive();
+    } catch {
+      toast({ title: 'Error', description: 'Gagal menyimpan konfigurasi live.', variant: 'destructive' });
+    }
+    setLiveSaving(false);
+  };
+
+  const handleCreateLiveToken = async () => {
+    try {
+      await supabase.functions.invoke('manage-live', { body: { action: 'create_token', label: newTokenLabel, max_devices: newTokenMaxDevices } });
+      setNewTokenLabel('');
+      setNewTokenMaxDevices(1);
+      toast({ title: 'Berhasil', description: 'Token live dibuat.' });
+      await refreshLive();
+    } catch {
+      toast({ title: 'Error', description: 'Gagal membuat token.', variant: 'destructive' });
+    }
+  };
+
+  const handleDeleteLiveToken = async (id: string) => {
+    await supabase.functions.invoke('manage-live', { body: { action: 'delete_token', id } });
+    await refreshLive();
+  };
+  const handleResetLiveDevices = async (id: string) => {
+    await supabase.functions.invoke('manage-live', { body: { action: 'reset_devices', id } });
+    toast({ title: 'Berhasil', description: 'Daftar perangkat token direset.' });
+    await refreshLive();
+  };
+  const copyLiveTokenLink = async (token: string) => {
+    const url = `${window.location.origin}/live?t=${token}`;
+    try { await navigator.clipboard.writeText(url); toast({ title: 'Tersalin', description: 'Link live disalin.' }); } catch { /* ignore */ }
   };
 
   const handleUnblockBrowser = async (id: string) => {
