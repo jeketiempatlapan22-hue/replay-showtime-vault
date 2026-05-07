@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Menu, X, Home, MessageCircle, Phone, Sun, Moon, Radio } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Menu, X, Home, MessageCircle, Phone, Sun, Moon, Radio, LogIn, LogOut, User as UserIcon } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
+import { toast } from '@/hooks/use-toast';
 import logoImg from '@/assets/logo.png';
 
 interface HamburgerMenuProps {
@@ -15,6 +17,14 @@ interface HamburgerMenuProps {
 export default function HamburgerMenu({ whatsappNumber, whatsappLink, lightMode, onToggleMode }: HamburgerMenuProps) {
   const [open, setOpen] = useState(false);
   const [liveOn, setLiveOn] = useState(false);
+  const { user } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    toast({ title: 'Berhasil keluar' });
+    setOpen(false);
+  };
 
   useEffect(() => {
     const fetch = () => supabase.rpc('get_live_status').then(({ data }) => {
