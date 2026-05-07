@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { isFullscreenActive, onFullscreenChange, requestFs, exitFs } from '@/lib/fullscreen';
-import { Play, Pause, Volume2, VolumeX, Maximize, Minimize } from 'lucide-react';
+import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, SkipBack, SkipForward } from 'lucide-react';
 import LiveWatermark from '@/components/LiveWatermark';
 
 interface Props {
@@ -37,6 +37,9 @@ export default function EmbedPlayer({ type, source, title, watermark }: Props) {
   const [volume, setVolume] = useState(initialVolume);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showHint, setShowHint] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [seeking, setSeeking] = useState(false);
 
   const ytId = type === 'youtube' ? extractYoutubeId(source) : '';
   const cfUid = type === 'cloudflare' ? extractCloudflareUid(source) : '';
@@ -143,6 +146,51 @@ export default function EmbedPlayer({ type, source, title, watermark }: Props) {
     return onFullscreenChange(onChange);
   }, []);
 
+  // Poll YT current time / duration
+  useEffect(() => {
+    if (type !== 'youtube') return;
+    const id = window.setInterval(() => {
+      const p = ytPlayerRef.current;
+      if (!p?.getCurrentTime) return;
+      try {
+        if (!seeking) setCurrentTime(p.getCurrentTime() || 0);
+        const d = p.getDuration() || 0;
+        if (d && d !== duration) setDuration(d);
+      } catch { /* ignore */ }
+    }, 500);
+    return () => clearInterval(id);
+  }, [type, seeking, duration]);
+
+  const onSeekChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const v = Number(e.target.value);
+    setCurrentTime(v);
+  };
+  const onSeekCommit = (e: React.SyntheticEvent<HTMLInputElement>) => {
+    const v = Number((e.target as HTMLInputElement).value);
+    if (type === 'youtube') {
+      try { ytPlayerRef.current?.seekTo(v, true); } catch { /* ignore */ }
+    }
+    setSeeking(false);
+  };
+  const seekBy = (delta: number) => {
+    if (type !== 'youtube') return;
+    const p = ytPlayerRef.current;
+    if (!p?.getCurrentTime) return;
+    try {
+      const t = Math.max(0, Math.min((p.getDuration() || 0), (p.getCurrentTime() || 0) + delta));
+      p.seekTo(t, true);
+      setCurrentTime(t);
+    } catch { /* ignore */ }
+  };
+  const fmt = (s: number) => {
+    if (!isFinite(s) || s < 0) s = 0;
+    const m = Math.floor(s / 60);
+    const sec = Math.floor(s % 60).toString().padStart(2, '0');
+    const h = Math.floor(m / 60);
+    if (h > 0) return `${h}:${(m % 60).toString().padStart(2, '0')}:${sec}`;
+    return `${m}:${sec}`;
+  };
+
   const toggleFullscreen = () => {
     if (!containerRef.current) return;
     if (!isFullscreenActive()) requestFs(containerRef.current);
@@ -190,10 +238,40 @@ export default function EmbedPlayer({ type, source, title, watermark }: Props) {
 
       {/* Controls */}
       <div className="absolute inset-x-0 bottom-0 z-10 px-3 pb-3 pt-8 bg-gradient-to-t from-black/80 to-transparent">
+        {type === 'youtube' && (
+          <div className="flex items-center gap-2 mb-1 text-[11px] text-white/90 font-mono" onClick={(e) => e.stopPropagation()}>
+            <span>{fmt(currentTime)}</span>
+            <input
+              type="range"
+              min={0}
+              max={Math.max(1, duration)}
+              step={1}
+              value={Math.min(currentTime, duration || 0)}
+              onMouseDown={() => setSeeking(true)}
+              onTouchStart={() => setSeeking(true)}
+              onChange={onSeekChange}
+              onMouseUp={onSeekCommit}
+              onTouchEnd={onSeekCommit}
+              onKeyUp={onSeekCommit}
+              className="flex-1 h-1 accent-primary cursor-pointer"
+            />
+            <span>{fmt(duration)}</span>
+          </div>
+        )}
         <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
           <button onClick={togglePlay} className="p-2 text-white hover:text-primary transition-colors">
             {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
           </button>
+          {type === 'youtube' && (
+            <>
+              <button onClick={() => seekBy(-10)} className="p-2 text-white hover:text-primary transition-colors" aria-label="Mundur 10 detik">
+                <SkipBack className="w-5 h-5" />
+              </button>
+              <button onClick={() => seekBy(10)} className="p-2 text-white hover:text-primary transition-colors" aria-label="Maju 10 detik">
+                <SkipForward className="w-5 h-5" />
+              </button>
+            </>
+          )}
           <button onClick={toggleMute} className="p-2 text-white hover:text-primary transition-colors">
             {muted || volume === 0 ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
           </button>
