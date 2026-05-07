@@ -172,8 +172,8 @@ export default function EmbedPlayer({ type, source, title }: Props) {
         style={{ border: 0 }}
       />
 
-      {/* Anti-click overlay - covers entire iframe to block YouTube logo / Watch on YT button */}
-      <div className="absolute inset-0" onClick={togglePlay} />
+      {/* Anti-click overlay - covers entire iframe to block YouTube logo / Watch on YT button. Click does NOT toggle play. */}
+      <div className="absolute inset-0" onClick={(e) => e.preventDefault()} />
 
       {showHint && (
         <button
