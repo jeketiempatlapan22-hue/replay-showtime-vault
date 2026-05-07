@@ -639,7 +639,11 @@ export default function Admin() {
                   ))}
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <div className="pt-2 border-t border-border/50">
+                  <Label>Lineup Member (koma)</Label>
+                  <Input list="member-names" value={liveCfg.lineup} onChange={e => setLiveCfg(c => ({ ...c, lineup: e.target.value }))} placeholder="Alya, Anindya, Lia, ..." />
+                  <p className="text-[11px] text-muted-foreground mt-1">Foto otomatis muncul di halaman Live jika nama cocok dengan data di tab Member.</p>
+                </div>
                   <div className="sm:col-span-2">
                     <Label>Sandi Live (opsional)</Label>
                     <Input type="text" value={liveCfg.password} onChange={e => setLiveCfg(c => ({ ...c, password: e.target.value }))} placeholder="Sandi alternatif untuk akses live" />
