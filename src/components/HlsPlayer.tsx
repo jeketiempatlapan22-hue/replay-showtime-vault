@@ -515,7 +515,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, onFatalError
         ref={videoRef}
         className="absolute inset-0 w-full h-full"
         playsInline
-        onClick={togglePlay}
+        onClick={resetHideTimer}
         title={title}
       />
 
@@ -555,18 +555,18 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, onFatalError
           background: 'linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 50%, rgba(0,0,0,0.3) 100%)',
         }}
       >
-        <button
-          type="button"
-          onClick={togglePlay}
-          className="absolute inset-0 flex items-center justify-center"
-          aria-label={isPlaying ? 'Pause' : 'Play'}
-        >
-          {!isPlaying && !loading && (
+        {!isPlaying && !loading && (
+          <button
+            type="button"
+            onClick={togglePlay}
+            className="absolute inset-0 flex items-center justify-center"
+            aria-label="Play"
+          >
             <div className="w-20 h-20 rounded-full bg-primary/90 flex items-center justify-center backdrop-blur-sm transition-transform hover:scale-110">
               <Play className="w-10 h-10 text-primary-foreground ml-1" fill="currentColor" />
             </div>
-          )}
-        </button>
+          </button>
+        )}
 
         <div className="relative z-10 px-3 sm:px-4 pb-3 sm:pb-4 space-y-2" onClick={(e) => e.stopPropagation()}>
           <div className="flex items-center gap-2 text-white text-xs">
