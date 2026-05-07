@@ -51,6 +51,23 @@ export default function CommentSection({ replayId }: CommentSectionProps) {
     return () => { supabase.removeChannel(ch); };
   }, []);
 
+  // Sync admin username for badge detection
+  useEffect(() => {
+    const fetchAdmin = async () => {
+      const { data } = await supabase.from('site_settings').select('value').eq('key', 'admin_username').maybeSingle();
+      if (data?.value) setAdminUsername(data.value);
+    };
+    fetchAdmin();
+    const ch = supabase
+      .channel('site-settings-adminname')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'site_settings', filter: 'key=eq.admin_username' }, (payload) => {
+        const row = (payload.new || payload.old) as { value?: string };
+        if (row?.value) setAdminUsername(row.value);
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, []);
+
   const fetchComments = async () => {
     const { data } = await supabase
       .from('comments')
