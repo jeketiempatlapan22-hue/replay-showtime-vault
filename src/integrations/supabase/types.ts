@@ -79,6 +79,7 @@ export type Database = {
           id: string
           month: string
           password: string
+          paused: boolean
           updated_at: string
         }
         Insert: {
@@ -86,6 +87,7 @@ export type Database = {
           id?: string
           month: string
           password: string
+          paused?: boolean
           updated_at?: string
         }
         Update: {
@@ -93,6 +95,7 @@ export type Database = {
           id?: string
           month?: string
           password?: string
+          paused?: boolean
           updated_at?: string
         }
         Relationships: []
