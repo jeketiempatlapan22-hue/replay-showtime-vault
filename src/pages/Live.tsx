@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Lock, Loader2, ShoppingBag, MessageCircle } from 'lucide-react';
+import { ArrowLeft, Lock, Loader2, ShoppingBag, MessageCircle, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
@@ -8,12 +8,14 @@ import { supabase } from '@/integrations/supabase/client';
 import { getBrowserId } from '@/lib/browserId';
 import HlsPlayer from '@/components/HlsPlayer';
 import EmbedPlayer from '@/components/EmbedPlayer';
+import MemberAvatar from '@/components/MemberAvatar';
+import LiveChat from '@/components/LiveChat';
 
 type SrcType = 'm3u8' | 'youtube' | 'cloudflare';
 interface PublicSource { label: string; type: SrcType }
 interface PrivateSource extends PublicSource { url: string }
-interface LiveStatus { enabled: boolean; title: string; type: string; require_password: boolean; sources: PublicSource[] }
-interface UnlockedConfig { title: string; type: SrcType; url: string; sources: PrivateSource[]; watermark: string }
+interface LiveStatus { enabled: boolean; title: string; type: string; require_password: boolean; sources: PublicSource[]; lineup: string[] }
+interface UnlockedConfig { title: string; type: SrcType; url: string; sources: PrivateSource[]; watermark: string; enabled: boolean }
 
 const SS_KEY = 'replaytime-live-unlocked';
 const SS_SRC_KEY = 'replaytime-live-source-idx';
@@ -38,8 +40,12 @@ export default function Live() {
 
   const fetchStatus = () => supabase.rpc('get_live_status').then(({ data }) => {
     const row: any = Array.isArray(data) ? data[0] : data;
-    setStatus(row ? { enabled: !!row.enabled, title: row.title || 'Live', type: row.type || 'm3u8', require_password: row.require_password !== false, sources: Array.isArray(row.sources) ? row.sources : [] }
-      : { enabled: false, title: 'Live', type: 'm3u8', require_password: true, sources: [] });
+    setStatus(row ? {
+      enabled: !!row.enabled, title: row.title || 'Live', type: row.type || 'm3u8',
+      require_password: row.require_password !== false,
+      sources: Array.isArray(row.sources) ? row.sources : [],
+      lineup: Array.isArray(row.lineup) ? row.lineup : [],
+    } : { enabled: false, title: 'Live', type: 'm3u8', require_password: true, sources: [], lineup: [] });
     setStatusLoading(false);
     return row;
   });
@@ -51,18 +57,16 @@ export default function Live() {
         body: { ...opts, browser_id: getBrowserId() },
       });
       if (data?.valid) {
-        const cfg: UnlockedConfig = { title: data.title, type: data.type, url: data.url, sources: Array.isArray(data.sources) ? data.sources : [], watermark: data.watermark || '' };
+        const cfg: UnlockedConfig = { title: data.title, type: data.type, url: data.url, sources: Array.isArray(data.sources) ? data.sources : [], watermark: data.watermark || '', enabled: !!data.enabled };
         setUnlocked(cfg);
         setKickedMsg('');
         try { sessionStorage.setItem(SS_KEY, JSON.stringify(cfg)); } catch { /* ignore */ }
       } else if (silent) {
-        // Silent revalidation failed → kick
         setUnlocked(null);
         try { sessionStorage.removeItem(SS_KEY); } catch { /* ignore */ }
         setKickedMsg('Akses Anda telah dicabut oleh admin.');
       } else {
         if (data?.reason === 'device_limit') setPwError('Batas perangkat untuk token ini telah tercapai.');
-        else if (data?.reason === 'off') setPwError('Live sedang tidak aktif.');
         else if (data?.reason === 'bad_password') setPwError('Sandi salah.');
         else if (data?.reason === 'revoked') setPwError('Token tidak valid atau telah dicabut.');
         else setPwError('Gagal membuka akses live.');
@@ -74,25 +78,16 @@ export default function Live() {
   };
 
   useEffect(() => {
-    let cancelled = false;
-    fetchStatus().then(row => {
-      if (cancelled) return;
-      if (!row?.enabled) { setUnlocked(null); try { sessionStorage.removeItem(SS_KEY); } catch { /* ignore */ } }
-    });
+    fetchStatus();
     try {
       const cached = sessionStorage.getItem(SS_KEY);
       if (cached) setUnlocked(JSON.parse(cached));
     } catch { /* ignore */ }
 
     const cfgChannel = supabase.channel('live-config-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'live_config_private' }, () => {
-        fetchStatus().then(row => {
-          if (!row?.enabled) { setUnlocked(null); try { sessionStorage.removeItem(SS_KEY); } catch { /* ignore */ } }
-        });
-      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'live_config_private' }, () => { fetchStatus(); })
       .subscribe();
 
-    // Realtime kick when admin revokes/deletes tokens
     const tokChannel = supabase.channel('live-tokens-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'live_tokens' }, () => {
         const t = search.get('t');
@@ -104,29 +99,18 @@ export default function Live() {
       })
       .subscribe();
 
-    // Re-validate on tab focus
-    const onVis = () => {
-      if (document.visibilityState !== 'visible') return;
-      const t = search.get('t');
-      if (t && unlocked) void doUnlock({ token: t }, true);
-    };
-    document.addEventListener('visibilitychange', onVis);
-
     return () => {
-      cancelled = true;
       supabase.removeChannel(cfgChannel);
       supabase.removeChannel(tokChannel);
-      document.removeEventListener('visibilitychange', onVis);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Auto-unlock with token from URL
   useEffect(() => {
     const t = search.get('t');
-    if (!t || unlocked || statusLoading || !status?.enabled) return;
+    if (!t || unlocked || statusLoading) return;
     void doUnlock({ token: t });
-  }, [search, status, statusLoading]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [search, statusLoading]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const allSources = useMemo<PrivateSource[]>(() => {
     if (!unlocked) return [];
@@ -150,12 +134,14 @@ export default function Live() {
     void doUnlock({ password: pwInput.trim() });
   };
 
+  const liveActive = unlocked?.enabled ?? status?.enabled ?? false;
+
   return (
     <div className="min-h-screen bg-background relative z-10">
       <div className="sticky top-0 z-20 bg-card/90 backdrop-blur border-b border-border px-3 sm:px-4 py-3 flex items-center gap-3">
         <Button variant="ghost" size="icon" onClick={() => navigate('/')} className="shrink-0"><ArrowLeft className="w-5 h-5" /></Button>
         <div className="flex-1 min-w-0 flex items-center gap-2">
-          {status?.enabled ? (
+          {liveActive ? (
             <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-red-500/15 border border-red-500/40 text-red-500 text-[10px] font-bold uppercase tracking-wider">
               <span className="relative flex h-1.5 w-1.5">
                 <span className="absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75 animate-ping" />
@@ -188,7 +174,6 @@ export default function Live() {
               </p>
             </div>
 
-            {/* Password form — primary action */}
             <form onSubmit={submitPassword} className="space-y-2">
               <label className="flex items-center gap-2 text-xs font-medium text-foreground">
                 <Lock className="w-3.5 h-3.5" />
@@ -215,7 +200,6 @@ export default function Live() {
 
             {kickedMsg && <p className="text-xs text-destructive text-center">{kickedMsg}</p>}
 
-            {/* Beli Show CTA */}
             <div className="pt-4 border-t border-border space-y-3">
               <div className="text-center space-y-1">
                 <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-foreground">
@@ -235,40 +219,63 @@ export default function Live() {
           </div>
         ) : (
           <>
-            {activeSource && (
-              <div className="flex items-center justify-between flex-wrap gap-2 px-1">
-                <div className="text-xs text-muted-foreground">
-                  Sumber aktif: <span className="font-semibold text-foreground">{activeSource.label || 'Player'}</span>
-                  <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded bg-secondary text-[10px] uppercase tracking-wider">{typeLabel(activeSource.type)}</span>
+            {liveActive && activeSource ? (
+              <>
+                <div className="flex items-center justify-between flex-wrap gap-2 px-1">
+                  <div className="text-xs text-muted-foreground">
+                    Sumber aktif: <span className="font-semibold text-foreground">{activeSource.label || 'Player'}</span>
+                    <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded bg-secondary text-[10px] uppercase tracking-wider">{typeLabel(activeSource.type)}</span>
+                  </div>
+                  {unlocked.watermark && (
+                    <span className="text-[10px] font-mono text-muted-foreground">ID: {unlocked.watermark}</span>
+                  )}
                 </div>
-                {unlocked.watermark && (
-                  <span className="text-[10px] font-mono text-muted-foreground">ID: {unlocked.watermark}</span>
+
+                {allSources.length > 1 && (
+                  <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                    {allSources.map((s, i) => (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => selectSource(i)}
+                        className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                          i === safeIdx ? 'bg-primary text-primary-foreground border-primary' : 'bg-card text-foreground border-border hover:bg-secondary'
+                        }`}
+                      >
+                        {s.label || `Player ${i + 1}`}
+                      </button>
+                    ))}
+                  </div>
                 )}
+
+                {activeSource.type === 'm3u8'
+                  ? <HlsPlayer key={`m3u8-${safeIdx}-${activeSource.url}`} src={activeSource.url} title={unlocked.title} watermark={unlocked.watermark} />
+                  : <EmbedPlayer key={`em-${safeIdx}-${activeSource.url}`} type={activeSource.type} source={activeSource.url} title={unlocked.title} watermark={unlocked.watermark} />}
+              </>
+            ) : (
+              <div className="rounded-2xl bg-card/60 border border-border p-6 text-center space-y-2">
+                <p className="text-sm font-semibold text-foreground">Live sedang OFF AIR</p>
+                <p className="text-xs text-muted-foreground">Akses Anda valid. Player akan muncul otomatis saat live aktif.</p>
               </div>
             )}
 
-            {allSources.length > 1 && (
-              <div className="flex items-center gap-2 overflow-x-auto pb-1">
-                {allSources.map((s, i) => (
-                  <button
-                    key={i}
-                    type="button"
-                    onClick={() => selectSource(i)}
-                    className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
-                      i === safeIdx ? 'bg-primary text-primary-foreground border-primary' : 'bg-card text-foreground border-border hover:bg-secondary'
-                    }`}
-                  >
-                    {s.label || `Player ${i + 1}`}
-                  </button>
-                ))}
+            {/* LINEUP */}
+            {status?.lineup && status.lineup.length > 0 && (
+              <div className="rounded-2xl bg-card/80 border border-border p-3 sm:p-4 space-y-2">
+                <div className="flex items-center gap-2">
+                  <Users className="w-4 h-4 text-primary" />
+                  <span className="text-xs font-bold uppercase tracking-wider text-foreground">Lineup</span>
+                </div>
+                <div className="flex gap-3 overflow-x-auto pb-1">
+                  {status.lineup.map((m, i) => (
+                    <MemberAvatar key={i} name={m} size={56} />
+                  ))}
+                </div>
               </div>
             )}
 
-            {activeSource && (
-              activeSource.type === 'm3u8'
-                ? <HlsPlayer key={`m3u8-${safeIdx}-${activeSource.url}`} src={activeSource.url} title={unlocked.title} watermark={unlocked.watermark} />
-                : <EmbedPlayer key={`em-${safeIdx}-${activeSource.url}`} type={activeSource.type} source={activeSource.url} title={unlocked.title} watermark={unlocked.watermark} />
-            )}
+            {/* LIVE CHAT */}
+            <LiveChat />
           </>
         )}
       </div>
