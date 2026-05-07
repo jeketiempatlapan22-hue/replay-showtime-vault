@@ -22,6 +22,7 @@ export default function CommentSection({ replayId }: CommentSectionProps) {
   const [sending, setSending] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [chatEnabled, setChatEnabled] = useState(true);
+  const [adminUsername, setAdminUsername] = useState<string>('Admin');
 
   useEffect(() => {
     const checkAdmin = async () => {
