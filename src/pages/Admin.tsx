@@ -324,7 +324,7 @@ export default function Admin() {
     setSendingReply(true);
     const { error } = await supabase.from('comments').insert({
       replay_id: replyingTo.replay_id,
-      name: '🛡️ Admin',
+      name: `🛡️ ${(adminUsername || 'Admin').trim()}`,
       message: replyText.trim(),
     });
     if (error) {
