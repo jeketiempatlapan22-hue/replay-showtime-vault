@@ -294,7 +294,7 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
         )}
 
         {/* Playlist chips */}
-        {sources.length > 1 && activeSource && (
+        {sources.length >= 1 && activeSource && (
           <div className="mt-3">
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1.5">
               <ListVideo className="w-3.5 h-3.5" />
