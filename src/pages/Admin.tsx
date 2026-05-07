@@ -529,6 +529,84 @@ export default function Admin() {
             </Card>
           </TabsContent>
 
+          {/* ===== LIVE TAB ===== */}
+          <TabsContent value="live" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="font-sans text-base sm:text-lg flex items-center gap-2">
+                  <Radio className={`w-5 h-5 ${liveCfg.enabled ? 'text-red-500' : 'text-primary'}`} />
+                  Konfigurasi Live
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex items-center justify-between p-3 rounded-lg bg-secondary/40 border border-border">
+                  <div>
+                    <Label className="text-sm">Aktifkan Halaman Live</Label>
+                    <p className="text-[11px] text-muted-foreground">User dapat membuka <code>/live</code> ketika diaktifkan.</p>
+                  </div>
+                  <Switch checked={liveCfg.enabled} onCheckedChange={v => setLiveCfg(c => ({ ...c, enabled: v }))} />
+                </div>
+                <div>
+                  <Label>Judul Live</Label>
+                  <Input value={liveCfg.title} onChange={e => setLiveCfg(c => ({ ...c, title: e.target.value }))} placeholder="cth: Live Setlist Pajama Drive" />
+                </div>
+                <div>
+                  <Label>Tipe Sumber</Label>
+                  <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={liveCfg.type} onChange={e => setLiveCfg(c => ({ ...c, type: e.target.value }))}>
+                    <option value="m3u8">M3U8 (HLS)</option>
+                    <option value="youtube">YouTube</option>
+                    <option value="cloudflare">Cloudflare Stream</option>
+                  </select>
+                </div>
+                <div>
+                  <Label>URL / ID Sumber</Label>
+                  <Input value={liveCfg.url} onChange={e => setLiveCfg(c => ({ ...c, url: e.target.value }))} placeholder={liveCfg.type === 'youtube' ? 'YouTube ID atau URL' : liveCfg.type === 'cloudflare' ? 'UID Cloudflare' : 'https://.../playlist.m3u8'} />
+                </div>
+                <div>
+                  <Label>Sandi Live</Label>
+                  <Input type="text" value={liveCfg.password} onChange={e => setLiveCfg(c => ({ ...c, password: e.target.value }))} placeholder="Sandi untuk akses live" />
+                  <p className="text-[11px] text-muted-foreground mt-1">User bisa masuk pakai sandi ini ATAU lewat link token di bawah.</p>
+                </div>
+                <Button onClick={handleSaveLive} disabled={liveSaving}><Save className="w-4 h-4 mr-2" />{liveSaving ? 'Menyimpan...' : 'Simpan Konfigurasi'}</Button>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="font-sans text-base sm:text-lg flex items-center gap-2"><Link2 className="w-5 h-5 text-primary" />Token Akses Live</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 items-end">
+                  <div className="sm:col-span-2"><Label>Label</Label><Input value={newTokenLabel} onChange={e => setNewTokenLabel(e.target.value)} placeholder="cth: Member VIP - Andi" /></div>
+                  <div><Label>Max Device</Label><Input type="number" min={1} max={50} value={newTokenMaxDevices} onChange={e => setNewTokenMaxDevices(Math.max(1, Math.min(50, Number(e.target.value) || 1)))} /></div>
+                </div>
+                <Button size="sm" onClick={handleCreateLiveToken}><Plus className="w-4 h-4 mr-1" />Buat Token</Button>
+
+                {liveTokens.length === 0 ? (
+                  <p className="text-muted-foreground text-center py-4 text-sm">Belum ada token.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {liveTokens.map(t => (
+                      <div key={t.id} className="p-3 rounded-lg bg-secondary/40 border border-border space-y-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-sm font-medium">{t.label || '(tanpa label)'}</span>
+                          <Badge variant="secondary" className="text-[10px]">{t.devices_used}/{t.max_devices} device</Badge>
+                          {t.revoked && <Badge variant="destructive" className="text-[10px]">Dicabut</Badge>}
+                        </div>
+                        <code className="block text-[10px] bg-background border border-border rounded px-2 py-1 break-all">{t.token}</code>
+                        <div className="flex flex-wrap gap-1">
+                          <Button variant="outline" size="sm" className="h-7 text-[10px]" onClick={() => copyLiveTokenLink(t.token)}><Copy className="w-3 h-3 mr-1" />Salin link</Button>
+                          <Button variant="outline" size="sm" className="h-7 text-[10px]" onClick={() => handleResetLiveDevices(t.id)}><RefreshCw className="w-3 h-3 mr-1" />Reset device</Button>
+                          <Button variant="ghost" size="sm" className="h-7 text-[10px] text-destructive" onClick={() => handleDeleteLiveToken(t.id)}><Trash2 className="w-3 h-3 mr-1" />Hapus</Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
           {/* ===== PREVIEW TAB ===== */}
           <TabsContent value="preview">
             <div className="space-y-4">
