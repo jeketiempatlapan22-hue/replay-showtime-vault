@@ -629,6 +629,23 @@ export default function Admin() {
               </CardContent>
             </Card>
 
+            {/* Admin Username */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="font-sans text-base sm:text-lg flex items-center gap-2">
+                  <ShieldCheck className="w-5 h-5 text-primary" />Username Admin
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <p className="text-xs text-muted-foreground">Nama ini akan ditampilkan sebagai penanda saat admin berkomentar di kartu replay (otomatis diawali ikon 🛡️).</p>
+                <div className="flex gap-2">
+                  <Input placeholder="cth: AdminDhy" value={adminUsername} onChange={e => setAdminUsername(e.target.value.slice(0, 30))} />
+                  <Button onClick={handleSaveAdminUsername} size="sm" className="h-10 shrink-0"><Save className="w-4 h-4 mr-1" />Simpan</Button>
+                </div>
+                <p className="text-[11px] text-muted-foreground">Pratinjau: <span className="font-medium text-foreground">🛡️ {(adminUsername || 'Admin').trim()}</span></p>
+              </CardContent>
+            </Card>
+
             {/* WhatsApp */}
             <Card>
               <CardHeader><CardTitle className="font-sans text-base sm:text-lg flex items-center gap-2"><MessageCircle className="w-5 h-5 text-primary" />WhatsApp</CardTitle></CardHeader>
