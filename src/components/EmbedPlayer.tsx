@@ -146,6 +146,51 @@ export default function EmbedPlayer({ type, source, title, watermark }: Props) {
     return onFullscreenChange(onChange);
   }, []);
 
+  // Poll YT current time / duration
+  useEffect(() => {
+    if (type !== 'youtube') return;
+    const id = window.setInterval(() => {
+      const p = ytPlayerRef.current;
+      if (!p?.getCurrentTime) return;
+      try {
+        if (!seeking) setCurrentTime(p.getCurrentTime() || 0);
+        const d = p.getDuration() || 0;
+        if (d && d !== duration) setDuration(d);
+      } catch { /* ignore */ }
+    }, 500);
+    return () => clearInterval(id);
+  }, [type, seeking, duration]);
+
+  const onSeekChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const v = Number(e.target.value);
+    setCurrentTime(v);
+  };
+  const onSeekCommit = (e: React.SyntheticEvent<HTMLInputElement>) => {
+    const v = Number((e.target as HTMLInputElement).value);
+    if (type === 'youtube') {
+      try { ytPlayerRef.current?.seekTo(v, true); } catch { /* ignore */ }
+    }
+    setSeeking(false);
+  };
+  const seekBy = (delta: number) => {
+    if (type !== 'youtube') return;
+    const p = ytPlayerRef.current;
+    if (!p?.getCurrentTime) return;
+    try {
+      const t = Math.max(0, Math.min((p.getDuration() || 0), (p.getCurrentTime() || 0) + delta));
+      p.seekTo(t, true);
+      setCurrentTime(t);
+    } catch { /* ignore */ }
+  };
+  const fmt = (s: number) => {
+    if (!isFinite(s) || s < 0) s = 0;
+    const m = Math.floor(s / 60);
+    const sec = Math.floor(s % 60).toString().padStart(2, '0');
+    const h = Math.floor(m / 60);
+    if (h > 0) return `${h}:${(m % 60).toString().padStart(2, '0')}:${sec}`;
+    return `${m}:${sec}`;
+  };
+
   const toggleFullscreen = () => {
     if (!containerRef.current) return;
     if (!isFullscreenActive()) requestFs(containerRef.current);
