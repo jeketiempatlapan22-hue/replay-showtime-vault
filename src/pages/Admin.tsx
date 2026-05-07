@@ -109,6 +109,7 @@ export default function Admin() {
       setCurrentTheme((settings.theme as ThemeType) || 'ramadhan');
       setWaNumber(settings.whatsapp_number || '');
       setWaLink(settings.whatsapp_link || '');
+      setLiveChatEnabled((settings.live_chat_enabled ?? 'true') !== 'false');
       const { data: comments } = await supabase.from('comments').select('*').order('created_at', { ascending: false });
       if (comments) setAllComments(comments);
       const { data: blocks } = await supabase.from('blocked_browsers').select('*').order('created_at', { ascending: false });
@@ -171,6 +172,7 @@ export default function Admin() {
         image_url: form.imageUrl,
         source_type: form.sourceType,
         m3u8_url: isYoutube ? '' : form.m3u8Url,
+        sources: form.sources as any,
       };
       if (editingReplay) {
         await updateReplay(editingReplay.id, payload);
