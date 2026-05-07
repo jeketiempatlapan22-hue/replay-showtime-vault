@@ -28,9 +28,16 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ config: data }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
     if (action === "set_config") {
-      const { enabled, title, type, url, password, require_password } = body;
+      const { enabled, title, type, url, password, require_password, sources } = body;
+      const cleanSources = Array.isArray(sources)
+        ? sources.filter((s: any) => s && s.url).map((s: any) => ({
+            label: String(s.label || '').slice(0, 80),
+            type: ['m3u8', 'youtube', 'cloudflare'].includes(s.type) ? s.type : 'm3u8',
+            url: String(s.url || ''),
+          }))
+        : [];
       const { data: existing } = await admin.from("live_config_private").select("id").limit(1).maybeSingle();
-      const payload: any = { enabled: !!enabled, title: title ?? "Live", type: type ?? "m3u8", url: url ?? "", password: password ?? "", require_password: require_password !== false, updated_at: new Date().toISOString() };
+      const payload: any = { enabled: !!enabled, title: title ?? "Live", type: type ?? "m3u8", url: url ?? "", password: password ?? "", require_password: require_password !== false, sources: cleanSources, updated_at: new Date().toISOString() };
       if (existing) await admin.from("live_config_private").update(payload).eq("id", existing.id);
       else await admin.from("live_config_private").insert(payload);
       return new Response(JSON.stringify({ ok: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });

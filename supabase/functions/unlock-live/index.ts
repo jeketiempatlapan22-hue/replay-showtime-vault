@@ -43,7 +43,7 @@ Deno.serve(async (req) => {
     if (!valid) {
       return new Response(JSON.stringify({ valid: false }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
-    return new Response(JSON.stringify({ valid: true, title: cfg.title, type: cfg.type, url: cfg.url }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    return new Response(JSON.stringify({ valid: true, title: cfg.title, type: cfg.type, url: cfg.url, sources: Array.isArray(cfg.sources) ? cfg.sources : [] }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch {
     return new Response(JSON.stringify({ valid: false }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }

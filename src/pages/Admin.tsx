@@ -77,8 +77,9 @@ export default function Admin() {
   const [blockedBrowsers, setBlockedBrowsers] = useState<Array<{ id: string; browser_id: string; reason: string; unblocked: boolean; created_at: string }>>([]);
 
   // Live state
-  const [liveCfg, setLiveCfg] = useState<{ enabled: boolean; title: string; type: string; url: string; password: string; require_password: boolean }>({
-    enabled: false, title: 'Live', type: 'm3u8', url: '', password: '', require_password: true,
+  type LiveSrc = { label: string; type: 'm3u8' | 'youtube' | 'cloudflare'; url: string };
+  const [liveCfg, setLiveCfg] = useState<{ enabled: boolean; title: string; type: string; url: string; password: string; require_password: boolean; sources: LiveSrc[] }>({
+    enabled: false, title: 'Live', type: 'm3u8', url: '', password: '', require_password: true, sources: [],
   });
   const [liveTokens, setLiveTokens] = useState<Array<{ id: string; token: string; label: string; max_devices: number; revoked: boolean; devices_used: number }>>([]);
   const [newTokenLabel, setNewTokenLabel] = useState('');
@@ -139,7 +140,7 @@ export default function Admin() {
       ]);
       if (cfgRes.data?.config) {
         const c = cfgRes.data.config;
-        setLiveCfg({ enabled: !!c.enabled, title: c.title || 'Live', type: c.type || 'm3u8', url: c.url || '', password: c.password || '', require_password: c.require_password !== false });
+        setLiveCfg({ enabled: !!c.enabled, title: c.title || 'Live', type: c.type || 'm3u8', url: c.url || '', password: c.password || '', require_password: c.require_password !== false, sources: Array.isArray(c.sources) ? c.sources : [] });
       }
       if (tokRes.data?.tokens) setLiveTokens(tokRes.data.tokens);
     } catch { /* ignore */ }
@@ -559,9 +560,46 @@ export default function Admin() {
                   </select>
                 </div>
                 <div>
-                  <Label>URL / ID Sumber</Label>
+                  <Label>URL / ID Sumber Utama</Label>
                   <Input value={liveCfg.url} onChange={e => setLiveCfg(c => ({ ...c, url: e.target.value }))} placeholder={liveCfg.type === 'youtube' ? 'YouTube ID atau URL' : liveCfg.type === 'cloudflare' ? 'UID Cloudflare' : 'https://.../playlist.m3u8'} />
+                  <p className="text-[11px] text-muted-foreground mt-1">Ini akan ditampilkan sebagai sumber default. Tambah sumber alternatif/mirror di bawah.</p>
                 </div>
+
+                <div className="space-y-2 pt-2 border-t border-border/50">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm">Daftar Player / Mirror</Label>
+                    <Button type="button" size="sm" variant="outline" className="h-7 text-[11px]"
+                      onClick={() => setLiveCfg(c => ({ ...c, sources: [...c.sources, { label: `Player ${c.sources.length + 1}`, type: 'm3u8', url: '' }] }))}>
+                      <Plus className="w-3 h-3 mr-1" />Tambah Player
+                    </Button>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">Beri nama tiap player. Nama ini akan ditampilkan di halaman Live agar user bisa pilih sumber.</p>
+                  {liveCfg.sources.length === 0 && (
+                    <p className="text-[11px] text-muted-foreground italic text-center py-2">Belum ada player tambahan.</p>
+                  )}
+                  {liveCfg.sources.map((s, idx) => (
+                    <div key={idx} className="p-2 rounded-md border border-border bg-secondary/30 space-y-1.5">
+                      <div className="grid grid-cols-12 gap-1.5 items-center">
+                        <Input className="col-span-6 h-8 text-xs" placeholder="Nama (cth: Player 1, HD, Mirror)" value={s.label}
+                          onChange={e => setLiveCfg(c => ({ ...c, sources: c.sources.map((x, i) => i === idx ? { ...x, label: e.target.value } : x) }))} />
+                        <select className="col-span-5 h-8 rounded-md border border-input bg-background px-2 text-xs" value={s.type}
+                          onChange={e => setLiveCfg(c => ({ ...c, sources: c.sources.map((x, i) => i === idx ? { ...x, type: e.target.value as LiveSrc['type'] } : x) }))}>
+                          <option value="m3u8">M3U8</option>
+                          <option value="youtube">YouTube</option>
+                          <option value="cloudflare">Cloudflare</option>
+                        </select>
+                        <Button type="button" variant="ghost" size="icon" className="col-span-1 h-7 w-7 text-destructive"
+                          onClick={() => setLiveCfg(c => ({ ...c, sources: c.sources.filter((_, i) => i !== idx) }))}>
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
+                      <Input className="h-8 text-xs" placeholder={s.type === 'youtube' ? 'YouTube ID atau URL' : s.type === 'cloudflare' ? 'UID Cloudflare' : 'https://.../playlist.m3u8'}
+                        value={s.url}
+                        onChange={e => setLiveCfg(c => ({ ...c, sources: c.sources.map((x, i) => i === idx ? { ...x, url: e.target.value } : x) }))} />
+                    </div>
+                  ))}
+                </div>
+
                 <div>
                   <Label>Sandi Live</Label>
                   <Input type="text" value={liveCfg.password} onChange={e => setLiveCfg(c => ({ ...c, password: e.target.value }))} placeholder="Sandi untuk akses live" />

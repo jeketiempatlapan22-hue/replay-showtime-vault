@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHandle } from 'react';
 import Hls from 'hls.js';
 import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, RotateCcw, RotateCw, Loader2, Settings, Check } from 'lucide-react';
+import { isFullscreenActive, onFullscreenChange, requestFs, exitFs } from '@/lib/fullscreen';
 
 interface Props {
   src: string;
@@ -427,11 +428,10 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, onFatalError
     };
   }, []);
 
-  // Fullscreen tracking
+  // Fullscreen tracking (cross-browser)
   useEffect(() => {
-    const onChange = () => setIsFullscreen(!!document.fullscreenElement);
-    document.addEventListener('fullscreenchange', onChange);
-    return () => document.removeEventListener('fullscreenchange', onChange);
+    const onChange = () => setIsFullscreen(isFullscreenActive());
+    return onFullscreenChange(onChange);
   }, []);
 
   const resetHideTimer = useCallback(() => {
@@ -488,11 +488,8 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, onFatalError
 
   const toggleFullscreen = () => {
     if (!containerRef.current) return;
-    if (!document.fullscreenElement) {
-      containerRef.current.requestFullscreen?.().catch(() => {});
-    } else {
-      document.exitFullscreen?.().catch(() => {});
-    }
+    if (!isFullscreenActive()) requestFs(containerRef.current, videoRef.current);
+    else exitFs();
   };
 
   if (error) {
