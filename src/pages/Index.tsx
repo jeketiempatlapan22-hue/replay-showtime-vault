@@ -116,7 +116,10 @@ export default function Index() {
 
     const replayChannel = supabase
       .channel('replays-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'replays' }, () => {
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'replays' }, () => {
+        refreshReplays();
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'replays' }, () => {
         refreshReplays();
       })
       .subscribe();
