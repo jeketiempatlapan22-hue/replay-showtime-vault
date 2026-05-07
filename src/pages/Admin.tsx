@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, Trash2, Edit2, Key, Save, Palette, MessageCircle, LogOut, Eye, Send, List, Settings, ShieldCheck, Unlock as UnlockIcon, Link2, Copy, X } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Edit2, Key, Save, Palette, MessageCircle, LogOut, Eye, Send, List, Settings, ShieldCheck, Unlock as UnlockIcon, Link2, Copy, X, Radio, RefreshCw } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -75,6 +75,15 @@ export default function Admin() {
 
   // Blocked browsers
   const [blockedBrowsers, setBlockedBrowsers] = useState<Array<{ id: string; browser_id: string; reason: string; unblocked: boolean; created_at: string }>>([]);
+
+  // Live state
+  const [liveCfg, setLiveCfg] = useState<{ enabled: boolean; title: string; type: string; url: string; password: string; require_password: boolean }>({
+    enabled: false, title: 'Live', type: 'm3u8', url: '', password: '', require_password: true,
+  });
+  const [liveTokens, setLiveTokens] = useState<Array<{ id: string; token: string; label: string; max_devices: number; revoked: boolean; devices_used: number }>>([]);
+  const [newTokenLabel, setNewTokenLabel] = useState('');
+  const [newTokenMaxDevices, setNewTokenMaxDevices] = useState(1);
+  const [liveSaving, setLiveSaving] = useState(false);
 
   const showFeaturedMember = form.criteria === 'sts' || form.criteria === 'last_show';
 
