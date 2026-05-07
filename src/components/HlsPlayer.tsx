@@ -55,6 +55,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, onFatalError
   const [currentQuality, setCurrentQuality] = useState<number>(-1);
   const [autoActiveLabel, setAutoActiveLabel] = useState<string>('');
   const [showQualityMenu, setShowQualityMenu] = useState(false);
+  const [isLiveStream, setIsLiveStream] = useState(false);
 
   // Expose PiP API to parent
   useImperativeHandle(ref, () => ({
@@ -109,6 +110,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, onFatalError
     setQualities([]);
     setCurrentQuality(-1);
     setAutoActiveLabel('');
+    setIsLiveStream(false);
     recoveryAttemptsRef.current = 0;
     isLiveRef.current = false;
     lastProgressRef.current = { time: 0, checkedAt: Date.now(), recoveries: 0 };
@@ -213,7 +215,8 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, onFatalError
       hls.attachMedia(video);
       hls.on(Hls.Events.MANIFEST_PARSED, (_, data) => {
         setLoading(false);
-        isLiveRef.current = data.levels?.some(level => level.details?.live) || false;
+        isLiveRef.current = (data.levels || []).some((level: any) => level.details?.live) || false;
+        setIsLiveStream(isLiveRef.current);
         const levels: QualityLevel[] = (data.levels || []).map((lvl, i) => ({
           index: i,
           label: lvl.height ? `${lvl.height}p` : `${Math.round((lvl.bitrate || 0) / 1000)}kbps`,
@@ -227,6 +230,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, onFatalError
       });
       hls.on(Hls.Events.LEVEL_LOADED, (_, data) => {
         isLiveRef.current = !!data.details?.live;
+        setIsLiveStream(!!data.details?.live);
       });
       hls.on(Hls.Events.LEVEL_SWITCHED, (_, data) => {
         if (hls && hls.autoLevelEnabled) {
