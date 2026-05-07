@@ -238,10 +238,40 @@ export default function EmbedPlayer({ type, source, title, watermark }: Props) {
 
       {/* Controls */}
       <div className="absolute inset-x-0 bottom-0 z-10 px-3 pb-3 pt-8 bg-gradient-to-t from-black/80 to-transparent">
+        {type === 'youtube' && (
+          <div className="flex items-center gap-2 mb-1 text-[11px] text-white/90 font-mono" onClick={(e) => e.stopPropagation()}>
+            <span>{fmt(currentTime)}</span>
+            <input
+              type="range"
+              min={0}
+              max={Math.max(1, duration)}
+              step={1}
+              value={Math.min(currentTime, duration || 0)}
+              onMouseDown={() => setSeeking(true)}
+              onTouchStart={() => setSeeking(true)}
+              onChange={onSeekChange}
+              onMouseUp={onSeekCommit}
+              onTouchEnd={onSeekCommit}
+              onKeyUp={onSeekCommit}
+              className="flex-1 h-1 accent-primary cursor-pointer"
+            />
+            <span>{fmt(duration)}</span>
+          </div>
+        )}
         <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
           <button onClick={togglePlay} className="p-2 text-white hover:text-primary transition-colors">
             {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
           </button>
+          {type === 'youtube' && (
+            <>
+              <button onClick={() => seekBy(-10)} className="p-2 text-white hover:text-primary transition-colors" aria-label="Mundur 10 detik">
+                <SkipBack className="w-5 h-5" />
+              </button>
+              <button onClick={() => seekBy(10)} className="p-2 text-white hover:text-primary transition-colors" aria-label="Maju 10 detik">
+                <SkipForward className="w-5 h-5" />
+              </button>
+            </>
+          )}
           <button onClick={toggleMute} className="p-2 text-white hover:text-primary transition-colors">
             {muted || volume === 0 ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
           </button>
