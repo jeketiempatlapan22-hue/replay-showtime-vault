@@ -1,67 +1,97 @@
+## Ringkasan Permintaan
 
-## Analisis
+User minta 4 fitur besar:
+1. **Multi-source playlist**: admin bisa simpan banyak link (YouTube/M3U8/Cloudflare) per replay, user pilih via tombol playlist di bawah player.
+2. **Live chat batas 30 pesan** + toggle aktif/nonaktif global oleh admin.
+3. **Auto-play** saat buka kartu & saat ganti playlist (termasuk `.live`).
+4. **Token akses replay**: admin generate 1 link unik per kartu yang langsung membuka replay tanpa input sandi.
 
-User minta 3 hal:
-1. **M3U8 lebih lancar** — kurangi lag dengan tuning hls.js buffer config + ABR settings
-2. **Animasi loading lebih jelas** — saat connect awal & saat buffering/lag mid-playback
-3. **Tombol PiP** di sebelah kanan RatingStars dengan deskripsi jelas
+---
 
 ## Rencana Implementasi
 
-### A. Tuning HLS.js untuk pemutaran lebih lancar (`src/components/HlsPlayer.tsx`)
+### 1. Skema Database (migration baru)
 
-Ganti config `new Hls(...)` dengan parameter optimal:
-- `enableWorker: true` (sudah ada) → offload parsing ke web worker
-- `lowLatencyMode: false` (sudah ada)
-- `backBufferLength: 30` → batasi back-buffer agar memory tidak bengkak
-- `maxBufferLength: 60` → buffer ke depan 60 detik
-- `maxMaxBufferLength: 120` → cap absolut
-- `maxBufferSize: 60 * 1000 * 1000` → 60MB cap
-- `maxBufferHole: 0.5` → toleransi gap kecil
-- `highBufferWatchdogPeriod: 2`
-- `nudgeOffset: 0.1`, `nudgeMaxRetry: 5`
-- ABR: `abrEwmaDefaultEstimate: 500_000` (mulai konservatif untuk koneksi lambat), `startLevel: -1` (auto pilih lowest dulu untuk fast start)
-- **Auto-recovery saat error non-fatal**: di handler `Hls.Events.ERROR`, kalau `data.type === NETWORK_ERROR` panggil `hls.startLoad()`, kalau `MEDIA_ERROR` panggil `hls.recoverMediaError()` — hanya escalate ke `onFatalError` setelah retry gagal
+Tambah kolom & tabel:
+- `replays.sources` (jsonb, default `'[]'`) — array source playlist:
+  ```
+  [{ id, label, type: 'youtube'|'m3u8'|'cloudflare', url, is_default }]
+  ```
+  Kolom lama `youtube_id`, `m3u8_url`, `source_type` tetap (fallback bila `sources` kosong).
+- `replays.access_token` (text, unique, nullable) — token akses untuk URL ajaib.
+- `site_settings` row baru: `live_chat_enabled` (`'true'`/`'false'`).
+- Trigger: setelah INSERT comments, hapus baris `comments` per `replay_id` di luar 30 terakhir (`DELETE … WHERE id NOT IN (SELECT id ORDER BY created_at DESC LIMIT 30)`).
 
-### B. Animasi loading yang lebih informatif
+### 2. Edge Functions
 
-- State baru: `buffering` (terpisah dari initial `loading`)
-- `loading` = saat manifest belum di-parse / sumber baru di-load
-- `buffering` = `waiting` event mid-playback
-- Overlay berbeda:
-  - **Initial loading**: spinner besar + teks "Menghubungkan ke server..."
-  - **Buffering**: spinner kecil pojok + teks "Memuat..." dengan backdrop blur ringan (tidak menghalangi tonton)
-- Tambahkan animasi pulse untuk indikator buffer
+**Update `get-replay-source`**:
+- Return `sources` array (selain field lama untuk backward compat).
+- Tambah mode token: jika body berisi `access_token` (tanpa `password`), validasi `replays.access_token = token` → return source tanpa cek sandi.
 
-### C. Picture-in-Picture
+### 3. Admin Panel (`src/pages/Admin.tsx`)
 
-**Di `HlsPlayer.tsx`**: expose method PiP via `useImperativeHandle` ATAU lebih simpel — handle PiP sepenuhnya di parent dengan ref ke video element.
+**Form Add/Edit Replay**:
+- Section "Sumber Playlist" dinamis: tombol "+ Tambah sumber", tiap baris punya: Label (mis. "IDN"), Type (dropdown YouTube/M3U8/Cloudflare), URL, radio "default". Bisa hapus baris.
+- Form lama tetap sebagai fallback bila admin tidak isi sources.
 
-**Pendekatan terpilih**: Tambahkan prop `videoRef` external + atau forwardRef ke video element, ATAU simplest — buat fungsi PiP di `YouTubePlayer.tsx` yang akses video element via querySelector di container HLS player.
+**Section "Token Akses"** di tiap card replay (di list):
+- Tombol "Generate Token" → call RPC/insert random token (`crypto.randomUUID()`).
+- Tampil link copy-able: `https://<domain>/?token=<token>&replay=<id>`.
+- Tombol "Hapus Token".
 
-Lebih clean: ubah `HlsPlayer` jadi `forwardRef` yang expose `{ requestPip, exitPip, isPipActive }` ke parent.
+**Tab Pengaturan**:
+- Toggle "Live Chat Aktif" → tulis `site_settings.live_chat_enabled`.
 
-**Di `YouTubePlayer.tsx`** (lokasi tombol):
-- Bagian rating: ubah dari `<RatingStars />` jadi flex container `<div><RatingStars /><PipButton /></div>`
-- Tombol PiP:
-  - Icon `PictureInPicture2` dari lucide-react
-  - Label visible: "PiP"
-  - Tooltip + helper text di bawah: "Picture-in-Picture: tonton video dalam jendela kecil mengambang sambil membuka tab/aplikasi lain"
-  - Disabled & tampilkan pesan kalau:
-    - Sumber adalah YouTube iframe (PiP tidak bisa diakses dari cross-origin iframe — sembunyikan tombol)
-    - Browser tidak support (`!document.pictureInPictureEnabled`)
-- State PiP active untuk toggle label "Buka PiP" / "Keluar PiP"
+### 4. Player Multi-Source (`src/components/YouTubePlayer.tsx`)
 
-### D. Hindari false-positive di mobile
+- State `activeSourceId`. Default = source dengan `is_default=true` atau index 0; kalau tidak ada `sources`, fallback ke field lama.
+- Render player sesuai type aktif:
+  - `m3u8` → `HlsPlayer` (autoplay).
+  - `youtube` → iframe (tambah `autoplay=1&mute=1` agar policy browser lolos saat user sudah klik kartu).
+  - `cloudflare` → iframe Cloudflare Stream (`https://iframe.videodelivery.net/<uid>`).
+- **Tombol Playlist di bawah player** (mirip screenshot user): scroll horizontal pill buttons, satu per source, aktif highlight primary.
+- **Auto-play saat ganti**: ubah source → unmount-mount HlsPlayer / set iframe src baru; HlsPlayer di-set autoplay (`video.play()` di `MANIFEST_PARSED`). Untuk `.live` (no duration), tetap berjalan karena hls.js menangani live secara native.
 
-Viewport user 484px → mobile. Pastikan tombol PiP tetap tampil di layout flex-col yang sudah ada (`flex-col sm:flex-row`).
+### 5. HlsPlayer (`src/components/HlsPlayer.tsx`)
 
-## Files yang Akan Diubah
+- Tambah prop `autoPlay` (default true).
+- Pada `MANIFEST_PARSED` & saat `src` berubah: `video.muted = true` (agar autoplay diizinkan), `video.play()`.
+- Pertahankan logika resume position untuk VOD; deteksi `levels[0].details?.live` → jangan paksa resume time, langsung live edge.
 
-- `src/components/HlsPlayer.tsx` — tuning hls.js, recovery error, dual loading state, forwardRef untuk PiP
-- `src/components/YouTubePlayer.tsx` — ref ke HlsPlayer, tombol PiP di samping RatingStars dengan deskripsi, hide saat YouTube/unsupported
+### 6. Komentar / Live Chat (`src/components/CommentSection.tsx`)
 
-## Catatan Teknis
+- Fetch hanya 30 pesan terakhir (`order desc limit 30` lalu reverse).
+- Cek `site_settings.live_chat_enabled`:
+  - Jika false → tampilkan banner "Live chat dinonaktifkan oleh admin", sembunyikan input.
+- Subscribe perubahan settings via realtime (channel `site-settings`) supaya toggle admin langsung berlaku.
 
-- PiP **tidak akan tersedia untuk source YouTube** karena iframe cross-origin. Tombol akan disembunyikan otomatis saat sumber aktif YouTube — UI memberi info "PiP hanya tersedia untuk sumber M3U8".
-- Recovery loop dibatasi (max 3 retry per session) untuk hindari infinite loop saat sumber benar-benar mati → escalate ke `onFatalError` (fallback ke YouTube tetap jalan).
+### 7. Token Auto-Unlock (`src/pages/Index.tsx`)
+
+- Saat mount, baca `?token=<>&replay=<id>` dari URL.
+- Call edge function dengan `access_token` → kalau valid, simpan source ke session, set `unlockedIds`, langsung buka `YouTubePlayer` untuk replay tsb.
+- Bersihkan query param setelah dipakai.
+
+### 8. Store helpers (`src/lib/store.ts`)
+
+- Update `getReplaySource(replayId, password?, token?)` agar mendukung dua mode.
+- Tambah `setReplayToken(id, token|null)` (admin only via authenticated update).
+- Tambah `getLiveChatEnabled()` & `setLiveChatEnabled()`.
+- Update `getReplays` SELECT untuk include `sources` & `access_token` (token aman karena tanpa token tidak buka apa-apa, tapi lebih aman: token TIDAK dipublic-select; admin fetch via `getReplaysAdmin`).
+
+---
+
+## Detail Teknis Singkat
+
+- **Backward compat**: jika `sources` kosong, builder klien membentuk satu source dari `youtube_id`/`m3u8_url` lama.
+- **Cloudflare**: deteksi UID (32 hex) atau URL penuh; embed via `<iframe src="https://iframe.videodelivery.net/<uid>?autoplay=true&muted=true">`.
+- **Trigger pruning komentar**: pakai `AFTER INSERT FOR EACH ROW` SECURITY DEFINER untuk hindari masalah RLS saat delete.
+- **Token generation**: client `crypto.randomUUID()` cukup; disimpan di `replays.access_token` dengan unique index.
+- **Autoplay policy**: paksa `muted=true` saat pertama play; user bisa unmute manual.
+
+---
+
+## Pertanyaan Kecil (non-blocking; default jika tidak dijawab)
+
+- Token akses bersifat **permanen sampai admin hapus** (default), bukan time-limited.
+- Maks **5 source** per replay (default).
+- `.live` stream **tidak menyimpan posisi** (default langsung live edge).
