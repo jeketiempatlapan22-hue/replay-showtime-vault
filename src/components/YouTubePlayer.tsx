@@ -303,10 +303,17 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
             <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-thin">
               {sources.map(s => {
                 const active = s.id === activeSourceId;
+                const warm = () => {
+                  if (s.type === 'm3u8') void prefetchM3U8(s.url);
+                  else if (s.type === 'youtube') prefetchYouTube(s.url);
+                  else if (s.type === 'cloudflare') prefetchCloudflare(s.url);
+                };
                 return (
                   <button
                     key={s.id}
                     type="button"
+                    onPointerEnter={warm}
+                    onFocus={warm}
                     onClick={() => { setHlsFailed(false); setActiveSourceId(s.id); }}
                     className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
                       active
