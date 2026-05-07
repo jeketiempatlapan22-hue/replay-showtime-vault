@@ -182,7 +182,8 @@ export default function Admin() {
   const handleSaveLive = async () => {
     setLiveSaving(true);
     try {
-      await supabase.functions.invoke('manage-live', { body: { action: 'set_config', ...liveCfg } });
+      const lineupArr = liveCfg.lineup.split(',').map(s => s.trim()).filter(Boolean);
+      await supabase.functions.invoke('manage-live', { body: { action: 'set_config', ...liveCfg, lineup: lineupArr } });
       toast({ title: 'Berhasil', description: `Live ${liveCfg.enabled ? 'diaktifkan' : 'dinonaktifkan'}.` });
       await refreshLive();
     } catch {
