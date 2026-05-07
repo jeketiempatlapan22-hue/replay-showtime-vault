@@ -148,22 +148,16 @@ export default function Live() {
             <div className="mx-auto w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
               <Lock className="w-6 h-6 text-primary" />
             </div>
-            <div className="text-center">
+            <div className="text-center space-y-1.5">
               <p className="text-foreground font-semibold">Akses Live Terkunci</p>
-              <p className="text-sm text-muted-foreground mt-1">Masukkan sandi atau gunakan link dengan token.</p>
+              <p className="text-sm text-muted-foreground">Halaman live ini hanya bisa diakses melalui <span className="font-semibold text-foreground">link token</span> yang diberikan admin.</p>
+              <p className="text-xs text-muted-foreground">Format link: <code className="px-1 py-0.5 rounded bg-secondary text-[10px]">/live?t=TOKEN</code></p>
               {status.sources?.length > 0 && (
-                <p className="text-[11px] text-muted-foreground mt-2">Tersedia {status.sources.length + 1} player setelah terbuka.</p>
+                <p className="text-[11px] text-muted-foreground pt-1">Tersedia {status.sources.length + 1} player setelah link terbuka.</p>
               )}
             </div>
-            <Input type="password" placeholder="Sandi live..." value={pwInput}
-              onChange={e => { setPwInput(e.target.value); setPwError(''); }}
-              onKeyDown={e => e.key === 'Enter' && pwInput.trim() && doUnlock({ password: pwInput.trim() })}
-              autoFocus
-            />
             {pwError && <p className="text-xs text-destructive text-center">{pwError}</p>}
-            <Button className="w-full" disabled={submitting || !pwInput.trim()} onClick={() => doUnlock({ password: pwInput.trim() })}>
-              {submitting ? 'Memeriksa...' : 'Buka Live'}
-            </Button>
+            <Button variant="outline" className="w-full" onClick={() => navigate('/')}>Kembali ke Beranda</Button>
           </div>
         ) : (
           <>
