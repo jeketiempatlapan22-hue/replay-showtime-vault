@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { isFullscreenActive, onFullscreenChange, requestFs, exitFs } from '@/lib/fullscreen';
 import { Play, Pause, Volume2, VolumeX, Maximize, Minimize } from 'lucide-react';
+import LiveWatermark from '@/components/LiveWatermark';
 
 interface Props {
   type: 'youtube' | 'cloudflare';
   source: string; // youtube id or url, cloudflare uid
   title: string;
+  watermark?: string;
 }
 
 function extractYoutubeId(raw: string): string {
