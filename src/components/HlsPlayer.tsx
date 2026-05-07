@@ -517,6 +517,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
         onClick={resetHideTimer}
         title={title}
       />
+      {watermark && <LiveWatermark code={watermark} />}
 
       {/* Initial loading overlay */}
       {loading && (
