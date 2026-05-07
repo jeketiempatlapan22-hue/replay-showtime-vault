@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { isFullscreenActive, onFullscreenChange, requestFs, exitFs } from '@/lib/fullscreen';
 import { Play, Pause, Volume2, VolumeX, Maximize, Minimize } from 'lucide-react';
 
 interface Props {
@@ -136,15 +137,14 @@ export default function EmbedPlayer({ type, source, title }: Props) {
   };
 
   useEffect(() => {
-    const onChange = () => setIsFullscreen(!!document.fullscreenElement);
-    document.addEventListener('fullscreenchange', onChange);
-    return () => document.removeEventListener('fullscreenchange', onChange);
+    const onChange = () => setIsFullscreen(isFullscreenActive());
+    return onFullscreenChange(onChange);
   }, []);
 
   const toggleFullscreen = () => {
     if (!containerRef.current) return;
-    if (!document.fullscreenElement) containerRef.current.requestFullscreen?.().catch(() => {});
-    else document.exitFullscreen?.().catch(() => {});
+    if (!isFullscreenActive()) requestFs(containerRef.current);
+    else exitFs();
   };
 
   const ytEmbedUrl = ytId
