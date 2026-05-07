@@ -41,11 +41,16 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, onFatalError
   const lastProgressRef = useRef({ time: 0, checkedAt: Date.now(), recoveries: 0 });
   const onFatalErrorRef = useRef(onFatalError);
 
+  const initialVolume = (() => { try { const v = parseFloat(localStorage.getItem('replaytime-volume') || ''); return isFinite(v) ? Math.max(0, Math.min(1, v)) : 1; } catch { return 1; } })();
+  const initialMuted = (() => { try { return localStorage.getItem('replaytime-muted') === '1'; } catch { return false; } })();
+  const savedQualityHeight = (() => { try { const v = parseInt(localStorage.getItem('replaytime-quality-height') || '', 10); return isFinite(v) ? v : null; } catch { return null; } })();
+  const userQualityRef = useRef<number | null>(savedQualityHeight);
+
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [volume, setVolume] = useState(1);
-  const [muted, setMuted] = useState(false);
+  const [volume, setVolume] = useState(initialVolume);
+  const [muted, setMuted] = useState(initialMuted);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showControls, setShowControls] = useState(true);
   const [loading, setLoading] = useState(true); // initial connect
@@ -56,6 +61,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, onFatalError
   const [autoActiveLabel, setAutoActiveLabel] = useState<string>('');
   const [showQualityMenu, setShowQualityMenu] = useState(false);
   const [isLiveStream, setIsLiveStream] = useState(false);
+  const [needsUnmute, setNeedsUnmute] = useState(false);
 
   // Expose PiP API to parent
   useImperativeHandle(ref, () => ({
