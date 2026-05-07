@@ -22,6 +22,7 @@ export default function CommentSection({ replayId }: CommentSectionProps) {
   const [sending, setSending] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [chatEnabled, setChatEnabled] = useState(true);
+  const [adminUsername, setAdminUsername] = useState<string>('Admin');
 
   useEffect(() => {
     const checkAdmin = async () => {
@@ -45,6 +46,23 @@ export default function CommentSection({ replayId }: CommentSectionProps) {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'site_settings', filter: 'key=eq.live_chat_enabled' }, (payload) => {
         const row = (payload.new || payload.old) as { value?: string };
         setChatEnabled(row?.value !== 'false');
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, []);
+
+  // Sync admin username for badge detection
+  useEffect(() => {
+    const fetchAdmin = async () => {
+      const { data } = await supabase.from('site_settings').select('value').eq('key', 'admin_username').maybeSingle();
+      if (data?.value) setAdminUsername(data.value);
+    };
+    fetchAdmin();
+    const ch = supabase
+      .channel('site-settings-adminname')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'site_settings', filter: 'key=eq.admin_username' }, (payload) => {
+        const row = (payload.new || payload.old) as { value?: string };
+        if (row?.value) setAdminUsername(row.value);
       })
       .subscribe();
     return () => { supabase.removeChannel(ch); };
@@ -126,7 +144,9 @@ export default function CommentSection({ replayId }: CommentSectionProps) {
           <p className="text-sm text-muted-foreground text-center py-4">Belum ada komentar. Jadilah yang pertama!</p>
         )}
         {comments.map(c => {
-          const isAdminComment = c.name.startsWith('🛡️') || c.name.startsWith('🛡');
+          const adminName = (adminUsername || 'Admin').trim().toLowerCase();
+          const cleanName = c.name.replace(/^🛡️?\s*/, '').trim().toLowerCase();
+          const isAdminComment = c.name.startsWith('🛡️') || c.name.startsWith('🛡') || (!!adminName && cleanName === adminName);
           return (
           <div key={c.id} className={`p-3 rounded-lg border animate-fade-up group ${isAdminComment ? 'bg-primary/10 border-primary/40 ring-1 ring-primary/30' : 'bg-secondary/50 border-border'}`} style={{ animationFillMode: 'forwards' }}>
             <div className="flex items-center justify-between mb-1">
