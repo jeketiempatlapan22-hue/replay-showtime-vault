@@ -62,7 +62,7 @@ export default function EmbedPlayer({ type, source, title }: Props) {
                 try {
                   const state = ytPlayerRef.current.getPlayerState();
                   if (state !== 1 && !muted) {
-                    // try muted autoplay fallback
+                    // try muted autoplay fallback (do NOT persist forced mute)
                     ytPlayerRef.current.mute();
                     setMuted(true);
                     ytPlayerRef.current.playVideo();

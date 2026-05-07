@@ -142,7 +142,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, onFatalError
             video.muted = true;
             setMuted(true);
             setNeedsUnmute(true);
-            try { localStorage.setItem('replaytime-muted', '1'); } catch { /* ignore */ }
+            // Do NOT persist forced mute — keep user's preference intact
             video.play().catch(() => {});
           });
         }
