@@ -21,19 +21,33 @@ export default function CommentSection({ replayId }: CommentSectionProps) {
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [chatEnabled, setChatEnabled] = useState(true);
 
-  // Check if current user is admin
   useEffect(() => {
     const checkAdmin = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
-      const { data } = await supabase.rpc('has_role', {
-        _user_id: session.user.id,
-        _role: 'admin',
-      });
+      const { data } = await supabase.rpc('has_role', { _user_id: session.user.id, _role: 'admin' });
       setIsAdmin(data === true);
     };
     checkAdmin();
+  }, []);
+
+  // Live chat enabled flag (global setting)
+  useEffect(() => {
+    const fetchFlag = async () => {
+      const { data } = await supabase.from('site_settings').select('value').eq('key', 'live_chat_enabled').maybeSingle();
+      setChatEnabled(data?.value !== 'false');
+    };
+    fetchFlag();
+    const ch = supabase
+      .channel('site-settings-livechat')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'site_settings', filter: 'key=eq.live_chat_enabled' }, (payload) => {
+        const row = (payload.new || payload.old) as { value?: string };
+        setChatEnabled(row?.value !== 'false');
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
   }, []);
 
   const fetchComments = async () => {
@@ -41,8 +55,9 @@ export default function CommentSection({ replayId }: CommentSectionProps) {
       .from('comments')
       .select('*')
       .eq('replay_id', replayId)
-      .order('created_at', { ascending: true });
-    if (data) setComments(data);
+      .order('created_at', { ascending: false })
+      .limit(30);
+    if (data) setComments([...data].reverse());
   };
 
   useEffect(() => {
@@ -51,7 +66,10 @@ export default function CommentSection({ replayId }: CommentSectionProps) {
     const channel = supabase
       .channel(`comments-${replayId}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'comments', filter: `replay_id=eq.${replayId}` }, (payload) => {
-        setComments(prev => [...prev, payload.new as Comment]);
+        setComments(prev => {
+          const next = [...prev, payload.new as Comment];
+          return next.length > 30 ? next.slice(next.length - 30) : next;
+        });
       })
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'comments', filter: `replay_id=eq.${replayId}` }, (payload) => {
         const deletedId = (payload.old as { id?: string }).id;
