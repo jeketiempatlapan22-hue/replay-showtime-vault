@@ -160,8 +160,7 @@ export default function Admin() {
 
   const handleCreateLiveToken = async () => {
     try {
-      await supabase.functions.invoke('manage-live', { body: { action: 'create_token', label: newTokenLabel, max_devices: newTokenMaxDevices } });
-      setNewTokenLabel('');
+      await supabase.functions.invoke('manage-live', { body: { action: 'create_token', max_devices: newTokenMaxDevices } });
       setNewTokenMaxDevices(1);
       toast({ title: 'Berhasil', description: 'Token live dibuat.' });
       await refreshLive();
@@ -172,6 +171,11 @@ export default function Admin() {
 
   const handleDeleteLiveToken = async (id: string) => {
     await supabase.functions.invoke('manage-live', { body: { action: 'delete_token', id } });
+    await refreshLive();
+  };
+  const handleRevokeLiveToken = async (id: string, revoked: boolean) => {
+    await supabase.functions.invoke('manage-live', { body: { action: 'revoke_token', id, revoked } });
+    toast({ title: 'Berhasil', description: revoked ? 'Token dicabut.' : 'Token diaktifkan kembali.' });
     await refreshLive();
   };
   const handleResetLiveDevices = async (id: string) => {
