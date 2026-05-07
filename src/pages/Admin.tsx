@@ -639,9 +639,25 @@ export default function Admin() {
                   <Button onClick={handleSaveMasterPassword} size="sm" className="h-10"><Save className="w-4 h-4 mr-1" />Simpan</Button>
                 </div>
                 {masterPasswords.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mt-3">
+                  <div className="flex flex-col gap-2 mt-3">
                     {masterPasswords.map(mp => (
-                      <Badge key={mp.month} variant="secondary" className="text-xs py-1 px-2">{mp.month}: {mp.password}</Badge>
+                      <div key={mp.month} className="flex items-center justify-between gap-2 p-2 rounded-md border border-border bg-secondary/40">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <Badge variant={mp.paused ? 'outline' : 'secondary'} className="text-xs py-1 px-2 truncate">
+                            {mp.month}: {mp.password}
+                          </Badge>
+                          {mp.paused && <span className="text-[10px] uppercase tracking-wide text-destructive font-semibold">Dijeda</span>}
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <div className="flex items-center gap-1">
+                            <span className="text-[10px] text-muted-foreground">Aktif</span>
+                            <Switch checked={!mp.paused} onCheckedChange={(v) => handleToggleMasterPaused(mp.month, !v)} />
+                          </div>
+                          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleDeleteMasterPassword(mp.month)}>
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
+                      </div>
                     ))}
                   </div>
                 )}
