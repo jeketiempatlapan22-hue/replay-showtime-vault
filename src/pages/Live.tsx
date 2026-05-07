@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Lock, Loader2, Radio } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+
 import { supabase } from '@/integrations/supabase/client';
 import { getBrowserId } from '@/lib/browserId';
 import HlsPlayer from '@/components/HlsPlayer';
@@ -25,7 +25,7 @@ export default function Live() {
   const [status, setStatus] = useState<LiveStatus | null>(null);
   const [statusLoading, setStatusLoading] = useState(true);
   const [unlocked, setUnlocked] = useState<UnlockedConfig | null>(null);
-  const [, setPwInput] = useState('');
+  
   const [pwError, setPwError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [sourceIdx, setSourceIdx] = useState<number>(() => {
@@ -85,7 +85,6 @@ export default function Live() {
         const cfg: UnlockedConfig = { title: data.title, type: data.type, url: data.url, sources: Array.isArray(data.sources) ? data.sources : [] };
         setUnlocked(cfg);
         try { sessionStorage.setItem(SS_KEY, JSON.stringify(cfg)); } catch { /* ignore */ }
-        if (!silent) setPwInput('');
       } else if (!silent) {
         if (data?.reason === 'device_limit') setPwError('Batas perangkat untuk token ini telah tercapai.');
         else if (data?.reason === 'off') setPwError('Live sedang tidak aktif.');
