@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, Trash2, Edit2, Key, Save, Palette, MessageCircle, LogOut, Eye, Send, List, Settings, ShieldCheck, Unlock as UnlockIcon, Link2, Copy, X, Radio, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Edit2, Key, Save, Palette, MessageCircle, LogOut, Eye, Send, List, Settings, ShieldCheck, Unlock as UnlockIcon, Link2, Copy, X, Radio, RefreshCw, Users, Upload } from 'lucide-react';
+import { getMembers, upsertMember, deleteMember, uploadMemberPhoto, type Member } from '@/lib/members';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -78,9 +79,12 @@ export default function Admin() {
 
   // Live state
   type LiveSrc = { label: string; type: 'm3u8' | 'youtube' | 'cloudflare'; url: string };
-  const [liveCfg, setLiveCfg] = useState<{ enabled: boolean; title: string; type: string; url: string; password: string; require_password: boolean; sources: LiveSrc[] }>({
-    enabled: false, title: 'Live', type: 'm3u8', url: '', password: '', require_password: true, sources: [],
+  const [liveCfg, setLiveCfg] = useState<{ enabled: boolean; title: string; type: string; url: string; password: string; require_password: boolean; sources: LiveSrc[]; lineup: string }>({
+    enabled: false, title: 'Live', type: 'm3u8', url: '', password: '', require_password: true, sources: [], lineup: '',
   });
+  const [members, setMembers] = useState<Member[]>([]);
+  const [memberForm, setMemberForm] = useState<{ id?: string; name: string; photo_url: string }>({ name: '', photo_url: '' });
+  const [memberUploading, setMemberUploading] = useState(false);
   const [liveTokens, setLiveTokens] = useState<Array<{ id: string; token: string; label: string; max_devices: number; revoked: boolean; devices_used: number }>>([]);
   
   const [newTokenMaxDevices, setNewTokenMaxDevices] = useState(1);
@@ -140,10 +144,39 @@ export default function Admin() {
       ]);
       if (cfgRes.data?.config) {
         const c = cfgRes.data.config;
-        setLiveCfg({ enabled: !!c.enabled, title: c.title || 'Live', type: c.type || 'm3u8', url: c.url || '', password: c.password || '', require_password: c.require_password !== false, sources: Array.isArray(c.sources) ? c.sources : [] });
+        setLiveCfg({ enabled: !!c.enabled, title: c.title || 'Live', type: c.type || 'm3u8', url: c.url || '', password: c.password || '', require_password: c.require_password !== false, sources: Array.isArray(c.sources) ? c.sources : [], lineup: Array.isArray(c.lineup) ? c.lineup.join(', ') : '' });
       }
       if (tokRes.data?.tokens) setLiveTokens(tokRes.data.tokens);
     } catch { /* ignore */ }
+    try { setMembers(await getMembers()); } catch { /* ignore */ }
+  };
+
+  const handleSaveMember = async () => {
+    const name = memberForm.name.trim();
+    if (!name) { toast({ title: 'Error', description: 'Nama wajib diisi.', variant: 'destructive' }); return; }
+    try {
+      await upsertMember(name, memberForm.photo_url, memberForm.id);
+      setMemberForm({ name: '', photo_url: '' });
+      setMembers(await getMembers());
+      toast({ title: 'Berhasil', description: 'Member tersimpan.' });
+    } catch (e: any) {
+      toast({ title: 'Error', description: e.message || 'Gagal menyimpan member.', variant: 'destructive' });
+    }
+  };
+  const handleDeleteMember = async (id: string) => {
+    await deleteMember(id);
+    setMembers(await getMembers());
+    toast({ title: 'Dihapus' });
+  };
+  const handleMemberPhotoUpload = async (file: File) => {
+    setMemberUploading(true);
+    try {
+      const url = await uploadMemberPhoto(file);
+      setMemberForm(f => ({ ...f, photo_url: url }));
+    } catch {
+      toast({ title: 'Error', description: 'Gagal upload foto.', variant: 'destructive' });
+    }
+    setMemberUploading(false);
   };
 
   const handleSaveLive = async () => {
