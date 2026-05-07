@@ -77,6 +77,7 @@ export type Database = {
         Row: {
           enabled: boolean
           id: string
+          lineup: string[]
           password: string
           require_password: boolean
           sources: Json
@@ -88,6 +89,7 @@ export type Database = {
         Insert: {
           enabled?: boolean
           id?: string
+          lineup?: string[]
           password?: string
           require_password?: boolean
           sources?: Json
@@ -99,6 +101,7 @@ export type Database = {
         Update: {
           enabled?: boolean
           id?: string
+          lineup?: string[]
           password?: string
           require_password?: boolean
           sources?: Json

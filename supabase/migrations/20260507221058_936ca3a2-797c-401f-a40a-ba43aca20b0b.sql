@@ -1,0 +1,1 @@
+ALTER TABLE public.live_config_private ADD COLUMN IF NOT EXISTS lineup text[] NOT NULL DEFAULT '{}'::text[];
