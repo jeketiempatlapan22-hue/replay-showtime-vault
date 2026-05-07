@@ -277,17 +277,21 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, onFatalError
         setBuffering(false);
         onFatalErrorRef.current?.();
       });
+      startStallWatchdog();
     } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
       video.src = src;
-      video.addEventListener('loadedmetadata', () => {
+      nativeLoadedHandler = () => {
         setLoading(false);
-        try { video.muted = true; video.play()?.catch(() => {}); } catch { /* ignore */ }
-      }, { once: true });
-      video.addEventListener('error', () => {
+        safePlay();
+      };
+      nativeErrorHandler = () => {
         setError('Gagal memuat video.');
         setLoading(false);
         onFatalErrorRef.current?.();
-      }, { once: true });
+      };
+      video.addEventListener('loadedmetadata', nativeLoadedHandler, { once: true });
+      video.addEventListener('error', nativeErrorHandler, { once: true });
+      startStallWatchdog();
     } else {
       setError('Browser ini tidak mendukung pemutaran HLS.');
       setLoading(false);
@@ -295,6 +299,10 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, onFatalError
     }
 
     return () => {
+      if (stallWatchdogRef.current) clearInterval(stallWatchdogRef.current);
+      stallWatchdogRef.current = null;
+      if (nativeLoadedHandler) video.removeEventListener('loadedmetadata', nativeLoadedHandler);
+      if (nativeErrorHandler) video.removeEventListener('error', nativeErrorHandler);
       if (hls) hls.destroy();
       hlsRef.current = null;
     };
@@ -318,7 +326,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, onFatalError
     const onDurationChange = () => setDuration(video.duration);
     const onWaiting = () => {
       // mid-play stall (not initial)
-      if (!loading) setBuffering(true);
+      if (!loadingRef.current) setBuffering(true);
     };
     const onPlaying = () => {
       setLoading(false);
@@ -327,6 +335,9 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, onFatalError
       recoveryAttemptsRef.current = 0;
     };
     const onCanPlay = () => setBuffering(false);
+    const onProgress = () => {
+      lastProgressRef.current = { time: video.currentTime, checkedAt: Date.now(), recoveries: 0 };
+    };
     const onVolumeChange = () => {
       setVolume(video.volume);
       setMuted(video.muted);
@@ -339,6 +350,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, onFatalError
     video.addEventListener('waiting', onWaiting);
     video.addEventListener('playing', onPlaying);
     video.addEventListener('canplay', onCanPlay);
+    video.addEventListener('progress', onProgress);
     video.addEventListener('volumechange', onVolumeChange);
 
     return () => {
@@ -349,9 +361,10 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, onFatalError
       video.removeEventListener('waiting', onWaiting);
       video.removeEventListener('playing', onPlaying);
       video.removeEventListener('canplay', onCanPlay);
+      video.removeEventListener('progress', onProgress);
       video.removeEventListener('volumechange', onVolumeChange);
     };
-  }, [loading]);
+  }, []);
 
   // Fullscreen tracking
   useEffect(() => {
