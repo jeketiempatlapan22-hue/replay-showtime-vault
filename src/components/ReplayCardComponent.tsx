@@ -148,9 +148,9 @@ export default function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWa
 
           <div className="flex items-start gap-2 text-sm text-muted-foreground">
             <Users className="w-4 h-4 text-primary mt-0.5 shrink-0" />
-            <div className="flex flex-wrap gap-1">
+            <div className="flex flex-wrap gap-2">
               {replay.lineup.map((member, i) => (
-                <Badge key={i} variant="secondary" className="text-xs">{highlightText(member, searchQuery)}</Badge>
+                <MemberAvatar key={i} name={member} size={40} />
               ))}
             </div>
           </div>
