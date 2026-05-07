@@ -82,7 +82,7 @@ export default function Admin() {
     enabled: false, title: 'Live', type: 'm3u8', url: '', password: '', require_password: true, sources: [],
   });
   const [liveTokens, setLiveTokens] = useState<Array<{ id: string; token: string; label: string; max_devices: number; revoked: boolean; devices_used: number }>>([]);
-  const [newTokenLabel, setNewTokenLabel] = useState('');
+  
   const [newTokenMaxDevices, setNewTokenMaxDevices] = useState(1);
   const [liveSaving, setLiveSaving] = useState(false);
 
