@@ -7,7 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import RatingStars from '@/components/RatingStars';
 import CommentSection from '@/components/CommentSection';
 import HlsPlayer, { type HlsPlayerHandle } from '@/components/HlsPlayer';
-import { prefetchM3U8, prefetchYouTube, prefetchCloudflare, preconnect } from '@/lib/prefetch';
+import { prefetchM3U8, prefetchYouTube, prefetchCloudflare } from '@/lib/prefetch';
 
 interface Props {
   replay: ReplayRow;
