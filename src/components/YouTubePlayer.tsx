@@ -16,16 +16,27 @@ interface Props {
 
 function buildSources(source: ReplaySource | null, replay: ReplayRow): PlaylistSource[] {
   if (!source) return [];
-  if (source.sources && source.sources.length > 0) return source.sources;
-  // Fallback: build single source from legacy fields
-  const fallback: PlaylistSource[] = [];
-  if (source.m3u8_url) {
-    fallback.push({ id: 'legacy-m3u8', label: 'M3U8', type: 'm3u8', url: source.m3u8_url, is_default: true });
+  const list: PlaylistSource[] = Array.isArray(source.sources) ? [...source.sources] : [];
+  // Always append legacy fields as additional sources if they aren't already present
+  if (source.m3u8_url && !list.some(s => s.type === 'm3u8' && s.url === source.m3u8_url)) {
+    list.push({
+      id: 'legacy-m3u8',
+      label: list.length === 0 ? 'M3U8' : `M3U8 ${list.filter(s => s.type === 'm3u8').length + 1}`,
+      type: 'm3u8',
+      url: source.m3u8_url,
+      is_default: list.length === 0,
+    });
   }
-  if (source.youtube_id) {
-    fallback.push({ id: 'legacy-yt', label: 'YouTube', type: 'youtube', url: source.youtube_id, is_default: !source.m3u8_url });
+  if (source.youtube_id && !list.some(s => s.type === 'youtube' && s.url === source.youtube_id)) {
+    list.push({
+      id: 'legacy-yt',
+      label: list.length === 0 ? 'YouTube' : `YouTube ${list.filter(s => s.type === 'youtube').length + 1}`,
+      type: 'youtube',
+      url: source.youtube_id,
+      is_default: list.length === 0,
+    });
   }
-  return fallback;
+  return list;
 }
 
 function extractYoutubeId(raw: string): string {
