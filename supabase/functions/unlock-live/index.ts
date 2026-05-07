@@ -17,29 +17,29 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
     const { data: cfg } = await supabase.from("live_config_private").select("*").limit(1).maybeSingle();
-    if (!cfg || !cfg.enabled) return json({ valid: false, reason: "off" }, 403);
+    if (!cfg) return json({ valid: false, reason: "off" });
 
-    if (!token && !password) return json({ valid: false, reason: "password_or_token_required" }, 400);
+    if (!token && !password) return json({ valid: false, reason: "password_or_token_required" });
 
     // Token path (device-locked)
     if (token) {
       const { data: t } = await supabase.from("live_tokens").select("*").eq("token", token).maybeSingle();
-      if (!t || t.revoked) return json({ valid: false, reason: "revoked" }, 403);
-      if (!browser_id) return json({ valid: false, reason: "no_device" }, 400);
+      if (!t || t.revoked) return json({ valid: false, reason: "revoked" });
+      if (!browser_id) return json({ valid: false, reason: "no_device" });
+      if (!cfg.enabled) return json({ valid: false, reason: "off" });
 
       const { data: existing } = await supabase
         .from("live_token_devices").select("id").eq("token_id", t.id).eq("browser_id", browser_id).maybeSingle();
       if (!existing) {
         const { count } = await supabase
           .from("live_token_devices").select("id", { count: "exact", head: true }).eq("token_id", t.id);
-        if ((count || 0) >= t.max_devices) return json({ valid: false, reason: "device_limit" }, 403);
+        if ((count || 0) >= t.max_devices) return json({ valid: false, reason: "device_limit" });
         const { error: insErr } = await supabase
           .from("live_token_devices").insert({ token_id: t.id, browser_id });
         if (insErr) {
-          // Could be unique-constraint race — re-check
           const { data: re } = await supabase
             .from("live_token_devices").select("id").eq("token_id", t.id).eq("browser_id", browser_id).maybeSingle();
-          if (!re) return json({ valid: false, reason: "device_limit" }, 403);
+          if (!re) return json({ valid: false, reason: "device_limit" });
         }
       }
       const last4 = String(token).slice(-4).toUpperCase();
@@ -52,7 +52,8 @@ Deno.serve(async (req) => {
 
     // Password path
     if (password) {
-      if (!cfg.password || cfg.password !== password) return json({ valid: false, reason: "bad_password" }, 403);
+      if (!cfg.password || cfg.password !== password) return json({ valid: false, reason: "bad_password" });
+      if (!cfg.enabled) return json({ valid: false, reason: "off" });
       return json({
         valid: true, title: cfg.title, type: cfg.type, url: cfg.url,
         sources: Array.isArray(cfg.sources) ? cfg.sources : [],
@@ -60,7 +61,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    return json({ valid: false }, 403);
+    return json({ valid: false });
   } catch {
     return json({ valid: false }, 500);
   }
