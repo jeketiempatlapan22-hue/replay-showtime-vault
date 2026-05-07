@@ -25,7 +25,7 @@ function extractCloudflareUid(raw: string): string {
 const VOL_KEY = 'replaytime-volume';
 const MUTED_KEY = 'replaytime-muted';
 
-export default function EmbedPlayer({ type, source, title }: Props) {
+export default function EmbedPlayer({ type, source, title, watermark }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const ytPlayerRef = useRef<any>(null);
