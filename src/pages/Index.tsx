@@ -122,9 +122,14 @@ export default function Index() {
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'replays' }, () => {
         refreshReplays();
       })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'replays' }, () => {
-        // Auto-refresh halaman saat admin mengubah player/playlist agar sumber video terbaru terpasang
-        try { window.location.reload(); } catch { /* ignore */ }
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'replays' }, (payload) => {
+        // Hanya refresh data jika ada perubahan pada sumber/playlist atau metadata penting.
+        // Abaikan UPDATE yang hanya menambah view_count agar tidak terjadi reload loop.
+        const oldRow = (payload.old || {}) as Record<string, unknown>;
+        const newRow = (payload.new || {}) as Record<string, unknown>;
+        const watched = ['sources', 'm3u8_url', 'youtube_id', 'source_type', 'title', 'criteria', 'date', 'show_time', 'image_url', 'lineup', 'access_token', 'password'];
+        const changed = watched.some(k => JSON.stringify(oldRow[k]) !== JSON.stringify(newRow[k]));
+        if (changed) refreshReplays();
       })
       .subscribe();
 
