@@ -158,8 +158,10 @@ export default function Admin() {
 
   const handleSaveReplay = async () => {
     const isYoutube = form.sourceType === 'youtube';
-    if (!form.title || !form.date || !form.password || (isYoutube ? !form.youtubeId : !form.m3u8Url)) {
-      toast({ title: 'Error', description: `Judul, tanggal, sandi, dan ${isYoutube ? 'YouTube ID' : 'link M3U8'} wajib diisi!`, variant: 'destructive' });
+    const hasSources = form.sources.length > 0;
+    const fallbackOk = isYoutube ? !!form.youtubeId : !!form.m3u8Url;
+    if (!form.title || !form.date || !form.password || (!hasSources && !fallbackOk)) {
+      toast({ title: 'Error', description: 'Judul, tanggal, sandi, dan minimal 1 sumber video wajib diisi!', variant: 'destructive' });
       return;
     }
     const lineupArr = form.lineup.split(',').map(s => s.trim()).filter(Boolean);
