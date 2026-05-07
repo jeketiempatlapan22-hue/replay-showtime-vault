@@ -14,6 +14,51 @@ export type Database = {
   }
   public: {
     Tables: {
+      active_shows: {
+        Row: {
+          category: string
+          created_at: string
+          description: string
+          id: string
+          image_url: string
+          is_active: boolean
+          lineup: string[]
+          show_date: string
+          show_time: string
+          sort_order: number
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          description?: string
+          id?: string
+          image_url?: string
+          is_active?: boolean
+          lineup?: string[]
+          show_date: string
+          show_time?: string
+          sort_order?: number
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          description?: string
+          id?: string
+          image_url?: string
+          is_active?: boolean
+          lineup?: string[]
+          show_date?: string
+          show_time?: string
+          sort_order?: number
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       blocked_browsers: {
         Row: {
           browser_id: string
