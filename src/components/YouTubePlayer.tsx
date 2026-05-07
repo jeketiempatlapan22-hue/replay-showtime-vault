@@ -7,6 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import RatingStars from '@/components/RatingStars';
 import CommentSection from '@/components/CommentSection';
 import HlsPlayer, { type HlsPlayerHandle } from '@/components/HlsPlayer';
+import EmbedPlayer from '@/components/EmbedPlayer';
 import { prefetchM3U8, prefetchYouTube, prefetchCloudflare } from '@/lib/prefetch';
 
 interface Props {
@@ -39,18 +40,6 @@ function buildSources(source: ReplaySource | null, replay: ReplayRow): PlaylistS
   return list;
 }
 
-function extractYoutubeId(raw: string): string {
-  const r = (raw || '').trim();
-  const matched = r.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/|v\/))([A-Za-z0-9_-]{11})/)?.[1];
-  const fallback = r.match(/([A-Za-z0-9_-]{11})/)?.[1];
-  return (matched || fallback || '').slice(0, 11);
-}
-
-function extractCloudflareUid(raw: string): string {
-  const r = (raw || '').trim();
-  const m = r.match(/([a-f0-9]{32})/i)?.[1];
-  return m || r;
-}
 
 export default function YouTubePlayer({ replay, onBack }: Props) {
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -65,7 +54,7 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
   const [pwChecking, setPwChecking] = useState(false);
   const [activeSourceId, setActiveSourceId] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const iframeRef = useRef<HTMLIFrameElement>(null);
+  
   const hlsPlayerRef = useRef<HlsPlayerHandle>(null);
   const [pipActive, setPipActive] = useState(false);
   const pipSupported = typeof document !== 'undefined' && !!document.pictureInPictureEnabled;
@@ -198,27 +187,7 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
     }
   }, [activeSource, sources]);
 
-  // Build YouTube embed URL with autoplay+mute and full controls (play/pause + resolution)
-  const ytEmbedUrl = useMemo(() => {
-    if (!activeSource || activeSource.type !== 'youtube') return '';
-    const id = extractYoutubeId(activeSource.url);
-    if (!/^[A-Za-z0-9_-]{11}$/.test(id)) return '';
-    return `https://www.youtube-nocookie.com/embed/${id}?rel=0&modestbranding=1&playsinline=1&autoplay=1&mute=1&controls=1&fs=1&iv_load_policy=3&enablejsapi=0&origin=${encodeURIComponent(window.location.origin)}`;
-  }, [activeSource]);
-
-  const cfEmbedUrl = useMemo(() => {
-    if (!activeSource || activeSource.type !== 'cloudflare') return '';
-    const uid = extractCloudflareUid(activeSource.url);
-    if (!uid) return '';
-    return `https://iframe.videodelivery.net/${uid}?autoplay=true&muted=true&controls=true&preload=auto`;
-  }, [activeSource]);
-
-  // Set iframe src after mount
-  useEffect(() => {
-    if (!iframeRef.current) return;
-    const url = activeSource?.type === 'youtube' ? ytEmbedUrl : activeSource?.type === 'cloudflare' ? cfEmbedUrl : '';
-    if (url) iframeRef.current.src = url;
-  }, [activeSource, ytEmbedUrl, cfEmbedUrl]);
+  // YouTube/Cloudflare are now rendered by EmbedPlayer (overlay-protected)
 
   const lineup = replay.lineup || [];
 
@@ -288,20 +257,12 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
             onPipChange={setPipActive}
           />
         ) : (
-          <div className="relative w-full overflow-hidden rounded-xl bg-black" style={{ paddingBottom: '56.25%' }}>
-            <iframe
-              ref={iframeRef}
-              key={activeSource.id}
-              src={activeSource.type === 'youtube' ? ytEmbedUrl : cfEmbedUrl}
-              className="absolute inset-0 w-full h-full"
-              title={replay.title}
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
-              allowFullScreen
-              referrerPolicy="strict-origin-when-cross-origin"
-              loading="eager"
-              style={{ border: 0 }}
-            />
-          </div>
+          <EmbedPlayer
+            key={activeSource.id}
+            type={activeSource.type as 'youtube' | 'cloudflare'}
+            source={activeSource.url}
+            title={replay.title}
+          />
         )}
 
         {/* Playlist chips */}

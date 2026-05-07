@@ -73,6 +73,95 @@ export type Database = {
           },
         ]
       }
+      live_config_private: {
+        Row: {
+          enabled: boolean
+          id: string
+          password: string
+          require_password: boolean
+          title: string
+          type: string
+          updated_at: string
+          url: string
+        }
+        Insert: {
+          enabled?: boolean
+          id?: string
+          password?: string
+          require_password?: boolean
+          title?: string
+          type?: string
+          updated_at?: string
+          url?: string
+        }
+        Update: {
+          enabled?: boolean
+          id?: string
+          password?: string
+          require_password?: boolean
+          title?: string
+          type?: string
+          updated_at?: string
+          url?: string
+        }
+        Relationships: []
+      }
+      live_token_devices: {
+        Row: {
+          browser_id: string
+          created_at: string
+          id: string
+          token_id: string
+        }
+        Insert: {
+          browser_id: string
+          created_at?: string
+          id?: string
+          token_id: string
+        }
+        Update: {
+          browser_id?: string
+          created_at?: string
+          id?: string
+          token_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "live_token_devices_token_id_fkey"
+            columns: ["token_id"]
+            isOneToOne: false
+            referencedRelation: "live_tokens"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      live_tokens: {
+        Row: {
+          created_at: string
+          id: string
+          label: string
+          max_devices: number
+          revoked: boolean
+          token: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          label?: string
+          max_devices?: number
+          revoked?: boolean
+          token: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          label?: string
+          max_devices?: number
+          revoked?: boolean
+          token?: string
+        }
+        Relationships: []
+      }
       master_passwords: {
         Row: {
           created_at: string
@@ -239,6 +328,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_live_status: {
+        Args: never
+        Returns: {
+          enabled: boolean
+          require_password: boolean
+          title: string
+          type: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

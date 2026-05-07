@@ -41,11 +41,16 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, onFatalError
   const lastProgressRef = useRef({ time: 0, checkedAt: Date.now(), recoveries: 0 });
   const onFatalErrorRef = useRef(onFatalError);
 
+  const initialVolume = (() => { try { const v = parseFloat(localStorage.getItem('replaytime-volume') || ''); return isFinite(v) ? Math.max(0, Math.min(1, v)) : 1; } catch { return 1; } })();
+  const initialMuted = (() => { try { return localStorage.getItem('replaytime-muted') === '1'; } catch { return false; } })();
+  const savedQualityHeight = (() => { try { const v = parseInt(localStorage.getItem('replaytime-quality-height') || '', 10); return isFinite(v) ? v : null; } catch { return null; } })();
+  const userQualityRef = useRef<number | null>(savedQualityHeight);
+
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [volume, setVolume] = useState(1);
-  const [muted, setMuted] = useState(false);
+  const [volume, setVolume] = useState(initialVolume);
+  const [muted, setMuted] = useState(initialMuted);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showControls, setShowControls] = useState(true);
   const [loading, setLoading] = useState(true); // initial connect
@@ -56,6 +61,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, onFatalError
   const [autoActiveLabel, setAutoActiveLabel] = useState<string>('');
   const [showQualityMenu, setShowQualityMenu] = useState(false);
   const [isLiveStream, setIsLiveStream] = useState(false);
+  const [needsUnmute, setNeedsUnmute] = useState(false);
 
   // Expose PiP API to parent
   useImperativeHandle(ref, () => ({
@@ -121,13 +127,24 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, onFatalError
 
     video.preload = 'auto';
     video.autoplay = true;
-    video.muted = true;
+    video.volume = initialVolume;
+    video.muted = initialMuted;
     video.setAttribute('playsinline', 'true');
 
     const safePlay = () => {
       try {
-        const p = video.play();
-        if (p && typeof p.catch === 'function') p.catch(() => {});
+        // Try unmuted first if user prefers sound
+        const tryPlay = video.play();
+        if (tryPlay && typeof tryPlay.catch === 'function') {
+          tryPlay.catch(() => {
+            // Browser blocked autoplay with sound; fallback muted
+            video.muted = true;
+            setMuted(true);
+            setNeedsUnmute(true);
+            try { localStorage.setItem('replaytime-muted', '1'); } catch { /* ignore */ }
+            video.play().catch(() => {});
+          });
+        }
       } catch { /* ignore */ }
     };
 
@@ -230,7 +247,16 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, onFatalError
         }));
         levels.sort((a, b) => (b.height || 0) - (a.height || 0));
         setQualities([{ index: -1, label: 'Auto' }, ...levels]);
-        // Autoplay (muted to satisfy browser policy). User can unmute manually.
+        // Restore saved quality preference
+        if (userQualityRef.current && hls) {
+          const match = levels.find(l => l.height === userQualityRef.current);
+          if (match) {
+            hls.currentLevel = match.index;
+            hls.autoLevelCapping = match.index;
+            hls.capLevelToPlayerSize = false;
+            setCurrentQuality(match.index);
+          }
+        }
         safePlay();
       });
       hls.on(Hls.Events.LEVEL_LOADED, (_, data) => {
@@ -241,6 +267,15 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, onFatalError
         if (hls && hls.autoLevelEnabled) {
           const lvl = hls.levels[data.level];
           setAutoActiveLabel(lvl?.height ? `${lvl.height}p` : '');
+        } else if (hls && userQualityRef.current) {
+          // Enforce user's manual quality if hls.js drifted
+          const lvl = hls.levels[data.level];
+          if (lvl?.height && lvl.height !== userQualityRef.current) {
+            const target = hls.levels.findIndex(l => l.height === userQualityRef.current);
+            if (target >= 0 && target !== data.level) {
+              try { hls.currentLevel = target; } catch { /* ignore */ }
+            }
+          }
         }
       });
       hls.on(Hls.Events.ERROR, (_, data) => {
@@ -324,6 +359,21 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, onFatalError
     hlsRef.current.currentLevel = levelIndex;
     setCurrentQuality(levelIndex);
     setShowQualityMenu(false);
+    if (levelIndex === -1) {
+      // Auto: re-enable adaptive
+      hlsRef.current.autoLevelCapping = -1;
+      hlsRef.current.capLevelToPlayerSize = true;
+      userQualityRef.current = null;
+      try { localStorage.removeItem('replaytime-quality-height'); } catch { /* ignore */ }
+    } else {
+      const lvl = hlsRef.current.levels[levelIndex];
+      const h = lvl?.height || null;
+      // Lock the level so ABR/cap doesn't override user's choice
+      hlsRef.current.autoLevelCapping = levelIndex;
+      hlsRef.current.capLevelToPlayerSize = false;
+      userQualityRef.current = h;
+      if (h) try { localStorage.setItem('replaytime-quality-height', String(h)); } catch { /* ignore */ }
+    }
   };
 
   // Video event listeners
@@ -423,13 +473,17 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, onFatalError
     if (!video) return;
     const v = Number(e.target.value);
     video.volume = v;
-    if (v > 0 && video.muted) video.muted = false;
+    if (v > 0 && video.muted) { video.muted = false; setNeedsUnmute(false); }
+    try { localStorage.setItem('replaytime-volume', String(v)); } catch { /* ignore */ }
+    try { localStorage.setItem('replaytime-muted', video.muted ? '1' : '0'); } catch { /* ignore */ }
   };
 
   const toggleMute = () => {
     const video = videoRef.current;
     if (!video) return;
     video.muted = !video.muted;
+    if (!video.muted) setNeedsUnmute(false);
+    try { localStorage.setItem('replaytime-muted', video.muted ? '1' : '0'); } catch { /* ignore */ }
   };
 
   const toggleFullscreen = () => {
@@ -479,6 +533,17 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, onFatalError
           <Loader2 className="w-3.5 h-3.5 text-primary animate-spin" />
           <span className="text-xs font-medium text-white/90">Memuat...</span>
         </div>
+      )}
+
+      {/* Unmute hint when browser blocked autoplay-with-sound */}
+      {needsUnmute && muted && (
+        <button
+          type="button"
+          onClick={toggleMute}
+          className="absolute top-3 left-1/2 -translate-x-1/2 z-30 px-4 py-2 rounded-full bg-primary text-primary-foreground text-xs font-semibold shadow-lg animate-fade-in"
+        >
+          🔊 Tap untuk aktifkan suara
+        </button>
       )}
 
       {/* Controls overlay */}

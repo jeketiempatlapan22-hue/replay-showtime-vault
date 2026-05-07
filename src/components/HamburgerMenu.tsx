@@ -1,5 +1,7 @@
-import { useState } from 'react';
-import { Menu, X, Home, MessageCircle, Phone, Sun, Moon } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Menu, X, Home, MessageCircle, Phone, Sun, Moon, Radio } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import logoImg from '@/assets/logo.png';
 
@@ -12,6 +14,19 @@ interface HamburgerMenuProps {
 
 export default function HamburgerMenu({ whatsappNumber, whatsappLink, lightMode, onToggleMode }: HamburgerMenuProps) {
   const [open, setOpen] = useState(false);
+  const [liveOn, setLiveOn] = useState(false);
+
+  useEffect(() => {
+    const fetch = () => supabase.rpc('get_live_status').then(({ data }) => {
+      const row = Array.isArray(data) ? data[0] : data;
+      setLiveOn(!!row?.enabled);
+    });
+    fetch();
+    const ch = supabase.channel('hamburger-live-status')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'live_config_private' }, fetch)
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, []);
 
   return (
     <>
@@ -53,6 +68,24 @@ export default function HamburgerMenu({ whatsappNumber, whatsappLink, lightMode,
             <Home className="w-5 h-5 text-primary" />
             <span className="font-medium">Beranda</span>
           </a>
+
+          <Link
+            to="/live"
+            onClick={() => setOpen(false)}
+            className="flex items-center gap-3 px-4 py-3 rounded-lg text-foreground hover:bg-secondary transition-colors"
+          >
+            <Radio className={`w-5 h-5 ${liveOn ? 'text-red-500' : 'text-primary'}`} />
+            <span className="font-medium flex-1">Live</span>
+            {liveOn && (
+              <span className="flex items-center gap-1 text-[10px] font-bold text-red-500">
+                <span className="relative flex h-2 w-2">
+                  <span className="absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75 animate-ping" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500" />
+                </span>
+                ON AIR
+              </span>
+            )}
+          </Link>
 
           {whatsappNumber && (
             <a
