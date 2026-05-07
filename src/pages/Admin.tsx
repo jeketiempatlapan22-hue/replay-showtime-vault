@@ -151,7 +151,7 @@ export default function Admin() {
   const handleLogout = async () => { await supabase.auth.signOut(); setIsLoggedIn(false); };
 
   const resetForm = () => {
-    setForm({ title: '', showName: '', date: '', showTime: '19:00', criteria: 'reguler', featuredMember: '', lineup: '', password: '', youtubeId: '', imageUrl: '', sourceType: 'youtube', m3u8Url: '' });
+    setForm({ title: '', showName: '', date: '', showTime: '19:00', criteria: 'reguler', featuredMember: '', lineup: '', password: '', youtubeId: '', imageUrl: '', sourceType: 'youtube', m3u8Url: '', sources: [] });
     setEditingReplay(null);
   };
 
@@ -193,6 +193,7 @@ export default function Admin() {
       title: r.title, showName: r.show_name, date: r.date, showTime: (r.show_time || '19:00:00').slice(0, 5), criteria: r.criteria,
       featuredMember: r.featured_member, lineup: r.lineup.join(', '), password: r.password, youtubeId: r.youtube_id, imageUrl: r.image_url,
       sourceType: (r as any).source_type || 'youtube', m3u8Url: (r as any).m3u8_url || '',
+      sources: Array.isArray((r as any).sources) ? (r as any).sources : [],
     });
     setShowAddDialog(true);
   };
