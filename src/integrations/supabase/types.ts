@@ -109,6 +109,36 @@ export type Database = {
         }
         Relationships: []
       }
+      live_messages: {
+        Row: {
+          browser_id: string
+          created_at: string
+          id: string
+          is_admin: boolean
+          message: string
+          name: string
+          pinned: boolean
+        }
+        Insert: {
+          browser_id?: string
+          created_at?: string
+          id?: string
+          is_admin?: boolean
+          message: string
+          name?: string
+          pinned?: boolean
+        }
+        Update: {
+          browser_id?: string
+          created_at?: string
+          id?: string
+          is_admin?: boolean
+          message?: string
+          name?: string
+          pinned?: boolean
+        }
+        Relationships: []
+      }
       live_token_devices: {
         Row: {
           browser_id: string
@@ -188,6 +218,30 @@ export type Database = {
           month?: string
           password?: string
           paused?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      members: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          photo_url: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          photo_url?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          photo_url?: string
           updated_at?: string
         }
         Relationships: []
