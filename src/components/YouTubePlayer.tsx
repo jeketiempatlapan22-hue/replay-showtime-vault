@@ -7,6 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import RatingStars from '@/components/RatingStars';
 import CommentSection from '@/components/CommentSection';
 import HlsPlayer, { type HlsPlayerHandle } from '@/components/HlsPlayer';
+import { prefetchM3U8, prefetchYouTube, prefetchCloudflare } from '@/lib/prefetch';
 
 interface Props {
   replay: ReplayRow;
@@ -116,6 +117,24 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
     () => sources.find(s => s.id === activeSourceId) || null,
     [sources, activeSourceId],
   );
+
+  // Prefetch all non-active sources in background so switching is instant
+  useEffect(() => {
+    if (!sources.length) return;
+    const idle = (cb: () => void) => {
+      const ric = (window as unknown as { requestIdleCallback?: (cb: () => void) => number }).requestIdleCallback;
+      if (typeof ric === 'function') ric(cb);
+      else setTimeout(cb, 300);
+    };
+    idle(() => {
+      sources.forEach(s => {
+        if (s.id === activeSourceId) return;
+        if (s.type === 'm3u8') void prefetchM3U8(s.url);
+        else if (s.type === 'youtube') prefetchYouTube(s.url);
+        else if (s.type === 'cloudflare') prefetchCloudflare(s.url);
+      });
+    });
+  }, [sources, activeSourceId]);
 
   const handleSubmitPassword = async () => {
     const trimmed = pwInput.trim();
@@ -284,10 +303,17 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
             <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-thin">
               {sources.map(s => {
                 const active = s.id === activeSourceId;
+                const warm = () => {
+                  if (s.type === 'm3u8') void prefetchM3U8(s.url);
+                  else if (s.type === 'youtube') prefetchYouTube(s.url);
+                  else if (s.type === 'cloudflare') prefetchCloudflare(s.url);
+                };
                 return (
                   <button
                     key={s.id}
                     type="button"
+                    onPointerEnter={warm}
+                    onFocus={warm}
                     onClick={() => { setHlsFailed(false); setActiveSourceId(s.id); }}
                     className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
                       active
