@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, Trash2, Edit2, Key, Save, Palette, MessageCircle, LogOut, Eye, Send, List, Settings, ShieldCheck, Unlock as UnlockIcon, Link2, Copy, X, Radio, RefreshCw, Users, Upload, Search, ArrowUpDown } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Edit2, Key, Save, Palette, MessageCircle, LogOut, Eye, Send, List, Settings, ShieldCheck, Unlock as UnlockIcon, Link2, Copy, X, Radio, RefreshCw, Users, Upload, Search, ArrowUpDown, Sparkles, Calendar } from 'lucide-react';
 import { getMembers, upsertMember, deleteMember, uploadMemberPhoto, type Member } from '@/lib/members';
+import { getActiveShows, upsertActiveShow, deleteActiveShow, type ActiveShow } from '@/lib/activeShows';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -92,6 +93,63 @@ export default function Admin() {
   const [newTokenMaxDevices, setNewTokenMaxDevices] = useState(1);
   const [liveSaving, setLiveSaving] = useState(false);
 
+  // Active shows state
+  const [activeShows, setActiveShows] = useState<ActiveShow[]>([]);
+  const [showForm, setShowForm] = useState<{ id?: string; title: string; show_date: string; show_time: string; lineup: string; category: string; description: string; image_url: string; sort_order: number; is_active: boolean }>({
+    title: '', show_date: '', show_time: '19:00', lineup: '', category: 'reguler', description: '', image_url: '', sort_order: 0, is_active: true,
+  });
+  const [showEditing, setShowEditing] = useState(false);
+
+  const refreshActiveShows = () => getActiveShows(true).then(setActiveShows);
+
+  const resetShowForm = () => {
+    setShowForm({ title: '', show_date: '', show_time: '19:00', lineup: '', category: 'reguler', description: '', image_url: '', sort_order: 0, is_active: true });
+    setShowEditing(false);
+  };
+
+  const handleSaveShow = async () => {
+    if (!showForm.title.trim() || !showForm.show_date) {
+      toast({ title: 'Lengkapi data', description: 'Judul dan tanggal wajib diisi.', variant: 'destructive' });
+      return;
+    }
+    try {
+      await upsertActiveShow({
+        id: showForm.id,
+        title: showForm.title.trim(),
+        show_date: showForm.show_date,
+        show_time: showForm.show_time || '19:00',
+        lineup: showForm.lineup.split(',').map(s => s.trim()).filter(Boolean),
+        category: showForm.category,
+        description: showForm.description.trim(),
+        image_url: showForm.image_url.trim(),
+        sort_order: Number(showForm.sort_order) || 0,
+        is_active: showForm.is_active,
+      });
+      toast({ title: showForm.id ? 'Show diperbarui' : 'Show ditambahkan' });
+      resetShowForm();
+      refreshActiveShows();
+    } catch (e: any) {
+      toast({ title: 'Gagal menyimpan', description: e.message, variant: 'destructive' });
+    }
+  };
+
+  const handleEditShow = (s: ActiveShow) => {
+    setShowForm({
+      id: s.id, title: s.title, show_date: s.show_date, show_time: s.show_time,
+      lineup: s.lineup.join(', '), category: s.category, description: s.description,
+      image_url: s.image_url, sort_order: s.sort_order, is_active: s.is_active,
+    });
+    setShowEditing(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleDeleteShow = async (id: string) => {
+    if (!confirm('Hapus show ini?')) return;
+    try { await deleteActiveShow(id); toast({ title: 'Show dihapus' }); refreshActiveShows(); }
+    catch (e: any) { toast({ title: 'Gagal', description: e.message, variant: 'destructive' }); }
+  };
+
+
   const showFeaturedMember = form.criteria === 'sts' || form.criteria === 'last_show';
 
   useEffect(() => {
@@ -133,6 +191,7 @@ export default function Admin() {
       const { data: blocks } = await supabase.from('blocked_browsers').select('*').order('created_at', { ascending: false });
       if (blocks) setBlockedBrowsers(blocks as any);
       void refreshLive();
+      void refreshActiveShows();
     } catch {
       toast({ title: 'Error', description: 'Gagal memuat data.', variant: 'destructive' });
     }
@@ -504,8 +563,9 @@ export default function Admin() {
       {/* Tabs */}
       <div className="max-w-6xl mx-auto px-2 sm:px-4 py-4">
         <Tabs defaultValue="replays" className="w-full">
-          <TabsList className="grid w-full grid-cols-4 sm:grid-cols-7 mb-4">
+          <TabsList className="grid w-full grid-cols-4 sm:grid-cols-8 mb-4">
             <TabsTrigger value="replays" className="text-[10px] sm:text-sm gap-1"><List className="w-3.5 h-3.5 hidden sm:block" />Replay</TabsTrigger>
+            <TabsTrigger value="shows" className="text-[10px] sm:text-sm gap-1"><Sparkles className="w-3.5 h-3.5 hidden sm:block" />Show</TabsTrigger>
             <TabsTrigger value="live" className="text-[10px] sm:text-sm gap-1"><Radio className="w-3.5 h-3.5 hidden sm:block" />Live</TabsTrigger>
             <TabsTrigger value="members" className="text-[10px] sm:text-sm gap-1"><Users className="w-3.5 h-3.5 hidden sm:block" />Member</TabsTrigger>
             <TabsTrigger value="preview" className="text-[10px] sm:text-sm gap-1"><Eye className="w-3.5 h-3.5 hidden sm:block" />Preview</TabsTrigger>
@@ -571,7 +631,101 @@ export default function Admin() {
             </Card>
           </TabsContent>
 
+          {/* ===== ACTIVE SHOWS TAB ===== */}
+          <TabsContent value="shows" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="font-sans text-base sm:text-lg flex items-center gap-2">
+                  <Sparkles className="w-5 h-5" /> {showEditing ? 'Edit Show Aktif' : 'Tambah Show Aktif'}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div>
+                  <Label>Judul Show *</Label>
+                  <Input value={showForm.title} onChange={e => setShowForm({ ...showForm, title: e.target.value })} placeholder="Misal: Aturan Anti Cinta" />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label>Tanggal Show *</Label>
+                    <Input type="date" value={showForm.show_date} onChange={e => setShowForm({ ...showForm, show_date: e.target.value })} />
+                  </div>
+                  <div>
+                    <Label>Jam Show</Label>
+                    <Input type="time" value={showForm.show_time} onChange={e => setShowForm({ ...showForm, show_time: e.target.value })} />
+                  </div>
+                </div>
+                <div>
+                  <Label>Kategori</Label>
+                  <select value={showForm.category} onChange={e => setShowForm({ ...showForm, category: e.target.value })}
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+                    {CRITERIA_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <Label>Lineup Member (pisahkan dengan koma)</Label>
+                  <Input value={showForm.lineup} onChange={e => setShowForm({ ...showForm, lineup: e.target.value })} placeholder="Freya, Christy, Gracia" />
+                </div>
+                <div>
+                  <Label>Deskripsi</Label>
+                  <Input value={showForm.description} onChange={e => setShowForm({ ...showForm, description: e.target.value })} placeholder="Deskripsi singkat show" />
+                </div>
+                <div>
+                  <Label>Gambar Show</Label>
+                  <ImagePicker value={showForm.image_url} onChange={url => setShowForm({ ...showForm, image_url: url })} />
+                </div>
+                <div className="grid grid-cols-2 gap-3 items-end">
+                  <div>
+                    <Label>Urutan Tampil</Label>
+                    <Input type="number" value={showForm.sort_order} onChange={e => setShowForm({ ...showForm, sort_order: Number(e.target.value) })} />
+                  </div>
+                  <div className="flex items-center gap-2 h-10">
+                    <Switch checked={showForm.is_active} onCheckedChange={v => setShowForm({ ...showForm, is_active: v })} />
+                    <span className="text-sm">Tampilkan di landing</span>
+                  </div>
+                </div>
+                <div className="flex gap-2 pt-2">
+                  <Button onClick={handleSaveShow} className="flex-1"><Save className="w-4 h-4 mr-2" />{showEditing ? 'Update' : 'Tambah'}</Button>
+                  {showEditing && <Button variant="outline" onClick={resetShowForm}>Batal</Button>}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader><CardTitle className="font-sans text-base sm:text-lg">Daftar Show ({activeShows.length})</CardTitle></CardHeader>
+              <CardContent>
+                {activeShows.length === 0 ? (
+                  <p className="text-muted-foreground text-center py-8">Belum ada show aktif.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {activeShows.map(s => (
+                      <div key={s.id} className="p-2 sm:p-3 rounded-lg bg-secondary/50 border border-border flex items-center gap-3">
+                        {s.image_url && <img src={s.image_url} alt="" className="w-12 h-8 sm:w-16 sm:h-10 rounded object-cover shrink-0" />}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium text-sm sm:text-base truncate">{s.title}</p>
+                            {!s.is_active && <Badge variant="outline" className="text-[10px]">Off</Badge>}
+                          </div>
+                          <p className="text-xs text-muted-foreground truncate">
+                            <Calendar className="w-3 h-3 inline mr-1" />
+                            {new Date(`${s.show_date}T${s.show_time}`).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })}
+                            {' · '}{getCriteriaLabel(s.category)}
+                            {s.lineup.length > 0 && ` · ${s.lineup.length} member`}
+                          </p>
+                        </div>
+                        <div className="flex gap-1 shrink-0">
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditShow(s)}><Edit2 className="w-4 h-4" /></Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteShow(s.id)}><Trash2 className="w-4 h-4" /></Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
           {/* ===== LIVE TAB ===== */}
+
           <TabsContent value="live" className="space-y-4">
             <Card>
               <CardHeader>

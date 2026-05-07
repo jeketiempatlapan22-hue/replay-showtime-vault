@@ -8,6 +8,7 @@ import HamburgerMenu from '@/components/HamburgerMenu';
 import ReplayCardComponent from '@/components/ReplayCardComponent';
 import ReplayCardSkeleton from '@/components/ReplayCardSkeleton';
 import StatsBar from '@/components/StatsBar';
+import ActiveShowsSection from '@/components/ActiveShowsSection';
 import YouTubePlayer from '@/components/YouTubePlayer';
 import { getReplaysByMonth, getReplays, getSettings } from '@/lib/store';
 import { type ReplayRow } from '@/lib/store';
@@ -434,6 +435,9 @@ export default function Index() {
         </header>
 
         <main className="max-w-7xl mx-auto px-4 pb-20">
+          {/* Active Shows */}
+          <ActiveShowsSection />
+
           {/* Stats */}
           {!loading && allReplays.length > 0 && <StatsBar replays={allReplays} />}
 
