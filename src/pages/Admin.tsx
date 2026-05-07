@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, Trash2, Edit2, Key, Save, Palette, MessageCircle, LogOut, Eye, Send, List, Settings, ShieldCheck, Unlock as UnlockIcon } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Edit2, Key, Save, Palette, MessageCircle, LogOut, Eye, Send, List, Settings, ShieldCheck, Unlock as UnlockIcon, Link2, Copy, X } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -9,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { addReplay, deleteReplay, updateReplay, getReplaysAdmin, getAllMasterPasswords, setMasterPassword, getSettings, setSetting, type ReplayRow, type MasterPasswordRow } from '@/lib/store';
+import { addReplay, deleteReplay, updateReplay, getReplaysAdmin, getAllMasterPasswords, setMasterPassword, getSettings, setSetting, setReplayAccessToken, type ReplayRow, type MasterPasswordRow, type PlaylistSource } from '@/lib/store';
 import { THEME_OPTIONS, type ThemeType } from '@/components/ThemedBackground';
 import ImagePicker from '@/components/ImagePicker';
 import { toast } from '@/hooks/use-toast';
@@ -51,7 +52,8 @@ export default function Admin() {
   const [editingReplay, setEditingReplay] = useState<ReplayRow | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ReplayRow | null>(null);
 
-  const [form, setForm] = useState({ title: '', showName: '', date: '', showTime: '19:00', criteria: 'reguler', featuredMember: '', lineup: '', password: '', youtubeId: '', imageUrl: '', sourceType: 'youtube', m3u8Url: '' });
+  const [form, setForm] = useState({ title: '', showName: '', date: '', showTime: '19:00', criteria: 'reguler', featuredMember: '', lineup: '', password: '', youtubeId: '', imageUrl: '', sourceType: 'youtube', m3u8Url: '', sources: [] as PlaylistSource[] });
+  const [liveChatEnabled, setLiveChatEnabled] = useState(true);
 
   const [mpYear, setMpYear] = useState(String(new Date().getFullYear()));
   const [mpMonth, setMpMonth] = useState(String(new Date().getMonth() + 1).padStart(2, '0'));
