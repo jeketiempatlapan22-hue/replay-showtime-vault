@@ -1,105 +1,91 @@
-# Plan: Halaman Live, Token Device-Lock, Perbaikan Player
+# Rencana: Live Access, Watermark Token, & Fix DevTools
 
-## 1. Halaman Live baru (`/live`)
+## 1. Token Live (Admin Panel) — buat/revoke/salin cepat
 
-**Route:** Tambah `/live` di `src/App.tsx`, file baru `src/pages/Live.tsx`.
+Edit `src/pages/Admin.tsx` (tab Live → seksi Token):
+- Hilangkan input **Label**. Form pembuatan token cukup 2 elemen sebaris: input angka **Jumlah Device** + tombol **+ Buat Token**.
+- Tabel token tampilkan kolom: **Kode (RT-XXXX)**, Token (truncate), Device terpakai/maks, Status (Aktif/Dicabut), Aksi (📋 Salin Link, 🔄 Reset Device, ⛔ Revoke/Aktifkan, 🗑 Hapus).
+- Tambah aksi **Revoke** baru (toggle `revoked`) — selama ini hanya Hapus. User dgn token yang di-revoke otomatis tidak bisa unlock & player live miliknya akan kick keluar (lihat §4 realtime).
+- Label `RT-XXXX` = `RT-` + 4 karakter terakhir token. Ini juga yg muncul di watermark (§3) supaya admin tinggal cocokkan & klik Revoke.
 
-**Sumber data:** Konfigurasi live disimpan di `site_settings` (key sudah ada) sebagai JSON tunggal `live_config`:
-```json
-{
-  "enabled": true,
-  "title": "Live Saat Ini",
-  "type": "m3u8" | "youtube" | "cloudflare",
-  "url": "...",
-  "password": "...",        // opsional, kalau kosong → wajib token
-  "require_password": true
-}
-```
-Disimpan via edge function (lihat §3) supaya `password` tak terekspos publik.
+Edit `supabase/functions/manage-live/index.ts`:
+- `create_token`: label opsional (default `''`), tetap simpan; tidak wajib di body.
+- Tambah action baru `revoke_token` `{ id, revoked: bool }` yang update kolom `revoked`.
 
-**Tampilan:**
-- Jika `enabled=false` → halaman menampilkan "Tidak ada live saat ini" + tombol balik.
-- Jika `enabled=true` & belum unlock → form sandi **atau** tombol "Punya token? Tempel di URL".
-- Setelah unlock → render player sesuai `type`:
-  - `m3u8` → `HlsPlayer` yang sudah ada.
-  - `youtube` / `cloudflare` → iframe + **overlay anti-klik** (lihat §4).
+## 2. Aktifkan Kembali Sandi Live (selain token link)
 
-**Akses via token link:** `/live?t=TOKEN`. Token diverifikasi server-side; jika valid, langsung unlock tanpa sandi.
+Edit `supabase/functions/unlock-live/index.ts`:
+- Terima `{ password?, token?, browser_id }`. Jika ada `token` → alur lama (device lock). Jika tidak ada token tapi ada `password` & cocok dengan `live_config_private.password` (& `require_password=true`) → unlock; tapi jangan kirimkan watermark token (set `watermark = "RT-PWD"` agar admin tahu sumber password).
+- Validasi: jika keduanya kosong → `password_or_token_required`.
+- Response sukses tambahkan `watermark: "RT-XXXX"` (4 char terakhir token) atau `"RT-PWD"`.
 
-## 2. Toggle Live & token manager di Admin Panel
+Edit `src/pages/Live.tsx`:
+- Jika tidak ada token URL & belum unlock → tampilkan form sandi (Input + tombol "Buka") DAN tombol "Punya link token? Buka link Anda".
+- Simpan `watermark` ke state & sessionStorage.
 
-Tab baru **"Live"** di `src/pages/Admin.tsx`:
-- Switch "Aktifkan Live"
-- Pilih tipe (m3u8 / youtube / cloudflare) + input URL/ID
-- Input judul + sandi live
-- Tombol "Simpan" (memanggil edge function `set-live-config`).
-- Sub-section **Token Akses Live**: tabel token dengan kolom Token, Max Device, Device Terdaftar, Aksi (copy link, hapus). Tombol "Buat Token" → input nama + jumlah device (default 1).
+Edit `src/pages/Admin.tsx` (tab Live):
+- Kembalikan input **Sandi Live** + switch **Wajib Sandi**. Kirim ke `manage-live` set_config (sudah ada di backend).
 
-## 3. Backend (Lovable Cloud)
+## 3. Watermark RT-XXXX di Player Live
 
-**Migrasi DB baru:**
-- Tabel `live_tokens`: `id uuid pk`, `token text unique`, `label text`, `max_devices int default 1`, `created_at`, `revoked bool default false`.
-- Tabel `live_token_devices`: `id`, `token_id fk → live_tokens`, `browser_id text`, `created_at`, unique(token_id, browser_id).
-- RLS: SELECT public hanya untuk count? → lebih aman: **tutup semua akses anon**, semua interaksi via edge function.
-- `live_config` disimpan di `site_settings` (key=`live_config`, value=JSON). Karena `site_settings` SELECT publik, **password tidak boleh disimpan plaintext di sana** → simpan password di key terpisah `live_password` yang dibaca hanya server-side oleh edge function (RLS tetap public select → masalah). Solusi: simpan password di kolom `password` tabel baru `live_config_private` (RLS deny anon, hanya service-role yang baca via edge function).
+Buat komponen baru `src/components/LiveWatermark.tsx`:
+- Overlay absolute pojok (rotasi posisi tiap ~12 detik antara 4 sudut agar sulit di-crop), `pointer-events:none`, opacity ~0.55, font monospace, background blur ringan.
+- Props: `code: string` (mis. `"RT-1A2B"`).
 
-**Edge functions baru (semua `verify_jwt = false`, validasi manual):**
-1. `get-live-config`: kembalikan `{enabled, title, type, has_password}` tanpa URL/password.
-2. `unlock-live`: input `{password?, token?, browser_id}`. Kalau token: cek valid & belum revoked, kalau `live_token_devices` count < max → tambahkan browser_id; kalau browser_id sudah ada → izinkan. Kalau password: cocokkan dgn `live_config_private.password`. Sukses → kembalikan `{url, type, title, session_token}` (session_token JWT singkat ~6 jam disimpan di sessionStorage).
-3. `set-live-config` (admin only, validasi role): set config.
-4. `manage-live-tokens` (admin only): create / list / revoke token.
+Edit `src/components/HlsPlayer.tsx` & `src/components/EmbedPlayer.tsx`:
+- Terima prop opsional `watermark?: string`. Render `<LiveWatermark>` di dalam container player setelah video/iframe.
 
-## 4. Overlay Anti-Klik untuk YouTube/Cloudflare
+Edit `src/pages/Live.tsx`:
+- Teruskan `watermark` ke kedua player.
 
-Komponen baru `src/components/EmbedPlayer.tsx`:
-- Iframe YouTube pakai `enablejsapi=1` + IFrame Player API supaya kita bisa kontrol `playVideo/pauseVideo/setVolume/mute/unMute` dari luar.
-- Overlay `<div>` absolut di atas iframe (`pointer-events: auto`) yang menelan semua klik. Di atas overlay, render kontrol custom: tombol play/pause, slider volume, fullscreen.
-- Untuk Cloudflare Stream: pakai Stream Player SDK yang punya API serupa, atau iframe + overlay (Cloudflare punya postMessage API).
-- Hasil: user tak bisa klik logo YouTube / "Watch on YouTube", tapi tombol custom kita berfungsi.
+## 4. Realtime Kick saat Token Direvoke / Dihapus
 
-Komponen ini dipakai di Halaman Live **dan** di `YouTubePlayer.tsx` agar konsisten.
+Edit `src/pages/Live.tsx`:
+- Tambah subscribe ke channel `postgres_changes` tabel `live_tokens` (filter event UPDATE/DELETE). Saat ada perubahan, panggil `unlock-live` ulang (silent) dengan token URL; jika respons tidak `valid` → reset state (`unlocked=null`, hapus sessionStorage), tampilkan pesan "Akses dicabut admin".
+- Migrasi DB: `ALTER PUBLICATION supabase_realtime ADD TABLE public.live_tokens;` + set `REPLICA IDENTITY FULL`.
 
-## 5. Perbaikan Volume Auto-Mute saat masuk replay/live
+## 5. CTA "Beli Show" untuk User Tanpa Akses
 
-**Masalah saat ini:** `HlsPlayer` set `video.muted = true` di mount karena syarat autoplay browser.
+Edit `src/pages/Live.tsx` di state "akses terkunci":
+- Heading besar **"Beli Show"** + deskripsi singkat ("Hubungi admin untuk mendapatkan token akses live.").
+- Tombol utama hijau **"Hubungi Admin via WhatsApp"** → `https://wa.me/6288809048431?text=Halo%20admin%2C%20saya%20ingin%20beli%20akses%20show%20live.` (target `_blank`, `rel="noopener"`).
+- Form sandi tetap di bawahnya (collapsible).
 
-**Perbaikan:**
-- Simpan preferensi volume terakhir user di `localStorage` (`replaytime-volume`, `replaytime-muted`).
-- Coba `video.play()` **unmuted** dulu; jika promise reject → fallback `muted=true` lalu play, dan tampilkan tombol "Tap untuk aktifkan suara" yang besar di overlay.
-- Untuk EmbedPlayer YouTube: sama; `setVolume(savedVolume); unMute();` setelah `onReady`, fallback mute jika autoplay-with-sound diblokir browser.
-- Setiap user ubah volume → simpan ke localStorage; player berikutnya pakai nilai itu.
+## 6. Fix DevTools False-Positive
 
-## 6. Fix Resolusi Sering Berubah Sendiri
+Edit `src/hooks/useDevToolsDetector.ts`:
+- **Buang** strategi `console.debug(probe)` + getter trick — ini false-positive di banyak browser modern (extension, React DevTools, atau preview iframe Lovable mem-format objek).
+- **Buang** `console.clear()` periodik (mengganggu user & kadang trigger detector lain).
+- Detector hanya pakai size-diff dengan threshold lebih ketat: `SIZE_THRESHOLD = 320`, `CONFIRM_COUNT = 4` (≥6 detik konsisten), dan **skip total** jika:
+  - viewport mobile (`innerWidth < 900` atau `window.matchMedia('(pointer: coarse)').matches`)
+  - di iframe (`window.top !== window.self`) — preview Lovable jalan di iframe
+  - device pixel ratio aneh / zoom (`Math.abs(window.devicePixelRatio - Math.round(window.devicePixelRatio)) > 0.1` cukup → skip karena zoom UI bikin diff)
+- Tetap blokir F12 / Ctrl+Shift+I/J/C dan right-click (instant trigger).
+- Hapus interval check jika sudah triggered.
 
-**Penyebab:** `capLevelToPlayerSize: true` + ABR aktif → hls.js menurunkan kualitas otomatis walau user pilih manual.
+## 7. Penegakan Device-Lock yang Sebenarnya
 
-**Perbaikan di `HlsPlayer.tsx`:**
-- Saat `selectQuality(idx)` dengan `idx !== -1`: set `hls.currentLevel = idx` **dan** `hls.autoLevelCapping = idx` + simpan pilihan ke `localStorage` (`replaytime-quality-height`).
-- Set `capLevelToPlayerSize = false` ketika user memilih manual (re-create instance atau pakai `hls.capLevelToPlayerSize = false`).
-- Pada `MANIFEST_PARSED`: jika ada saved quality height, cari level dengan height match dan terapkan otomatis.
-- Pada `LEVEL_SWITCHED`: jika user mode manual dan level berbeda dari pilihannya → paksa kembali (`hls.currentLevel = userPick`).
+Saat ini `unlock-live` sudah cek `browser_id` di `live_token_devices`. Tambahkan:
+- Edit `unlock-live/index.ts`: gunakan transaksi soft — gunakan `upsert` `(token_id, browser_id)` dengan unique index agar concurrent request tak melebihi limit. Tambah migrasi:
+  ```sql
+  CREATE UNIQUE INDEX IF NOT EXISTS live_token_devices_token_browser_uniq
+    ON public.live_token_devices(token_id, browser_id);
+  ```
+- Sebelum insert: hitung lagi `count` dgn `head: true`; jika `>= max_devices` → tolak `device_limit`. (Race kecil tapi limit umumnya ≤10, dan unique index memastikan tidak ada duplikat browser_id.)
+- Di `Live.tsx`: simpan `browser_id` yang di-acknowledge server ke sessionStorage; setiap kali tab live aktif (visibilitychange → visible), re-validate via `unlock-live` silent. Jika invalid (mis. admin reset device) → kick.
 
-## 7. Tampilan & Navigasi
+## 8. File yang Diubah / Dibuat
 
-- Tambah link "Live" di `HamburgerMenu.tsx` dengan badge "● LIVE" merah berdenyut jika `live_config.enabled`.
-- Halaman Live mengikuti tema yang sama (`ThemedBackground`).
+**Baru**
+- `src/components/LiveWatermark.tsx`
+- Migrasi: unique index `live_token_devices`, enable realtime `live_tokens`.
 
-## File yang Dibuat/Diubah
+**Diubah**
+- `src/hooks/useDevToolsDetector.ts`
+- `src/pages/Live.tsx` (form sandi, CTA Beli Show, watermark, kick realtime, revalidate)
+- `src/pages/Admin.tsx` (form token tanpa label, kolom kode RT-XXXX, tombol revoke, sandi live UI kembali)
+- `src/components/HlsPlayer.tsx` & `src/components/EmbedPlayer.tsx` (prop watermark)
+- `supabase/functions/manage-live/index.ts` (action `revoke_token`, label opsional)
+- `supabase/functions/unlock-live/index.ts` (password fallback, watermark dalam respons, device-lock ketat)
 
-**Baru:**
-- `src/pages/Live.tsx`
-- `src/components/EmbedPlayer.tsx`
-- `supabase/functions/get-live-config/index.ts`
-- `supabase/functions/unlock-live/index.ts`
-- `supabase/functions/set-live-config/index.ts`
-- `supabase/functions/manage-live-tokens/index.ts`
-- Migrasi: tabel `live_tokens`, `live_token_devices`, `live_config_private`.
-
-**Diubah:**
-- `src/App.tsx` (route `/live`)
-- `src/pages/Admin.tsx` (tab Live + token manager)
-- `src/components/HlsPlayer.tsx` (persistent quality + unmute logic)
-- `src/components/YouTubePlayer.tsx` (pakai EmbedPlayer untuk YT/CF + unmute)
-- `src/components/HamburgerMenu.tsx` (link Live + badge)
-
-Setelah disetujui, saya akan mengimplementasikan semuanya berurutan dan menjalankan migrasi DB + deploy edge functions secara otomatis.
+Setelah disetujui saya implementasi semuanya berurutan + jalankan migrasi & deploy fungsi.

@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { isFullscreenActive, onFullscreenChange, requestFs, exitFs } from '@/lib/fullscreen';
 import { Play, Pause, Volume2, VolumeX, Maximize, Minimize } from 'lucide-react';
+import LiveWatermark from '@/components/LiveWatermark';
 
 interface Props {
   type: 'youtube' | 'cloudflare';
   source: string; // youtube id or url, cloudflare uid
   title: string;
+  watermark?: string;
 }
 
 function extractYoutubeId(raw: string): string {
@@ -23,7 +25,7 @@ function extractCloudflareUid(raw: string): string {
 const VOL_KEY = 'replaytime-volume';
 const MUTED_KEY = 'replaytime-muted';
 
-export default function EmbedPlayer({ type, source, title }: Props) {
+export default function EmbedPlayer({ type, source, title, watermark }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const ytPlayerRef = useRef<any>(null);
@@ -174,6 +176,8 @@ export default function EmbedPlayer({ type, source, title }: Props) {
 
       {/* Anti-click overlay - covers entire iframe to block YouTube logo / Watch on YT button. Click does NOT toggle play. */}
       <div className="absolute inset-0" onClick={(e) => e.preventDefault()} />
+
+      {watermark && <LiveWatermark code={watermark} />}
 
       {showHint && (
         <button

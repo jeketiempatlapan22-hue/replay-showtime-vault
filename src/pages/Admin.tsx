@@ -82,7 +82,7 @@ export default function Admin() {
     enabled: false, title: 'Live', type: 'm3u8', url: '', password: '', require_password: true, sources: [],
   });
   const [liveTokens, setLiveTokens] = useState<Array<{ id: string; token: string; label: string; max_devices: number; revoked: boolean; devices_used: number }>>([]);
-  const [newTokenLabel, setNewTokenLabel] = useState('');
+  
   const [newTokenMaxDevices, setNewTokenMaxDevices] = useState(1);
   const [liveSaving, setLiveSaving] = useState(false);
 
@@ -160,8 +160,7 @@ export default function Admin() {
 
   const handleCreateLiveToken = async () => {
     try {
-      await supabase.functions.invoke('manage-live', { body: { action: 'create_token', label: newTokenLabel, max_devices: newTokenMaxDevices } });
-      setNewTokenLabel('');
+      await supabase.functions.invoke('manage-live', { body: { action: 'create_token', max_devices: newTokenMaxDevices } });
       setNewTokenMaxDevices(1);
       toast({ title: 'Berhasil', description: 'Token live dibuat.' });
       await refreshLive();
@@ -172,6 +171,11 @@ export default function Admin() {
 
   const handleDeleteLiveToken = async (id: string) => {
     await supabase.functions.invoke('manage-live', { body: { action: 'delete_token', id } });
+    await refreshLive();
+  };
+  const handleRevokeLiveToken = async (id: string, revoked: boolean) => {
+    await supabase.functions.invoke('manage-live', { body: { action: 'revoke_token', id, revoked } });
+    toast({ title: 'Berhasil', description: revoked ? 'Token dicabut.' : 'Token diaktifkan kembali.' });
     await refreshLive();
   };
   const handleResetLiveDevices = async (id: string) => {
@@ -600,8 +604,21 @@ export default function Admin() {
                   ))}
                 </div>
 
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <div className="sm:col-span-2">
+                    <Label>Sandi Live (opsional)</Label>
+                    <Input type="text" value={liveCfg.password} onChange={e => setLiveCfg(c => ({ ...c, password: e.target.value }))} placeholder="Sandi alternatif untuk akses live" />
+                  </div>
+                  <div className="flex items-end gap-2">
+                    <div className="flex items-center gap-2 h-10">
+                      <Switch checked={liveCfg.require_password} onCheckedChange={v => setLiveCfg(c => ({ ...c, require_password: v }))} />
+                      <span className="text-xs text-muted-foreground">Aktifkan sandi</span>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="rounded-md bg-secondary/40 border border-border p-2.5">
-                  <p className="text-[11px] text-muted-foreground"><strong className="text-foreground">Akses live hanya melalui link token.</strong> Buat token di bawah lalu salin link <code>/live?t=...</code> untuk dibagikan ke user. Sandi sudah dinonaktifkan demi keamanan & device-lock per token.</p>
+                  <p className="text-[11px] text-muted-foreground"><strong className="text-foreground">Akses live:</strong> melalui link token (terkunci per device) atau sandi di atas. Kosongkan sandi & matikan switch jika ingin token-only.</p>
                 </div>
                 <Button onClick={handleSaveLive} disabled={liveSaving}><Save className="w-4 h-4 mr-2" />{liveSaving ? 'Menyimpan...' : 'Simpan Konfigurasi'}</Button>
               </CardContent>
@@ -612,31 +629,42 @@ export default function Admin() {
                 <CardTitle className="font-sans text-base sm:text-lg flex items-center gap-2"><Link2 className="w-5 h-5 text-primary" />Token Akses Live</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 items-end">
-                  <div className="sm:col-span-2"><Label>Label</Label><Input value={newTokenLabel} onChange={e => setNewTokenLabel(e.target.value)} placeholder="cth: Member VIP - Andi" /></div>
-                  <div><Label>Max Device</Label><Input type="number" min={1} max={50} value={newTokenMaxDevices} onChange={e => setNewTokenMaxDevices(Math.max(1, Math.min(50, Number(e.target.value) || 1)))} /></div>
+                <div className="flex items-end gap-2">
+                  <div className="flex-1">
+                    <Label>Jumlah Device</Label>
+                    <Input type="number" min={1} max={50} value={newTokenMaxDevices} onChange={e => setNewTokenMaxDevices(Math.max(1, Math.min(50, Number(e.target.value) || 1)))} />
+                  </div>
+                  <Button onClick={handleCreateLiveToken}><Plus className="w-4 h-4 mr-1" />Buat Token</Button>
                 </div>
-                <Button size="sm" onClick={handleCreateLiveToken}><Plus className="w-4 h-4 mr-1" />Buat Token</Button>
+                <p className="text-[11px] text-muted-foreground">Setiap token dikunci ke jumlah perangkat yang ditentukan. Kode <strong>RT-XXXX</strong> di samping token akan muncul sebagai watermark di player user — gunakan untuk meng-Revoke jika terjadi penyalahgunaan.</p>
 
                 {liveTokens.length === 0 ? (
                   <p className="text-muted-foreground text-center py-4 text-sm">Belum ada token.</p>
                 ) : (
                   <div className="space-y-2">
-                    {liveTokens.map(t => (
-                      <div key={t.id} className="p-3 rounded-lg bg-secondary/40 border border-border space-y-2">
+                    {liveTokens.map(t => {
+                      const code = `RT-${t.token.slice(-4).toUpperCase()}`;
+                      return (
+                      <div key={t.id} className={`p-3 rounded-lg border space-y-2 ${t.revoked ? 'bg-destructive/5 border-destructive/30' : 'bg-secondary/40 border-border'}`}>
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-sm font-medium">{t.label || '(tanpa label)'}</span>
+                          <span className="text-sm font-mono font-bold text-primary">{code}</span>
                           <Badge variant="secondary" className="text-[10px]">{t.devices_used}/{t.max_devices} device</Badge>
-                          {t.revoked && <Badge variant="destructive" className="text-[10px]">Dicabut</Badge>}
+                          {t.revoked ? <Badge variant="destructive" className="text-[10px]">Dicabut</Badge> : <Badge className="text-[10px] bg-green-600">Aktif</Badge>}
                         </div>
                         <code className="block text-[10px] bg-background border border-border rounded px-2 py-1 break-all">{t.token}</code>
                         <div className="flex flex-wrap gap-1">
                           <Button variant="outline" size="sm" className="h-7 text-[10px]" onClick={() => copyLiveTokenLink(t.token)}><Copy className="w-3 h-3 mr-1" />Salin link</Button>
                           <Button variant="outline" size="sm" className="h-7 text-[10px]" onClick={() => handleResetLiveDevices(t.id)}><RefreshCw className="w-3 h-3 mr-1" />Reset device</Button>
+                          {t.revoked ? (
+                            <Button variant="outline" size="sm" className="h-7 text-[10px]" onClick={() => handleRevokeLiveToken(t.id, false)}><UnlockIcon className="w-3 h-3 mr-1" />Aktifkan</Button>
+                          ) : (
+                            <Button variant="outline" size="sm" className="h-7 text-[10px] text-orange-600" onClick={() => handleRevokeLiveToken(t.id, true)}><X className="w-3 h-3 mr-1" />Revoke</Button>
+                          )}
                           <Button variant="ghost" size="sm" className="h-7 text-[10px] text-destructive" onClick={() => handleDeleteLiveToken(t.id)}><Trash2 className="w-3 h-3 mr-1" />Hapus</Button>
                         </div>
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </CardContent>

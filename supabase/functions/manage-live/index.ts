@@ -58,7 +58,12 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ token }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
     if (action === "delete_token") {
+      await admin.from("live_token_devices").delete().eq("token_id", body.id);
       await admin.from("live_tokens").delete().eq("id", body.id);
+      return new Response(JSON.stringify({ ok: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    if (action === "revoke_token") {
+      await admin.from("live_tokens").update({ revoked: !!body.revoked }).eq("id", body.id);
       return new Response(JSON.stringify({ ok: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
     if (action === "reset_devices") {
