@@ -2,10 +2,12 @@ import { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHand
 import Hls from 'hls.js';
 import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, RotateCcw, RotateCw, Loader2, Settings, Check } from 'lucide-react';
 import { isFullscreenActive, onFullscreenChange, requestFs, exitFs } from '@/lib/fullscreen';
+import LiveWatermark from '@/components/LiveWatermark';
 
 interface Props {
   src: string;
   title: string;
+  watermark?: string;
   onFatalError?: () => void;
   onPipChange?: (active: boolean) => void;
 }
