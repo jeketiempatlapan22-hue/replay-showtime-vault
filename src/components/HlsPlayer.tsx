@@ -535,6 +535,17 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, onFatalError
         </div>
       )}
 
+      {/* Unmute hint when browser blocked autoplay-with-sound */}
+      {needsUnmute && muted && (
+        <button
+          type="button"
+          onClick={toggleMute}
+          className="absolute top-3 left-1/2 -translate-x-1/2 z-30 px-4 py-2 rounded-full bg-primary text-primary-foreground text-xs font-semibold shadow-lg animate-fade-in"
+        >
+          🔊 Tap untuk aktifkan suara
+        </button>
+      )}
+
       {/* Controls overlay */}
       <div
         className={`absolute inset-0 flex flex-col justify-end transition-opacity duration-300 ${
