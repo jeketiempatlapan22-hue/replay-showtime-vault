@@ -118,6 +118,24 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
     [sources, activeSourceId],
   );
 
+  // Prefetch all non-active sources in background so switching is instant
+  useEffect(() => {
+    if (!sources.length) return;
+    const idle = (cb: () => void) => {
+      const ric = (window as unknown as { requestIdleCallback?: (cb: () => void) => number }).requestIdleCallback;
+      if (typeof ric === 'function') ric(cb);
+      else setTimeout(cb, 300);
+    };
+    idle(() => {
+      sources.forEach(s => {
+        if (s.id === activeSourceId) return;
+        if (s.type === 'm3u8') void prefetchM3U8(s.url);
+        else if (s.type === 'youtube') prefetchYouTube(s.url);
+        else if (s.type === 'cloudflare') prefetchCloudflare(s.url);
+      });
+    });
+  }, [sources, activeSourceId]);
+
   const handleSubmitPassword = async () => {
     const trimmed = pwInput.trim();
     if (!trimmed) { setPwError('Sandi wajib diisi.'); return; }
