@@ -392,6 +392,7 @@ export type Database = {
         Args: never
         Returns: {
           enabled: boolean
+          lineup: string[]
           require_password: boolean
           sources: Json
           title: string
