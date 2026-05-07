@@ -742,24 +742,61 @@ export default function Admin() {
                     </div>
                   </div>
                 </div>
-                {members.length === 0 ? (
-                  <p className="text-muted-foreground text-center py-6 text-sm">Belum ada member.</p>
-                ) : (
-                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
-                    {members.map(m => (
-                      <div key={m.id} className="text-center space-y-1 group relative">
-                        <div className="w-full aspect-square rounded-full overflow-hidden border-2 border-border bg-secondary mx-auto">
-                          {m.photo_url ? <img src={m.photo_url} alt={m.name} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-xs">{m.name.slice(0,2)}</div>}
+                {(() => {
+                  const q = memberSearch.trim().toLowerCase();
+                  const filtered = members.filter(m => !q || m.name.toLowerCase().includes(q));
+                  const sorted = [...filtered].sort((a, b) => {
+                    if (memberSort === 'az') return a.name.localeCompare(b.name);
+                    if (memberSort === 'za') return b.name.localeCompare(a.name);
+                    const ad = a.created_at || '', bd = b.created_at || '';
+                    return memberSort === 'newest' ? bd.localeCompare(ad) : ad.localeCompare(bd);
+                  });
+                  return (
+                    <>
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <div className="relative flex-1">
+                          <Search className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                          <Input
+                            value={memberSearch}
+                            onChange={e => setMemberSearch(e.target.value)}
+                            placeholder="Cari member..."
+                            className="pl-8"
+                          />
                         </div>
-                        <p className="text-xs font-medium truncate">{m.name}</p>
-                        <div className="flex justify-center gap-1 opacity-0 group-hover:opacity-100 transition">
-                          <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => setMemberForm({ id: m.id, name: m.name, photo_url: m.photo_url })}><Edit2 className="w-3 h-3" /></Button>
-                          <Button size="icon" variant="ghost" className="h-6 w-6 text-destructive" onClick={() => handleDeleteMember(m.id)}><Trash2 className="w-3 h-3" /></Button>
-                        </div>
+                        <select
+                          value={memberSort}
+                          onChange={e => setMemberSort(e.target.value as typeof memberSort)}
+                          className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+                        >
+                          <option value="az">Nama A-Z</option>
+                          <option value="za">Nama Z-A</option>
+                          <option value="newest">Terbaru</option>
+                          <option value="oldest">Terlama</option>
+                        </select>
                       </div>
-                    ))}
-                  </div>
-                )}
+                      {sorted.length === 0 ? (
+                        <p className="text-muted-foreground text-center py-6 text-sm">
+                          {q ? `Tidak ada member cocok "${memberSearch}".` : 'Belum ada member.'}
+                        </p>
+                      ) : (
+                        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
+                          {sorted.map(m => (
+                            <div key={m.id} className="text-center space-y-1 group relative">
+                              <div className="w-full aspect-square rounded-full overflow-hidden border-2 border-border bg-secondary mx-auto">
+                                {m.photo_url ? <img src={m.photo_url} alt={m.name} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-xs">{m.name.slice(0,2)}</div>}
+                              </div>
+                              <p className="text-xs font-medium truncate">{m.name}</p>
+                              <div className="flex justify-center gap-1 opacity-0 group-hover:opacity-100 transition">
+                                <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => setMemberForm({ id: m.id, name: m.name, photo_url: m.photo_url })}><Edit2 className="w-3 h-3" /></Button>
+                                <Button size="icon" variant="ghost" className="h-6 w-6 text-destructive" onClick={() => handleDeleteMember(m.id)}><Trash2 className="w-3 h-3" /></Button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
               </CardContent>
             </Card>
           </TabsContent>
