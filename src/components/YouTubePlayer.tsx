@@ -40,18 +40,6 @@ function buildSources(source: ReplaySource | null, replay: ReplayRow): PlaylistS
   return list;
 }
 
-function extractYoutubeId(raw: string): string {
-  const r = (raw || '').trim();
-  const matched = r.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/|v\/))([A-Za-z0-9_-]{11})/)?.[1];
-  const fallback = r.match(/([A-Za-z0-9_-]{11})/)?.[1];
-  return (matched || fallback || '').slice(0, 11);
-}
-
-function extractCloudflareUid(raw: string): string {
-  const r = (raw || '').trim();
-  const m = r.match(/([a-f0-9]{32})/i)?.[1];
-  return m || r;
-}
 
 export default function YouTubePlayer({ replay, onBack }: Props) {
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -66,7 +54,7 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
   const [pwChecking, setPwChecking] = useState(false);
   const [activeSourceId, setActiveSourceId] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const iframeRef = useRef<HTMLIFrameElement>(null);
+  
   const hlsPlayerRef = useRef<HlsPlayerHandle>(null);
   const [pipActive, setPipActive] = useState(false);
   const pipSupported = typeof document !== 'undefined' && !!document.pictureInPictureEnabled;
