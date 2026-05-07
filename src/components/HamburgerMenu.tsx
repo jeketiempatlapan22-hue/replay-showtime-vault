@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Menu, X, Home, MessageCircle, Phone, Sun, Moon, Radio } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Menu, X, Home, MessageCircle, Phone, Sun, Moon, Radio, LogIn, LogOut, User as UserIcon } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
+import { toast } from '@/hooks/use-toast';
 import logoImg from '@/assets/logo.png';
 
 interface HamburgerMenuProps {
@@ -15,6 +17,14 @@ interface HamburgerMenuProps {
 export default function HamburgerMenu({ whatsappNumber, whatsappLink, lightMode, onToggleMode }: HamburgerMenuProps) {
   const [open, setOpen] = useState(false);
   const [liveOn, setLiveOn] = useState(false);
+  const { user } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    toast({ title: 'Berhasil keluar' });
+    setOpen(false);
+  };
 
   useEffect(() => {
     const fetch = () => supabase.rpc('get_live_status').then(({ data }) => {
@@ -113,6 +123,35 @@ export default function HamburgerMenu({ whatsappNumber, whatsappLink, lightMode,
               <span className="font-medium">Saluran WhatsApp</span>
             </a>
           )}
+
+          <div className="pt-2 mt-2 border-t border-border">
+            {user ? (
+              <>
+                <div className="flex items-center gap-3 px-4 py-3 rounded-lg text-foreground">
+                  <UserIcon className="w-5 h-5 text-primary" />
+                  <div className="min-w-0 flex-1">
+                    <span className="font-medium block truncate">{user.email}</span>
+                    <span className="text-xs text-muted-foreground">Sudah masuk</span>
+                  </div>
+                </div>
+                <button
+                  onClick={handleLogout}
+                  className="flex items-center gap-3 w-full px-4 py-3 rounded-lg text-foreground hover:bg-secondary transition-colors"
+                >
+                  <LogOut className="w-5 h-5 text-primary" />
+                  <span className="font-medium">Keluar</span>
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={() => { setOpen(false); navigate('/auth'); }}
+                className="flex items-center gap-3 w-full px-4 py-3 rounded-lg text-foreground hover:bg-secondary transition-colors"
+              >
+                <LogIn className="w-5 h-5 text-primary" />
+                <span className="font-medium">Masuk / Daftar</span>
+              </button>
+            )}
+          </div>
         </nav>
 
         {/* Dark/Light toggle at bottom */}

@@ -294,6 +294,33 @@ export type Database = {
         }
         Relationships: []
       }
+      profiles: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          phone: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          phone?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          phone?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       ratings: {
         Row: {
           browser_id: string
@@ -433,6 +460,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      email_for_phone: { Args: { _phone: string }; Returns: string }
       get_live_status: {
         Args: never
         Returns: {
@@ -452,6 +480,7 @@ export type Database = {
         Returns: boolean
       }
       increment_view_count: { Args: { _replay_id: string }; Returns: number }
+      phone_exists: { Args: { _phone: string }; Returns: boolean }
     }
     Enums: {
       app_role: "admin" | "user"
