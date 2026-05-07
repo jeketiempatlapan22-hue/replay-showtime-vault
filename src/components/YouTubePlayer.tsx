@@ -289,20 +289,12 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
             onPipChange={setPipActive}
           />
         ) : (
-          <div className="relative w-full overflow-hidden rounded-xl bg-black" style={{ paddingBottom: '56.25%' }}>
-            <iframe
-              ref={iframeRef}
-              key={activeSource.id}
-              src={activeSource.type === 'youtube' ? ytEmbedUrl : cfEmbedUrl}
-              className="absolute inset-0 w-full h-full"
-              title={replay.title}
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
-              allowFullScreen
-              referrerPolicy="strict-origin-when-cross-origin"
-              loading="eager"
-              style={{ border: 0 }}
-            />
-          </div>
+          <EmbedPlayer
+            key={activeSource.id}
+            type={activeSource.type as 'youtube' | 'cloudflare'}
+            source={activeSource.url}
+            title={replay.title}
+          />
         )}
 
         {/* Playlist chips */}
