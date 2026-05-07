@@ -262,12 +262,13 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
             <iframe
               ref={iframeRef}
               key={activeSource.id}
+              src={activeSource.type === 'youtube' ? ytEmbedUrl : cfEmbedUrl}
               className="absolute inset-0 w-full h-full"
               title={replay.title}
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
               allowFullScreen
               referrerPolicy="strict-origin-when-cross-origin"
-              loading="lazy"
+              loading="eager"
               style={{ border: 0 }}
             />
           </div>
