@@ -176,12 +176,6 @@ export default function Live() {
       <div className="w-full max-w-5xl mx-auto px-2 sm:px-4 py-4 space-y-3">
         {statusLoading ? (
           <div className="flex items-center justify-center py-20"><Loader2 className="w-10 h-10 text-primary animate-spin" /></div>
-        ) : !status?.enabled ? (
-          <div className="rounded-xl bg-card/80 border border-border p-10 text-center space-y-3">
-            <Radio className="w-12 h-12 text-muted-foreground mx-auto" />
-            <p className="text-foreground font-semibold">Live tidak aktif</p>
-            <p className="text-sm text-muted-foreground">Belum ada siaran live saat ini. Cek kembali nanti.</p>
-          </div>
         ) : !unlocked ? (
           <div className="rounded-2xl bg-card/80 border border-border p-6 max-w-md mx-auto space-y-5">
             <div className="text-center space-y-3">
