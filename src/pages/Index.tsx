@@ -122,6 +122,10 @@ export default function Index() {
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'replays' }, () => {
         refreshReplays();
       })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'replays' }, () => {
+        // Auto-refresh halaman saat admin mengubah player/playlist agar sumber video terbaru terpasang
+        try { window.location.reload(); } catch { /* ignore */ }
+      })
       .subscribe();
 
     // Realtime theme sync
