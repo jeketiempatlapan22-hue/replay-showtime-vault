@@ -144,17 +144,6 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
     incrementView();
   }, [replay.id]);
 
-  useEffect(() => {
-    const channel = supabase
-      .channel(`replay-views-${replay.id}`)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'replays', filter: `id=eq.${replay.id}` }, (payload) => {
-        const newRow = payload.new as { view_count?: number };
-        if (typeof newRow.view_count === 'number') setViewCount(newRow.view_count);
-      })
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [replay.id]);
-
   const toggleFullscreen = useCallback(() => {
     if (!containerRef.current) return;
     if (!document.fullscreenElement) {
