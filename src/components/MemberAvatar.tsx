@@ -8,12 +8,13 @@ let inflight: Promise<Cache> | null = null;
 async function loadAll(): Promise<Cache> {
   if (cache) return cache;
   if (inflight) return inflight;
-  inflight = supabase.from('members').select('name,photo_url').then(({ data }) => {
+  inflight = (async () => {
+    const { data } = await supabase.from('members').select('name,photo_url');
     const map: Cache = {};
     (data || []).forEach((m: any) => { map[m.name.toLowerCase()] = m.photo_url || null; });
     cache = map;
     return map;
-  });
+  })();
   return inflight;
 }
 
