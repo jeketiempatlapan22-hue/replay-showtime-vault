@@ -247,7 +247,16 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, onFatalError
         }));
         levels.sort((a, b) => (b.height || 0) - (a.height || 0));
         setQualities([{ index: -1, label: 'Auto' }, ...levels]);
-        // Autoplay (muted to satisfy browser policy). User can unmute manually.
+        // Restore saved quality preference
+        if (userQualityRef.current && hls) {
+          const match = levels.find(l => l.height === userQualityRef.current);
+          if (match) {
+            hls.currentLevel = match.index;
+            hls.autoLevelCapping = match.index;
+            hls.capLevelToPlayerSize = false;
+            setCurrentQuality(match.index);
+          }
+        }
         safePlay();
       });
       hls.on(Hls.Events.LEVEL_LOADED, (_, data) => {
@@ -258,6 +267,15 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, onFatalError
         if (hls && hls.autoLevelEnabled) {
           const lvl = hls.levels[data.level];
           setAutoActiveLabel(lvl?.height ? `${lvl.height}p` : '');
+        } else if (hls && userQualityRef.current) {
+          // Enforce user's manual quality if hls.js drifted
+          const lvl = hls.levels[data.level];
+          if (lvl?.height && lvl.height !== userQualityRef.current) {
+            const target = hls.levels.findIndex(l => l.height === userQualityRef.current);
+            if (target >= 0 && target !== data.level) {
+              try { hls.currentLevel = target; } catch { /* ignore */ }
+            }
+          }
         }
       });
       hls.on(Hls.Events.ERROR, (_, data) => {
