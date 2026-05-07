@@ -274,6 +274,20 @@ export default function Admin() {
     }
   };
 
+  const handleSaveAdminUsername = async () => {
+    const name = (adminUsername || '').trim();
+    if (!name) {
+      toast({ title: 'Error', description: 'Username admin tidak boleh kosong.', variant: 'destructive' });
+      return;
+    }
+    try {
+      await setSetting('admin_username', name);
+      toast({ title: 'Berhasil', description: `Username admin disimpan: ${name}` });
+    } catch {
+      toast({ title: 'Error', description: 'Gagal menyimpan username admin.', variant: 'destructive' });
+    }
+  };
+
   const handleGenerateToken = async (r: ReplayRow) => {
     const token = (crypto as any).randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2) + Date.now().toString(36);
     try {
