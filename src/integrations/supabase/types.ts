@@ -77,6 +77,7 @@ export type Database = {
         Row: {
           enabled: boolean
           id: string
+          lineup: string[]
           password: string
           require_password: boolean
           sources: Json
@@ -88,6 +89,7 @@ export type Database = {
         Insert: {
           enabled?: boolean
           id?: string
+          lineup?: string[]
           password?: string
           require_password?: boolean
           sources?: Json
@@ -99,6 +101,7 @@ export type Database = {
         Update: {
           enabled?: boolean
           id?: string
+          lineup?: string[]
           password?: string
           require_password?: boolean
           sources?: Json
@@ -106,6 +109,36 @@ export type Database = {
           type?: string
           updated_at?: string
           url?: string
+        }
+        Relationships: []
+      }
+      live_messages: {
+        Row: {
+          browser_id: string
+          created_at: string
+          id: string
+          is_admin: boolean
+          message: string
+          name: string
+          pinned: boolean
+        }
+        Insert: {
+          browser_id?: string
+          created_at?: string
+          id?: string
+          is_admin?: boolean
+          message: string
+          name?: string
+          pinned?: boolean
+        }
+        Update: {
+          browser_id?: string
+          created_at?: string
+          id?: string
+          is_admin?: boolean
+          message?: string
+          name?: string
+          pinned?: boolean
         }
         Relationships: []
       }
@@ -188,6 +221,30 @@ export type Database = {
           month?: string
           password?: string
           paused?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      members: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          photo_url: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          photo_url?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          photo_url?: string
           updated_at?: string
         }
         Relationships: []
@@ -335,6 +392,7 @@ export type Database = {
         Args: never
         Returns: {
           enabled: boolean
+          lineup: string[]
           require_password: boolean
           sources: Json
           title: string

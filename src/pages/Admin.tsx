@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, Trash2, Edit2, Key, Save, Palette, MessageCircle, LogOut, Eye, Send, List, Settings, ShieldCheck, Unlock as UnlockIcon, Link2, Copy, X, Radio, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Edit2, Key, Save, Palette, MessageCircle, LogOut, Eye, Send, List, Settings, ShieldCheck, Unlock as UnlockIcon, Link2, Copy, X, Radio, RefreshCw, Users, Upload } from 'lucide-react';
+import { getMembers, upsertMember, deleteMember, uploadMemberPhoto, type Member } from '@/lib/members';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -78,9 +79,12 @@ export default function Admin() {
 
   // Live state
   type LiveSrc = { label: string; type: 'm3u8' | 'youtube' | 'cloudflare'; url: string };
-  const [liveCfg, setLiveCfg] = useState<{ enabled: boolean; title: string; type: string; url: string; password: string; require_password: boolean; sources: LiveSrc[] }>({
-    enabled: false, title: 'Live', type: 'm3u8', url: '', password: '', require_password: true, sources: [],
+  const [liveCfg, setLiveCfg] = useState<{ enabled: boolean; title: string; type: string; url: string; password: string; require_password: boolean; sources: LiveSrc[]; lineup: string }>({
+    enabled: false, title: 'Live', type: 'm3u8', url: '', password: '', require_password: true, sources: [], lineup: '',
   });
+  const [members, setMembers] = useState<Member[]>([]);
+  const [memberForm, setMemberForm] = useState<{ id?: string; name: string; photo_url: string }>({ name: '', photo_url: '' });
+  const [memberUploading, setMemberUploading] = useState(false);
   const [liveTokens, setLiveTokens] = useState<Array<{ id: string; token: string; label: string; max_devices: number; revoked: boolean; devices_used: number }>>([]);
   
   const [newTokenMaxDevices, setNewTokenMaxDevices] = useState(1);
@@ -140,16 +144,46 @@ export default function Admin() {
       ]);
       if (cfgRes.data?.config) {
         const c = cfgRes.data.config;
-        setLiveCfg({ enabled: !!c.enabled, title: c.title || 'Live', type: c.type || 'm3u8', url: c.url || '', password: c.password || '', require_password: c.require_password !== false, sources: Array.isArray(c.sources) ? c.sources : [] });
+        setLiveCfg({ enabled: !!c.enabled, title: c.title || 'Live', type: c.type || 'm3u8', url: c.url || '', password: c.password || '', require_password: c.require_password !== false, sources: Array.isArray(c.sources) ? c.sources : [], lineup: Array.isArray(c.lineup) ? c.lineup.join(', ') : '' });
       }
       if (tokRes.data?.tokens) setLiveTokens(tokRes.data.tokens);
     } catch { /* ignore */ }
+    try { setMembers(await getMembers()); } catch { /* ignore */ }
+  };
+
+  const handleSaveMember = async () => {
+    const name = memberForm.name.trim();
+    if (!name) { toast({ title: 'Error', description: 'Nama wajib diisi.', variant: 'destructive' }); return; }
+    try {
+      await upsertMember(name, memberForm.photo_url, memberForm.id);
+      setMemberForm({ name: '', photo_url: '' });
+      setMembers(await getMembers());
+      toast({ title: 'Berhasil', description: 'Member tersimpan.' });
+    } catch (e: any) {
+      toast({ title: 'Error', description: e.message || 'Gagal menyimpan member.', variant: 'destructive' });
+    }
+  };
+  const handleDeleteMember = async (id: string) => {
+    await deleteMember(id);
+    setMembers(await getMembers());
+    toast({ title: 'Dihapus' });
+  };
+  const handleMemberPhotoUpload = async (file: File) => {
+    setMemberUploading(true);
+    try {
+      const url = await uploadMemberPhoto(file);
+      setMemberForm(f => ({ ...f, photo_url: url }));
+    } catch {
+      toast({ title: 'Error', description: 'Gagal upload foto.', variant: 'destructive' });
+    }
+    setMemberUploading(false);
   };
 
   const handleSaveLive = async () => {
     setLiveSaving(true);
     try {
-      await supabase.functions.invoke('manage-live', { body: { action: 'set_config', ...liveCfg } });
+      const lineupArr = liveCfg.lineup.split(',').map(s => s.trim()).filter(Boolean);
+      await supabase.functions.invoke('manage-live', { body: { action: 'set_config', ...liveCfg, lineup: lineupArr } });
       toast({ title: 'Berhasil', description: `Live ${liveCfg.enabled ? 'diaktifkan' : 'dinonaktifkan'}.` });
       await refreshLive();
     } catch {
@@ -468,9 +502,10 @@ export default function Admin() {
       {/* Tabs */}
       <div className="max-w-6xl mx-auto px-2 sm:px-4 py-4">
         <Tabs defaultValue="replays" className="w-full">
-          <TabsList className="grid w-full grid-cols-6 mb-4">
+          <TabsList className="grid w-full grid-cols-4 sm:grid-cols-7 mb-4">
             <TabsTrigger value="replays" className="text-[10px] sm:text-sm gap-1"><List className="w-3.5 h-3.5 hidden sm:block" />Replay</TabsTrigger>
             <TabsTrigger value="live" className="text-[10px] sm:text-sm gap-1"><Radio className="w-3.5 h-3.5 hidden sm:block" />Live</TabsTrigger>
+            <TabsTrigger value="members" className="text-[10px] sm:text-sm gap-1"><Users className="w-3.5 h-3.5 hidden sm:block" />Member</TabsTrigger>
             <TabsTrigger value="preview" className="text-[10px] sm:text-sm gap-1"><Eye className="w-3.5 h-3.5 hidden sm:block" />Preview</TabsTrigger>
             <TabsTrigger value="comments" className="text-[10px] sm:text-sm gap-1"><MessageCircle className="w-3.5 h-3.5 hidden sm:block" />Komentar</TabsTrigger>
             <TabsTrigger value="security" className="text-[10px] sm:text-sm gap-1"><ShieldCheck className="w-3.5 h-3.5 hidden sm:block" />Blokir</TabsTrigger>
@@ -604,6 +639,12 @@ export default function Admin() {
                   ))}
                 </div>
 
+                <div className="pt-2 border-t border-border/50">
+                  <Label>Lineup Member (koma)</Label>
+                  <Input list="member-names" value={liveCfg.lineup} onChange={e => setLiveCfg(c => ({ ...c, lineup: e.target.value }))} placeholder="Alya, Anindya, Lia, ..." />
+                  <p className="text-[11px] text-muted-foreground mt-1">Foto otomatis muncul di halaman Live jika nama cocok dengan data di tab Member.</p>
+                </div>
+
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                   <div className="sm:col-span-2">
                     <Label>Sandi Live (opsional)</Label>
@@ -672,6 +713,55 @@ export default function Admin() {
           </TabsContent>
 
           {/* ===== PREVIEW TAB ===== */}
+          {/* ===== MEMBERS TAB ===== */}
+          <TabsContent value="members">
+            <Card>
+              <CardHeader><CardTitle className="font-sans text-base sm:text-lg flex items-center gap-2"><Users className="w-5 h-5 text-primary" />Daftar Member ({members.length})</CardTitle></CardHeader>
+              <CardContent className="space-y-4">
+                <div className="p-3 rounded-lg border border-border bg-secondary/40 space-y-2">
+                  <div className="flex items-start gap-3">
+                    <div className="w-16 h-16 rounded-full overflow-hidden border border-border bg-card shrink-0 flex items-center justify-center">
+                      {memberForm.photo_url ? (
+                        <img src={memberForm.photo_url} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <Users className="w-6 h-6 text-muted-foreground" />
+                      )}
+                    </div>
+                    <div className="flex-1 space-y-2">
+                      <Input placeholder="Nama member (cth: Alya)" value={memberForm.name} onChange={e => setMemberForm(f => ({ ...f, name: e.target.value }))} />
+                      <div className="flex gap-2">
+                        <input type="file" accept="image/*" id="mph" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleMemberPhotoUpload(f); }} />
+                        <Button variant="outline" size="sm" onClick={() => document.getElementById('mph')?.click()} disabled={memberUploading}>
+                          <Upload className="w-3.5 h-3.5 mr-1" />{memberUploading ? 'Upload...' : 'Foto'}
+                        </Button>
+                        <Button size="sm" onClick={handleSaveMember}><Save className="w-3.5 h-3.5 mr-1" />{memberForm.id ? 'Update' : 'Tambah'}</Button>
+                        {memberForm.id && <Button variant="ghost" size="sm" onClick={() => setMemberForm({ name: '', photo_url: '' })}>Batal</Button>}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                {members.length === 0 ? (
+                  <p className="text-muted-foreground text-center py-6 text-sm">Belum ada member.</p>
+                ) : (
+                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
+                    {members.map(m => (
+                      <div key={m.id} className="text-center space-y-1 group relative">
+                        <div className="w-full aspect-square rounded-full overflow-hidden border-2 border-border bg-secondary mx-auto">
+                          {m.photo_url ? <img src={m.photo_url} alt={m.name} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-xs">{m.name.slice(0,2)}</div>}
+                        </div>
+                        <p className="text-xs font-medium truncate">{m.name}</p>
+                        <div className="flex justify-center gap-1 opacity-0 group-hover:opacity-100 transition">
+                          <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => setMemberForm({ id: m.id, name: m.name, photo_url: m.photo_url })}><Edit2 className="w-3 h-3" /></Button>
+                          <Button size="icon" variant="ghost" className="h-6 w-6 text-destructive" onClick={() => handleDeleteMember(m.id)}><Trash2 className="w-3 h-3" /></Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
           <TabsContent value="preview">
             <div className="space-y-4">
               <p className="text-sm text-muted-foreground">Pilih replay untuk melihat tampilan kartu:</p>
@@ -903,6 +993,9 @@ export default function Admin() {
             </Card>
           </TabsContent>
         </Tabs>
+        <datalist id="member-names">
+          {members.map(m => <option key={m.id} value={m.name} />)}
+        </datalist>
       </div>
 
       {/* Reply Dialog */}
@@ -999,7 +1092,7 @@ export default function Admin() {
               <div><Label>Tanggal *</Label><Input type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} /></div>
               <div><Label>Jam Show</Label><Input type="time" value={form.showTime} onChange={e => setForm(f => ({ ...f, showTime: e.target.value }))} /></div>
             </div>
-            <div><Label>Lineup (koma)</Label><Input placeholder="Member 1, Member 2, ..." value={form.lineup} onChange={e => setForm(f => ({ ...f, lineup: e.target.value }))} /></div>
+            <div><Label>Lineup (koma)</Label><Input list="member-names" placeholder="Member 1, Member 2, ..." value={form.lineup} onChange={e => setForm(f => ({ ...f, lineup: e.target.value }))} /></div>
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label>Playlist Sumber Video</Label>
