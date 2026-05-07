@@ -724,30 +724,77 @@ export default function Admin() {
               <div><Label>Jam Show</Label><Input type="time" value={form.showTime} onChange={e => setForm(f => ({ ...f, showTime: e.target.value }))} /></div>
             </div>
             <div><Label>Lineup (koma)</Label><Input placeholder="Member 1, Member 2, ..." value={form.lineup} onChange={e => setForm(f => ({ ...f, lineup: e.target.value }))} /></div>
-            <div>
-              <Label>Sumber Video</Label>
-              <div className="grid grid-cols-2 gap-2 mt-1">
-                <button
-                  type="button"
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>Playlist Sumber Video</Label>
+                <Button type="button" variant="outline" size="sm" className="h-7 text-xs"
+                  disabled={form.sources.length >= 6}
+                  onClick={() => setForm(f => ({
+                    ...f,
+                    sources: [...f.sources, {
+                      id: (crypto as any).randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2),
+                      label: `Sumber ${f.sources.length + 1}`,
+                      type: 'm3u8',
+                      url: '',
+                      is_default: f.sources.length === 0,
+                    }],
+                  }))}>
+                  <Plus className="w-3 h-3 mr-1" />Tambah
+                </Button>
+              </div>
+              <p className="text-[11px] text-muted-foreground">User dapat memilih playlist via tombol di bawah player. Maks 6.</p>
+              {form.sources.length === 0 && (
+                <p className="text-xs text-muted-foreground italic">Tidak ada playlist. Akan menggunakan field tunggal di bawah sebagai fallback.</p>
+              )}
+              {form.sources.map((s, idx) => (
+                <div key={s.id} className="p-2 rounded-md border border-border bg-secondary/30 space-y-1.5">
+                  <div className="grid grid-cols-12 gap-1.5 items-center">
+                    <Input className="col-span-4 h-8 text-xs" placeholder="Label" value={s.label}
+                      onChange={e => setForm(f => ({ ...f, sources: f.sources.map((x, i) => i === idx ? { ...x, label: e.target.value } : x) }))} />
+                    <select className="col-span-4 h-8 rounded-md border border-input bg-background px-2 text-xs"
+                      value={s.type}
+                      onChange={e => setForm(f => ({ ...f, sources: f.sources.map((x, i) => i === idx ? { ...x, type: e.target.value as any } : x) }))}>
+                      <option value="youtube">YouTube</option>
+                      <option value="m3u8">M3U8 (HLS)</option>
+                      <option value="cloudflare">Cloudflare Stream</option>
+                    </select>
+                    <label className="col-span-3 text-[10px] flex items-center gap-1">
+                      <input type="radio" name="default-source" checked={!!s.is_default}
+                        onChange={() => setForm(f => ({ ...f, sources: f.sources.map((x, i) => ({ ...x, is_default: i === idx })) }))} />
+                      Default
+                    </label>
+                    <Button type="button" variant="ghost" size="icon" className="col-span-1 h-7 w-7 text-destructive"
+                      onClick={() => setForm(f => ({ ...f, sources: f.sources.filter((_, i) => i !== idx) }))}>
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+                  <Input className="h-8 text-xs" placeholder={s.type === 'youtube' ? 'YouTube ID atau URL' : s.type === 'cloudflare' ? 'Cloudflare UID atau URL' : 'Link .m3u8 (boleh .live)'}
+                    value={s.url}
+                    onChange={e => setForm(f => ({ ...f, sources: f.sources.map((x, i) => i === idx ? { ...x, url: e.target.value } : x) }))} />
+                </div>
+              ))}
+            </div>
+
+            <div className="pt-2 border-t border-border/50 space-y-2">
+              <Label className="text-xs text-muted-foreground">Fallback (kompatibel lama, dipakai jika playlist kosong)</Label>
+              <div className="grid grid-cols-2 gap-2">
+                <button type="button"
                   onClick={() => setForm(f => ({ ...f, sourceType: 'youtube' }))}
-                  className={`p-2 rounded-md border-2 text-sm font-medium transition-all ${form.sourceType === 'youtube' ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground'}`}
-                >
+                  className={`p-2 rounded-md border-2 text-xs font-medium transition-all ${form.sourceType === 'youtube' ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground'}`}>
                   📺 YouTube
                 </button>
-                <button
-                  type="button"
+                <button type="button"
                   onClick={() => setForm(f => ({ ...f, sourceType: 'm3u8' }))}
-                  className={`p-2 rounded-md border-2 text-sm font-medium transition-all ${form.sourceType === 'm3u8' ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground'}`}
-                >
+                  className={`p-2 rounded-md border-2 text-xs font-medium transition-all ${form.sourceType === 'm3u8' ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground'}`}>
                   🎬 M3U8 (HLS)
                 </button>
               </div>
+              {form.sourceType === 'youtube' ? (
+                <Input placeholder="YouTube ID (fallback)" value={form.youtubeId} onChange={e => setForm(f => ({ ...f, youtubeId: e.target.value }))} />
+              ) : (
+                <Input placeholder="Link M3U8 (fallback)" value={form.m3u8Url} onChange={e => setForm(f => ({ ...f, m3u8Url: e.target.value }))} />
+              )}
             </div>
-            {form.sourceType === 'youtube' ? (
-              <div><Label>YouTube ID *</Label><Input placeholder="dQw4w9WgXcQ" value={form.youtubeId} onChange={e => setForm(f => ({ ...f, youtubeId: e.target.value }))} /></div>
-            ) : (
-              <div><Label>Link M3U8 *</Label><Input placeholder="https://stream.mux.com/xxx.m3u8" value={form.m3u8Url} onChange={e => setForm(f => ({ ...f, m3u8Url: e.target.value }))} /></div>
-            )}
             <div><Label>Foto Kartu</Label><ImagePicker value={form.imageUrl} onChange={url => setForm(f => ({ ...f, imageUrl: url }))} /></div>
             <div><Label>Sandi *</Label><Input placeholder="Sandi untuk replay ini" value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} /></div>
             <Button className="w-full" onClick={handleSaveReplay}>
