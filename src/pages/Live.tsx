@@ -25,7 +25,7 @@ export default function Live() {
   const [status, setStatus] = useState<LiveStatus | null>(null);
   const [statusLoading, setStatusLoading] = useState(true);
   const [unlocked, setUnlocked] = useState<UnlockedConfig | null>(null);
-  const [pwInput, setPwInput] = useState('');
+  const [, setPwInput] = useState('');
   const [pwError, setPwError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [sourceIdx, setSourceIdx] = useState<number>(() => {
@@ -56,7 +56,10 @@ export default function Live() {
         fetchStatus().then(row => {
           if (!row?.enabled) { setUnlocked(null); try { sessionStorage.removeItem(SS_KEY); } catch { /* ignore */ } }
           // re-unlock to refresh URLs if admin changed sources
-          else if (unlocked) { void doUnlock({ password: '__refresh__' }, true); }
+          else if (unlocked) {
+            const t = search.get('t');
+            if (t) void doUnlock({ token: t }, true);
+          }
         });
       })
       .subscribe();
@@ -71,7 +74,7 @@ export default function Live() {
     void doUnlock({ token: t });
   }, [search, status, statusLoading]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const doUnlock = async (opts: { password?: string; token?: string }, silent = false) => {
+  const doUnlock = async (opts: { token?: string }, silent = false) => {
     if (!silent) setSubmitting(true);
     if (!silent) setPwError('');
     try {
@@ -86,7 +89,8 @@ export default function Live() {
       } else if (!silent) {
         if (data?.reason === 'device_limit') setPwError('Batas perangkat untuk token ini telah tercapai.');
         else if (data?.reason === 'off') setPwError('Live sedang tidak aktif.');
-        else setPwError(opts.token ? 'Token tidak valid atau dicabut.' : 'Sandi salah.');
+        else if (data?.reason === 'token_required') setPwError('Akses live hanya melalui link token.');
+        else setPwError('Token tidak valid atau dicabut.');
       }
     } catch {
       if (!silent) setPwError('Gagal terhubung ke server.');
