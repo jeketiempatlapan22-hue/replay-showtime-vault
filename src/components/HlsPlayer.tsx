@@ -127,13 +127,24 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, onFatalError
 
     video.preload = 'auto';
     video.autoplay = true;
-    video.muted = true;
+    video.volume = initialVolume;
+    video.muted = initialMuted;
     video.setAttribute('playsinline', 'true');
 
     const safePlay = () => {
       try {
-        const p = video.play();
-        if (p && typeof p.catch === 'function') p.catch(() => {});
+        // Try unmuted first if user prefers sound
+        const tryPlay = video.play();
+        if (tryPlay && typeof tryPlay.catch === 'function') {
+          tryPlay.catch(() => {
+            // Browser blocked autoplay with sound; fallback muted
+            video.muted = true;
+            setMuted(true);
+            setNeedsUnmute(true);
+            try { localStorage.setItem('replaytime-muted', '1'); } catch { /* ignore */ }
+            video.play().catch(() => {});
+          });
+        }
       } catch { /* ignore */ }
     };
 
