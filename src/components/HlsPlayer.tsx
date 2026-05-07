@@ -168,46 +168,52 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, onFatalError
     if (Hls.isSupported()) {
       hls = new Hls({
         enableWorker: true,
-        lowLatencyMode: false,
+        lowLatencyMode: src.includes('.live') || src.includes('live'),
         // Buffer tuning untuk playback halus
-        backBufferLength: 30,
-        maxBufferLength: 30,
-        maxMaxBufferLength: 60,
-        maxBufferSize: 60 * 1000 * 1000,
-        maxBufferHole: 0.5,
+        backBufferLength: 90,
+        maxBufferLength: 90,
+        maxMaxBufferLength: 180,
+        maxBufferSize: 120 * 1000 * 1000,
+        maxBufferHole: 0.75,
         highBufferWatchdogPeriod: 2,
         nudgeOffset: 0.1,
-        nudgeMaxRetry: 5,
+        nudgeMaxRetry: 8,
         // ABR: mulai dari kualitas terendah supaya cepat play, lalu naikkan
         startLevel: -1,
         autoStartLoad: true,
-        abrEwmaDefaultEstimate: 1_000_000,
-        abrBandWidthFactor: 0.9,
-        abrBandWidthUpFactor: 0.7,
+        abrEwmaDefaultEstimate: 700_000,
+        abrBandWidthFactor: 0.75,
+        abrBandWidthUpFactor: 0.55,
         abrMaxWithRealBitrate: true,
         testBandwidth: true,
-        // Retry agresif tapi cepat untuk segment fragments
-        manifestLoadingTimeOut: 10_000,
-        manifestLoadingMaxRetry: 4,
-        manifestLoadingRetryDelay: 500,
-        levelLoadingTimeOut: 10_000,
-        levelLoadingMaxRetry: 4,
-        levelLoadingRetryDelay: 500,
-        fragLoadingTimeOut: 20_000,
-        fragLoadingMaxRetry: 6,
-        fragLoadingRetryDelay: 500,
+        capLevelToPlayerSize: true,
+        // Retry stabil untuk sesi panjang dan penonton ramai
+        manifestLoadingTimeOut: 18_000,
+        manifestLoadingMaxRetry: 8,
+        manifestLoadingRetryDelay: 800,
+        manifestLoadingMaxRetryTimeout: 8_000,
+        levelLoadingTimeOut: 18_000,
+        levelLoadingMaxRetry: 8,
+        levelLoadingRetryDelay: 800,
+        levelLoadingMaxRetryTimeout: 8_000,
+        fragLoadingTimeOut: 30_000,
+        fragLoadingMaxRetry: 10,
+        fragLoadingRetryDelay: 800,
+        fragLoadingMaxRetryTimeout: 10_000,
         // Stall detection
-        maxStarvationDelay: 4,
-        maxLoadingDelay: 4,
+        maxStarvationDelay: 8,
+        maxLoadingDelay: 8,
         // Hindari buffering ulang berlebihan
-        appendErrorMaxRetry: 3,
-        liveSyncDurationCount: 3,
+        appendErrorMaxRetry: 5,
+        liveSyncDurationCount: 4,
+        liveMaxLatencyDurationCount: 12,
       });
       hlsRef.current = hls;
       hls.loadSource(src);
       hls.attachMedia(video);
       hls.on(Hls.Events.MANIFEST_PARSED, (_, data) => {
         setLoading(false);
+        isLiveRef.current = data.levels?.some(level => level.details?.live) || false;
         const levels: QualityLevel[] = (data.levels || []).map((lvl, i) => ({
           index: i,
           label: lvl.height ? `${lvl.height}p` : `${Math.round((lvl.bitrate || 0) / 1000)}kbps`,
@@ -217,11 +223,10 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, onFatalError
         levels.sort((a, b) => (b.height || 0) - (a.height || 0));
         setQualities([{ index: -1, label: 'Auto' }, ...levels]);
         // Autoplay (muted to satisfy browser policy). User can unmute manually.
-        try {
-          video.muted = true;
-          const p = video.play();
-          if (p && typeof p.catch === 'function') p.catch(() => {});
-        } catch { /* ignore */ }
+        safePlay();
+      });
+      hls.on(Hls.Events.LEVEL_LOADED, (_, data) => {
+        isLiveRef.current = !!data.details?.live;
       });
       hls.on(Hls.Events.LEVEL_SWITCHED, (_, data) => {
         if (hls && hls.autoLevelEnabled) {
@@ -231,8 +236,13 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, onFatalError
       });
       hls.on(Hls.Events.ERROR, (_, data) => {
         // Non-fatal errors: log only, hls.js handles internal retries.
-        // Do NOT call startLoad() on non-fatal — it would restart from position 0.
-        if (!data.fatal) return;
+        if (!data.fatal) {
+          if (data.type === Hls.ErrorTypes.MEDIA_ERROR && recoveryAttemptsRef.current < 2) {
+            recoveryAttemptsRef.current += 1;
+            try { hls?.recoverMediaError(); safePlay(); } catch { /* ignore */ }
+          }
+          return;
+        }
 
         // Fatal: try to recover IN-PLACE, preserving currentTime.
         if (recoveryAttemptsRef.current < 3) {
@@ -242,8 +252,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, onFatalError
 
           if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
             try {
-              // startLoad(resumeTime) keeps the playhead instead of restarting at 0
-              hls?.startLoad(resumeTime);
+              hls?.startLoad(isLiveRef.current ? -1 : resumeTime);
               if (wasPlaying) video.play().catch(() => {});
               return;
             } catch { /* ignore */ }
