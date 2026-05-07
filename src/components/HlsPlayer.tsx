@@ -147,30 +147,34 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, onFatalError
           lastProgressRef.current = { time: current, checkedAt: now, recoveries: 0 };
           return;
         }
-        if (now - last.checkedAt < 8000) return;
+        // Only act after 12s of true stall to avoid interrupting normal playback
+        if (now - last.checkedAt < 12000) return;
 
         setBuffering(true);
         lastProgressRef.current = { time: current, checkedAt: now, recoveries: last.recoveries + 1 };
 
         const hlsInstance = hlsRef.current;
         if (hlsInstance) {
-          const liveTarget = isLiveRef.current ? hlsInstance.liveSyncPosition : null;
-          if (typeof liveTarget === 'number' && Number.isFinite(liveTarget) && liveTarget > 0 && current < liveTarget - 18) {
-            video.currentTime = liveTarget;
+          // For live streams: gently nudge to live edge if we've fallen far behind. Do NOT reload.
+          if (isLiveRef.current) {
+            const liveTarget = hlsInstance.liveSyncPosition;
+            if (typeof liveTarget === 'number' && Number.isFinite(liveTarget) && liveTarget > 0 && current < liveTarget - 30) {
+              try { video.currentTime = liveTarget; } catch { /* ignore */ }
+            }
           }
-          hlsInstance.startLoad(isLiveRef.current ? -1 : resumePosition());
-          if (last.recoveries >= 2) hlsInstance.recoverMediaError();
-        } else {
-          video.load();
+          // Resume loading from CURRENT position (preserves playback). Never call recoverMediaError here
+          // because it can reset position to 0 and make a live/VOD stream restart from the beginning.
+          try { hlsInstance.startLoad(-1); } catch { /* ignore */ }
         }
         safePlay();
-      }, 3000);
+      }, 4000);
     };
 
     if (Hls.isSupported()) {
       hls = new Hls({
         enableWorker: true,
-        lowLatencyMode: src.includes('.live') || src.includes('live'),
+        // Disable LL-HLS auto-detection: it caused stalls/restarts on regular streams whose URL contains "live"
+        lowLatencyMode: false,
         // Buffer tuning untuk playback halus
         backBufferLength: 90,
         maxBufferLength: 90,
@@ -257,22 +261,24 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, onFatalError
 
           if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
             try {
-              hls?.startLoad(isLiveRef.current ? -1 : resumeTime);
+              // Resume from current position; for live, -1 jumps to live edge (not start)
+              hls?.startLoad(-1);
               if (wasPlaying) video.play().catch(() => {});
               return;
             } catch { /* ignore */ }
           } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
             try {
               hls?.recoverMediaError();
-              // recoverMediaError preserves position; just resume play state
-              if (wasPlaying) {
-                const onReady = () => {
-                  video.currentTime = resumeTime;
-                  video.play().catch(() => {});
-                  video.removeEventListener('loadedmetadata', onReady);
-                };
-                video.addEventListener('loadedmetadata', onReady, { once: true });
-              }
+              // Restore the user's position after recovery (recoverMediaError can reset to 0)
+              const restore = () => {
+                if (!isLiveRef.current && resumeTime > 0 && Math.abs(video.currentTime - resumeTime) > 1) {
+                  try { video.currentTime = resumeTime; } catch { /* ignore */ }
+                }
+                if (wasPlaying) video.play().catch(() => {});
+              };
+              video.addEventListener('loadedmetadata', restore, { once: true });
+              // Also try after a short delay in case loadedmetadata doesn't fire
+              setTimeout(restore, 800);
               return;
             } catch { /* ignore */ }
           }
