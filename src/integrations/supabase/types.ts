@@ -131,6 +131,7 @@ export type Database = {
       }
       replays: {
         Row: {
+          access_token: string | null
           created_at: string
           criteria: string
           date: string
@@ -143,12 +144,14 @@ export type Database = {
           show_name: string
           show_time: string | null
           source_type: string
+          sources: Json
           title: string
           updated_at: string
           view_count: number
           youtube_id: string
         }
         Insert: {
+          access_token?: string | null
           created_at?: string
           criteria?: string
           date: string
@@ -161,12 +164,14 @@ export type Database = {
           show_name?: string
           show_time?: string | null
           source_type?: string
+          sources?: Json
           title: string
           updated_at?: string
           view_count?: number
           youtube_id?: string
         }
         Update: {
+          access_token?: string | null
           created_at?: string
           criteria?: string
           date?: string
@@ -179,6 +184,7 @@ export type Database = {
           show_name?: string
           show_time?: string | null
           source_type?: string
+          sources?: Json
           title?: string
           updated_at?: string
           view_count?: number

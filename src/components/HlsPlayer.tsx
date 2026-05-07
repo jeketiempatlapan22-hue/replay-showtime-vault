@@ -155,6 +155,12 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, onFatalError
         }));
         levels.sort((a, b) => (b.height || 0) - (a.height || 0));
         setQualities([{ index: -1, label: 'Auto' }, ...levels]);
+        // Autoplay (muted to satisfy browser policy). User can unmute manually.
+        try {
+          video.muted = true;
+          const p = video.play();
+          if (p && typeof p.catch === 'function') p.catch(() => {});
+        } catch { /* ignore */ }
       });
       hls.on(Hls.Events.LEVEL_SWITCHED, (_, data) => {
         if (hls && hls.autoLevelEnabled) {
@@ -203,7 +209,10 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, onFatalError
       });
     } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
       video.src = src;
-      video.addEventListener('loadedmetadata', () => setLoading(false), { once: true });
+      video.addEventListener('loadedmetadata', () => {
+        setLoading(false);
+        try { video.muted = true; video.play()?.catch(() => {}); } catch { /* ignore */ }
+      }, { once: true });
       video.addEventListener('error', () => {
         setError('Gagal memuat video.');
         setLoading(false);

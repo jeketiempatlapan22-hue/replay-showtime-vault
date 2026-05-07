@@ -1,8 +1,8 @@
-import { ArrowLeft, Maximize, Minimize, Eye, Loader2, Lock, PictureInPicture2 } from 'lucide-react';
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { ArrowLeft, Maximize, Minimize, Eye, Loader2, Lock, PictureInPicture2, ListVideo } from 'lucide-react';
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { type ReplayRow, getReplaySource, type ReplaySource } from '@/lib/store';
+import { type ReplayRow, getReplaySource, type ReplaySource, type PlaylistSource } from '@/lib/store';
 import { supabase } from '@/integrations/supabase/client';
 import RatingStars from '@/components/RatingStars';
 import CommentSection from '@/components/CommentSection';
@@ -13,17 +13,45 @@ interface Props {
   onBack: () => void;
 }
 
+function buildSources(source: ReplaySource | null, replay: ReplayRow): PlaylistSource[] {
+  if (!source) return [];
+  if (source.sources && source.sources.length > 0) return source.sources;
+  // Fallback: build single source from legacy fields
+  const fallback: PlaylistSource[] = [];
+  if (source.m3u8_url) {
+    fallback.push({ id: 'legacy-m3u8', label: 'M3U8', type: 'm3u8', url: source.m3u8_url, is_default: true });
+  }
+  if (source.youtube_id) {
+    fallback.push({ id: 'legacy-yt', label: 'YouTube', type: 'youtube', url: source.youtube_id, is_default: !source.m3u8_url });
+  }
+  return fallback;
+}
+
+function extractYoutubeId(raw: string): string {
+  const r = (raw || '').trim();
+  const matched = r.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/|v\/))([A-Za-z0-9_-]{11})/)?.[1];
+  const fallback = r.match(/([A-Za-z0-9_-]{11})/)?.[1];
+  return (matched || fallback || '').slice(0, 11);
+}
+
+function extractCloudflareUid(raw: string): string {
+  const r = (raw || '').trim();
+  const m = r.match(/([a-f0-9]{32})/i)?.[1];
+  return m || r;
+}
+
 export default function YouTubePlayer({ replay, onBack }: Props) {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [viewCount, setViewCount] = useState(replay.view_count ?? 0);
   const [hlsFailed, setHlsFailed] = useState(false);
   const [source, setSource] = useState<ReplaySource | null>(null);
   const [sourceLoading, setSourceLoading] = useState(true);
-  const [sourceError, setSourceError] = useState<string | null>(null);
+  const [sourceError] = useState<string | null>(null);
   const [needsPassword, setNeedsPassword] = useState(false);
   const [pwInput, setPwInput] = useState('');
   const [pwError, setPwError] = useState('');
   const [pwChecking, setPwChecking] = useState(false);
+  const [activeSourceId, setActiveSourceId] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const hlsPlayerRef = useRef<HlsPlayerHandle>(null);
@@ -34,31 +62,36 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
     setViewCount(replay.view_count ?? 0);
   }, [replay.id, replay.view_count]);
 
-  // Fetch source server-side via edge function (uses sandi from sessionStorage)
   useEffect(() => {
     let cancelled = false;
     setSource(null);
     setSourceLoading(true);
-    setSourceError(null);
     setHlsFailed(false);
     setNeedsPassword(false);
     setPwInput('');
     setPwError('');
+    setActiveSourceId(null);
 
-    const password = (() => {
-      try { return sessionStorage.getItem(`replaytime-pw-${replay.id}`) || ''; } catch { return ''; }
-    })();
+    let password = '';
+    let token = '';
+    try {
+      password = sessionStorage.getItem(`replaytime-pw-${replay.id}`) || '';
+      token = sessionStorage.getItem(`replaytime-tok-${replay.id}`) || '';
+    } catch { /* ignore */ }
 
-    if (!password) {
+    if (!password && !token) {
       setSourceLoading(false);
       setNeedsPassword(true);
       return;
     }
 
-    getReplaySource(replay.id, password).then((src) => {
+    getReplaySource(replay.id, token ? { accessToken: token } : { password }).then((src) => {
       if (cancelled) return;
       if (!src) {
-        try { sessionStorage.removeItem(`replaytime-pw-${replay.id}`); } catch { /* ignore */ }
+        try {
+          sessionStorage.removeItem(`replaytime-pw-${replay.id}`);
+          sessionStorage.removeItem(`replaytime-tok-${replay.id}`);
+        } catch { /* ignore */ }
         setSourceLoading(false);
         setNeedsPassword(true);
         return;
@@ -70,15 +103,26 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
     return () => { cancelled = true; };
   }, [replay.id]);
 
+  const sources = useMemo(() => buildSources(source, replay), [source, replay]);
+
+  // Pick default active source when sources arrive
+  useEffect(() => {
+    if (!sources.length || activeSourceId) return;
+    const def = sources.find(s => s.is_default) || sources[0];
+    setActiveSourceId(def.id);
+  }, [sources, activeSourceId]);
+
+  const activeSource = useMemo(
+    () => sources.find(s => s.id === activeSourceId) || null,
+    [sources, activeSourceId],
+  );
+
   const handleSubmitPassword = async () => {
     const trimmed = pwInput.trim();
-    if (!trimmed) {
-      setPwError('Sandi wajib diisi.');
-      return;
-    }
+    if (!trimmed) { setPwError('Sandi wajib diisi.'); return; }
     setPwChecking(true);
     setPwError('');
-    const src = await getReplaySource(replay.id, trimmed);
+    const src = await getReplaySource(replay.id, { password: trimmed });
     setPwChecking(false);
     if (src) {
       try { sessionStorage.setItem(`replaytime-pw-${replay.id}`, trimmed); } catch { /* ignore */ }
@@ -89,7 +133,6 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
       setPwError('Sandi salah. Coba lagi.');
     }
   };
-
 
   useEffect(() => {
     const incrementView = async () => {
@@ -104,9 +147,7 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
   useEffect(() => {
     const channel = supabase
       .channel(`replay-views-${replay.id}`)
-      .on('postgres_changes', {
-        event: 'UPDATE', schema: 'public', table: 'replays', filter: `id=eq.${replay.id}`,
-      }, (payload) => {
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'replays', filter: `id=eq.${replay.id}` }, (payload) => {
         const newRow = payload.new as { view_count?: number };
         if (typeof newRow.view_count === 'number') setViewCount(newRow.view_count);
       })
@@ -117,8 +158,7 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
   const toggleFullscreen = useCallback(() => {
     if (!containerRef.current) return;
     if (!document.fullscreenElement) {
-      containerRef.current.requestFullscreen?.() ||
-        (containerRef.current as any).webkitRequestFullscreen?.();
+      containerRef.current.requestFullscreen?.() || (containerRef.current as any).webkitRequestFullscreen?.();
       setIsFullscreen(true);
     } else {
       document.exitFullscreen?.() || (document as any).webkitExitFullscreen?.();
@@ -126,26 +166,40 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
     }
   }, []);
 
-  const m3u8Url = (source?.m3u8_url || '').trim();
-  const rawId = (source?.youtube_id || '').trim();
-  const matchedId = rawId.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/|v\/))([A-Za-z0-9_-]{11})/)?.[1];
-  const fallbackId = rawId.match(/([A-Za-z0-9_-]{11})/)?.[1];
-  const extractedId = (matchedId || fallbackId || '').slice(0, 11);
-  const isValidYoutube = /^[A-Za-z0-9_-]{11}$/.test(extractedId);
   const handleHlsFatalError = useCallback(() => {
-    if (isValidYoutube) setHlsFailed(true);
-  }, [isValidYoutube]);
+    // Try to switch to next source automatically
+    if (!activeSource) return;
+    const idx = sources.findIndex(s => s.id === activeSource.id);
+    const next = sources.find((s, i) => i !== idx);
+    if (next) {
+      setActiveSourceId(next.id);
+      setHlsFailed(false);
+    } else {
+      setHlsFailed(true);
+    }
+  }, [activeSource, sources]);
 
-  // Priority: M3U8 first if present and not failed → otherwise YouTube
-  const useM3u8 = !!m3u8Url && !hlsFailed;
-  const useYoutube = !useM3u8 && isValidYoutube;
+  // Build YouTube embed URL with autoplay+mute
+  const ytEmbedUrl = useMemo(() => {
+    if (!activeSource || activeSource.type !== 'youtube') return '';
+    const id = extractYoutubeId(activeSource.url);
+    if (!/^[A-Za-z0-9_-]{11}$/.test(id)) return '';
+    return `https://www.youtube-nocookie.com/embed/${id}?rel=0&modestbranding=1&playsinline=1&autoplay=1&mute=1&iv_load_policy=3&enablejsapi=0&origin=${encodeURIComponent(window.location.origin)}`;
+  }, [activeSource]);
 
-  // Set iframe src via JS after mount so YouTube ID is not in initial HTML.
+  const cfEmbedUrl = useMemo(() => {
+    if (!activeSource || activeSource.type !== 'cloudflare') return '';
+    const uid = extractCloudflareUid(activeSource.url);
+    if (!uid) return '';
+    return `https://iframe.videodelivery.net/${uid}?autoplay=true&muted=true`;
+  }, [activeSource]);
+
+  // Set iframe src after mount
   useEffect(() => {
-    if (!useYoutube || !iframeRef.current) return;
-    const url = `https://www.youtube-nocookie.com/embed/${extractedId}?rel=0&modestbranding=1&playsinline=1&autoplay=0&iv_load_policy=3&enablejsapi=0&origin=${encodeURIComponent(window.location.origin)}`;
-    iframeRef.current.src = url;
-  }, [useYoutube, extractedId, replay.id]);
+    if (!iframeRef.current) return;
+    const url = activeSource?.type === 'youtube' ? ytEmbedUrl : activeSource?.type === 'cloudflare' ? cfEmbedUrl : '';
+    if (url) iframeRef.current.src = url;
+  }, [activeSource, ytEmbedUrl, cfEmbedUrl]);
 
   const lineup = replay.lineup || [];
 
@@ -159,7 +213,7 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
           <h1 className="text-base sm:text-lg font-semibold truncate font-sans">{replay.title}</h1>
           <p className="text-xs sm:text-sm text-muted-foreground">{replay.criteria}</p>
         </div>
-        {useYoutube && (
+        {activeSource && activeSource.type !== 'm3u8' && (
           <Button variant="ghost" size="icon" onClick={toggleFullscreen} className="shrink-0">
             {isFullscreen ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
           </Button>
@@ -188,14 +242,9 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
               <p className="text-sm text-muted-foreground">Sesi sandi tidak ditemukan. Masukkan ulang untuk menonton.</p>
             </div>
             <div className="max-w-xs mx-auto space-y-2">
-              <Input
-                type="password"
-                placeholder="Sandi replay..."
-                value={pwInput}
+              <Input type="password" placeholder="Sandi replay..." value={pwInput}
                 onChange={(e) => { setPwInput(e.target.value); setPwError(''); }}
-                onKeyDown={(e) => e.key === 'Enter' && handleSubmitPassword()}
-                autoFocus
-              />
+                onKeyDown={(e) => e.key === 'Enter' && handleSubmitPassword()} autoFocus />
               {pwError && <p className="text-xs text-destructive">{pwError}</p>}
               <Button className="w-full" onClick={handleSubmitPassword} disabled={pwChecking}>
                 {pwChecking ? 'Memeriksa...' : 'Buka Replay'}
@@ -206,19 +255,24 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
           <div className="rounded-xl bg-destructive/10 border border-destructive/30 p-6 text-center">
             <p className="text-destructive font-medium">{sourceError}</p>
           </div>
-        ) : useM3u8 ? (
+        ) : !activeSource ? (
+          <div className="rounded-xl bg-destructive/10 border border-destructive/30 p-6 text-center">
+            <p className="text-destructive font-medium">Video belum tersedia. Hubungi admin.</p>
+          </div>
+        ) : activeSource.type === 'm3u8' && !hlsFailed ? (
           <HlsPlayer
             ref={hlsPlayerRef}
-            src={m3u8Url}
+            key={activeSource.id}
+            src={activeSource.url}
             title={replay.title}
             onFatalError={handleHlsFatalError}
             onPipChange={setPipActive}
           />
-        ) : useYoutube ? (
+        ) : (
           <div className="relative w-full overflow-hidden rounded-xl bg-black" style={{ paddingBottom: '56.25%' }}>
             <iframe
               ref={iframeRef}
-              key={replay.id}
+              key={activeSource.id}
               className="absolute inset-0 w-full h-full"
               title={replay.title}
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
@@ -228,9 +282,34 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
               style={{ border: 0 }}
             />
           </div>
-        ) : (
-          <div className="rounded-xl bg-destructive/10 border border-destructive/30 p-6 text-center">
-            <p className="text-destructive font-medium">Video belum tersedia. Hubungi admin.</p>
+        )}
+
+        {/* Playlist chips */}
+        {sources.length > 1 && activeSource && (
+          <div className="mt-3">
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1.5">
+              <ListVideo className="w-3.5 h-3.5" />
+              <span>Pilih playlist</span>
+            </div>
+            <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-thin">
+              {sources.map(s => {
+                const active = s.id === activeSourceId;
+                return (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => { setHlsFailed(false); setActiveSourceId(s.id); }}
+                    className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+                      active
+                        ? 'bg-primary text-primary-foreground border-primary shadow-md'
+                        : 'bg-card/60 text-foreground border-border hover:border-primary/50'
+                    }`}
+                  >
+                    {s.label || s.type.toUpperCase()}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         )}
 
@@ -242,7 +321,7 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
             </div>
             <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-4 w-full sm:w-auto">
               <RatingStars replayId={replay.id} />
-              {useM3u8 && pipSupported && (
+              {activeSource?.type === 'm3u8' && pipSupported && (
                 <div className="flex flex-col items-end">
                   <Button
                     type="button"
@@ -255,7 +334,6 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
                       else await hlsPlayerRef.current.requestPip();
                     }}
                     title="Picture-in-Picture: tonton video di jendela kecil mengambang"
-                    aria-label="Picture in Picture"
                   >
                     <PictureInPicture2 className="w-4 h-4" />
                     <span className="text-xs font-medium">{pipActive ? 'Tutup PiP' : 'PiP'}</span>

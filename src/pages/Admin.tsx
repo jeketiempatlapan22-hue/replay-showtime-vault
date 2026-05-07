@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, Trash2, Edit2, Key, Save, Palette, MessageCircle, LogOut, Eye, Send, List, Settings, ShieldCheck, Unlock as UnlockIcon } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Edit2, Key, Save, Palette, MessageCircle, LogOut, Eye, Send, List, Settings, ShieldCheck, Unlock as UnlockIcon, Link2, Copy, X } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -9,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { addReplay, deleteReplay, updateReplay, getReplaysAdmin, getAllMasterPasswords, setMasterPassword, getSettings, setSetting, type ReplayRow, type MasterPasswordRow } from '@/lib/store';
+import { addReplay, deleteReplay, updateReplay, getReplaysAdmin, getAllMasterPasswords, setMasterPassword, getSettings, setSetting, setReplayAccessToken, type ReplayRow, type MasterPasswordRow, type PlaylistSource } from '@/lib/store';
 import { THEME_OPTIONS, type ThemeType } from '@/components/ThemedBackground';
 import ImagePicker from '@/components/ImagePicker';
 import { toast } from '@/hooks/use-toast';
@@ -51,7 +52,8 @@ export default function Admin() {
   const [editingReplay, setEditingReplay] = useState<ReplayRow | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ReplayRow | null>(null);
 
-  const [form, setForm] = useState({ title: '', showName: '', date: '', showTime: '19:00', criteria: 'reguler', featuredMember: '', lineup: '', password: '', youtubeId: '', imageUrl: '', sourceType: 'youtube', m3u8Url: '' });
+  const [form, setForm] = useState({ title: '', showName: '', date: '', showTime: '19:00', criteria: 'reguler', featuredMember: '', lineup: '', password: '', youtubeId: '', imageUrl: '', sourceType: 'youtube', m3u8Url: '', sources: [] as PlaylistSource[] });
+  const [liveChatEnabled, setLiveChatEnabled] = useState(true);
 
   const [mpYear, setMpYear] = useState(String(new Date().getFullYear()));
   const [mpMonth, setMpMonth] = useState(String(new Date().getMonth() + 1).padStart(2, '0'));
@@ -107,6 +109,7 @@ export default function Admin() {
       setCurrentTheme((settings.theme as ThemeType) || 'ramadhan');
       setWaNumber(settings.whatsapp_number || '');
       setWaLink(settings.whatsapp_link || '');
+      setLiveChatEnabled((settings.live_chat_enabled ?? 'true') !== 'false');
       const { data: comments } = await supabase.from('comments').select('*').order('created_at', { ascending: false });
       if (comments) setAllComments(comments);
       const { data: blocks } = await supabase.from('blocked_browsers').select('*').order('created_at', { ascending: false });
@@ -149,14 +152,16 @@ export default function Admin() {
   const handleLogout = async () => { await supabase.auth.signOut(); setIsLoggedIn(false); };
 
   const resetForm = () => {
-    setForm({ title: '', showName: '', date: '', showTime: '19:00', criteria: 'reguler', featuredMember: '', lineup: '', password: '', youtubeId: '', imageUrl: '', sourceType: 'youtube', m3u8Url: '' });
+    setForm({ title: '', showName: '', date: '', showTime: '19:00', criteria: 'reguler', featuredMember: '', lineup: '', password: '', youtubeId: '', imageUrl: '', sourceType: 'youtube', m3u8Url: '', sources: [] });
     setEditingReplay(null);
   };
 
   const handleSaveReplay = async () => {
     const isYoutube = form.sourceType === 'youtube';
-    if (!form.title || !form.date || !form.password || (isYoutube ? !form.youtubeId : !form.m3u8Url)) {
-      toast({ title: 'Error', description: `Judul, tanggal, sandi, dan ${isYoutube ? 'YouTube ID' : 'link M3U8'} wajib diisi!`, variant: 'destructive' });
+    const hasSources = form.sources.length > 0;
+    const fallbackOk = isYoutube ? !!form.youtubeId : !!form.m3u8Url;
+    if (!form.title || !form.date || !form.password || (!hasSources && !fallbackOk)) {
+      toast({ title: 'Error', description: 'Judul, tanggal, sandi, dan minimal 1 sumber video wajib diisi!', variant: 'destructive' });
       return;
     }
     const lineupArr = form.lineup.split(',').map(s => s.trim()).filter(Boolean);
@@ -169,6 +174,7 @@ export default function Admin() {
         image_url: form.imageUrl,
         source_type: form.sourceType,
         m3u8_url: isYoutube ? '' : form.m3u8Url,
+        sources: form.sources as any,
       };
       if (editingReplay) {
         await updateReplay(editingReplay.id, payload);
@@ -191,6 +197,7 @@ export default function Admin() {
       title: r.title, showName: r.show_name, date: r.date, showTime: (r.show_time || '19:00:00').slice(0, 5), criteria: r.criteria,
       featuredMember: r.featured_member, lineup: r.lineup.join(', '), password: r.password, youtubeId: r.youtube_id, imageUrl: r.image_url,
       sourceType: (r as any).source_type || 'youtube', m3u8Url: (r as any).m3u8_url || '',
+      sources: Array.isArray((r as any).sources) ? (r as any).sources : [],
     });
     setShowAddDialog(true);
   };
@@ -232,6 +239,51 @@ export default function Admin() {
       toast({ title: 'Berhasil', description: 'Info WhatsApp berhasil disimpan!' });
     } catch {
       toast({ title: 'Error', description: 'Gagal menyimpan info WhatsApp.', variant: 'destructive' });
+    }
+  };
+
+  const handleToggleLiveChat = async (enabled: boolean) => {
+    setLiveChatEnabled(enabled);
+    try {
+      await setSetting('live_chat_enabled', enabled ? 'true' : 'false');
+      toast({ title: 'Berhasil', description: `Live chat ${enabled ? 'diaktifkan' : 'dinonaktifkan'}.` });
+    } catch {
+      toast({ title: 'Error', description: 'Gagal menyimpan setelan.', variant: 'destructive' });
+    }
+  };
+
+  const handleGenerateToken = async (r: ReplayRow) => {
+    const token = (crypto as any).randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2) + Date.now().toString(36);
+    try {
+      await setReplayAccessToken(r.id, token);
+      const url = `${window.location.origin}/?token=${token}&replay=${r.id}`;
+      try { await navigator.clipboard.writeText(url); } catch { /* ignore */ }
+      toast({ title: 'Token dibuat', description: 'Link akses telah disalin ke clipboard.' });
+      await refreshData();
+    } catch {
+      toast({ title: 'Error', description: 'Gagal membuat token.', variant: 'destructive' });
+    }
+  };
+
+  const handleRevokeToken = async (r: ReplayRow) => {
+    try {
+      await setReplayAccessToken(r.id, null);
+      toast({ title: 'Dihapus', description: 'Token akses telah dicabut.' });
+      await refreshData();
+    } catch {
+      toast({ title: 'Error', description: 'Gagal mencabut token.', variant: 'destructive' });
+    }
+  };
+
+  const copyTokenUrl = async (r: ReplayRow) => {
+    const tk = (r as any).access_token;
+    if (!tk) return;
+    const url = `${window.location.origin}/?token=${tk}&replay=${r.id}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      toast({ title: 'Tersalin', description: 'Link akses disalin ke clipboard.' });
+    } catch {
+      toast({ title: 'Error', description: 'Gagal menyalin.', variant: 'destructive' });
     }
   };
 
@@ -330,24 +382,48 @@ export default function Admin() {
                   <p className="text-muted-foreground text-center py-8">Belum ada replay.</p>
                 ) : (
                   <div className="space-y-2">
-                    {replays.map(r => (
-                      <div key={r.id} className="flex items-center gap-2 sm:gap-4 p-2 sm:p-3 rounded-lg bg-secondary/50 border border-border">
-                        {r.image_url && <img src={r.image_url} alt="" className="w-12 h-8 sm:w-16 sm:h-10 rounded object-cover shrink-0" />}
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-sm sm:text-base truncate">{r.title}</p>
-                          <p className="text-xs text-muted-foreground truncate">
-                            {new Date(r.date).toLocaleDateString('id-ID')} · {getCriteriaLabel(r.criteria)}
-                            {r.featured_member && ` · ⭐ ${r.featured_member}`}
-                            {' · 👁 '}{r.view_count || 0}
-                          </p>
+                    {replays.map(r => {
+                      const tk = (r as any).access_token as string | null;
+                      return (
+                        <div key={r.id} className="p-2 sm:p-3 rounded-lg bg-secondary/50 border border-border space-y-2">
+                          <div className="flex items-center gap-2 sm:gap-4">
+                            {r.image_url && <img src={r.image_url} alt="" className="w-12 h-8 sm:w-16 sm:h-10 rounded object-cover shrink-0" />}
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-sm sm:text-base truncate">{r.title}</p>
+                              <p className="text-xs text-muted-foreground truncate">
+                                {new Date(r.date).toLocaleDateString('id-ID')} · {getCriteriaLabel(r.criteria)}
+                                {r.featured_member && ` · ⭐ ${r.featured_member}`}
+                                {' · 👁 '}{r.view_count || 0}
+                              </p>
+                            </div>
+                            <div className="flex gap-1 shrink-0">
+                              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setPreviewReplay(r)}><Eye className="w-4 h-4" /></Button>
+                              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditReplay(r)}><Edit2 className="w-4 h-4" /></Button>
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setDeleteTarget(r)}><Trash2 className="w-4 h-4" /></Button>
+                            </div>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-border/50">
+                            <Link2 className="w-3.5 h-3.5 text-primary" />
+                            <span className="text-[11px] text-muted-foreground">Token akses:</span>
+                            {tk ? (
+                              <>
+                                <code className="text-[10px] px-1.5 py-0.5 rounded bg-background border border-border break-all max-w-[200px] truncate">{tk}</code>
+                                <Button variant="outline" size="sm" className="h-6 text-[10px] px-2" onClick={() => copyTokenUrl(r)}>
+                                  <Copy className="w-3 h-3 mr-1" />Salin link
+                                </Button>
+                                <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2 text-destructive" onClick={() => handleRevokeToken(r)}>
+                                  <X className="w-3 h-3 mr-1" />Cabut
+                                </Button>
+                              </>
+                            ) : (
+                              <Button variant="outline" size="sm" className="h-6 text-[10px] px-2" onClick={() => handleGenerateToken(r)}>
+                                <Plus className="w-3 h-3 mr-1" />Buat token
+                              </Button>
+                            )}
+                          </div>
                         </div>
-                        <div className="flex gap-1 shrink-0">
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setPreviewReplay(r)}><Eye className="w-4 h-4" /></Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditReplay(r)}><Edit2 className="w-4 h-4" /></Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setDeleteTarget(r)}><Trash2 className="w-4 h-4" /></Button>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </CardContent>
@@ -501,6 +577,22 @@ export default function Admin() {
               </CardContent>
             </Card>
 
+            {/* Live Chat Toggle */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="font-sans text-base sm:text-lg flex items-center gap-2">
+                  <MessageCircle className="w-5 h-5 text-primary" />Live Chat
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="flex items-center justify-between gap-3">
+                <div className="space-y-0.5">
+                  <Label className="text-sm">Aktifkan Live Chat</Label>
+                  <p className="text-xs text-muted-foreground">Saat dimatikan, user tidak bisa mengirim pesan baru. Hanya 30 pesan terakhir per replay yang disimpan.</p>
+                </div>
+                <Switch checked={liveChatEnabled} onCheckedChange={handleToggleLiveChat} />
+              </CardContent>
+            </Card>
+
             {/* WhatsApp */}
             <Card>
               <CardHeader><CardTitle className="font-sans text-base sm:text-lg flex items-center gap-2"><MessageCircle className="w-5 h-5 text-primary" />WhatsApp</CardTitle></CardHeader>
@@ -634,30 +726,77 @@ export default function Admin() {
               <div><Label>Jam Show</Label><Input type="time" value={form.showTime} onChange={e => setForm(f => ({ ...f, showTime: e.target.value }))} /></div>
             </div>
             <div><Label>Lineup (koma)</Label><Input placeholder="Member 1, Member 2, ..." value={form.lineup} onChange={e => setForm(f => ({ ...f, lineup: e.target.value }))} /></div>
-            <div>
-              <Label>Sumber Video</Label>
-              <div className="grid grid-cols-2 gap-2 mt-1">
-                <button
-                  type="button"
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>Playlist Sumber Video</Label>
+                <Button type="button" variant="outline" size="sm" className="h-7 text-xs"
+                  disabled={form.sources.length >= 6}
+                  onClick={() => setForm(f => ({
+                    ...f,
+                    sources: [...f.sources, {
+                      id: (crypto as any).randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2),
+                      label: `Sumber ${f.sources.length + 1}`,
+                      type: 'm3u8',
+                      url: '',
+                      is_default: f.sources.length === 0,
+                    }],
+                  }))}>
+                  <Plus className="w-3 h-3 mr-1" />Tambah
+                </Button>
+              </div>
+              <p className="text-[11px] text-muted-foreground">User dapat memilih playlist via tombol di bawah player. Maks 6.</p>
+              {form.sources.length === 0 && (
+                <p className="text-xs text-muted-foreground italic">Tidak ada playlist. Akan menggunakan field tunggal di bawah sebagai fallback.</p>
+              )}
+              {form.sources.map((s, idx) => (
+                <div key={s.id} className="p-2 rounded-md border border-border bg-secondary/30 space-y-1.5">
+                  <div className="grid grid-cols-12 gap-1.5 items-center">
+                    <Input className="col-span-4 h-8 text-xs" placeholder="Label" value={s.label}
+                      onChange={e => setForm(f => ({ ...f, sources: f.sources.map((x, i) => i === idx ? { ...x, label: e.target.value } : x) }))} />
+                    <select className="col-span-4 h-8 rounded-md border border-input bg-background px-2 text-xs"
+                      value={s.type}
+                      onChange={e => setForm(f => ({ ...f, sources: f.sources.map((x, i) => i === idx ? { ...x, type: e.target.value as any } : x) }))}>
+                      <option value="youtube">YouTube</option>
+                      <option value="m3u8">M3U8 (HLS)</option>
+                      <option value="cloudflare">Cloudflare Stream</option>
+                    </select>
+                    <label className="col-span-3 text-[10px] flex items-center gap-1">
+                      <input type="radio" name="default-source" checked={!!s.is_default}
+                        onChange={() => setForm(f => ({ ...f, sources: f.sources.map((x, i) => ({ ...x, is_default: i === idx })) }))} />
+                      Default
+                    </label>
+                    <Button type="button" variant="ghost" size="icon" className="col-span-1 h-7 w-7 text-destructive"
+                      onClick={() => setForm(f => ({ ...f, sources: f.sources.filter((_, i) => i !== idx) }))}>
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+                  <Input className="h-8 text-xs" placeholder={s.type === 'youtube' ? 'YouTube ID atau URL' : s.type === 'cloudflare' ? 'Cloudflare UID atau URL' : 'Link .m3u8 (boleh .live)'}
+                    value={s.url}
+                    onChange={e => setForm(f => ({ ...f, sources: f.sources.map((x, i) => i === idx ? { ...x, url: e.target.value } : x) }))} />
+                </div>
+              ))}
+            </div>
+
+            <div className="pt-2 border-t border-border/50 space-y-2">
+              <Label className="text-xs text-muted-foreground">Fallback (kompatibel lama, dipakai jika playlist kosong)</Label>
+              <div className="grid grid-cols-2 gap-2">
+                <button type="button"
                   onClick={() => setForm(f => ({ ...f, sourceType: 'youtube' }))}
-                  className={`p-2 rounded-md border-2 text-sm font-medium transition-all ${form.sourceType === 'youtube' ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground'}`}
-                >
+                  className={`p-2 rounded-md border-2 text-xs font-medium transition-all ${form.sourceType === 'youtube' ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground'}`}>
                   📺 YouTube
                 </button>
-                <button
-                  type="button"
+                <button type="button"
                   onClick={() => setForm(f => ({ ...f, sourceType: 'm3u8' }))}
-                  className={`p-2 rounded-md border-2 text-sm font-medium transition-all ${form.sourceType === 'm3u8' ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground'}`}
-                >
+                  className={`p-2 rounded-md border-2 text-xs font-medium transition-all ${form.sourceType === 'm3u8' ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground'}`}>
                   🎬 M3U8 (HLS)
                 </button>
               </div>
+              {form.sourceType === 'youtube' ? (
+                <Input placeholder="YouTube ID (fallback)" value={form.youtubeId} onChange={e => setForm(f => ({ ...f, youtubeId: e.target.value }))} />
+              ) : (
+                <Input placeholder="Link M3U8 (fallback)" value={form.m3u8Url} onChange={e => setForm(f => ({ ...f, m3u8Url: e.target.value }))} />
+              )}
             </div>
-            {form.sourceType === 'youtube' ? (
-              <div><Label>YouTube ID *</Label><Input placeholder="dQw4w9WgXcQ" value={form.youtubeId} onChange={e => setForm(f => ({ ...f, youtubeId: e.target.value }))} /></div>
-            ) : (
-              <div><Label>Link M3U8 *</Label><Input placeholder="https://stream.mux.com/xxx.m3u8" value={form.m3u8Url} onChange={e => setForm(f => ({ ...f, m3u8Url: e.target.value }))} /></div>
-            )}
             <div><Label>Foto Kartu</Label><ImagePicker value={form.imageUrl} onChange={url => setForm(f => ({ ...f, imageUrl: url }))} /></div>
             <div><Label>Sandi *</Label><Input placeholder="Sandi untuk replay ini" value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} /></div>
             <Button className="w-full" onClick={handleSaveReplay}>

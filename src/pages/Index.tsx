@@ -160,6 +160,27 @@ export default function Index() {
   useEffect(() => {
     if (loading || allReplays.length === 0 || displayedReplay) return;
 
+    // 1) Token URL: ?token=...&replay=...
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const token = params.get('token');
+      const tokenReplay = params.get('replay');
+      if (token && tokenReplay) {
+        const matched = allReplays.find(r => r.id === tokenReplay);
+        if (matched) {
+          try { sessionStorage.setItem(`replaytime-tok-${tokenReplay}`, token); } catch { /* ignore */ }
+          setUnlockedIds(prev => prev.has(tokenReplay) ? prev : new Set(prev).add(tokenReplay));
+          setDisplayedReplay(matched);
+          setWatchingReplay(matched);
+          requestAnimationFrame(() => requestAnimationFrame(() => setPlayerVisible(true)));
+          // Clean URL
+          const cleaned = window.location.pathname;
+          window.history.replaceState({}, '', cleaned);
+          return;
+        }
+      }
+    } catch { /* ignore */ }
+
     try {
       const activeReplayId = sessionStorage.getItem(ACTIVE_REPLAY_STORAGE_KEY);
       if (!activeReplayId) return;
