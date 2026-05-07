@@ -123,6 +123,35 @@ export default function HamburgerMenu({ whatsappNumber, whatsappLink, lightMode,
               <span className="font-medium">Saluran WhatsApp</span>
             </a>
           )}
+
+          <div className="pt-2 mt-2 border-t border-border">
+            {user ? (
+              <>
+                <div className="flex items-center gap-3 px-4 py-3 rounded-lg text-foreground">
+                  <UserIcon className="w-5 h-5 text-primary" />
+                  <div className="min-w-0 flex-1">
+                    <span className="font-medium block truncate">{user.email}</span>
+                    <span className="text-xs text-muted-foreground">Sudah masuk</span>
+                  </div>
+                </div>
+                <button
+                  onClick={handleLogout}
+                  className="flex items-center gap-3 w-full px-4 py-3 rounded-lg text-foreground hover:bg-secondary transition-colors"
+                >
+                  <LogOut className="w-5 h-5 text-primary" />
+                  <span className="font-medium">Keluar</span>
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={() => { setOpen(false); navigate('/auth'); }}
+                className="flex items-center gap-3 w-full px-4 py-3 rounded-lg text-foreground hover:bg-secondary transition-colors"
+              >
+                <LogIn className="w-5 h-5 text-primary" />
+                <span className="font-medium">Masuk / Daftar</span>
+              </button>
+            )}
+          </div>
         </nav>
 
         {/* Dark/Light toggle at bottom */}
