@@ -37,6 +37,9 @@ export default function EmbedPlayer({ type, source, title, watermark }: Props) {
   const [volume, setVolume] = useState(initialVolume);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showHint, setShowHint] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [seeking, setSeeking] = useState(false);
 
   const ytId = type === 'youtube' ? extractYoutubeId(source) : '';
   const cfUid = type === 'cloudflare' ? extractCloudflareUid(source) : '';
