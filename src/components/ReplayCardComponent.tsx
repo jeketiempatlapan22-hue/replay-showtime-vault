@@ -3,6 +3,7 @@ import { Lock, Unlock, Play, Calendar, Users, Tag, Star, Tv, Bookmark, BookmarkC
 import { type ReplayRow, verifyPassword } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import MemberAvatar from '@/components/MemberAvatar';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
