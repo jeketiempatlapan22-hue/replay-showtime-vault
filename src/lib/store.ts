@@ -123,6 +123,16 @@ export async function setMasterPassword(month: string, password: string) {
   }
 }
 
+export async function setMasterPasswordPaused(month: string, paused: boolean) {
+  const { error } = await supabase.from('master_passwords').update({ paused }).eq('month', month);
+  if (error) throw error;
+}
+
+export async function deleteMasterPassword(month: string) {
+  const { error } = await supabase.from('master_passwords').delete().eq('month', month);
+  if (error) throw error;
+}
+
 export async function verifyPassword(replayId: string, password: string): Promise<boolean> {
   try {
     const { data, error } = await supabase.functions.invoke('verify-password', {
