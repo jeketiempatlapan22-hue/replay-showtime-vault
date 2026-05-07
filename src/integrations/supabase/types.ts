@@ -79,6 +79,7 @@ export type Database = {
           id: string
           password: string
           require_password: boolean
+          sources: Json
           title: string
           type: string
           updated_at: string
@@ -89,6 +90,7 @@ export type Database = {
           id?: string
           password?: string
           require_password?: boolean
+          sources?: Json
           title?: string
           type?: string
           updated_at?: string
@@ -99,6 +101,7 @@ export type Database = {
           id?: string
           password?: string
           require_password?: boolean
+          sources?: Json
           title?: string
           type?: string
           updated_at?: string
@@ -333,6 +336,7 @@ export type Database = {
         Returns: {
           enabled: boolean
           require_password: boolean
+          sources: Json
           title: string
           type: string
         }[]
