@@ -85,6 +85,8 @@ export default function Admin() {
   const [members, setMembers] = useState<Member[]>([]);
   const [memberForm, setMemberForm] = useState<{ id?: string; name: string; photo_url: string }>({ name: '', photo_url: '' });
   const [memberUploading, setMemberUploading] = useState(false);
+  const [memberSearch, setMemberSearch] = useState('');
+  const [memberSort, setMemberSort] = useState<'az' | 'za' | 'newest' | 'oldest'>('az');
   const [liveTokens, setLiveTokens] = useState<Array<{ id: string; token: string; label: string; max_devices: number; revoked: boolean; devices_used: number }>>([]);
   
   const [newTokenMaxDevices, setNewTokenMaxDevices] = useState(1);
