@@ -144,7 +144,9 @@ export default function CommentSection({ replayId }: CommentSectionProps) {
           <p className="text-sm text-muted-foreground text-center py-4">Belum ada komentar. Jadilah yang pertama!</p>
         )}
         {comments.map(c => {
-          const isAdminComment = c.name.startsWith('🛡️') || c.name.startsWith('🛡');
+          const adminName = (adminUsername || 'Admin').trim().toLowerCase();
+          const cleanName = c.name.replace(/^🛡️?\s*/, '').trim().toLowerCase();
+          const isAdminComment = c.name.startsWith('🛡️') || c.name.startsWith('🛡') || (!!adminName && cleanName === adminName);
           return (
           <div key={c.id} className={`p-3 rounded-lg border animate-fade-up group ${isAdminComment ? 'bg-primary/10 border-primary/40 ring-1 ring-primary/30' : 'bg-secondary/50 border-border'}`} style={{ animationFillMode: 'forwards' }}>
             <div className="flex items-center justify-between mb-1">
