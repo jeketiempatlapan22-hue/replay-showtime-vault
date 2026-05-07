@@ -4,10 +4,11 @@ export interface Member {
   id: string;
   name: string;
   photo_url: string;
+  created_at?: string;
 }
 
 export async function getMembers(): Promise<Member[]> {
-  const { data } = await supabase.from('members').select('id,name,photo_url').order('name');
+  const { data } = await supabase.from('members').select('id,name,photo_url,created_at').order('name');
   return (data || []) as Member[];
 }
 
