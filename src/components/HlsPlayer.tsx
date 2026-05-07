@@ -401,13 +401,13 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, onFatalError
 
   const seek = (delta: number) => {
     const video = videoRef.current;
-    if (!video) return;
+    if (!video || isLiveStream) return;
     video.currentTime = Math.max(0, Math.min(video.duration || 0, video.currentTime + delta));
   };
 
   const seekTo = (e: React.ChangeEvent<HTMLInputElement>) => {
     const video = videoRef.current;
-    if (!video) return;
+    if (!video || isLiveStream) return;
     video.currentTime = Number(e.target.value);
   };
 
@@ -498,34 +498,37 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, onFatalError
 
         <div className="relative z-10 px-3 sm:px-4 pb-3 sm:pb-4 space-y-2" onClick={(e) => e.stopPropagation()}>
           <div className="flex items-center gap-2 text-white text-xs">
-            <span className="tabular-nums">{formatTime(currentTime)}</span>
+            <span className="tabular-nums">{isLiveStream ? 'LIVE' : formatTime(currentTime)}</span>
             <input
               type="range"
               min={0}
               max={duration || 0}
               step={0.1}
-              value={currentTime}
+              value={isLiveStream ? 0 : currentTime}
               onChange={seekTo}
-              className="flex-1 h-1.5 accent-primary cursor-pointer"
+              disabled={isLiveStream}
+              className="flex-1 h-1.5 accent-primary cursor-pointer disabled:cursor-default disabled:opacity-70"
               style={{
-                background: `linear-gradient(to right, hsl(var(--primary)) 0%, hsl(var(--primary)) ${
-                  duration ? (currentTime / duration) * 100 : 0
-                }%, rgba(255,255,255,0.3) ${duration ? (currentTime / duration) * 100 : 0}%, rgba(255,255,255,0.3) 100%)`,
+                background: isLiveStream
+                  ? 'linear-gradient(to right, hsl(var(--primary)) 0%, hsl(var(--primary)) 100%)'
+                  : `linear-gradient(to right, hsl(var(--primary)) 0%, hsl(var(--primary)) ${
+                    duration ? (currentTime / duration) * 100 : 0
+                  }%, rgba(255,255,255,0.3) ${duration ? (currentTime / duration) * 100 : 0}%, rgba(255,255,255,0.3) 100%)`,
                 borderRadius: '999px',
                 appearance: 'none',
               }}
             />
-            <span className="tabular-nums">{formatTime(duration)}</span>
+            <span className="tabular-nums">{isLiveStream ? 'ON AIR' : formatTime(duration)}</span>
           </div>
 
           <div className="flex items-center gap-1 sm:gap-2">
             <button type="button" onClick={togglePlay} className="p-2 text-white hover:text-primary transition-colors" aria-label={isPlaying ? 'Pause' : 'Play'}>
               {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
             </button>
-            <button type="button" onClick={() => seek(-10)} className="p-2 text-white hover:text-primary transition-colors" aria-label="Mundur 10 detik" title="Mundur 10 detik">
+            <button type="button" onClick={() => seek(-10)} disabled={isLiveStream} className="p-2 text-white hover:text-primary transition-colors disabled:opacity-40 disabled:hover:text-white" aria-label="Mundur 10 detik" title="Mundur 10 detik">
               <RotateCcw className="w-5 h-5" />
             </button>
-            <button type="button" onClick={() => seek(10)} className="p-2 text-white hover:text-primary transition-colors" aria-label="Maju 10 detik" title="Maju 10 detik">
+            <button type="button" onClick={() => seek(10)} disabled={isLiveStream} className="p-2 text-white hover:text-primary transition-colors disabled:opacity-40 disabled:hover:text-white" aria-label="Maju 10 detik" title="Maju 10 detik">
               <RotateCw className="w-5 h-5" />
             </button>
 
