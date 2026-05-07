@@ -600,10 +600,8 @@ export default function Admin() {
                   ))}
                 </div>
 
-                <div>
-                  <Label>Sandi Live</Label>
-                  <Input type="text" value={liveCfg.password} onChange={e => setLiveCfg(c => ({ ...c, password: e.target.value }))} placeholder="Sandi untuk akses live" />
-                  <p className="text-[11px] text-muted-foreground mt-1">User bisa masuk pakai sandi ini ATAU lewat link token di bawah.</p>
+                <div className="rounded-md bg-secondary/40 border border-border p-2.5">
+                  <p className="text-[11px] text-muted-foreground"><strong className="text-foreground">Akses live hanya melalui link token.</strong> Buat token di bawah lalu salin link <code>/live?t=...</code> untuk dibagikan ke user. Sandi sudah dinonaktifkan demi keamanan & device-lock per token.</p>
                 </div>
                 <Button onClick={handleSaveLive} disabled={liveSaving}><Save className="w-4 h-4 mr-2" />{liveSaving ? 'Menyimpan...' : 'Simpan Konfigurasi'}</Button>
               </CardContent>
