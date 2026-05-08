@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Loader2, CheckCircle2, Copy, Smartphone } from 'lucide-react';
+import { setShowPurchase, setReplayPurchase } from '@/lib/purchases';
 
 interface Props {
   open: boolean;
@@ -15,13 +16,15 @@ interface Props {
   amount: number; // pakasir_amount in rupiah
   itemTitle: string; // e.g. "Show: Title" or "Replay: Title"
   replayId?: string | null;
+  /** 'show' | 'replay' (tied to active show) | 'replay_only' (standalone replay card) */
+  kind?: 'show' | 'replay' | 'replay_only';
 }
 
 type Status = 'form' | 'creating' | 'qr' | 'paid' | 'expired';
 
 const EXPIRY_MS = 30 * 60 * 1000;
 
-export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, amount, itemTitle, replayId }: Props) {
+export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, amount, itemTitle, replayId, kind = 'show' }: Props) {
   const [phone, setPhone] = useState(() => { try { return localStorage.getItem('replaytime-phone') || ''; } catch { return ''; } });
   const [status, setStatus] = useState<Status>('form');
   const [orderId, setOrderId] = useState<string | null>(null);
