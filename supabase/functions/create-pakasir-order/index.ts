@@ -1,0 +1,78 @@
+// Create a Pakasir dynamic QRIS order for an active show purchase.
+// Each call creates a NEW order_id; webhook will deliver token via WhatsApp.
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+function normalizePhone(raw: string) {
+  const d = String(raw || '').replace(/\D/g, '');
+  if (!d) return '';
+  if (d.startsWith('0')) return '62' + d.slice(1);
+  if (d.startsWith('62')) return d;
+  if (d.startsWith('8')) return '62' + d;
+  return d;
+}
+
+function validPhone(p: string) {
+  return /^62\d{8,13}$/.test(p);
+}
+
+function genOrderId() {
+  return 'rt' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+}
+
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+
+  try {
+    const body = await req.json().catch(() => ({}));
+    const showId = String(body.show_id ?? '');
+    const kind = String(body.kind ?? 'show'); // 'show' | 'replay'
+    const phone = normalizePhone(String(body.phone ?? ''));
+
+    if (!showId) return new Response(JSON.stringify({ error: 'missing show_id' }), { status: 400, headers: corsHeaders });
+    if (!validPhone(phone)) return new Response(JSON.stringify({ error: 'invalid phone' }), { status: 400, headers: corsHeaders });
+    if (kind !== 'show' && kind !== 'replay') return new Response(JSON.stringify({ error: 'invalid kind' }), { status: 400, headers: corsHeaders });
+
+    const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+
+    const { data: show, error: showErr } = await admin
+      .from('active_shows').select('*').eq('id', showId).maybeSingle();
+    if (showErr || !show) return new Response(JSON.stringify({ error: 'show not found' }), { status: 404, headers: corsHeaders });
+
+    const amount = kind === 'replay'
+      ? Number(show.price_replay || show.pakasir_amount || 0)
+      : Number(show.price_show || show.pakasir_amount || 0);
+    if (!amount || amount < 100) return new Response(JSON.stringify({ error: 'invalid amount' }), { status: 400, headers: corsHeaders });
+
+    const slug = Deno.env.get('PAKASIR_PROJECT_SLUG');
+    if (!slug) return new Response(JSON.stringify({ error: 'pakasir not configured' }), { status: 500, headers: corsHeaders });
+
+    const orderId = genOrderId();
+    const itemTitle = `${kind === 'replay' ? 'Replay' : 'Show'} • ${show.title}`;
+
+    // Pakasir dynamic QRIS URL pattern (web-checkout)
+    const qrUrl = `https://app.pakasir.com/pay/${slug}/${orderId}?amount=${amount}&qris_only=1`;
+
+    const { data: order, error: orderErr } = await admin.from('orders').insert({
+      user_phone: phone,
+      replay_id: kind === 'replay' ? show.replay_id : null,
+      show_id: show.id,
+      item_title: itemTitle,
+      amount,
+      status: 'pending',
+      pakasir_order_id: orderId,
+      pakasir_qr_url: qrUrl,
+    }).select('id').single();
+    if (orderErr) return new Response(JSON.stringify({ error: orderErr.message }), { status: 500, headers: corsHeaders });
+
+    return new Response(JSON.stringify({
+      ok: true, order_id: order.id, pakasir_order_id: orderId, amount, qr_url: qrUrl,
+    }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+  } catch (e) {
+    return new Response(JSON.stringify({ error: String(e) }), { status: 500, headers: corsHeaders });
+  }
+});
