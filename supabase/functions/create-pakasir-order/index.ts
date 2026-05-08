@@ -62,9 +62,12 @@ Deno.serve(async (req) => {
       const { data: show, error: showErr } = await admin
         .from('active_shows').select('*').eq('id', showId).maybeSingle();
       if (showErr || !show) return new Response(JSON.stringify({ error: 'show not found' }), { status: 404, headers: corsHeaders });
-      amount = kind === 'replay'
-        ? Number(show.price_replay || show.pakasir_amount || 0)
-        : Number(show.price_show || show.pakasir_amount || 0);
+      if (kind === 'replay') {
+        const a = Number(show.price_replay || show.pakasir_amount || 0);
+        amount = a >= 100 ? a : 2000; // default Rp 2.000 for replay if admin not set
+      } else {
+        amount = Number(show.price_show || show.pakasir_amount || 0);
+      }
       itemTitle = `${kind === 'replay' ? 'Replay' : 'Show'} • ${show.title}`;
       resolvedShowId = show.id;
       resolvedReplayId = kind === 'replay' ? show.replay_id : null;
