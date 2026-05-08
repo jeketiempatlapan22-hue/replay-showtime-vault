@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Loader2, CheckCircle2, Copy, Smartphone } from 'lucide-react';
+import { Loader2, CheckCircle2, Copy, Smartphone, ExternalLink, QrCode } from 'lucide-react';
 import { setShowPurchase, setReplayPurchase } from '@/lib/purchases';
 
 interface Props {
@@ -205,38 +205,34 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
 
         {status === 'qr' && (
           <div className="space-y-3">
-            <div className="rounded-lg border border-border bg-card p-2 text-center">
-              <div className="text-xs text-muted-foreground mb-1">Scan QRIS untuk Pembayaran</div>
-              {qrUrl && (
-                <div className="relative w-full overflow-hidden rounded bg-white" style={{ height: 460 }}>
-                  <iframe
-                    src={qrUrl}
-                    title="QRIS Pembayaran"
-                    className="w-full h-full border-0"
-                    allow="payment *"
-                    sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-                  />
+            <div className="rounded-lg border border-border bg-card p-4 text-center space-y-3">
+              <div className="flex flex-col items-center gap-2">
+                <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
+                  <QrCode className="w-8 h-8 text-primary" />
                 </div>
-              )}
-              <div className="text-[10px] text-muted-foreground mt-2">Order: {pakasirOrderId}</div>
-              {qrUrl && (
-                <a
-                  href={qrUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-block mt-2 text-[11px] text-primary hover:underline"
-                >
-                  Buka di tab baru ↗
-                </a>
-              )}
+                <div className="text-sm font-semibold text-foreground">QRIS Pembayaran Siap</div>
+                <div className="text-xs text-muted-foreground px-2">
+                  Klik tombol di bawah untuk membuka halaman QRIS Pakasir. Scan QR di sana dengan aplikasi e-wallet/m-banking Anda.
+                </div>
+              </div>
+              <a
+                href={qrUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center gap-2 w-full rounded-md bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-3 text-sm font-semibold transition"
+              >
+                <ExternalLink className="w-4 h-4" />
+                Buka Halaman Pembayaran QRIS
+              </a>
+              <div className="text-[10px] text-muted-foreground">Order ID: {pakasirOrderId}</div>
             </div>
             <div className="flex items-center justify-between text-xs">
-              <span className="text-muted-foreground">Berlaku selama</span>
+              <span className="text-muted-foreground">QRIS berlaku selama</span>
               <span className="font-mono font-semibold text-primary">{mm}:{ss}</span>
             </div>
             <div className="flex items-center gap-2 rounded-md bg-muted/40 p-2 text-xs text-muted-foreground">
               <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
-              Menunggu pembayaran... status akan otomatis berubah.
+              Menunggu pembayaran... halaman ini akan otomatis berubah saat lunas.
             </div>
           </div>
         )}
