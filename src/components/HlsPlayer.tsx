@@ -352,8 +352,10 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
       stallWatchdogRef.current = null;
       if (nativeLoadedHandler) video.removeEventListener('loadedmetadata', nativeLoadedHandler);
       if (nativeErrorHandler) video.removeEventListener('error', nativeErrorHandler);
-      if (hls) hls.destroy();
+      try { if (hls) hls.destroy(); } catch { /* ignore */ }
       hlsRef.current = null;
+      // Reset native source to prevent leaked playback when switching providers
+      try { video.removeAttribute('src'); video.load(); } catch { /* ignore */ }
     };
   }, [src]);
 
