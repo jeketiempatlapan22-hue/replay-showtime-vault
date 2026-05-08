@@ -45,7 +45,10 @@ function pad(n: number) { return String(n).padStart(2, '0'); }
 function ScheduleCountdown({ title, showDate, showTime, imageUrl }: { title: string; showDate?: string; showTime?: string; imageUrl?: string }) {
   const target = showDate && showTime ? new Date(`${showDate}T${showTime}`) : null;
   const [now, setNow] = useState(Date.now());
-  useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
+  useEffect(() => {
+    const t = setInterval(() => { if (document.visibilityState === 'visible') setNow(Date.now()); }, 1000);
+    return () => clearInterval(t);
+  }, []);
 
   const diff = target ? target.getTime() - now : 0;
   const past = !target || diff <= 0;
@@ -204,31 +207,20 @@ export default function Live() {
       if (cached) setUnlocked(JSON.parse(cached));
     } catch { /* ignore */ }
 
-    const cfgChannel = supabase.channel('live-config-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'live_config_private' }, () => { fetchStatus(); })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'active_shows', ...(showId ? { filter: `id=eq.${showId}` } : {}) }, () => { fetchStatus(); })
-      .subscribe();
+    // Scope realtime subscriptions narrowly to reduce server load with many concurrent users.
+    const tParam = search.get('t');
+    const bid = getBrowserId();
+    const cfgChannel = showId
+      ? supabase.channel(`live-cfg:${showId}`)
+          .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'active_shows', filter: `id=eq.${showId}` }, () => { fetchStatus(); })
+          .subscribe()
+      : supabase.channel('live-cfg:global')
+          .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'live_config_private' }, () => { fetchStatus(); })
+          .subscribe();
 
-    const tokChannel = supabase.channel('live-tokens-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'live_tokens' }, () => {
-        const t = search.get('t');
-        if (t) void doUnlock({ token: t }, true);
-      })
-      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'live_token_devices' }, () => {
-        const t = search.get('t');
-        if (t) void doUnlock({ token: t }, true);
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'active_show_tokens' }, () => {
-        const t = search.get('t');
-        if (t) void doUnlock({ token: t }, true);
-      })
-      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'active_show_token_devices' }, () => {
-        const t = search.get('t');
-        if (t) void doUnlock({ token: t }, true);
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'blocked_browsers', filter: `browser_id=eq.${getBrowserId()}` }, () => {
-        const t = search.get('t');
-        if (t) void doUnlock({ token: t }, true);
+    const tokChannel = supabase.channel(`live-blk:${bid}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'blocked_browsers', filter: `browser_id=eq.${bid}` }, () => {
+        if (tParam) void doUnlock({ token: tParam }, true);
         else if (unlocked) {
           setUnlocked(null);
           try { sessionStorage.removeItem(`${SS_KEY_BASE}${showId?'-'+showId:''}`); } catch { /* ignore */ }
@@ -237,7 +229,13 @@ export default function Live() {
       })
       .subscribe();
 
+    // Lightweight token revalidation: poll every 60s instead of subscribing to entire token tables.
+    const revalidate = window.setInterval(() => {
+      if (tParam && document.visibilityState === 'visible') void doUnlock({ token: tParam }, true);
+    }, 60000);
+
     return () => {
+      window.clearInterval(revalidate);
       supabase.removeChannel(cfgChannel);
       supabase.removeChannel(tokChannel);
     };
@@ -295,21 +293,22 @@ export default function Live() {
     const channel = supabase.channel(`live-viewers:${showKey}`, {
       config: { presence: { key: bid } },
     });
+    let pending: number | null = null;
     const recount = () => {
-      try {
-        const state = channel.presenceState() as Record<string, unknown[]>;
-        // Each presence key IS a browser_id; using Set guarantees uniqueness
-        // even if duplicate join events surface the same key multiple times.
-        const unique = new Set<string>();
-        for (const k of Object.keys(state)) if (k) unique.add(k);
-        setViewerCount(unique.size);
-      } catch { /* ignore */ }
+      if (pending) return;
+      pending = window.setTimeout(() => {
+        pending = null;
+        try {
+          const state = channel.presenceState() as Record<string, unknown[]>;
+          const unique = new Set<string>();
+          for (const k of Object.keys(state)) if (k) unique.add(k);
+          setViewerCount(unique.size);
+        } catch { /* ignore */ }
+      }, 1500);
     };
     let tracked = false;
     channel
       .on('presence', { event: 'sync' }, recount)
-      .on('presence', { event: 'join' }, recount)
-      .on('presence', { event: 'leave' }, recount)
       .subscribe(async (status) => {
         if (status === 'SUBSCRIBED' && !tracked) {
           tracked = true;
@@ -317,9 +316,8 @@ export default function Live() {
           recount();
         }
       });
-    const interval = window.setInterval(recount, 10000);
     return () => {
-      window.clearInterval(interval);
+      if (pending) window.clearTimeout(pending);
       try { void channel.untrack(); } catch { /* ignore */ }
       supabase.removeChannel(channel);
     };

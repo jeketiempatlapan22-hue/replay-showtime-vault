@@ -63,8 +63,25 @@ export default function LiveChat() {
 
   useEffect(() => {
     refresh();
+    // Incrementally apply realtime payloads instead of refetching for each event.
+    // With many concurrent viewers this reduces DB load by orders of magnitude.
     const ch = supabase.channel('live-chat-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'live_messages' }, () => { refresh(); })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'live_messages' }, (payload) => {
+        const m = payload.new as Msg;
+        if (m.pinned) setPinned(prev => [m, ...prev.filter(x => x.id !== m.id)]);
+        else setMessages(prev => [...prev.filter(x => x.id !== m.id), m].slice(-30));
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'live_messages' }, (payload) => {
+        const m = payload.new as Msg;
+        setPinned(prev => m.pinned ? [m, ...prev.filter(x => x.id !== m.id)] : prev.filter(x => x.id !== m.id));
+        setMessages(prev => m.pinned ? prev.filter(x => x.id !== m.id) : prev.map(x => x.id === m.id ? m : x));
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'live_messages' }, (payload) => {
+        const id = (payload.old as { id?: string })?.id;
+        if (!id) return;
+        setMessages(prev => prev.filter(x => x.id !== id));
+        setPinned(prev => prev.filter(x => x.id !== id));
+      })
       .subscribe();
     return () => { supabase.removeChannel(ch); };
   }, []);
