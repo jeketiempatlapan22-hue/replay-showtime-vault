@@ -37,10 +37,7 @@ Deno.serve(async (req) => {
         .maybeSingle();
       if (!show || !show.is_active) return json({ valid: false, reason: "off" });
 
-      const startMs = new Date(`${show.show_date}T${show.show_time}`).getTime();
-      const nowMs = Date.now();
-      const autoOn = show.live_auto_schedule && nowMs >= startMs && nowMs <= startMs + 8 * 3600 * 1000;
-      const enabled = !!show.is_live || !!autoOn;
+      const enabled = !!show.is_live;
 
       const okPayload = {
         valid: true,
