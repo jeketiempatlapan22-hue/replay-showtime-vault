@@ -9,6 +9,7 @@ import HlsPlayer from '@/components/HlsPlayer';
 import EmbedPlayer from '@/components/EmbedPlayer';
 import { type ActiveShow, getShowDateTime } from '@/lib/activeShows';
 import { useNavigate } from 'react-router-dom';
+import { getShowPurchase } from '@/lib/purchases';
 
 const CATEGORY_LABELS: Record<string, string> = {
   reguler: 'Reguler', sts: 'STS', last_show: 'Last Show', aniv: 'Anniversary', special: 'Show Spesial',
@@ -53,16 +54,27 @@ export default function ActiveShowCard({ show, index = 0 }: { show: ActiveShow; 
   const autoLive = !!show.live_auto_schedule && nowMs >= startMs && nowMs <= startMs + 8 * 3600 * 1000;
   const isLiveNow = !!show.is_live || autoLive;
 
-  // Per-show unlock check (sessionStorage written by /live page after password/token success)
+  // Per-show unlock check (sessionStorage live unlock OR localStorage purchase)
   const [hasAccess, setHasAccess] = useState(false);
+  const [purchasedToken, setPurchasedToken] = useState<string>('');
   useEffect(() => {
-    try { setHasAccess(!!sessionStorage.getItem(`replaytime-live-unlocked-${show.id}`)); } catch { /* ignore */ }
-    const onStorage = () => {
-      try { setHasAccess(!!sessionStorage.getItem(`replaytime-live-unlocked-${show.id}`)); } catch { /* ignore */ }
+    const refresh = () => {
+      try {
+        const sess = !!sessionStorage.getItem(`replaytime-live-unlocked-${show.id}`);
+        const purchase = getShowPurchase(show.id);
+        setPurchasedToken(purchase?.token || '');
+        setHasAccess(sess || !!purchase?.token);
+      } catch { /* ignore */ }
     };
-    window.addEventListener('storage', onStorage);
-    window.addEventListener('focus', onStorage);
-    return () => { window.removeEventListener('storage', onStorage); window.removeEventListener('focus', onStorage); };
+    refresh();
+    window.addEventListener('storage', refresh);
+    window.addEventListener('focus', refresh);
+    window.addEventListener('replaytime-purchases-updated', refresh);
+    return () => {
+      window.removeEventListener('storage', refresh);
+      window.removeEventListener('focus', refresh);
+      window.removeEventListener('replaytime-purchases-updated', refresh);
+    };
   }, [show.id]);
 
   const openBuy = (mode: 'show' | 'replay') => { setBuyMode(mode); setBuyOpen(true); };
@@ -70,7 +82,10 @@ export default function ActiveShowCard({ show, index = 0 }: { show: ActiveShow; 
     if (inlineReplay) { setInlinePlayerOpen(true); return; }
     if (show.replay_id) navigate(`/replay/${show.replay_id}`);
   };
-  const goLive = () => navigate(`/live?show=${show.id}`);
+  const goLive = () => {
+    if (purchasedToken) navigate(`/live?show=${show.id}&t=${purchasedToken}`);
+    else navigate(`/live?show=${show.id}`);
+  };
 
   return (
     <div
@@ -209,6 +224,7 @@ export default function ActiveShowCard({ show, index = 0 }: { show: ActiveShow; 
         amount={show.pakasir_amount}
         itemTitle={buyMode === 'replay' ? `Replay: ${show.title}` : `Show: ${show.title}`}
         replayId={buyMode === 'replay' ? show.replay_id : null}
+        kind={buyMode === 'replay' ? 'replay' : 'show'}
       />
     </div>
   );

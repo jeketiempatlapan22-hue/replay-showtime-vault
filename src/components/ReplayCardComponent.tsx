@@ -1,11 +1,14 @@
-import { useState } from 'react';
-import { Lock, Unlock, Play, Calendar, Users, Tag, Star, Tv, Bookmark, BookmarkCheck } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Lock, Unlock, Play, Calendar, Users, Tag, Star, Tv, Bookmark, BookmarkCheck, ShoppingCart, Copy } from 'lucide-react';
 import { type ReplayRow, verifyPassword } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import MemberAvatar from '@/components/MemberAvatar';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import BuyShowDialog from '@/components/BuyShowDialog';
+import { getReplayPurchase } from '@/lib/purchases';
+import { toast } from '@/hooks/use-toast';
 
 const CRITERIA_LABELS: Record<string, string> = {
   reguler: 'Reguler', sts: 'STS', last_show: 'Last Show', aniv: 'Anniversary', special: 'Show Spesial',
@@ -32,11 +35,46 @@ function highlightText(text: string, query: string) {
   );
 }
 
+const REPLAY_DEFAULT_PRICE = 2000;
+
 export default function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWatch, onUnlockAndWatch, index = 0, isBookmarked, onToggleBookmark, searchQuery = '' }: Props) {
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [checking, setChecking] = useState(false);
+  const [buyOpen, setBuyOpen] = useState(false);
+  const [purchasedToken, setPurchasedToken] = useState<string>('');
+
+  // Sync purchase state from localStorage
+  useEffect(() => {
+    const refresh = () => {
+      const p = getReplayPurchase(replay.id);
+      setPurchasedToken(p?.token || '');
+    };
+    refresh();
+    window.addEventListener('storage', refresh);
+    window.addEventListener('focus', refresh);
+    window.addEventListener('replaytime-purchases-updated', refresh);
+    return () => {
+      window.removeEventListener('storage', refresh);
+      window.removeEventListener('focus', refresh);
+      window.removeEventListener('replaytime-purchases-updated', refresh);
+    };
+  }, [replay.id]);
+
+  const isPurchased = !!purchasedToken;
+
+  // After purchase, treat as unlocked & store token in sessionStorage so player can fetch source.
+  useEffect(() => {
+    if (isPurchased) {
+      try { sessionStorage.setItem(`replaytime-tok-${replay.id}`, purchasedToken); } catch { /* ignore */ }
+      if (!isUnlocked) onUnlock(replay.id);
+    }
+  }, [isPurchased, purchasedToken, replay.id, isUnlocked, onUnlock]);
+
+  const copyToken = async () => {
+    try { await navigator.clipboard.writeText(purchasedToken); toast({ title: 'Sandi disalin' }); } catch { /* ignore */ }
+  };
 
   const handleSubmitPassword = async () => {
     if (checking) return;
@@ -156,17 +194,46 @@ export default function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWa
             </div>
           </div>
 
-          {isUnlocked ? (
+          {isPurchased ? (
+            <div className="space-y-2 mt-2">
+              <Button type="button" className="w-full" onClick={() => onWatch(replay)}>
+                <Play className="w-4 h-4 mr-2" /> Tonton Replay
+              </Button>
+              <div className="rounded-md border border-border bg-muted/30 p-2 space-y-1">
+                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Sandi akses kamu</div>
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 text-[11px] font-mono break-all text-foreground">{purchasedToken}</code>
+                  <Button type="button" size="sm" variant="outline" onClick={copyToken} className="h-7 px-2"><Copy className="w-3 h-3" /></Button>
+                </div>
+              </div>
+            </div>
+          ) : isUnlocked ? (
             <Button type="button" className="w-full mt-2" onClick={() => onWatch(replay)}>
               <Play className="w-4 h-4 mr-2" /> Tonton Sekarang
             </Button>
           ) : (
-            <Button type="button" variant="outline" className="w-full mt-2 border-primary/50 text-primary hover:bg-primary hover:text-primary-foreground" onClick={() => setShowPasswordDialog(true)}>
-              <Lock className="w-4 h-4 mr-2" /> Buka dengan Sandi
-            </Button>
+            <div className="space-y-2 mt-2">
+              <Button type="button" className="w-full gap-2" onClick={() => setBuyOpen(true)}>
+                <ShoppingCart className="w-4 h-4" /> Beli Replay · Rp {REPLAY_DEFAULT_PRICE.toLocaleString('id-ID')}
+              </Button>
+              <Button type="button" variant="outline" className="w-full border-primary/50 text-primary hover:bg-primary hover:text-primary-foreground" onClick={() => setShowPasswordDialog(true)}>
+                <Lock className="w-4 h-4 mr-2" /> Buka dengan Sandi
+              </Button>
+            </div>
           )}
         </div>
       </div>
+
+      <BuyShowDialog
+        open={buyOpen}
+        onOpenChange={setBuyOpen}
+        showId=""
+        showTitle={replay.title}
+        amount={REPLAY_DEFAULT_PRICE}
+        itemTitle={`Replay: ${replay.title}`}
+        replayId={replay.id}
+        kind="replay_only"
+      />
 
       <Dialog open={showPasswordDialog} onOpenChange={setShowPasswordDialog}>
         <DialogContent className="bg-card border-border">

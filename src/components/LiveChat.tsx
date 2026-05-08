@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { Send, Pin, PinOff, Trash2, MessageCircle, ShieldCheck } from 'lucide-react';
+import { Send, Pin, PinOff, Trash2, MessageCircle, ShieldCheck, UserCog } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { getBrowserId } from '@/lib/browserId';
 
@@ -22,7 +23,24 @@ export default function LiveChat() {
   const [sending, setSending] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminUsername, setAdminUsername] = useState('Admin');
+  const [nameModalOpen, setNameModalOpen] = useState(false);
+  const [nameInput, setNameInput] = useState('');
+  const [nameError, setNameError] = useState('');
   const listRef = useRef<HTMLDivElement>(null);
+
+  // Modal opens on demand when user tries to interact without a name.
+  // (Username is required per browser before any chat interaction.)
+
+  const saveName = () => {
+    const v = nameInput.trim();
+    if (v.length < 2) { setNameError('Nama minimal 2 karakter.'); return; }
+    if (v.length > 40) { setNameError('Nama maksimal 40 karakter.'); return; }
+    setName(v);
+    try { localStorage.setItem('replaytime-name', v); } catch { /* ignore */ }
+    setNameError('');
+    setNameModalOpen(false);
+  };
+  const openChangeName = () => { setNameInput(name); setNameError(''); setNameModalOpen(true); };
 
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
@@ -58,9 +76,9 @@ export default function LiveChat() {
   const send = async () => {
     const msg = text.trim().slice(0, 500);
     if (!msg || sending) return;
+    if (!isAdmin && !name.trim()) { openChangeName(); return; }
     setSending(true);
     const display = (name.trim() || 'Anonim').slice(0, 40);
-    localStorage.setItem('replaytime-name', display);
     await supabase.from('live_messages').insert({
       browser_id: getBrowserId(),
       name: isAdmin ? (adminUsername || 'Admin') : display,
@@ -87,11 +105,18 @@ export default function LiveChat() {
     return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
   };
 
+  const canChat = isAdmin || !!name.trim();
+
   return (
     <div className="rounded-2xl bg-card/80 border border-border overflow-hidden flex flex-col h-[60vh] min-h-[380px]">
       <div className="flex items-center gap-2 px-3 py-2 border-b border-border bg-secondary/40">
         <MessageCircle className="w-4 h-4 text-primary" />
         <span className="text-sm font-semibold">Live Chat</span>
+        {!isAdmin && name && (
+          <button onClick={openChangeName} className="ml-auto inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground">
+            <UserCog className="w-3 h-3" /> {name}
+          </button>
+        )}
       </div>
 
       {/* Pinned banner */}
@@ -143,23 +168,51 @@ export default function LiveChat() {
 
       {/* Input */}
       <div className="border-t border-border p-2 space-y-1.5 bg-secondary/30">
-        {!isAdmin && (
-          <Input
-            value={name} onChange={e => setName(e.target.value)} placeholder="Nama (opsional)"
-            className="h-8 text-xs bg-background"
-          />
+        {!canChat && (
+          <button
+            onClick={openChangeName}
+            className="w-full text-[11px] text-primary underline-offset-2 hover:underline text-left"
+          >
+            Masukkan nama dulu untuk mengirim pesan →
+          </button>
         )}
         <div className="flex gap-1.5">
           <Input
-            value={text} onChange={e => setText(e.target.value.slice(0, 500))}
-            onKeyDown={e => e.key === 'Enter' && send()}
-            placeholder="Ketik pesan..." className="h-9 text-sm bg-background"
+            value={text}
+            onChange={e => setText(e.target.value.slice(0, 500))}
+            onKeyDown={e => e.key === 'Enter' && canChat && send()}
+            onFocus={() => { if (!canChat) openChangeName(); }}
+            placeholder={canChat ? 'Ketik pesan...' : 'Masukkan nama untuk berinteraksi'}
+            className="h-9 text-sm bg-background"
+            disabled={!canChat}
           />
-          <Button size="icon" onClick={send} disabled={sending || !text.trim()} className="h-9 w-9 shrink-0">
+          <Button size="icon" onClick={send} disabled={sending || !text.trim() || !canChat} className="h-9 w-9 shrink-0">
             <Send className="w-4 h-4" />
           </Button>
         </div>
       </div>
+
+      {/* Name modal */}
+      <Dialog open={nameModalOpen} onOpenChange={(o) => { if (o || name.trim()) setNameModalOpen(o); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Masukkan Nama</DialogTitle>
+            <DialogDescription>Nama akan ditampilkan saat kamu berinteraksi di live chat. Wajib diisi tiap perangkat.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Input
+              autoFocus
+              value={nameInput}
+              onChange={(e) => { setNameInput(e.target.value.slice(0, 40)); setNameError(''); }}
+              onKeyDown={(e) => e.key === 'Enter' && saveName()}
+              placeholder="Nama kamu (2-40 karakter)"
+              maxLength={40}
+            />
+            {nameError && <p className="text-xs text-destructive">{nameError}</p>}
+            <Button className="w-full" onClick={saveName} disabled={nameInput.trim().length < 2}>Simpan Nama</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

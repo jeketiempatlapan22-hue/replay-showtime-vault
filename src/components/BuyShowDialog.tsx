@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Loader2, CheckCircle2, Copy, Smartphone } from 'lucide-react';
+import { setShowPurchase, setReplayPurchase } from '@/lib/purchases';
 
 interface Props {
   open: boolean;
@@ -15,13 +16,15 @@ interface Props {
   amount: number; // pakasir_amount in rupiah
   itemTitle: string; // e.g. "Show: Title" or "Replay: Title"
   replayId?: string | null;
+  /** 'show' | 'replay' (tied to active show) | 'replay_only' (standalone replay card) */
+  kind?: 'show' | 'replay' | 'replay_only';
 }
 
 type Status = 'form' | 'creating' | 'qr' | 'paid' | 'expired';
 
 const EXPIRY_MS = 30 * 60 * 1000;
 
-export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, amount, itemTitle, replayId }: Props) {
+export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, amount, itemTitle, replayId, kind = 'show' }: Props) {
   const [phone, setPhone] = useState(() => { try { return localStorage.getItem('replaytime-phone') || ''; } catch { return ''; } });
   const [status, setStatus] = useState<Status>('form');
   const [orderId, setOrderId] = useState<string | null>(null);
@@ -59,6 +62,16 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
     if (now - createdAt > EXPIRY_MS) setStatus('expired');
   }, [now, createdAt, status]);
 
+  // Persist purchase locally so user does not need to repurchase next visit.
+  const persistPaid = (token: string) => {
+    if (!token) return;
+    if (kind === 'replay_only' && replayId) {
+      setReplayPurchase(replayId, { token, paidAt: Date.now() });
+    } else if (showId) {
+      setShowPurchase(showId, { token, kind: kind === 'replay' ? 'replay' : 'show', paidAt: Date.now() });
+    }
+  };
+
   // Realtime subscribe to order status when QR shown
   useEffect(() => {
     if (status !== 'qr' || !orderId) return;
@@ -67,7 +80,9 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders', filter: `id=eq.${orderId}` }, (payload: any) => {
         const row = payload?.new;
         if (row?.status === 'paid') {
-          setAccessToken(row.access_token || '');
+          const tok = row.access_token || '';
+          setAccessToken(tok);
+          persistPaid(tok);
           setStatus('paid');
         }
       })
@@ -77,7 +92,9 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
     const poll = setInterval(async () => {
       const { data } = await supabase.from('orders').select('status, access_token').eq('id', orderId).maybeSingle();
       if (data?.status === 'paid') {
-        setAccessToken((data as any).access_token || '');
+        const tok = (data as any).access_token || '';
+        setAccessToken(tok);
+        persistPaid(tok);
         setStatus('paid');
       }
     }, 8000);
@@ -85,6 +102,7 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
       try { supabase.removeChannel(ch); } catch { /* ignore */ }
       clearInterval(poll);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, orderId]);
 
   const normalizePhone = (raw: string) => {
@@ -111,10 +129,11 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
       const { data, error } = await supabase.functions.invoke('create-pakasir-order', {
         body: {
           phone: norm,
-          show_id: showId,
-          replay_id: replayId || null,
+          show_id: kind === 'replay_only' ? undefined : showId,
+          replay_id: replayId || undefined,
           item_title: itemTitle,
           amount,
+          kind,
         },
       });
       if (error) throw error;

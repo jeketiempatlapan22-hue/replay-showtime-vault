@@ -30,37 +30,55 @@ Deno.serve(async (req) => {
   try {
     const body = await req.json().catch(() => ({}));
     const showId = String(body.show_id ?? '');
-    const kind = String(body.kind ?? 'show'); // 'show' | 'replay'
+    const replayId = String(body.replay_id ?? '');
+    const kind = String(body.kind ?? 'show'); // 'show' | 'replay' | 'replay_only'
     const phone = normalizePhone(String(body.phone ?? ''));
 
-    if (!showId) return new Response(JSON.stringify({ error: 'missing show_id' }), { status: 400, headers: corsHeaders });
     if (!validPhone(phone)) return new Response(JSON.stringify({ error: 'invalid phone' }), { status: 400, headers: corsHeaders });
-    if (kind !== 'show' && kind !== 'replay') return new Response(JSON.stringify({ error: 'invalid kind' }), { status: 400, headers: corsHeaders });
+    if (!['show', 'replay', 'replay_only'].includes(kind)) {
+      return new Response(JSON.stringify({ error: 'invalid kind' }), { status: 400, headers: corsHeaders });
+    }
 
     const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
-
-    const { data: show, error: showErr } = await admin
-      .from('active_shows').select('*').eq('id', showId).maybeSingle();
-    if (showErr || !show) return new Response(JSON.stringify({ error: 'show not found' }), { status: 404, headers: corsHeaders });
-
-    const amount = kind === 'replay'
-      ? Number(show.price_replay || show.pakasir_amount || 0)
-      : Number(show.price_show || show.pakasir_amount || 0);
-    if (!amount || amount < 100) return new Response(JSON.stringify({ error: 'invalid amount' }), { status: 400, headers: corsHeaders });
-
     const slug = Deno.env.get('PAKASIR_PROJECT_SLUG');
     if (!slug) return new Response(JSON.stringify({ error: 'pakasir not configured' }), { status: 500, headers: corsHeaders });
 
-    const orderId = genOrderId();
-    const itemTitle = `${kind === 'replay' ? 'Replay' : 'Show'} • ${show.title}`;
+    let amount = 0;
+    let itemTitle = '';
+    let resolvedShowId: string | null = null;
+    let resolvedReplayId: string | null = null;
 
-    // Pakasir dynamic QRIS URL pattern (web-checkout)
+    if (kind === 'replay_only') {
+      // Standalone replay purchase — default Rp 2.000 if not provided.
+      if (!replayId) return new Response(JSON.stringify({ error: 'missing replay_id' }), { status: 400, headers: corsHeaders });
+      const { data: replay, error: rerr } = await admin
+        .from('replays').select('id, title').eq('id', replayId).maybeSingle();
+      if (rerr || !replay) return new Response(JSON.stringify({ error: 'replay not found' }), { status: 404, headers: corsHeaders });
+      amount = Math.max(2000, Number(body.amount || 0) || 2000);
+      itemTitle = `Replay • ${replay.title}`;
+      resolvedReplayId = replay.id;
+    } else {
+      if (!showId) return new Response(JSON.stringify({ error: 'missing show_id' }), { status: 400, headers: corsHeaders });
+      const { data: show, error: showErr } = await admin
+        .from('active_shows').select('*').eq('id', showId).maybeSingle();
+      if (showErr || !show) return new Response(JSON.stringify({ error: 'show not found' }), { status: 404, headers: corsHeaders });
+      amount = kind === 'replay'
+        ? Number(show.price_replay || show.pakasir_amount || 0)
+        : Number(show.price_show || show.pakasir_amount || 0);
+      itemTitle = `${kind === 'replay' ? 'Replay' : 'Show'} • ${show.title}`;
+      resolvedShowId = show.id;
+      resolvedReplayId = kind === 'replay' ? show.replay_id : null;
+    }
+
+    if (!amount || amount < 100) return new Response(JSON.stringify({ error: 'invalid amount' }), { status: 400, headers: corsHeaders });
+
+    const orderId = genOrderId();
     const qrUrl = `https://app.pakasir.com/pay/${slug}/${orderId}?amount=${amount}&qris_only=1`;
 
     const { data: order, error: orderErr } = await admin.from('orders').insert({
       user_phone: phone,
-      replay_id: kind === 'replay' ? show.replay_id : null,
-      show_id: show.id,
+      replay_id: resolvedReplayId,
+      show_id: resolvedShowId,
       item_title: itemTitle,
       amount,
       status: 'pending',
