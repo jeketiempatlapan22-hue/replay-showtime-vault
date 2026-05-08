@@ -358,6 +358,10 @@ export default function Live() {
           <>
             {liveActive && activeSource ? (
               <>
+                {activeSource.type === 'm3u8'
+                  ? <HlsPlayer key={`m3u8-${safeIdx}-${activeSource.url}`} src={activeSource.url} title={unlocked.title} watermark={unlocked.watermark} />
+                  : <EmbedPlayer key={`em-${safeIdx}-${activeSource.url}`} type={activeSource.type} source={activeSource.url} title={unlocked.title} watermark={unlocked.watermark} />}
+
                 <div className="flex items-center justify-between flex-wrap gap-2 px-1">
                   <div className="text-xs text-muted-foreground">
                     Sumber aktif: <span className="font-semibold text-foreground">{activeSource.label || 'Player'}</span>
@@ -372,7 +376,7 @@ export default function Live() {
                   <div className="flex items-center gap-2 overflow-x-auto pb-1">
                     {allSources.map((s, i) => (
                       <button
-                        key={i}
+                        key={`${s.type}-${s.url}-${i}`}
                         type="button"
                         onClick={() => selectSource(i)}
                         className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
@@ -384,10 +388,6 @@ export default function Live() {
                     ))}
                   </div>
                 )}
-
-                {activeSource.type === 'm3u8'
-                  ? <HlsPlayer key={`m3u8-${safeIdx}-${activeSource.url}`} src={activeSource.url} title={unlocked.title} watermark={unlocked.watermark} />
-                  : <EmbedPlayer key={`em-${safeIdx}-${activeSource.url}`} type={activeSource.type} source={activeSource.url} title={unlocked.title} watermark={unlocked.watermark} />}
               </>
             ) : (
               <ScheduleCountdown
