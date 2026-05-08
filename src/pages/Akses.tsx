@@ -41,9 +41,8 @@ export default function Akses() {
         .maybeSingle();
       if (error || !data) {
         setError('Replay tidak ditemukan.');
-      } else if (data.access_token && data.access_token !== token) {
-        setError('Token tidak valid atau sudah kadaluarsa.');
       } else {
+        // Validasi penuh dilakukan server-side saat pemutaran (master atau personal token).
         setReplay(data as ReplayLite);
       }
       setLoading(false);

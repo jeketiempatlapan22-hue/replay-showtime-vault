@@ -86,18 +86,23 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
       return;
     }
 
-    getReplaySource(replay.id, token ? { accessToken: token } : { password }).then((src) => {
+    getReplaySource(replay.id, token ? { accessToken: token } : { password }).then((res) => {
       if (cancelled) return;
-      if (!src) {
+      if (!res.data) {
         try {
           sessionStorage.removeItem(`replaytime-pw-${replay.id}`);
           sessionStorage.removeItem(`replaytime-tok-${replay.id}`);
         } catch { /* ignore */ }
         setSourceLoading(false);
         setNeedsPassword(true);
+        if (res.reason === 'device_limit') {
+          import('@/hooks/use-toast').then(({ toast }) => {
+            toast({ title: 'Token sudah dipakai', description: 'Token satuan ini sudah digunakan di perangkat lain.', variant: 'destructive' });
+          });
+        }
         return;
       }
-      setSource(src);
+      setSource(res.data);
       setSourceLoading(false);
     });
 
@@ -141,11 +146,11 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
     if (!trimmed) { setPwError('Sandi wajib diisi.'); return; }
     setPwChecking(true);
     setPwError('');
-    const src = await getReplaySource(replay.id, { password: trimmed });
+    const res = await getReplaySource(replay.id, { password: trimmed });
     setPwChecking(false);
-    if (src) {
+    if (res.data) {
       try { sessionStorage.setItem(`replaytime-pw-${replay.id}`, trimmed); } catch { /* ignore */ }
-      setSource(src);
+      setSource(res.data);
       setNeedsPassword(false);
       setPwInput('');
     } else {

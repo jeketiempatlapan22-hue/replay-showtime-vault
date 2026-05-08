@@ -88,6 +88,18 @@ Deno.serve(async (req) => {
     .delete()
     .lt('received_at', new Date(Date.now() - 5 * 60_000).toISOString());
 
+  // Per-phone rate limit: max 1 reply per 8 seconds
+  const RL_WINDOW_MS = 8000;
+  const { data: rl } = await admin.from('bot_rate_limit')
+    .select('last_sent_at').eq('phone', phoneNorm).maybeSingle();
+  if (rl?.last_sent_at && Date.now() - new Date(rl.last_sent_at).getTime() < RL_WINDOW_MS) {
+    return new Response('ok', { headers: corsHeaders });
+  }
+  await admin.from('bot_rate_limit').upsert({ phone: phoneNorm, last_sent_at: new Date().toISOString() });
+  // Janitor for rate limit (>10 min)
+  await admin.from('bot_rate_limit').delete()
+    .lt('last_sent_at', new Date(Date.now() - 10 * 60_000).toISOString());
+
   const lower = text.toLowerCase();
   const [cmd, ...rest] = lower.split(/\s+/);
   const arg = rest.join(' ').trim();
@@ -106,7 +118,7 @@ Deno.serve(async (req) => {
   }
 
   // Admin-only commands
-  const ADMIN_ONLY = new Set(['/buattoken']);
+  const ADMIN_ONLY = new Set(['/buattoken', '/tokensatuan']);
   let isBotAdmin = false;
   if (ADMIN_ONLY.has(cmd)) {
     const { data: ba } = await admin
@@ -212,8 +224,45 @@ Deno.serve(async (req) => {
           });
         }
       }
+    } else if (cmd === '/tokensatuan') {
+      const origin = map.get('site_origin') || '';
+      const parts = arg.split(/\s+/).filter(Boolean);
+      const code = (parts[0] || '').toLowerCase();
+      const label = parts.slice(1).join(' ').trim();
+      if (!code) {
+        reply = 'ℹ️ Format: */tokensatuan <kode> [label]*\n_Kode = 8 karakter pertama ID replay._\nKetik */buattoken* untuk melihat daftar replay.';
+      } else {
+        const { data: matches } = await admin
+          .from('replays')
+          .select('id,title')
+          .ilike('id', `${code}%`)
+          .limit(2);
+        if (!matches?.length) {
+          reply = `❌ Replay dengan kode *${code}* tidak ditemukan.`;
+        } else if (matches.length > 1) {
+          reply = `⚠️ Kode *${code}* ambigu. Gunakan kode lebih panjang.`;
+        } else {
+          const r = matches[0];
+          const tokenStr = crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, '').slice(0, 8);
+          const { data: pt, error: ptErr } = await admin
+            .from('replay_personal_tokens')
+            .insert({ replay_id: r.id, token: tokenStr, label: label || `Bot ${phoneNorm}`, max_devices: 1 })
+            .select('token').single();
+          if (ptErr || !pt) {
+            reply = `❌ Gagal membuat token satuan.`;
+          } else {
+            const link = `${origin}/akses?token=${pt.token}&replay=${r.id}`;
+            reply = `✅ *Token Satuan (1 device)*\n\n${r.title}\n🔗 ${link}\n\n_Hanya bisa dipakai oleh 1 perangkat pertama yang membuka._`;
+            await admin.from('token_deliveries').insert({
+              phone: phoneNorm, replay_id: r.id, replay_title: r.title,
+              access_token: pt.token, link, source: 'bot', requested_by: phoneNorm,
+            });
+          }
+        }
+      }
     }
   }
+
 
   await sendFonnte(phoneNorm, reply || '✅ OK');
   await admin.from('wa_outbox').insert({

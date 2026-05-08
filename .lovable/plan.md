@@ -1,91 +1,104 @@
-# Rencana: Live Access, Watermark Token, & Fix DevTools
+## Goals
 
-## 1. Token Live (Admin Panel) — buat/revoke/salin cepat
+1. Stop bot WhatsApp dari spam/balasan beruntun ke nomor yang sama.
+2. Tambah jenis token replay baru: **token satuan** (1 user, 1 device).
+3. Pertahankan **token master publik** (link yang bisa dibuka banyak orang) yang sudah ada.
+4. Bot bisa membuat kedua jenis token via WhatsApp.
+5. Rapikan halaman Admin dengan menu hamburger (drawer) menggantikan deretan tab.
+6. Jangan ganggu pemutaran replay yang sudah berjalan.
 
-Edit `src/pages/Admin.tsx` (tab Live → seksi Token):
-- Hilangkan input **Label**. Form pembuatan token cukup 2 elemen sebaris: input angka **Jumlah Device** + tombol **+ Buat Token**.
-- Tabel token tampilkan kolom: **Kode (RT-XXXX)**, Token (truncate), Device terpakai/maks, Status (Aktif/Dicabut), Aksi (📋 Salin Link, 🔄 Reset Device, ⛔ Revoke/Aktifkan, 🗑 Hapus).
-- Tambah aksi **Revoke** baru (toggle `revoked`) — selama ini hanya Hapus. User dgn token yang di-revoke otomatis tidak bisa unlock & player live miliknya akan kick keluar (lihat §4 realtime).
-- Label `RT-XXXX` = `RT-` + 4 karakter terakhir token. Ini juga yg muncul di watermark (§3) supaya admin tinggal cocokkan & klik Revoke.
+---
 
-Edit `supabase/functions/manage-live/index.ts`:
-- `create_token`: label opsional (default `''`), tetap simpan; tidak wajib di body.
-- Tambah action baru `revoke_token` `{ id, revoked: bool }` yang update kolom `revoked`.
+## 1. Rate limit bot per nomor
 
-## 2. Aktifkan Kembali Sandi Live (selain token link)
+**Database — migrasi baru:**
+```
+CREATE TABLE bot_rate_limit (
+  phone text PRIMARY KEY,
+  last_sent_at timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE bot_rate_limit ENABLE ROW LEVEL SECURITY;
+-- (no public policies; service role only)
+```
 
-Edit `supabase/functions/unlock-live/index.ts`:
-- Terima `{ password?, token?, browser_id }`. Jika ada `token` → alur lama (device lock). Jika tidak ada token tapi ada `password` & cocok dengan `live_config_private.password` (& `require_password=true`) → unlock; tapi jangan kirimkan watermark token (set `watermark = "RT-PWD"` agar admin tahu sumber password).
-- Validasi: jika keduanya kosong → `password_or_token_required`.
-- Response sukses tambahkan `watermark: "RT-XXXX"` (4 char terakhir token) atau `"RT-PWD"`.
+**Edge function `fonnte-webhook`:**
+- Setelah dedup, sebelum membalas: cek `bot_rate_limit.phone = phoneNorm`.
+- Bila `now() - last_sent_at < 8 detik` → return tanpa membalas (silent drop).
+- Bila lolos → upsert `last_sent_at = now()` dan lanjut proses.
+- Janitor: hapus baris > 10 menit.
 
-Edit `src/pages/Live.tsx`:
-- Jika tidak ada token URL & belum unlock → tampilkan form sandi (Input + tombol "Buka") DAN tombol "Punya link token? Buka link Anda".
-- Simpan `watermark` ke state & sessionStorage.
+Kombinasi dengan `bot_inbox_dedup` yang sudah ada memastikan: webhook duplikat diabaikan, dan kalau pun lolos, satu nomor maksimal dapat 1 balasan per 8 detik.
 
-Edit `src/pages/Admin.tsx` (tab Live):
-- Kembalikan input **Sandi Live** + switch **Wajib Sandi**. Kirim ke `manage-live` set_config (sudah ada di backend).
+---
 
-## 3. Watermark RT-XXXX di Player Live
+## 2. Token satuan replay (1 user / 1 device)
 
-Buat komponen baru `src/components/LiveWatermark.tsx`:
-- Overlay absolute pojok (rotasi posisi tiap ~12 detik antara 4 sudut agar sulit di-crop), `pointer-events:none`, opacity ~0.55, font monospace, background blur ringan.
-- Props: `code: string` (mis. `"RT-1A2B"`).
+Token master publik yang sudah ada (`replays.access_token`) tetap dipertahankan apa adanya — link ini bisa dibuka banyak orang dan banyak device.
 
-Edit `src/components/HlsPlayer.tsx` & `src/components/EmbedPlayer.tsx`:
-- Terima prop opsional `watermark?: string`. Render `<LiveWatermark>` di dalam container player setelah video/iframe.
+**Tabel baru:**
+```
+CREATE TABLE replay_personal_tokens (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  replay_id uuid NOT NULL,
+  token text NOT NULL UNIQUE,
+  label text DEFAULT '',
+  max_devices int NOT NULL DEFAULT 1,
+  revoked boolean NOT NULL DEFAULT false,
+  created_at timestamptz DEFAULT now()
+);
 
-Edit `src/pages/Live.tsx`:
-- Teruskan `watermark` ke kedua player.
+CREATE TABLE replay_token_devices (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  token_id uuid NOT NULL REFERENCES replay_personal_tokens(id) ON DELETE CASCADE,
+  browser_id text NOT NULL,
+  created_at timestamptz DEFAULT now(),
+  UNIQUE(token_id, browser_id)
+);
+```
+RLS: admin-only ALL untuk kedua tabel; insert device dilakukan oleh service role di edge function.
 
-## 4. Realtime Kick saat Token Direvoke / Dihapus
+**Edge function `get-replay-source` (update):**
+- Kalau `access_token` cocok dengan `replays.access_token` → master path (perilaku lama, tanpa device lock).
+- Kalau tidak cocok, lookup di `replay_personal_tokens`:
+  - jika ditemukan, tidak revoked, dan `replay_id` cocok → wajib `browser_id` di body. Cek/insert ke `replay_token_devices` mirip pola `unlock-live`. Bila count ≥ `max_devices` dan device belum terdaftar → tolak (`device_limit`).
+  - Bila lolos → kembalikan source (sama format seperti master).
 
-Edit `src/pages/Live.tsx`:
-- Tambah subscribe ke channel `postgres_changes` tabel `live_tokens` (filter event UPDATE/DELETE). Saat ada perubahan, panggil `unlock-live` ulang (silent) dengan token URL; jika respons tidak `valid` → reset state (`unlocked=null`, hapus sessionStorage), tampilkan pesan "Akses dicabut admin".
-- Migrasi DB: `ALTER PUBLICATION supabase_realtime ADD TABLE public.live_tokens;` + set `REPLICA IDENTITY FULL`.
+**Frontend `Akses.tsx` & `Index.tsx`:**
+- `Akses.tsx` menerima token apa pun. Validasi ringan: cek `replays.id`. Tidak lagi memblokir bila `access_token != token` (token bisa berasal dari `replay_personal_tokens`). Validasi penuh tetap dilakukan server-side oleh `get-replay-source`.
+- Saat panggil `getReplaySource`, kirim juga `browser_id` (dari `getBrowserId()`) supaya device-lock berfungsi. Kalau response `device_limit`, tampilkan toast "Token sudah dipakai di perangkat lain".
 
-## 5. CTA "Beli Show" untuk User Tanpa Akses
+Halaman replay/embed/HLS/YouTube tidak diubah — flow tetap "sessionStorage token → fetch source → render player".
 
-Edit `src/pages/Live.tsx` di state "akses terkunci":
-- Heading besar **"Beli Show"** + deskripsi singkat ("Hubungi admin untuk mendapatkan token akses live.").
-- Tombol utama hijau **"Hubungi Admin via WhatsApp"** → `https://wa.me/6288809048431?text=Halo%20admin%2C%20saya%20ingin%20beli%20akses%20show%20live.` (target `_blank`, `rel="noopener"`).
-- Form sandi tetap di bawahnya (collapsible).
+**Admin UI — sub-section di tab Replay:**
+- Pada baris setiap replay, tombol "Token Satuan" buka dialog: list token personal (label, dipakai/limit, revoke, copy link `/akses?token=...&replay=...`, hapus) + form tambah (label + max_devices, default 1).
 
-## 6. Fix DevTools False-Positive
+---
 
-Edit `src/hooks/useDevToolsDetector.ts`:
-- **Buang** strategi `console.debug(probe)` + getter trick — ini false-positive di banyak browser modern (extension, React DevTools, atau preview iframe Lovable mem-format objek).
-- **Buang** `console.clear()` periodik (mengganggu user & kadang trigger detector lain).
-- Detector hanya pakai size-diff dengan threshold lebih ketat: `SIZE_THRESHOLD = 320`, `CONFIRM_COUNT = 4` (≥6 detik konsisten), dan **skip total** jika:
-  - viewport mobile (`innerWidth < 900` atau `window.matchMedia('(pointer: coarse)').matches`)
-  - di iframe (`window.top !== window.self`) — preview Lovable jalan di iframe
-  - device pixel ratio aneh / zoom (`Math.abs(window.devicePixelRatio - Math.round(window.devicePixelRatio)) > 0.1` cukup → skip karena zoom UI bikin diff)
-- Tetap blokir F12 / Ctrl+Shift+I/J/C dan right-click (instant trigger).
-- Hapus interval check jika sudah triggered.
+## 3. Bot bisa buat kedua jenis token
 
-## 7. Penegakan Device-Lock yang Sebenarnya
+Tambahkan command (insert ke `bot_commands`):
+- `/buattoken <kode>` (sudah ada) → master publik (perilaku lama, tetap).
+- `/tokensatuan <kode> [label]` → buat 1 token personal (max_devices=1), balas link `/akses`.
+  - Tetap admin-only (`bot_admins` whitelist).
+  - Catat ke `token_deliveries` dengan `source='bot'`.
+- `/menu` di-update agar menampilkan command baru.
 
-Saat ini `unlock-live` sudah cek `browser_id` di `live_token_devices`. Tambahkan:
-- Edit `unlock-live/index.ts`: gunakan transaksi soft — gunakan `upsert` `(token_id, browser_id)` dengan unique index agar concurrent request tak melebihi limit. Tambah migrasi:
-  ```sql
-  CREATE UNIQUE INDEX IF NOT EXISTS live_token_devices_token_browser_uniq
-    ON public.live_token_devices(token_id, browser_id);
-  ```
-- Sebelum insert: hitung lagi `count` dgn `head: true`; jika `>= max_devices` → tolak `device_limit`. (Race kecil tapi limit umumnya ≤10, dan unique index memastikan tidak ada duplikat browser_id.)
-- Di `Live.tsx`: simpan `browser_id` yang di-acknowledge server ke sessionStorage; setiap kali tab live aktif (visibilitychange → visible), re-validate via `unlock-live` silent. Jika invalid (mis. admin reset device) → kick.
+---
 
-## 8. File yang Diubah / Dibuat
+## 4. Admin panel: menu hamburger
 
-**Baru**
-- `src/components/LiveWatermark.tsx`
-- Migrasi: unique index `live_token_devices`, enable realtime `live_tokens`.
+**Perubahan `src/pages/Admin.tsx`:**
+- Hapus `TabsList` panjang (10 trigger).
+- Ganti dengan: tombol hamburger di header → buka `Sheet` (`@/components/ui/sheet`) dari kiri berisi daftar menu vertikal (Replay, Show, Live, Member, Bot WA, Riwayat, Preview, Komentar, Blokir, Setelan), tiap item dengan icon + label.
+- Header juga menampilkan label tab aktif (mis. "Admin · Replay").
+- Pertahankan komponen `Tabs` tapi controlled via state `activeTab`; klik di drawer set state lalu tutup drawer.
+- `TabsContent` masing-masing tetap dirender seperti sekarang — tidak menyentuh isi tab supaya tidak ada regresi.
 
-**Diubah**
-- `src/hooks/useDevToolsDetector.ts`
-- `src/pages/Live.tsx` (form sandi, CTA Beli Show, watermark, kick realtime, revalidate)
-- `src/pages/Admin.tsx` (form token tanpa label, kolom kode RT-XXXX, tombol revoke, sandi live UI kembali)
-- `src/components/HlsPlayer.tsx` & `src/components/EmbedPlayer.tsx` (prop watermark)
-- `supabase/functions/manage-live/index.ts` (action `revoke_token`, label opsional)
-- `supabase/functions/unlock-live/index.ts` (password fallback, watermark dalam respons, device-lock ketat)
+---
 
-Setelah disetujui saya implementasi semuanya berurutan + jalankan migrasi & deploy fungsi.
+## Technical details
+
+- Files diubah: `supabase/functions/fonnte-webhook/index.ts`, `supabase/functions/get-replay-source/index.ts`, `src/pages/Akses.tsx`, `src/pages/Index.tsx` (kirim browser_id), `src/pages/Admin.tsx` (drawer + sub-dialog token satuan), `src/components/admin/BotAdmin.tsx` (seed command baru).
+- Files baru: 1 migrasi (3 tabel + RLS + seed `bot_commands` `/tokensatuan`), `src/components/admin/ReplayPersonalTokensDialog.tsx`.
+- Tidak menyentuh `YouTubePlayer`, `HlsPlayer`, `EmbedPlayer`, `ReplayCardComponent` — pemutaran replay tidak terganggu.
+- Memori `mem://security/source-protection` tetap valid: `youtube_id` / `m3u8_url` hanya keluar via `get-replay-source` setelah validasi.
