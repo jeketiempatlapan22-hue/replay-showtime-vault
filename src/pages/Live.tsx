@@ -152,16 +152,25 @@ export default function Live() {
               image_url: data.image_url || '',
             };
           });
-          // CRITICAL: Jangan timpa `url`/`sources` dari query tabel publik (RLS bisa mengembalikan kosong
-          // untuk non-admin). URL privat hanya boleh berasal dari edge function `unlock-live`.
-          // Hanya perbarui metadata yang aman: enabled, title, type. Ini mencegah player live
-          // (m3u8/youtube) di-remount dan kembali ke awal setiap kali admin mengubah row.
-          setUnlocked(prev => prev ? {
-            ...prev,
-            enabled,
-            title: data.title || prev.title,
-            type: (data.live_type as SrcType) || prev.type,
-          } : prev);
+          // Pertahankan URL privat yang sudah aktif agar player tidak remount/loncat ke awal
+          // saat admin mengubah row. Tapi jika belum ada URL (mis. live baru saja diaktifkan)
+          // ATAU live baru transisi off→on, gunakan URL/sources dari tabel publik supaya
+          // player benar-benar mulai (active_shows.live_url & live_sources publik dapat dibaca).
+          const pubMain = (data.live_url || '').trim();
+          const pubPrivSources = toPrivateSources(data.live_sources);
+          setUnlocked(prev => {
+            if (!prev) return prev;
+            const needsUrlRefresh = wasOff && enabled;
+            const hasNoUrl = !prev.url && (prev.sources || []).length === 0;
+            return {
+              ...prev,
+              enabled,
+              title: data.title || prev.title,
+              type: (data.live_type as SrcType) || prev.type,
+              url: (needsUrlRefresh || hasNoUrl) && pubMain ? pubMain : prev.url,
+              sources: (needsUrlRefresh || hasNoUrl) && pubPrivSources.length ? pubPrivSources : prev.sources,
+            };
+          });
           // When live just toggled on, silently re-call unlock to re-validate (token/blocked)
           if (enabled && wasOff) {
             const t = search.get('t');
