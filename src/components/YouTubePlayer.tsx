@@ -80,6 +80,7 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
       password = sessionStorage.getItem(`replaytime-pw-${replay.id}`) || '';
       token = sessionStorage.getItem(`replaytime-tok-${replay.id}`) || '';
     } catch { /* ignore */ }
+    setActiveToken(token);
 
     if (!password && !token) {
       setSourceLoading(false);
