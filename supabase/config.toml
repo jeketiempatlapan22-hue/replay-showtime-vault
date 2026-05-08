@@ -8,3 +8,15 @@ verify_jwt = false
 
 [functions.create-pakasir-order]
 verify_jwt = false
+
+[functions.membership-daily-reset]
+verify_jwt = false
+
+[functions.membership-self-reset]
+verify_jwt = false
+
+[functions.unlock-live]
+verify_jwt = false
+
+[functions.verify-password]
+verify_jwt = false
