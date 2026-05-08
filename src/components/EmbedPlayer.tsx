@@ -92,6 +92,11 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
 
   const isPlayingRef = useRef(false);
   useEffect(() => { isPlayingRef.current = isPlaying; }, [isPlaying]);
+  // Track whether autoplay-mute coercion has already run for the current source so that
+  // subsequent iframe.onLoad / YT onReady events don't re-force mute (and re-show the hint)
+  // after the user has already interacted.
+  const autoMuteAppliedRef = useRef(false);
+  const userUnmutedRef = useRef(false);
 
   const toggleControls = useCallback(() => {
     resetHideTimer();
@@ -100,11 +105,15 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
   const handleFrameLoaded = useCallback(() => {
     markReady(true);
     setIsPlaying(true);
-    // Browser autoplay is most reliable when embeds start muted. Show the same tap-to-unmute flow
-    // instead of reloading the iframe or leaving the user behind a loading overlay.
+    // Apply autoplay-mute coercion only ONCE per source. Once the user has unmuted, never force mute again.
+    if (autoMuteAppliedRef.current || userUnmutedRef.current) return;
+    autoMuteAppliedRef.current = true;
     if (!mutedRef.current) {
       mutedRef.current = true;
       setMuted(true);
+      setShowHint(true);
+    } else {
+      // Persisted-mute case: still show the hint so user can unmute easily.
       setShowHint(true);
     }
   }, [markReady]);
