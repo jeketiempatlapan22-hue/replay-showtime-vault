@@ -286,6 +286,39 @@ export default function Live() {
 
   const liveActive = !!(status?.enabled || unlocked?.enabled);
 
+  // ============ VIEWER COUNTER (presence) ============
+  const showKey = search.get('show') || 'global';
+  const [viewerCount, setViewerCount] = useState<number>(0);
+  useEffect(() => {
+    if (!liveActive || !unlocked) return;
+    const bid = getBrowserId();
+    const channel = supabase.channel(`live-viewers:${showKey}`, {
+      config: { presence: { key: bid } },
+    });
+    const recount = () => {
+      try {
+        const state = channel.presenceState() as Record<string, unknown[]>;
+        setViewerCount(Object.keys(state).length);
+      } catch { /* ignore */ }
+    };
+    channel
+      .on('presence', { event: 'sync' }, recount)
+      .on('presence', { event: 'join' }, recount)
+      .on('presence', { event: 'leave' }, recount)
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          try { await channel.track({ at: Date.now() }); } catch { /* ignore */ }
+          recount();
+        }
+      });
+    const interval = window.setInterval(recount, 10000);
+    return () => {
+      window.clearInterval(interval);
+      try { void channel.untrack(); } catch { /* ignore */ }
+      supabase.removeChannel(channel);
+    };
+  }, [liveActive, unlocked, showKey]);
+
   return (
     <div className="min-h-screen bg-background relative z-10">
       <div className="sticky top-0 z-20 bg-card/90 backdrop-blur border-b border-border px-3 sm:px-4 py-3 flex items-center gap-3">
