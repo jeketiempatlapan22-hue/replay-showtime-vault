@@ -251,9 +251,18 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
         return;
       }
       if (!p || typeof p.pauseVideo !== 'function') return;
-      if (isPlaying) p.pauseVideo(); else p.playVideo();
+      try {
+        const state = p.getPlayerState?.();
+        if (state === 1 || isPlaying) {
+          p.pauseVideo();
+          setIsPlaying(false);
+        } else {
+          p.playVideo();
+          setIsPlaying(true);
+        }
+      } catch { /* ignore */ }
     } else {
-      if (iframeRef.current) iframeRef.current.src = isPlaying ? 'about:blank' : cfEmbedUrl;
+      if (iframeRef.current && iframeRef.current.src === 'about:blank') iframeRef.current.src = cfEmbedUrl;
       cfPost(isPlaying ? 'pause' : 'play');
       setIsPlaying(!isPlaying);
     }
@@ -311,8 +320,9 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
 
   const seekTo = (t: number) => {
     const p = ytPlayerRef.current;
-    if (!p) return;
-    try { p.seekTo(Math.max(0, Math.min(duration || t, t)), true); setCurrentTime(t); } catch { /* ignore */ }
+    if (!p || useYoutubeFallback || !duration) return;
+    const target = Math.max(0, Math.min(duration, t));
+    try { p.seekTo(target, true); setCurrentTime(target); } catch { /* ignore */ }
   };
   const skip = (delta: number) => seekTo((currentTime || 0) + delta);
   const fmtTime = (s: number) => {
@@ -423,6 +433,8 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
               step={0.1}
               value={Math.min(currentTime, duration)}
               onChange={(e) => { setSeeking(true); setCurrentTime(Number(e.target.value)); }}
+              onPointerDown={(e) => { e.stopPropagation(); setSeeking(true); }}
+              onPointerUp={(e) => { e.stopPropagation(); seekTo(Number((e.target as HTMLInputElement).value)); setSeeking(false); resetHideTimer(); }}
               onMouseUp={(e) => { seekTo(Number((e.target as HTMLInputElement).value)); setSeeking(false); }}
               onTouchEnd={(e) => { seekTo(Number((e.target as HTMLInputElement).value)); setSeeking(false); }}
               aria-label="Seek"
