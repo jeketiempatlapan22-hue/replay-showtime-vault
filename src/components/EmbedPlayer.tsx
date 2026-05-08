@@ -128,6 +128,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
       return;
     }
     let cancelled = false;
+    let initialized = false;
     // Safety net: jangan biarkan overlay koneksi menutup iframe bila API/onLoad lambat atau diblokir.
     ytFallbackTimerRef.current = setTimeout(() => {
       if (cancelled || readyRef.current) return;
@@ -137,9 +138,10 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
 
     const init = () => {
       if (cancelled || !iframeRef.current) return;
+      if (initialized) return;
       const YT = (window as YoutubeWindow).YT;
       if (!YT?.Player) { setTimeout(init, 200); return; }
-      try { ytPlayerRef.current?.destroy?.(); } catch { /* ignore */ }
+      initialized = true;
       ytPlayerRef.current = new YT.Player(iframeRef.current, {
         events: {
           onReady: () => {
@@ -202,7 +204,8 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
     return () => {
       cancelled = true;
       if (ytFallbackTimerRef.current) clearTimeout(ytFallbackTimerRef.current);
-      try { ytPlayerRef.current?.pauseVideo?.(); ytPlayerRef.current?.destroy?.(); } catch { /* ignore */ }
+      try { ytPlayerRef.current?.pauseVideo?.(); } catch { /* ignore */ }
+      ytPlayerRef.current = null;
     };
   }, [ytId, type, markReady]);
 
@@ -318,10 +321,10 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
   };
 
   const ytEmbedUrl = ytId
-    ? `https://www.youtube-nocookie.com/embed/${ytId}?rel=0&modestbranding=1&playsinline=1&autoplay=1&mute=${muted || showHint ? 1 : 0}&controls=0&fs=0&iv_load_policy=3&disablekb=1&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`
+    ? `https://www.youtube-nocookie.com/embed/${ytId}?rel=0&modestbranding=1&playsinline=1&autoplay=1&mute=1&controls=0&fs=0&iv_load_policy=3&disablekb=1&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`
     : '';
   const cfEmbedUrl = cfUid
-    ? `https://iframe.videodelivery.net/${cfUid}?autoplay=true&controls=false&preload=auto&muted=${muted}`
+    ? `https://iframe.videodelivery.net/${cfUid}?autoplay=true&controls=false&preload=auto&muted=true`
     : '';
 
   return (
