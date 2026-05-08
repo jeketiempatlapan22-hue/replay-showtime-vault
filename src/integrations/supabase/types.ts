@@ -170,6 +170,45 @@ export type Database = {
         }
         Relationships: []
       }
+      bot_inbox_events: {
+        Row: {
+          command: string | null
+          created_at: string
+          detail: Json | null
+          device: string | null
+          event_name: string
+          from_me: boolean | null
+          id: string
+          inbox_id: string | null
+          message: string | null
+          phone: string | null
+        }
+        Insert: {
+          command?: string | null
+          created_at?: string
+          detail?: Json | null
+          device?: string | null
+          event_name: string
+          from_me?: boolean | null
+          id?: string
+          inbox_id?: string | null
+          message?: string | null
+          phone?: string | null
+        }
+        Update: {
+          command?: string | null
+          created_at?: string
+          detail?: Json | null
+          device?: string | null
+          event_name?: string
+          from_me?: boolean | null
+          id?: string
+          inbox_id?: string | null
+          message?: string | null
+          phone?: string | null
+        }
+        Relationships: []
+      }
       bot_rate_limit: {
         Row: {
           last_sent_at: string
