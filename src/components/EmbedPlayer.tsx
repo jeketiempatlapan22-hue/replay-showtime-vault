@@ -266,7 +266,13 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
         setShowHint(false);
         return;
       }
-      if (!p || typeof p.mute !== 'function') return;
+      if (!p || typeof p.mute !== 'function') {
+        if (iframeRef.current && ytId) {
+          iframeRef.current.src = `https://www.youtube-nocookie.com/embed/${ytId}?rel=0&modestbranding=1&playsinline=1&autoplay=1&mute=${m ? 1 : 0}&controls=0&fs=0&iv_load_policy=3&disablekb=1&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`;
+        }
+        if (!m) setShowHint(false);
+        return;
+      }
       if (m) p.mute(); else { p.unMute?.(); p.setVolume?.(Math.round(volume * 100)); p.playVideo?.(); }
     } else {
       cfPost(m ? 'mute' : 'unmute');
@@ -282,7 +288,13 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
     if (type === 'youtube') {
       const p = ytPlayerRef.current;
       if (useYoutubeFallback) return;
-      if (!p || typeof p.setVolume !== 'function') return;
+      if (!p || typeof p.setVolume !== 'function') {
+        if (v > 0 && iframeRef.current && ytId) {
+          iframeRef.current.src = `https://www.youtube-nocookie.com/embed/${ytId}?rel=0&modestbranding=1&playsinline=1&autoplay=1&mute=0&controls=0&fs=0&iv_load_policy=3&disablekb=1&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`;
+          setShowHint(false);
+        }
+        return;
+      }
       p.setVolume(Math.round(v * 100));
       if (v > 0) p.unMute();
     } else {
