@@ -156,7 +156,11 @@ export default function ShowLiveControl({ showId, showTitle }: Props) {
             <option value="youtube">YouTube</option>
             <option value="cloudflare">Cloudflare</option>
           </select>
-          <Input placeholder="URL atau ID video" value={newUrl} onChange={e => setNewUrl(e.target.value)} />
+          {newType === 'youtube' ? (
+            <YouTubeIdInput value={newUrl} onChange={setNewUrl} placeholder="URL YouTube atau ID 11 karakter" />
+          ) : (
+            <Input placeholder={newType === 'cloudflare' ? 'Cloudflare UID atau URL' : 'https://...m3u8'} value={newUrl} onChange={e => setNewUrl(e.target.value)} />
+          )}
           <Button type="button" onClick={addSource} size="sm"><Plus className="w-4 h-4 mr-1" />Tambah</Button>
         </div>
         {liveSources.length > 0 && (
