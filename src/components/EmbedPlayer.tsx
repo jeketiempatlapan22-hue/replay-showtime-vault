@@ -222,16 +222,20 @@ export default function EmbedPlayer({ type, source, title, watermark }: Props) {
       style={{ paddingBottom: isFullscreen ? '0' : '56.25%', height: isFullscreen ? '100%' : undefined }}
       onContextMenu={(e) => e.preventDefault()}
     >
-      <iframe
-        ref={iframeRef}
-        src={type === 'youtube' ? ytEmbedUrl : cfEmbedUrl}
-        className="absolute inset-0 w-full h-full pointer-events-none"
-        title={title}
-        allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
-        allowFullScreen
-        referrerPolicy="strict-origin-when-cross-origin"
-        style={{ border: 0 }}
-      />
+      {type === 'youtube' ? (
+        <div ref={ytMountRef} className="absolute inset-0 w-full h-full" />
+      ) : (
+        <iframe
+          ref={iframeRef}
+          src={cfEmbedUrl}
+          className="absolute inset-0 w-full h-full pointer-events-none"
+          title={title}
+          allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+          allowFullScreen
+          referrerPolicy="strict-origin-when-cross-origin"
+          style={{ border: 0 }}
+        />
+      )}
 
       {/* Anti-click overlay - covers entire iframe to block YouTube logo / Watch on YT button. Click does NOT toggle play. */}
       <div className="absolute inset-0" onClick={(e) => e.preventDefault()} />
