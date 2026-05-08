@@ -9,6 +9,7 @@ import HlsPlayer from '@/components/HlsPlayer';
 import EmbedPlayer from '@/components/EmbedPlayer';
 import { type ActiveShow, getShowDateTime } from '@/lib/activeShows';
 import { useNavigate } from 'react-router-dom';
+import { getShowPurchase } from '@/lib/purchases';
 
 const CATEGORY_LABELS: Record<string, string> = {
   reguler: 'Reguler', sts: 'STS', last_show: 'Last Show', aniv: 'Anniversary', special: 'Show Spesial',
