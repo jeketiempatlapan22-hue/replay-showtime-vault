@@ -209,18 +209,30 @@ export default function ShowLiveTokensDialog({ open, onOpenChange, showId, showT
                   <div className="border-t border-border pt-2 space-y-1">
                     {devs.length === 0 ? (
                       <p className="text-[11px] text-muted-foreground italic">Belum ada perangkat terhubung.</p>
-                    ) : devs.map(d => (
-                      <div key={d.id} className="flex items-center gap-2 text-[11px] bg-secondary/30 rounded p-1.5">
+                    ) : devs.map(d => {
+                      const isBlk = !!blocked[d.browser_id];
+                      return (
+                      <div key={d.id} className={`flex items-center gap-2 text-[11px] rounded p-1.5 ${isBlk ? 'bg-destructive/10 border border-destructive/30' : 'bg-secondary/30'}`}>
                         <Smartphone className="w-3 h-3 text-muted-foreground shrink-0" />
                         <div className="flex-1 min-w-0">
-                          <code className="break-all text-foreground">{d.browser_id.slice(0, 20)}…</code>
+                          <code className="break-all text-foreground">{d.browser_id.slice(0, 20)}…{isBlk && <Badge variant="destructive" className="ml-1 text-[9px]">DIBLOKIR</Badge>}</code>
                           <p className="text-[10px] text-muted-foreground">{new Date(d.created_at).toLocaleString('id-ID')}</p>
                         </div>
-                        <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-destructive" onClick={() => removeDevice(d.id)}>
+                        {isBlk ? (
+                          <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-green-600" title="Buka blokir" onClick={() => unblockBrowser(d.browser_id)}>
+                            <ShieldCheck className="w-3 h-3" />
+                          </Button>
+                        ) : (
+                          <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-orange-600" title="Blokir perangkat" onClick={() => blockBrowser(d.browser_id)}>
+                            <ShieldOff className="w-3 h-3" />
+                          </Button>
+                        )}
+                        <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-destructive" title="Reset device" onClick={() => removeDevice(d.id)}>
                           <Trash2 className="w-3 h-3" />
                         </Button>
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
