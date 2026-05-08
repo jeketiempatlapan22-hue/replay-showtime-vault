@@ -347,7 +347,7 @@ export default function Live() {
   const showKey = search.get('show') || 'global';
   const [viewerCount, setViewerCount] = useState<number>(0);
   useEffect(() => {
-    if (!liveActive) return;
+    if (!liveActive) { setViewerCount(0); return; }
     const bid = getBrowserId();
     const channel = supabase.channel(`live-viewers:${showKey}`, {
       config: { presence: { key: bid } },
@@ -359,24 +359,35 @@ export default function Live() {
         pending = null;
         try {
           const state = channel.presenceState() as Record<string, unknown[]>;
+          // Each unique presence key (browser_id) counts once even with multiple tabs
           const unique = new Set<string>();
-          for (const k of Object.keys(state)) if (k) unique.add(k);
+          for (const k of Object.keys(state)) if (k && Array.isArray(state[k]) && state[k].length > 0) unique.add(k);
           setViewerCount(unique.size);
         } catch { /* ignore */ }
-      }, 1500);
+      }, 600);
     };
     let tracked = false;
+    let heartbeat: number | null = null;
     channel
       .on('presence', { event: 'sync' }, recount)
+      .on('presence', { event: 'join' }, recount)
+      .on('presence', { event: 'leave' }, recount)
       .subscribe(async (status) => {
         if (status === 'SUBSCRIBED' && !tracked) {
           tracked = true;
           try { await channel.track({ at: Date.now() }); } catch { /* ignore */ }
           recount();
+          // Heartbeat: re-track every 25s so phantom presences expire & counter stays accurate
+          heartbeat = window.setInterval(() => {
+            if (document.visibilityState === 'visible') {
+              channel.track({ at: Date.now() }).catch(() => {});
+            }
+          }, 25000);
         }
       });
     return () => {
       if (pending) window.clearTimeout(pending);
+      if (heartbeat) window.clearInterval(heartbeat);
       try { void channel.untrack(); } catch { /* ignore */ }
       supabase.removeChannel(channel);
     };
