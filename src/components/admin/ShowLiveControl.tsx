@@ -8,6 +8,8 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import YouTubeIdInput from '@/components/admin/YouTubeIdInput';
+import { parseYouTubeId } from '@/lib/youtube';
 
 type SrcType = 'm3u8' | 'youtube' | 'cloudflare';
 interface LiveSource { label: string; type: SrcType; url: string }
