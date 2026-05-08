@@ -213,7 +213,7 @@ export default function ShowLiveControl({ showId, showTitle }: Props) {
         </div>
         <div>
           <Label className="text-xs">Link YouTube (URL atau ID)</Label>
-          <Input value={replayYt} onChange={e => setReplayYt(e.target.value)} placeholder="https://youtu.be/... atau ID 11 karakter" />
+          <YouTubeIdInput value={replayYt} onChange={setReplayYt} placeholder="URL YouTube (live/watch/youtu.be) atau ID 11 karakter" />
         </div>
       </div>
 
