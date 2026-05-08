@@ -412,25 +412,26 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
         style={{ touchAction: 'manipulation' }}
         onClick={(e) => e.stopPropagation()}
       >
-        {type === 'youtube' && duration > 0 && (
+        {type === 'youtube' && (
           <div className="flex items-center gap-1.5 sm:gap-2 mb-2 text-white text-[10px] sm:text-xs tabular-nums" onClick={(e) => e.stopPropagation()}>
-            <span className="w-10 sm:w-14 text-left shrink-0">{fmtTime(currentTime)}</span>
+            <span className="w-10 sm:w-14 text-left shrink-0">{duration > 0 ? fmtTime(currentTime) : '--:--'}</span>
             <input
               type="range"
               min={0}
-              max={duration}
+              max={duration > 0 ? duration : 1}
               step={0.1}
-              value={Math.min(currentTime, duration)}
+              value={duration > 0 ? Math.min(currentTime, duration) : 0}
+              disabled={duration <= 0}
               onChange={(e) => { setSeeking(true); setCurrentTime(Number(e.target.value)); }}
               onPointerDown={(e) => { e.stopPropagation(); setSeeking(true); }}
               onPointerUp={(e) => { e.stopPropagation(); seekTo(Number((e.target as HTMLInputElement).value)); setSeeking(false); resetHideTimer(); }}
               onMouseUp={(e) => { e.stopPropagation(); seekTo(Number((e.target as HTMLInputElement).value)); setSeeking(false); }}
               onTouchEnd={(e) => { e.stopPropagation(); seekTo(Number((e.target as HTMLInputElement).value)); setSeeking(false); }}
               aria-label="Seek"
-              className="min-w-0 flex-1 h-2 accent-primary cursor-pointer"
+              className="min-w-0 flex-1 h-2 accent-primary cursor-pointer disabled:opacity-60"
               style={{ touchAction: 'manipulation' }}
             />
-            <span className="w-10 sm:w-14 text-right shrink-0">{fmtTime(duration)}</span>
+            <span className="w-10 sm:w-14 text-right shrink-0">{duration > 0 ? fmtTime(duration) : '--:--'}</span>
           </div>
         )}
         <div className="flex items-center gap-1 sm:gap-2 min-w-0" onClick={(e) => e.stopPropagation()}>
