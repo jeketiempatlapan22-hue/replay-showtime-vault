@@ -460,11 +460,35 @@ Deno.serve(async (req) => {
         else if (matches.length > 1) reply = `⚠️ Kode *${code}* ambigu (${matches.length} match). Gunakan kode lebih panjang atau alias unik.`;
         else {
           const r = matches[0];
-          const res = await callCreateToken({
-            kind: 'master', replay_id: r.id, source: 'bot', requested_by: phoneNorm,
-            label: `Bot ${phoneNorm}`,
+          const res = await createTokenInline(admin, {
+            kind: 'master', replayId: r.id, requestedBy: phoneNorm,
+            label: `Bot ${phoneNorm}`, settingsMap: map as Map<string, string>,
           });
           reply = res.ok && res.message ? res.message : `❌ Gagal membuat token master. ${res.error || ''}`.trim();
+        }
+      }
+    } else if (cmd === '/createtokenrep') {
+      const code = arg.trim().toLowerCase();
+      if (!code) {
+        reply = 'ℹ️ Format: */createtokenrep <id|alias>*\n_Pakai alias admin yang Anda set di kartu replay, atau 8 karakter pertama ID._';
+      } else {
+        const { data: byAlias } = await admin
+          .from('replays').select('id,title').ilike('admin_alias', code).limit(2);
+        let matches = byAlias ?? [];
+        if (!matches.length) {
+          const { data: byId } = await admin
+            .from('replays').select('id,title').ilike('id', `${code}%`).limit(2);
+          matches = byId ?? [];
+        }
+        if (!matches.length) reply = `❌ Replay dengan id/alias *${code}* tidak ditemukan.`;
+        else if (matches.length > 1) reply = `⚠️ *${code}* ambigu (${matches.length} match). Pakai alias unik atau id yang lebih panjang.`;
+        else {
+          const r = matches[0];
+          const res = await createTokenInline(admin, {
+            kind: 'replay', replayId: r.id, requestedBy: phoneNorm,
+            label: `Bot ${phoneNorm}`, settingsMap: map as Map<string, string>,
+          });
+          reply = res.ok && res.message ? res.message : `❌ Gagal membuat token replay. ${res.error || ''}`.trim();
         }
       }
     } else if (cmd === '/token') {
