@@ -100,7 +100,7 @@ Deno.serve(async (req) => {
   }
 
   // Fonnte sends as multipart/form-data, x-www-form-urlencoded, or json
-  let phone = '', text = '', device = '', fromMe = false;
+  let phone = '', text = '', device = '', fromMe = false, deliverTest = false;
   try {
     const ct = req.headers.get('content-type') || '';
     if (ct.includes('application/json')) {
@@ -109,12 +109,14 @@ Deno.serve(async (req) => {
       device = String(j.device ?? '');
       text = String(j.message ?? j.text ?? '').trim();
       fromMe = j.fromMe === true || j.fromMe === 'true' || j.from_me === true;
+      deliverTest = j.deliver === true || j.deliver === 'true' || j.test_deliver === true;
     } else {
       const fd = await req.formData();
       phone = String(fd.get('sender') ?? fd.get('from') ?? '');
       device = String(fd.get('device') ?? '');
       text = String(fd.get('message') ?? fd.get('text') ?? '').trim();
       fromMe = String(fd.get('fromMe') ?? fd.get('from_me') ?? '') === 'true';
+      deliverTest = String(fd.get('deliver') ?? fd.get('test_deliver') ?? '') === 'true';
     }
   } catch {
     return debug('bad_payload');
@@ -315,7 +317,9 @@ Deno.serve(async (req) => {
 
 
   const finalReply = reply || '✅ OK';
-  const sendResult = testMode ? { ok: true, data: { skipped: true, reason: 'test_mode' } } : await sendFonnte(phoneNorm, finalReply);
+  const sendResult = testMode && !deliverTest
+    ? { ok: true, data: { skipped: true, reason: 'test_mode' } }
+    : await sendFonnte(phoneNorm, finalReply);
   await admin.from('wa_outbox').insert({
     phone: phoneNorm,
     message: finalReply,
@@ -325,7 +329,7 @@ Deno.serve(async (req) => {
   });
 
   if (testMode) {
-    return json({ ok: true, phone: phoneNorm, command: cmd, reply: finalReply });
+    return json({ ok: true, phone: phoneNorm, command: cmd, reply: finalReply, delivered: deliverTest, send: sendResult });
   }
 
   return new Response('ok', { headers: corsHeaders });
