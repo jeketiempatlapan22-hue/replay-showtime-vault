@@ -168,7 +168,14 @@ export default function Live() {
         body: { ...opts, browser_id: getBrowserId(), show_id: showId || undefined },
       });
       if (data?.valid) {
-        const cfg: UnlockedConfig = { title: data.title, type: data.type, url: data.url, sources: Array.isArray(data.sources) ? data.sources : [], watermark: data.watermark || '', enabled: !!data.enabled };
+        const cfg: UnlockedConfig = {
+          title: data.title,
+          type: isSrcType(data.type) ? data.type : 'm3u8',
+          url: data.url || '',
+          sources: toPrivateSources(data.sources),
+          watermark: data.watermark || '',
+          enabled: !!data.enabled,
+        };
         setUnlocked(cfg);
         setKickedMsg('');
         try { sessionStorage.setItem(`${SS_KEY_BASE}${showId?'-'+showId:''}`, JSON.stringify(cfg)); } catch { /* ignore */ }
