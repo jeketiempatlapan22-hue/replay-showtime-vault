@@ -91,19 +91,19 @@ Deno.serve(async (req) => {
   // Only process commands starting with '/' — silently ignore other chatter
   if (!text.startsWith('/')) return new Response('ok', { headers: corsHeaders });
 
-  // Dedup: same phone+message within 60s = duplicate webhook delivery
+  // Dedup: same phone+message within ~20s = duplicate webhook delivery from Fonnte.
+  // Prune FIRST so genuine repeated commands (>20s apart) are not blocked.
   const hash = await sha1(text);
+  await admin.from('bot_inbox_dedup')
+    .delete()
+    .lt('received_at', new Date(Date.now() - 20_000).toISOString());
   const { error: dupErr } = await admin
     .from('bot_inbox_dedup')
     .insert({ phone: phoneNorm, message_hash: hash });
   if (dupErr) {
-    // Likely unique violation → already processed recently
+    // Likely unique violation → already processed in last 20s
     return new Response('ok', { headers: corsHeaders });
   }
-  // Janitor: prune entries older than 30 seconds (short window so commands aren't blocked)
-  await admin.from('bot_inbox_dedup')
-    .delete()
-    .lt('received_at', new Date(Date.now() - 30_000).toISOString());
 
   // Per-phone rate limit: max 1 reply per 8 seconds
   const RL_WINDOW_MS = 8000;
