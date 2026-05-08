@@ -188,15 +188,9 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
 
         const hlsInstance = hlsRef.current;
         if (hlsInstance) {
-          // For live streams: gently nudge to live edge if we've fallen far behind. Do NOT reload.
-          if (isLiveRef.current) {
-            const liveTarget = hlsInstance.liveSyncPosition;
-            if (typeof liveTarget === 'number' && Number.isFinite(liveTarget) && liveTarget > 0 && current < liveTarget - 30) {
-              try { video.currentTime = liveTarget; } catch { /* ignore */ }
-            }
-          }
-          // Resume loading from CURRENT position (preserves playback). Never call recoverMediaError here
-          // because it can reset position to 0 and make a live/VOD stream restart from the beginning.
+          // JANGAN melakukan seek paksa ke live edge — itu menyebabkan video "loncat-loncat".
+          // Cukup minta hls.js melanjutkan loading dari posisi saat ini (-1 = lanjut natural,
+          // untuk live akan otomatis menyesuaikan ke edge tanpa hard seek yang terlihat user).
           try { hlsInstance.startLoad(-1); } catch { /* ignore */ }
         }
         safePlay();
