@@ -79,6 +79,12 @@ export default function Admin() {
   // Preview state
   const [previewReplay, setPreviewReplay] = useState<ReplayRow | null>(null);
 
+  // Personal-token dialog
+  const [personalTokenReplay, setPersonalTokenReplay] = useState<ReplayRow | null>(null);
+
+  // Hamburger drawer
+  const [activeTab, setActiveTab] = useState<string>('replays');
+  const [menuOpen, setMenuOpen] = useState(false);
   // Blocked browsers
   const [blockedBrowsers, setBlockedBrowsers] = useState<Array<{ id: string; browser_id: string; reason: string; unblocked: boolean; created_at: string }>>([]);
 
