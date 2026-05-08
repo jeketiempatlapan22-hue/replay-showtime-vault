@@ -15,6 +15,7 @@ import { getReplaysByMonth, getReplays, getSettings } from '@/lib/store';
 import { type ReplayRow } from '@/lib/store';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { useAutoHideOnInteraction } from '@/hooks/useAutoHideOnInteraction';
 
 const MONTH_NAMES: Record<string, string> = {
   '01': 'Januari', '02': 'Februari', '03': 'Maret', '04': 'April',
@@ -62,6 +63,7 @@ export default function Index() {
   const [lightMode, setLightMode] = useState(() => localStorage.getItem('replaytime-mode') === 'light');
   const [waNumber, setWaNumber] = useState('');
   const [waLink, setWaLink] = useState('');
+  const navVisible = useAutoHideOnInteraction(!watchingReplay, 3000);
 
   // Filters & sorting
   const [criteriaFilter, setCriteriaFilter] = useState('');
@@ -360,7 +362,7 @@ export default function Index() {
         <ThemedBackground theme={theme} />
       </div>
       <div className={`fixed inset-0 z-0 bg-background transition-opacity duration-700 ${lightMode ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} />
-      <HamburgerMenu whatsappNumber={waNumber} whatsappLink={waLink} lightMode={lightMode} onToggleMode={() => setLightMode(v => !v)} />
+      <HamburgerMenu whatsappNumber={waNumber} whatsappLink={waLink} lightMode={lightMode} onToggleMode={() => setLightMode(v => !v)} visible={navVisible} />
 
       <div className="relative z-10">
         <header className="text-center py-10 md:py-16 px-4">
