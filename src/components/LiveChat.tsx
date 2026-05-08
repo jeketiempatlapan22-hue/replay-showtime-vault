@@ -28,11 +28,8 @@ export default function LiveChat() {
   const [nameError, setNameError] = useState('');
   const listRef = useRef<HTMLDivElement>(null);
 
-  // Force username modal until user enters a name (per-browser, localStorage).
-  useEffect(() => {
-    if (isAdmin) return;
-    if (!name.trim()) { setNameInput(''); setNameModalOpen(true); }
-  }, [isAdmin, name]);
+  // Modal opens on demand when user tries to interact without a name.
+  // (Username is required per browser before any chat interaction.)
 
   const saveName = () => {
     const v = nameInput.trim();
