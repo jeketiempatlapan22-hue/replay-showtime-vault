@@ -100,6 +100,7 @@ export default function Live() {
   const [pwError, setPwError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [kickedMsg, setKickedMsg] = useState('');
+  const [failedSourceKeys, setFailedSourceKeys] = useState<string[]>([]);
   const [sourceIdx, setSourceIdx] = useState<number>(() => {
     try { return Math.max(0, Number(sessionStorage.getItem(SS_SRC_KEY) || '0')); } catch { return 0; }
   });
@@ -259,10 +260,18 @@ export default function Live() {
 
   const safeIdx = Math.min(sourceIdx, Math.max(0, allSources.length - 1));
   const activeSource = allSources[safeIdx];
+  const sourceKey = (source: PrivateSource, index: number) => `${index}:${source.type}:${source.url}`;
 
   const selectSource = (i: number) => {
     setSourceIdx(i);
     try { sessionStorage.setItem(SS_SRC_KEY, String(i)); } catch { /* ignore */ }
+  };
+
+  const handleSourceFatalError = () => {
+    const failedKey = activeSource ? sourceKey(activeSource, safeIdx) : '';
+    setFailedSourceKeys(prev => failedKey && !prev.includes(failedKey) ? [...prev, failedKey] : prev);
+    const next = allSources.findIndex((source, index) => index !== safeIdx && !failedSourceKeys.includes(sourceKey(source, index)));
+    if (next >= 0) selectSource(next);
   };
 
   const submitPassword = (e: React.FormEvent) => {
