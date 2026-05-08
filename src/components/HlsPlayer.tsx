@@ -10,6 +10,7 @@ interface Props {
   watermark?: string;
   onFatalError?: () => void;
   onPipChange?: (active: boolean) => void;
+  hideSeekButtons?: boolean;
 }
 
 export interface HlsPlayerHandle {
