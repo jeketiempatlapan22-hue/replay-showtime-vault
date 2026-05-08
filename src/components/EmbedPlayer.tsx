@@ -322,9 +322,9 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
     return onFullscreenChange(onChange);
   }, []);
 
-  // Poll YT time/duration
+  // Poll YT time/duration (skip for live: no scrubbing, no seeks)
   useEffect(() => {
-    if (type !== 'youtube' || !ready) return;
+    if (type !== 'youtube' || !ready || isLive) return;
     const id = setInterval(() => {
       const p = ytPlayerRef.current;
       if (!p || seeking) return;
@@ -336,7 +336,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
       } catch { /* ignore */ }
     }, 500);
     return () => clearInterval(id);
-  }, [ready, type, seeking, duration]);
+  }, [ready, type, seeking, duration, isLive]);
 
   const seekTo = (t: number) => {
     const p = ytPlayerRef.current;
