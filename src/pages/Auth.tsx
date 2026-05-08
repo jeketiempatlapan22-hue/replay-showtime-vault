@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Loader2, LogIn, UserPlus } from 'lucide-react';
+import { Loader2, LogIn, UserPlus, ShieldAlert } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from '@/hooks/use-toast';
 import logoImg from '@/assets/logo.png';
 
@@ -16,20 +17,66 @@ function normalizePhone(raw: string) {
   return digits;
 }
 
+type LockInfo = { locked: boolean; seconds_remaining: number; fail_count: number };
+
+async function checkLock(identifier: string): Promise<LockInfo> {
+  // RPC may not be in generated types yet — cast through any.
+  const { data, error } = await (supabase.rpc as unknown as (
+    fn: string,
+    args: Record<string, unknown>,
+  ) => Promise<{ data: LockInfo[] | null; error: unknown }>)(
+    'check_login_lock',
+    { _identifier: identifier },
+  );
+  if (error || !data || !data[0]) return { locked: false, seconds_remaining: 0, fail_count: 0 };
+  return data[0];
+}
+
+async function recordAttempt(identifier: string, success: boolean) {
+  await (supabase.rpc as unknown as (
+    fn: string,
+    args: Record<string, unknown>,
+  ) => Promise<unknown>)('record_login_attempt', { _identifier: identifier, _success: success });
+}
+
+function formatSeconds(s: number) {
+  if (s <= 0) return '0 detik';
+  const m = Math.floor(s / 60);
+  const sec = s % 60;
+  if (m > 0) return `${m} menit ${sec} detik`;
+  return `${sec} detik`;
+}
+
 export default function Auth() {
   const navigate = useNavigate();
   const [mode, setMode] = useState<'login' | 'signup'>('login');
-  const [identifier, setIdentifier] = useState(''); // email or phone (login)
+  const [identifier, setIdentifier] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
+  const [remember, setRemember] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [lockSeconds, setLockSeconds] = useState(0);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       if (data.session) navigate('/', { replace: true });
     });
   }, [navigate]);
+
+  // Countdown lockout timer
+  useEffect(() => {
+    if (lockSeconds <= 0) return;
+    const t = setInterval(() => setLockSeconds((s) => Math.max(0, s - 1)), 1000);
+    return () => clearInterval(t);
+  }, [lockSeconds]);
+
+  const persistRememberFlag = (val: boolean) => {
+    try {
+      localStorage.setItem('auth_remember', val ? 'true' : 'false');
+      sessionStorage.setItem('auth_session_alive', '1');
+    } catch { /* ignore */ }
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,22 +86,64 @@ export default function Auth() {
     }
     setBusy(true);
     try {
+      const rawId = identifier.trim().toLowerCase();
+      const lockKey = rawId.includes('@') ? rawId : normalizePhone(rawId);
+
+      // 1) Check brute-force lock
+      const lock = await checkLock(lockKey);
+      if (lock.locked) {
+        setLockSeconds(lock.seconds_remaining);
+        toast({
+          title: 'Terlalu banyak percobaan',
+          description: `Coba lagi dalam ${formatSeconds(lock.seconds_remaining)}.`,
+          variant: 'destructive',
+        });
+        setBusy(false);
+        return;
+      }
+
+      // 2) Resolve email if user typed phone
       let loginEmail = identifier.trim();
-      // If not an email, treat as phone and look up email
       if (!loginEmail.includes('@')) {
         const phoneNorm = normalizePhone(loginEmail);
         const { data, error } = await supabase.rpc('email_for_phone', { _phone: phoneNorm });
         if (error) throw error;
         if (!data) {
+          await recordAttempt(lockKey, false);
           toast({ title: 'Akun tidak ditemukan', description: 'Nomor HP belum terdaftar.', variant: 'destructive' });
           setBusy(false);
           return;
         }
         loginEmail = data as string;
       }
+
+      // 3) Attempt sign-in
       const { error } = await supabase.auth.signInWithPassword({ email: loginEmail, password });
-      if (error) throw error;
-      toast({ title: 'Berhasil masuk' });
+      if (error) {
+        await recordAttempt(lockKey, false);
+        const after = await checkLock(lockKey);
+        if (after.locked) {
+          setLockSeconds(after.seconds_remaining);
+          toast({
+            title: 'Akun dikunci sementara',
+            description: `Terlalu banyak percobaan gagal. Coba lagi dalam ${formatSeconds(after.seconds_remaining)}.`,
+            variant: 'destructive',
+          });
+        } else {
+          const remaining = Math.max(0, 5 - after.fail_count);
+          toast({
+            title: 'Gagal masuk',
+            description: `${error.message}. Sisa percobaan: ${remaining}.`,
+            variant: 'destructive',
+          });
+        }
+        setBusy(false);
+        return;
+      }
+
+      await recordAttempt(lockKey, true);
+      persistRememberFlag(remember);
+      toast({ title: 'Berhasil masuk', description: remember ? 'Sesi diingat di perangkat ini.' : 'Sesi hanya berlaku selama browser terbuka.' });
       navigate('/', { replace: true });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Gagal masuk';
@@ -73,7 +162,6 @@ export default function Auth() {
     setBusy(true);
     try {
       const phoneNorm = normalizePhone(phone);
-      // Check phone uniqueness
       const { data: exists } = await supabase.rpc('phone_exists', { _phone: phoneNorm });
       if (exists) {
         toast({ title: 'Nomor HP sudah dipakai', variant: 'destructive' });
@@ -89,6 +177,7 @@ export default function Auth() {
         },
       });
       if (error) throw error;
+      persistRememberFlag(remember);
       toast({ title: 'Akun dibuat', description: 'Anda otomatis masuk.' });
       navigate('/', { replace: true });
     } catch (err: unknown) {
@@ -98,6 +187,8 @@ export default function Auth() {
       setBusy(false);
     }
   };
+
+  const isLocked = lockSeconds > 0;
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
@@ -110,6 +201,16 @@ export default function Auth() {
           </p>
         </div>
 
+        {isLocked && (
+          <div className="flex items-start gap-2 p-3 rounded-lg border border-destructive/40 bg-destructive/10 text-destructive text-sm">
+            <ShieldAlert className="w-4 h-4 mt-0.5 shrink-0" />
+            <div>
+              <p className="font-medium">Login dikunci sementara</p>
+              <p className="text-xs opacity-90">Coba lagi dalam {formatSeconds(lockSeconds)}.</p>
+            </div>
+          </div>
+        )}
+
         {mode === 'login' ? (
           <form onSubmit={handleLogin} className="space-y-4">
             <div className="space-y-2">
@@ -120,6 +221,7 @@ export default function Auth() {
                 value={identifier}
                 onChange={(e) => setIdentifier(e.target.value)}
                 autoComplete="username"
+                disabled={isLocked}
               />
             </div>
             <div className="space-y-2">
@@ -131,11 +233,16 @@ export default function Auth() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 autoComplete="current-password"
+                disabled={isLocked}
               />
             </div>
-            <Button type="submit" className="w-full" disabled={busy}>
-              {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <LogIn className="w-4 h-4" />}
-              Masuk
+            <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer select-none">
+              <Checkbox checked={remember} onCheckedChange={(v) => setRemember(v === true)} disabled={isLocked} />
+              <span>Ingat saya di perangkat ini (30 hari)</span>
+            </label>
+            <Button type="submit" className="w-full" disabled={busy || isLocked}>
+              {busy ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <LogIn className="w-4 h-4 mr-2" />}
+              {isLocked ? `Tunggu ${formatSeconds(lockSeconds)}` : 'Masuk'}
             </Button>
           </form>
         ) : (
@@ -159,8 +266,12 @@ export default function Auth() {
                 autoComplete="new-password"
               />
             </div>
+            <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer select-none">
+              <Checkbox checked={remember} onCheckedChange={(v) => setRemember(v === true)} />
+              <span>Ingat saya di perangkat ini (30 hari)</span>
+            </label>
             <Button type="submit" className="w-full" disabled={busy}>
-              {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
+              {busy ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <UserPlus className="w-4 h-4 mr-2" />}
               Daftar
             </Button>
           </form>
