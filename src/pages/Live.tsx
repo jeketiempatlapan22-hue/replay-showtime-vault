@@ -186,6 +186,14 @@ export default function Live() {
         const t = search.get('t');
         if (t) void doUnlock({ token: t }, true);
       })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'active_show_tokens' }, () => {
+        const t = search.get('t');
+        if (t) void doUnlock({ token: t }, true);
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'active_show_token_devices' }, () => {
+        const t = search.get('t');
+        if (t) void doUnlock({ token: t }, true);
+      })
       .subscribe();
 
     return () => {
