@@ -191,10 +191,17 @@ Deno.serve(async (req) => {
         }
       } else {
         const code = arg.trim().toLowerCase();
-        const { data: matches } = await admin
-          .from('replays').select('id,title').ilike('id', `${code}%`).limit(2);
-        if (!matches?.length) reply = `❌ Replay dengan kode *${code}* tidak ditemukan.`;
-        else if (matches.length > 1) reply = `⚠️ Kode *${code}* ambigu (${matches.length} match). Gunakan kode lebih panjang.`;
+        // Lookup: by admin_alias (exact, case-insensitive) OR by id prefix
+        const { data: byAlias } = await admin
+          .from('replays').select('id,title').ilike('admin_alias', code).limit(2);
+        let matches = byAlias ?? [];
+        if (!matches.length) {
+          const { data: byId } = await admin
+            .from('replays').select('id,title').ilike('id', `${code}%`).limit(2);
+          matches = byId ?? [];
+        }
+        if (!matches.length) reply = `❌ Replay dengan kode/alias *${code}* tidak ditemukan.`;
+        else if (matches.length > 1) reply = `⚠️ Kode *${code}* ambigu (${matches.length} match). Gunakan kode lebih panjang atau alias unik.`;
         else {
           const r = matches[0];
           const res = await callCreateToken({
