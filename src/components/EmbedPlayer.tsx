@@ -125,7 +125,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
   useEffect(() => {
     markReady(false);
     setIsPlaying(false);
-    setUseYoutubeFallback(false);
+
     setDuration(0);
     setCurrentTime(0);
     if (ytFallbackTimerRef.current) clearTimeout(ytFallbackTimerRef.current);
@@ -286,7 +286,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
     if (v > 0 && muted) { setMuted(false); try { localStorage.setItem(MUTED_KEY, '0'); } catch { /* ignore */ } }
     if (type === 'youtube') {
       const p = ytPlayerRef.current;
-      if (useYoutubeFallback) return;
+
       if (!p || typeof p.setVolume !== 'function') {
         if (v > 0 && iframeRef.current && ytId) {
           iframeRef.current.src = `https://www.youtube-nocookie.com/embed/${ytId}?rel=0&modestbranding=1&playsinline=1&autoplay=1&mute=0&controls=0&fs=0&iv_load_policy=3&disablekb=1&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`;
@@ -324,7 +324,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
 
   const seekTo = (t: number) => {
     const p = ytPlayerRef.current;
-    if (!p || useYoutubeFallback || !duration) return;
+    if (!p || !duration) return;
     const target = Math.max(0, Math.min(duration, t));
     try { p.seekTo(target, true); setCurrentTime(target); } catch { /* ignore */ }
   };
