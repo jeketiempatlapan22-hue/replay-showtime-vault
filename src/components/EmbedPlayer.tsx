@@ -77,11 +77,17 @@ export default function EmbedPlayer({ type, source, title, watermark }: Props) {
     setUseYoutubeFallback(false);
     if (ytFallbackTimerRef.current) clearTimeout(ytFallbackTimerRef.current);
     if (type !== 'youtube') {
-      const id = setTimeout(() => { setReady(true); setIsPlaying(true); }, 900);
+      const id = setTimeout(() => { setReady(true); setIsPlaying(true); }, 600);
       return () => clearTimeout(id);
     }
-    if (!ytId) return;
+    if (!ytId) {
+      // Invalid YouTube id — clear loading so user sees error message instead of stuck spinner
+      setReady(true);
+      return;
+    }
     let cancelled = false;
+    // Shorter fallback so user is never stuck on "Menghubungkan ke pemutar".
+    // 1.5s is enough to attempt IFrame API; otherwise we use the iframe embed which is very reliable.
     ytFallbackTimerRef.current = setTimeout(() => {
       if (cancelled) return;
       setUseYoutubeFallback(true);
@@ -91,7 +97,7 @@ export default function EmbedPlayer({ type, source, title, watermark }: Props) {
         setMuted(true);
         setShowHint(true);
       }
-    }, 3500);
+    }, 1500);
 
     const init = () => {
       if (cancelled || !ytMountRef.current) return;
