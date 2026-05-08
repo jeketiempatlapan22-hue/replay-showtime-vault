@@ -561,7 +561,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
   return (
     <div
       ref={containerRef}
-      className="relative w-full overflow-hidden rounded-xl bg-black group/player"
+      className={`relative w-full overflow-hidden rounded-xl bg-black group/player ${showControls || !isPlaying ? '' : 'cursor-none'}`}
       style={{ paddingBottom: isFullscreen ? '0' : '56.25%', height: isFullscreen ? '100%' : undefined }}
       onMouseMove={resetHideTimer}
       onTouchStart={resetHideTimer}
@@ -570,7 +570,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
         ref={videoRef}
         className="absolute inset-0 w-full h-full"
         playsInline
-        onClick={resetHideTimer}
+        onClick={toggleControls}
         title={title}
       />
       {watermark && <LiveWatermark code={watermark} />}
@@ -595,7 +595,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
       {needsUnmute && muted && (
         <button
           type="button"
-          onClick={toggleMute}
+          onClick={(e) => { e.stopPropagation(); toggleMute(); }}
           className="absolute top-3 left-1/2 -translate-x-1/2 z-30 px-4 py-2 rounded-full bg-primary text-primary-foreground text-xs font-semibold shadow-lg animate-fade-in"
         >
           🔊 Tap untuk aktifkan suara
@@ -605,10 +605,14 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
       {/* Controls overlay */}
       <div
         className={`absolute inset-0 flex flex-col justify-end transition-opacity duration-300 ${
-          showControls || !isPlaying ? 'opacity-100' : 'opacity-0'
+          showControls || !isPlaying ? 'opacity-100' : 'opacity-0 pointer-events-none'
         }`}
         style={{
           background: 'linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 50%, rgba(0,0,0,0.3) 100%)',
+        }}
+        onClick={(e) => {
+          // Click on the empty overlay area (not on a control) toggles controls.
+          if (e.target === e.currentTarget) toggleControls();
         }}
       >
         {!isPlaying && !loading && (
