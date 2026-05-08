@@ -47,7 +47,6 @@ const MUTED_KEY = 'replaytime-muted';
 export default function EmbedPlayer({ type, source, title, watermark, hideSeekButtons = false }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const ytMountRef = useRef<HTMLDivElement>(null);
   const ytPlayerRef = useRef<YoutubePlayerApi | null>(null);
   const ytFallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const readyRef = useRef(false);
@@ -110,10 +109,8 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
   useEffect(() => { mutedRef.current = muted; }, [muted]);
   useEffect(() => { volumeRef.current = volume; }, [volume]);
 
-  // YouTube IFrame API — instantiate via div mount so YT injects an iframe sized 100% inside our container.
-  // Penting: untuk replay, seek bar/durasi mengandalkan IFrame API. Jadi kita TIDAK auto-fallback hanya
-  // karena timer pendek — fallback iframe (tanpa API) hanya dipakai bila API gagal (onError) atau setelah
-  // safety timeout panjang.
+  // YouTube: tampilkan iframe langsung agar tidak blank/stuck, lalu attach IFrame API ke iframe yang sama
+  // untuk kontrol replay (seek, durasi, play/pause, mute) saat API sudah siap.
   useEffect(() => {
     markReady(false);
     setIsPlaying(false);
@@ -122,7 +119,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
     setCurrentTime(0);
     if (ytFallbackTimerRef.current) clearTimeout(ytFallbackTimerRef.current);
     if (type !== 'youtube') {
-      const id = setTimeout(() => { markReady(true); setIsPlaying(true); }, 600);
+      const id = setTimeout(() => { markReady(true); setIsPlaying(true); }, 1200);
       return () => clearTimeout(id);
     }
     if (!ytId) {
@@ -131,28 +128,19 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
       return;
     }
     let cancelled = false;
-    // Safety net: kalau API benar-benar gagal load (script blocked / network), pakai fallback iframe.
+    // Safety net: jangan biarkan overlay koneksi menutup iframe bila API/onLoad lambat atau diblokir.
     ytFallbackTimerRef.current = setTimeout(() => {
       if (cancelled || readyRef.current) return;
-      setUseYoutubeFallback(true);
       markReady(true);
       setIsPlaying(true);
-    }, 15000);
+    }, 3000);
 
     const init = () => {
-      if (cancelled || !ytMountRef.current) return;
+      if (cancelled || !iframeRef.current) return;
       const YT = (window as YoutubeWindow).YT;
       if (!YT?.Player) { setTimeout(init, 200); return; }
-      ytPlayerRef.current = new YT.Player(ytMountRef.current, {
-        videoId: ytId,
-        width: '100%',
-        height: '100%',
-        host: 'https://www.youtube-nocookie.com',
-        playerVars: {
-          rel: 0, modestbranding: 1, playsinline: 1, autoplay: 1,
-          controls: 0, fs: 0, iv_load_policy: 3, disablekb: 1,
-          enablejsapi: 1, origin: window.location.origin,
-        },
+      try { ytPlayerRef.current?.destroy?.(); } catch { /* ignore */ }
+      ytPlayerRef.current = new YT.Player(iframeRef.current, {
         events: {
           onReady: () => {
             if (cancelled) return;
@@ -172,27 +160,22 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
             markReady(true);
             try {
               ytPlayerRef.current.setVolume?.(Math.round(volumeRef.current * 100));
-              if (mutedRef.current) ytPlayerRef.current.mute?.(); else ytPlayerRef.current.unMute?.();
+              // Embed dimulai muted agar autoplay stabil; user bisa aktifkan suara lewat tombol hint.
+              ytPlayerRef.current.mute?.();
+              if (!mutedRef.current) {
+                mutedRef.current = true;
+                setMuted(true);
+                setShowHint(true);
+              }
               ytPlayerRef.current.playVideo?.();
-              setTimeout(() => {
-                try {
-                  const state = ytPlayerRef.current?.getPlayerState?.();
-                  if (state !== 1 && !mutedRef.current) {
-                    ytPlayerRef.current?.mute?.();
-                    setMuted(true);
-                    ytPlayerRef.current?.playVideo?.();
-                    setShowHint(true);
-                  }
-                } catch { /* ignore */ }
-              }, 800);
             } catch { /* ignore */ }
           },
           onStateChange: (e: { data: number }) => {
-            setIsPlaying(e.data === 1);
+            if (e.data === 1 || e.data === 3) markReady(true);
+            setIsPlaying(e.data === 1 || e.data === 3);
           },
           onError: () => {
             if (cancelled) return;
-            setUseYoutubeFallback(true);
             markReady(true);
             setIsPlaying(true);
           },
