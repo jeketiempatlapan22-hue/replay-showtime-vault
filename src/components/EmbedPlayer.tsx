@@ -10,6 +10,25 @@ interface Props {
   watermark?: string;
 }
 
+interface YoutubePlayerApi {
+  getIframe?: () => HTMLIFrameElement;
+  setVolume?: (volume: number) => void;
+  mute?: () => void;
+  unMute?: () => void;
+  playVideo?: () => void;
+  pauseVideo?: () => void;
+  destroy?: () => void;
+  getPlayerState?: () => number;
+  getDuration?: () => number;
+  getCurrentTime?: () => number;
+  seekTo?: (seconds: number, allowSeekAhead: boolean) => void;
+}
+
+interface YoutubeWindow extends Window {
+  YT?: { Player: new (element: HTMLElement, options: Record<string, unknown>) => YoutubePlayerApi };
+  onYouTubeIframeAPIReady?: () => void;
+}
+
 function extractYoutubeId(raw: string): string {
   const r = (raw || '').trim();
   const matched = r.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/|v\/))([A-Za-z0-9_-]{11})/)?.[1];
@@ -29,7 +48,7 @@ export default function EmbedPlayer({ type, source, title, watermark }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const ytMountRef = useRef<HTMLDivElement>(null);
-  const ytPlayerRef = useRef<any>(null);
+  const ytPlayerRef = useRef<YoutubePlayerApi | null>(null);
   const ytFallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [ready, setReady] = useState(false);
   const [useYoutubeFallback, setUseYoutubeFallback] = useState(false);
