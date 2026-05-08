@@ -91,10 +91,17 @@ Deno.serve(async (req) => {
         if (!existing) {
           const { count } = await supabase
             .from("active_show_token_devices").select("id", { count: "exact", head: true }).eq("token_id", t.id);
-          if ((count || 0) >= t.max_devices) return json({ valid: false, reason: "device_limit" });
+          const isMulti = (t.max_devices || 1) > 1;
+          if ((count || 0) >= t.max_devices) {
+            // Multi-device/public token: don't kick already-connected user during silent revalidation.
+            if (isMulti && isSilent) {
+              return json({ ...okPayload, watermark: `RT-${String(token).slice(-4).toUpperCase()}`, token_kind: t.kind || 'personal', max_devices: t.max_devices || 1, soft: true });
+            }
+            return json({ valid: false, reason: "device_limit" });
+          }
           await supabase.from("active_show_token_devices").insert({ token_id: t.id, browser_id });
         }
-        return json({ ...okPayload, watermark: `RT-${String(token).slice(-4).toUpperCase()}` });
+        return json({ ...okPayload, watermark: `RT-${String(token).slice(-4).toUpperCase()}`, token_kind: t.kind || 'personal', max_devices: t.max_devices || 1 });
       }
 
       if (show.live_require_password) {
