@@ -362,6 +362,7 @@ export default function Live() {
                 title={status?.title || unlocked.title || 'Live'}
                 showDate={status?.show_date}
                 showTime={status?.show_time}
+                imageUrl={status?.image_url}
               />
             )}
 
