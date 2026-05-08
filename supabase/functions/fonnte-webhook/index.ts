@@ -411,15 +411,15 @@ Deno.serve(async (req) => {
 
 
   const finalReply = reply || '✅ OK';
-  const sendResult = testMode && !deliverTest
-    ? { ok: true, data: { skipped: true, reason: 'test_mode' } }
-    : await sendFonnte(phoneNorm, finalReply);
-  await admin.from('wa_outbox').insert({
+  const sendResult = await sendAndAudit(admin, {
     phone: phoneNorm,
     message: finalReply,
-    status: sendResult.ok ? 'sent' : 'failed',
-    error: sendResult.ok ? null : sendResult.error,
-    fonnte_response: sendResult.data as Record<string, unknown> | undefined,
+    inboxId,
+    testMode,
+    deliverTest,
+    command: cmd,
+    device: deviceNorm,
+    fromMe,
   });
 
   if (testMode) {
