@@ -12,9 +12,10 @@ interface HamburgerMenuProps {
   whatsappLink: string;
   lightMode: boolean;
   onToggleMode: () => void;
+  visible?: boolean;
 }
 
-export default function HamburgerMenu({ whatsappNumber, whatsappLink, lightMode, onToggleMode }: HamburgerMenuProps) {
+export default function HamburgerMenu({ whatsappNumber, whatsappLink, lightMode, onToggleMode, visible = true }: HamburgerMenuProps) {
   const [open, setOpen] = useState(false);
   const [liveOn, setLiveOn] = useState(false);
   const { user } = useAuth();
@@ -41,7 +42,7 @@ export default function HamburgerMenu({ whatsappNumber, whatsappLink, lightMode,
   return (
     <>
       {/* Top bar with hamburger + logo */}
-      <div className="fixed top-0 left-0 right-0 z-30 flex items-center justify-between px-4 py-3">
+      <div className={`fixed top-0 left-0 right-0 z-30 flex items-center justify-between px-3 sm:px-4 py-2 sm:py-3 transition-all duration-300 ${visible || open ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0 pointer-events-none'}`}>
         <Button
           variant="ghost"
           size="icon"
