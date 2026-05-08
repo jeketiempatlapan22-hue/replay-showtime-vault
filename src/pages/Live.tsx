@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Lock, Loader2, ShoppingBag, MessageCircle, Users } from 'lucide-react';
+import { ArrowLeft, Lock, Loader2, ShoppingBag, MessageCircle, Users, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
@@ -286,6 +286,39 @@ export default function Live() {
 
   const liveActive = !!(status?.enabled || unlocked?.enabled);
 
+  // ============ VIEWER COUNTER (presence) ============
+  const showKey = search.get('show') || 'global';
+  const [viewerCount, setViewerCount] = useState<number>(0);
+  useEffect(() => {
+    if (!liveActive || !unlocked) return;
+    const bid = getBrowserId();
+    const channel = supabase.channel(`live-viewers:${showKey}`, {
+      config: { presence: { key: bid } },
+    });
+    const recount = () => {
+      try {
+        const state = channel.presenceState() as Record<string, unknown[]>;
+        setViewerCount(Object.keys(state).length);
+      } catch { /* ignore */ }
+    };
+    channel
+      .on('presence', { event: 'sync' }, recount)
+      .on('presence', { event: 'join' }, recount)
+      .on('presence', { event: 'leave' }, recount)
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          try { await channel.track({ at: Date.now() }); } catch { /* ignore */ }
+          recount();
+        }
+      });
+    const interval = window.setInterval(recount, 10000);
+    return () => {
+      window.clearInterval(interval);
+      try { void channel.untrack(); } catch { /* ignore */ }
+      supabase.removeChannel(channel);
+    };
+  }, [liveActive, unlocked, showKey]);
+
   return (
     <div className="min-h-screen bg-background relative z-10">
       <div className="sticky top-0 z-20 bg-card/90 backdrop-blur border-b border-border px-3 sm:px-4 py-3 flex items-center gap-3">
@@ -376,10 +409,10 @@ export default function Live() {
                   : <EmbedPlayer key={`em-${safeIdx}-${activeSource.url}`} type={activeSource.type} source={activeSource.url} title={unlocked.title} watermark={unlocked.watermark} />}
 
                 <div className="flex items-center justify-between flex-wrap gap-2 px-1">
-                  <div className="text-xs text-muted-foreground">
-                    Sumber aktif: <span className="font-semibold text-foreground">{activeSource.label || 'Player'}</span>
-                    <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded bg-secondary text-[10px] uppercase tracking-wider">{typeLabel(activeSource.type)}</span>
-                  </div>
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-500/10 border border-red-500/30 text-red-500 text-xs font-semibold">
+                    <Eye className="w-3.5 h-3.5" />
+                    {viewerCount.toLocaleString('id-ID')} menonton
+                  </span>
                   {unlocked.watermark && (
                     <span className="text-[10px] font-mono text-muted-foreground">ID: {unlocked.watermark}</span>
                   )}
