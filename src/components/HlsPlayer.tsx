@@ -364,7 +364,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
       // Reset native source to prevent leaked playback when switching providers
       try { video.removeAttribute('src'); video.load(); } catch { /* ignore */ }
     };
-  }, [src]);
+  }, [src, initialMuted, initialVolume]);
 
   const selectQuality = (levelIndex: number) => {
     if (!hlsRef.current) return;
