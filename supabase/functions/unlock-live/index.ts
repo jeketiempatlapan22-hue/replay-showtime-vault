@@ -17,6 +17,17 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
+    // ===== Global block check by browser_id =====
+    if (browser_id) {
+      const { data: blk } = await supabase
+        .from("blocked_browsers")
+        .select("id,unblocked")
+        .eq("browser_id", browser_id)
+        .eq("unblocked", false)
+        .maybeSingle();
+      if (blk) return json({ valid: false, reason: "blocked" });
+    }
+
     // ===== Branch A: per-show live (active_shows) =====
     if (show_id) {
       const { data: show } = await supabase
@@ -26,10 +37,7 @@ Deno.serve(async (req) => {
         .maybeSingle();
       if (!show || !show.is_active) return json({ valid: false, reason: "off" });
 
-      const startMs = new Date(`${show.show_date}T${show.show_time}`).getTime();
-      const nowMs = Date.now();
-      const autoOn = show.live_auto_schedule && nowMs >= startMs && nowMs <= startMs + 8 * 3600 * 1000;
-      const enabled = !!show.is_live || !!autoOn;
+      const enabled = !!show.is_live;
 
       const okPayload = {
         valid: true,

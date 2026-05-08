@@ -586,8 +586,7 @@ export default function Admin() {
             <nav className="p-2">
               {[
                 { v: 'replays', label: 'Replay', Icon: List },
-                { v: 'shows', label: 'Show Aktif', Icon: Sparkles },
-                { v: 'live', label: 'Live', Icon: Radio },
+                { v: 'shows', label: 'Streaming Show', Icon: Radio },
                 { v: 'members', label: 'Member', Icon: Users },
                 { v: 'bot', label: 'Bot WhatsApp', Icon: Bot },
                 { v: 'history', label: 'Riwayat Token', Icon: History },
@@ -609,7 +608,7 @@ export default function Admin() {
           </SheetContent>
         </Sheet>
         <Button variant="ghost" size="icon" onClick={() => navigate('/')} className="shrink-0" title="Beranda"><ArrowLeft className="w-5 h-5" /></Button>
-        <h1 className="text-base sm:text-xl font-bold font-sans text-foreground flex-1 min-w-0 truncate">Admin · {({ replays: 'Replay', shows: 'Show', live: 'Live', members: 'Member', bot: 'Bot WA', history: 'Riwayat', preview: 'Preview', comments: 'Komentar', security: 'Blokir', settings: 'Setelan' } as Record<string, string>)[activeTab]}</h1>
+        <h1 className="text-base sm:text-xl font-bold font-sans text-foreground flex-1 min-w-0 truncate">Admin · {({ replays: 'Replay', shows: 'Streaming Show', members: 'Member', bot: 'Bot WA', history: 'Riwayat', preview: 'Preview', comments: 'Komentar', security: 'Blokir', settings: 'Setelan' } as Record<string, string>)[activeTab]}</h1>
         <div className="flex items-center gap-1 sm:gap-2 shrink-0">
           <Button size="sm" onClick={() => { resetForm(); setShowAddDialog(true); }} className="text-xs sm:text-sm">
             <Plus className="w-4 h-4 sm:mr-1" /> <span className="hidden sm:inline">Tambah</span>
@@ -621,7 +620,7 @@ export default function Admin() {
       <div className="max-w-6xl mx-auto px-2 sm:px-4 py-4">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="hidden">
-            <TabsTrigger value="replays" /><TabsTrigger value="shows" /><TabsTrigger value="live" /><TabsTrigger value="members" /><TabsTrigger value="bot" /><TabsTrigger value="history" /><TabsTrigger value="preview" /><TabsTrigger value="comments" /><TabsTrigger value="security" /><TabsTrigger value="settings" />
+            <TabsTrigger value="replays" /><TabsTrigger value="shows" /><TabsTrigger value="members" /><TabsTrigger value="bot" /><TabsTrigger value="history" /><TabsTrigger value="preview" /><TabsTrigger value="comments" /><TabsTrigger value="security" /><TabsTrigger value="settings" />
           </TabsList>
 
           <TabsContent value="bot"><BotAdmin /></TabsContent>
@@ -792,23 +791,49 @@ export default function Admin() {
                 ) : (
                   <div className="space-y-2">
                     {activeShows.map(s => (
-                      <div key={s.id} className="p-2 sm:p-3 rounded-lg bg-secondary/50 border border-border flex items-center gap-3">
-                        {s.image_url && <img src={s.image_url} alt="" className="w-12 h-8 sm:w-16 sm:h-10 rounded object-cover shrink-0" />}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <p className="font-medium text-sm sm:text-base truncate">{s.title}</p>
-                            {!s.is_active && <Badge variant="outline" className="text-[10px]">Off</Badge>}
+                      <div key={s.id} className={`p-2 sm:p-3 rounded-lg border space-y-2 ${s.is_live ? 'bg-red-500/10 border-red-500/40' : 'bg-secondary/50 border-border'}`}>
+                        <div className="flex items-center gap-3">
+                          {s.image_url && <img src={s.image_url} alt="" className="w-12 h-8 sm:w-16 sm:h-10 rounded object-cover shrink-0" />}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="font-medium text-sm sm:text-base truncate">{s.title}</p>
+                              {s.is_live && <Badge className="text-[10px] bg-red-600 text-white animate-pulse"><Radio className="w-2.5 h-2.5 mr-0.5 inline" />ON AIR</Badge>}
+                              {!s.is_active && <Badge variant="outline" className="text-[10px]">Off</Badge>}
+                            </div>
+                            <p className="text-xs text-muted-foreground truncate">
+                              <Calendar className="w-3 h-3 inline mr-1" />
+                              {new Date(`${s.show_date}T${s.show_time}`).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })}
+                              {' · '}{getCriteriaLabel(s.category)}
+                              {s.lineup.length > 0 && ` · ${s.lineup.length} member`}
+                            </p>
                           </div>
-                          <p className="text-xs text-muted-foreground truncate">
-                            <Calendar className="w-3 h-3 inline mr-1" />
-                            {new Date(`${s.show_date}T${s.show_time}`).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })}
-                            {' · '}{getCriteriaLabel(s.category)}
-                            {s.lineup.length > 0 && ` · ${s.lineup.length} member`}
-                          </p>
+                          <div className="flex gap-1 shrink-0">
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditShow(s)} title="Edit"><Edit2 className="w-4 h-4" /></Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteShow(s.id)} title="Hapus"><Trash2 className="w-4 h-4" /></Button>
+                          </div>
                         </div>
-                        <div className="flex gap-1 shrink-0">
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditShow(s)}><Edit2 className="w-4 h-4" /></Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteShow(s.id)}><Trash2 className="w-4 h-4" /></Button>
+                        <div className="flex items-center gap-2 flex-wrap pt-2 border-t border-border/40">
+                          <div className="flex items-center gap-2 px-2 py-1 rounded bg-card border border-border">
+                            <Radio className={`w-3.5 h-3.5 ${s.is_live ? 'text-red-500' : 'text-muted-foreground'}`} />
+                            <span className="text-xs font-medium">LIVE</span>
+                            <Switch
+                              checked={!!s.is_live}
+                              onCheckedChange={async (v) => {
+                                if (v) {
+                                  await supabase.from('active_shows').update({ is_live: false }).neq('id', s.id).eq('is_live', true);
+                                }
+                                const { error } = await supabase.from('active_shows').update({ is_live: v }).eq('id', s.id);
+                                if (error) toast({ title: 'Gagal', description: error.message, variant: 'destructive' });
+                                else { toast({ title: v ? `🔴 ${s.title} sedang LIVE` : 'Live dinonaktifkan' }); refreshActiveShows(); }
+                              }}
+                            />
+                          </div>
+                          <Button variant="outline" size="sm" className="h-7 text-[11px]" onClick={() => window.open(`/live?show=${s.id}`, '_blank')}>
+                            <Eye className="w-3 h-3 mr-1" />Buka Player
+                          </Button>
+                          <Button variant="outline" size="sm" className="h-7 text-[11px]" onClick={() => { handleEditShow(s); }}>
+                            <Settings className="w-3 h-3 mr-1" />Detail Live & Token
+                          </Button>
                         </div>
                       </div>
                     ))}
@@ -818,150 +843,7 @@ export default function Admin() {
             </Card>
           </TabsContent>
 
-          {/* ===== LIVE TAB ===== */}
-
-          <TabsContent value="live" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="font-sans text-base sm:text-lg flex items-center gap-2">
-                  <Radio className={`w-5 h-5 ${liveCfg.enabled ? 'text-red-500' : 'text-primary'}`} />
-                  Konfigurasi Live
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex items-center justify-between p-3 rounded-lg bg-secondary/40 border border-border">
-                  <div>
-                    <Label className="text-sm">Aktifkan Halaman Live</Label>
-                    <p className="text-[11px] text-muted-foreground">User dapat membuka <code>/live</code> ketika diaktifkan.</p>
-                  </div>
-                  <Switch checked={liveCfg.enabled} onCheckedChange={v => setLiveCfg(c => ({ ...c, enabled: v }))} />
-                </div>
-                <div>
-                  <Label>Judul Live</Label>
-                  <Input value={liveCfg.title} onChange={e => setLiveCfg(c => ({ ...c, title: e.target.value }))} placeholder="cth: Live Setlist Pajama Drive" />
-                </div>
-                <div>
-                  <Label>Tipe Sumber</Label>
-                  <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={liveCfg.type} onChange={e => setLiveCfg(c => ({ ...c, type: e.target.value }))}>
-                    <option value="m3u8">M3U8 (HLS)</option>
-                    <option value="youtube">YouTube</option>
-                    <option value="cloudflare">Cloudflare Stream</option>
-                  </select>
-                </div>
-                <div>
-                  <Label>URL / ID Sumber Utama</Label>
-                  <Input value={liveCfg.url} onChange={e => setLiveCfg(c => ({ ...c, url: e.target.value }))} placeholder={liveCfg.type === 'youtube' ? 'YouTube ID atau URL' : liveCfg.type === 'cloudflare' ? 'UID Cloudflare' : 'https://.../playlist.m3u8'} />
-                  <p className="text-[11px] text-muted-foreground mt-1">Ini akan ditampilkan sebagai sumber default. Tambah sumber alternatif/mirror di bawah.</p>
-                </div>
-
-                <div className="space-y-2 pt-2 border-t border-border/50">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-sm">Daftar Player / Mirror</Label>
-                    <Button type="button" size="sm" variant="outline" className="h-7 text-[11px]"
-                      onClick={() => setLiveCfg(c => ({ ...c, sources: [...c.sources, { label: `Player ${c.sources.length + 1}`, type: 'm3u8', url: '' }] }))}>
-                      <Plus className="w-3 h-3 mr-1" />Tambah Player
-                    </Button>
-                  </div>
-                  <p className="text-[11px] text-muted-foreground">Beri nama tiap player. Nama ini akan ditampilkan di halaman Live agar user bisa pilih sumber.</p>
-                  {liveCfg.sources.length === 0 && (
-                    <p className="text-[11px] text-muted-foreground italic text-center py-2">Belum ada player tambahan.</p>
-                  )}
-                  {liveCfg.sources.map((s, idx) => (
-                    <div key={idx} className="p-2 rounded-md border border-border bg-secondary/30 space-y-1.5">
-                      <div className="grid grid-cols-12 gap-1.5 items-center">
-                        <Input className="col-span-6 h-8 text-xs" placeholder="Nama (cth: Player 1, HD, Mirror)" value={s.label}
-                          onChange={e => setLiveCfg(c => ({ ...c, sources: c.sources.map((x, i) => i === idx ? { ...x, label: e.target.value } : x) }))} />
-                        <select className="col-span-5 h-8 rounded-md border border-input bg-background px-2 text-xs" value={s.type}
-                          onChange={e => setLiveCfg(c => ({ ...c, sources: c.sources.map((x, i) => i === idx ? { ...x, type: e.target.value as LiveSrc['type'] } : x) }))}>
-                          <option value="m3u8">M3U8</option>
-                          <option value="youtube">YouTube</option>
-                          <option value="cloudflare">Cloudflare</option>
-                        </select>
-                        <Button type="button" variant="ghost" size="icon" className="col-span-1 h-7 w-7 text-destructive"
-                          onClick={() => setLiveCfg(c => ({ ...c, sources: c.sources.filter((_, i) => i !== idx) }))}>
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </Button>
-                      </div>
-                      <Input className="h-8 text-xs" placeholder={s.type === 'youtube' ? 'YouTube ID atau URL' : s.type === 'cloudflare' ? 'UID Cloudflare' : 'https://.../playlist.m3u8'}
-                        value={s.url}
-                        onChange={e => setLiveCfg(c => ({ ...c, sources: c.sources.map((x, i) => i === idx ? { ...x, url: e.target.value } : x) }))} />
-                    </div>
-                  ))}
-                </div>
-
-                <div className="pt-2 border-t border-border/50">
-                  <Label>Lineup Member (koma)</Label>
-                  <Input list="member-names" value={liveCfg.lineup} onChange={e => setLiveCfg(c => ({ ...c, lineup: e.target.value }))} placeholder="Alya, Anindya, Lia, ..." />
-                  <p className="text-[11px] text-muted-foreground mt-1">Foto otomatis muncul di halaman Live jika nama cocok dengan data di tab Member.</p>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                  <div className="sm:col-span-2">
-                    <Label>Sandi Live (opsional)</Label>
-                    <Input type="text" value={liveCfg.password} onChange={e => setLiveCfg(c => ({ ...c, password: e.target.value }))} placeholder="Sandi alternatif untuk akses live" />
-                  </div>
-                  <div className="flex items-end gap-2">
-                    <div className="flex items-center gap-2 h-10">
-                      <Switch checked={liveCfg.require_password} onCheckedChange={v => setLiveCfg(c => ({ ...c, require_password: v }))} />
-                      <span className="text-xs text-muted-foreground">Aktifkan sandi</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="rounded-md bg-secondary/40 border border-border p-2.5">
-                  <p className="text-[11px] text-muted-foreground"><strong className="text-foreground">Akses live:</strong> melalui link token (terkunci per device) atau sandi di atas. Kosongkan sandi & matikan switch jika ingin token-only.</p>
-                </div>
-                <Button onClick={handleSaveLive} disabled={liveSaving}><Save className="w-4 h-4 mr-2" />{liveSaving ? 'Menyimpan...' : 'Simpan Konfigurasi'}</Button>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="font-sans text-base sm:text-lg flex items-center gap-2"><Link2 className="w-5 h-5 text-primary" />Token Akses Live</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex items-end gap-2">
-                  <div className="flex-1">
-                    <Label>Jumlah Device</Label>
-                    <Input type="number" min={1} max={50} value={newTokenMaxDevices} onChange={e => setNewTokenMaxDevices(Math.max(1, Math.min(50, Number(e.target.value) || 1)))} />
-                  </div>
-                  <Button onClick={handleCreateLiveToken}><Plus className="w-4 h-4 mr-1" />Buat Token</Button>
-                </div>
-                <p className="text-[11px] text-muted-foreground">Setiap token dikunci ke jumlah perangkat yang ditentukan. Kode <strong>RT-XXXX</strong> di samping token akan muncul sebagai watermark di player user — gunakan untuk meng-Revoke jika terjadi penyalahgunaan.</p>
-
-                {liveTokens.length === 0 ? (
-                  <p className="text-muted-foreground text-center py-4 text-sm">Belum ada token.</p>
-                ) : (
-                  <div className="space-y-2">
-                    {liveTokens.map(t => {
-                      const code = `RT-${t.token.slice(-4).toUpperCase()}`;
-                      return (
-                      <div key={t.id} className={`p-3 rounded-lg border space-y-2 ${t.revoked ? 'bg-destructive/5 border-destructive/30' : 'bg-secondary/40 border-border'}`}>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-sm font-mono font-bold text-primary">{code}</span>
-                          <Badge variant="secondary" className="text-[10px]">{t.devices_used}/{t.max_devices} device</Badge>
-                          {t.revoked ? <Badge variant="destructive" className="text-[10px]">Dicabut</Badge> : <Badge className="text-[10px] bg-green-600">Aktif</Badge>}
-                        </div>
-                        <code className="block text-[10px] bg-background border border-border rounded px-2 py-1 break-all">{t.token}</code>
-                        <div className="flex flex-wrap gap-1">
-                          <Button variant="outline" size="sm" className="h-7 text-[10px]" onClick={() => copyLiveTokenLink(t.token)}><Copy className="w-3 h-3 mr-1" />Salin link</Button>
-                          <Button variant="outline" size="sm" className="h-7 text-[10px]" onClick={() => handleResetLiveDevices(t.id)}><RefreshCw className="w-3 h-3 mr-1" />Reset device</Button>
-                          {t.revoked ? (
-                            <Button variant="outline" size="sm" className="h-7 text-[10px]" onClick={() => handleRevokeLiveToken(t.id, false)}><UnlockIcon className="w-3 h-3 mr-1" />Aktifkan</Button>
-                          ) : (
-                            <Button variant="outline" size="sm" className="h-7 text-[10px] text-orange-600" onClick={() => handleRevokeLiveToken(t.id, true)}><X className="w-3 h-3 mr-1" />Revoke</Button>
-                          )}
-                          <Button variant="ghost" size="sm" className="h-7 text-[10px] text-destructive" onClick={() => handleDeleteLiveToken(t.id)}><Trash2 className="w-3 h-3 mr-1" />Hapus</Button>
-                        </div>
-                      </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
+          {/* ===== LIVE TAB removed — merged into Streaming Show ===== */}
           {/* ===== PREVIEW TAB ===== */}
           {/* ===== MEMBERS TAB ===== */}
           <TabsContent value="members">

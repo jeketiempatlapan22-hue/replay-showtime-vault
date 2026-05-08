@@ -1,75 +1,60 @@
-
 ## Tujuan
-
-Sederhanakan: **satu panel admin per show** untuk semua kontrol Live & Replay. Tambah `admin_alias` agar admin bisa membuat token link Live via bot (`/createlink`, `/createpub`). Pastikan player Live benar-benar menampilkan embed yang dimasukkan, dan tampilkan countdown bila user sudah punya akses tapi LIVE belum diaktifkan admin.
+Sederhanakan admin: gabungkan tab **Live** dan **Show Aktif** menjadi satu tab **"Streaming Show"**. Toggle LIVE ada di setiap kartu show, dapat diaktifkan kapan saja (bebas jadwal). Player Live realtime memperbarui embed + playlist saat toggle ON. Background countdown memakai gambar kartu show (transparan). Tambah opsi blokir per `browser_id` agar perangkat tidak bisa akses lagi tanpa direset admin.
 
 ## Perubahan
 
-### 1. Database (migration)
-- Tambah kolom `active_shows.admin_alias TEXT UNIQUE` (nullable, lowercase, untuk lookup cepat seperti pada `replays.admin_alias`).
-- Tabel baru `active_show_tokens` (untuk token Live per-show):
-  - `id, show_id (FK active_shows), token TEXT UNIQUE, label TEXT, kind TEXT ('personal'|'public'), max_devices INT DEFAULT 1, revoked BOOLEAN, created_at`.
-  - RLS: hanya admin yang bisa kelola.
-- Tabel baru `active_show_token_devices` (`token_id, browser_id`) untuk membatasi 1 device pada `kind='personal'`.
-- Hapus section LIVE legacy global di UI admin (tabel `live_config_private` tetap ada untuk kompatibilitas, tapi panel Admin disederhanakan—hanya panel per-show).
+### 1. Admin Panel (`src/pages/Admin.tsx`)
+- Hapus tab **"Live"** (legacy `live_config_private`) — termasuk `liveCfg`, `liveTokens`, `handleSaveLive`, `handleCreateLiveToken`, dst. (kode masih ada di backend untuk kompatibilitas, tapi tidak diakses dari UI lagi.)
+- Rename tab `shows` menjadi **"Streaming Show"** (label & ikon `Radio`).
+- Pada list kartu show:
+  - Tambah **toggle "LIVE NOW"** langsung di header tiap kartu (tanpa harus buka dialog edit). Klik = update `is_live` instan + auto-mematikan show lain yang sedang live.
+  - Tampilkan badge merah berdenyut saat aktif.
+  - Tombol cepat: **"Buka Player"**, **"Token & Riwayat"**, **"Edit Detail"**.
+- Dialog edit show tetap memuat `ShowLiveControl` lengkap (URL, sumber, sandi, replay).
+- Hilangkan validasi "harus pada jam jadwal" — toggle bisa ON kapan pun.
 
-### 2. Admin Panel (UI)
-- Hapus / sembunyikan section **"Live Global"** lama.
-- Pindahkan `ShowLiveControl` ke tampil **inline pada tiap kartu Show Aktif** (bukan hanya di dialog edit), supaya admin tinggal toggle dari list:
-  - Toggle besar **"LIVE NOW"** per kartu (mutually exclusive: aktifkan satu otomatis matikan lainnya).
-  - Field **Alias** (untuk command bot).
-  - Tombol **"Salin /createlink <alias>"** dan **"Salin /createpub <alias>"** sebagai shortcut.
-  - Sumber video (label + tipe + URL) tetap, plus sandi & toggle wajib-sandi.
-- Replay mode (m3u8 / yt) tetap sebagai sub-section di kartu yang sama.
+### 2. `ShowLiveControl.tsx`
+- Hapus toggle **"Live Otomatis Sesuai Jadwal"** (atau biarkan tersembunyi & default false) karena sekarang murni manual via toggle admin.
+- Saat menyimpan, broadcast langsung ke realtime (sudah otomatis lewat update row).
 
-### 3. Bot Commands (`fonnte-webhook`)
-Tambah dua command admin baru:
-- `/createlink <alias|id8>` → buat token Live **personal** (1 device) untuk show terkait. Reply berisi link `https://<site>/live?show=<id>&t=<token>`.
-- `/createpub <alias|id8>` → buat token Live **publik** (multi-device, default 50). Reply link sama format.
-- Tanpa argumen → tampilkan daftar show aktif beserta alias.
-- Tambah `/createlink` & `/createpub` ke `ADMIN_ONLY` set.
+### 3. Player `src/pages/Live.tsx`
+- Sudah subscribe `active_shows` row spesifik. Tambahkan: ketika `is_live` berubah `false → true`, **panggil ulang `doUnlock`** (silent) bila user sudah punya token/sandi tersimpan, agar `unlocked.url` & `sources` selalu terupdate dengan embed terbaru.
+- Hapus dependency `live_auto_schedule` di logic enable — `enabled = !!data.is_live` saja.
+- **`ScheduleCountdown` baru**:
+  - Background = `image_url` show (object-cover, opacity ~30% + overlay gelap), agar judul/jadwal/countdown tetap terbaca.
+  - Tambah prop `imageUrl`, ambil dari query `active_shows`.
+- Player playlist tab (sumber tambahan) sudah otomatis re-render karena `unlocked.sources` di-refresh dari realtime row.
 
-### 4. Edge Function `unlock-live`
-Branch `show_id` ditambah jalur **token**:
-- Jika body berisi `token`, lookup di `active_show_tokens` (bukan `live_tokens`).
-- Validasi `revoked`, `kind`, dan limit device via `active_show_token_devices` + `browser_id`.
-- Bypass password jika token valid.
-- Tetap return `enabled` (false jika belum LIVE & belum dalam jendela auto-schedule), `title`, `type`, `url`, `sources`, `show_date`, `show_time`, `watermark`.
+### 4. Blokir per `browser_id`
+- Migration: gunakan tabel `blocked_browsers` yang sudah ada (`browser_id`, `unblocked`, `reason`).
+- Edge function `unlock-live`: sebelum cek token/password, query `blocked_browsers` untuk `browser_id` user. Jika ada baris dengan `unblocked=false` → return `{ valid: false, reason: 'blocked' }`.
+- `Live.tsx`: tampilkan pesan "Perangkat ini diblokir oleh admin" bila reason `blocked`.
+- Pada `ShowLiveTokensDialog.tsx` (panel device per token): tambah tombol **"Blokir Perangkat"** di tiap row device → insert ke `blocked_browsers` (`browser_id`, `reason='admin_block'`, `unblocked=false`). Tombol **"Buka Blokir"** bila sudah diblokir → `update unblocked=true`.
+- Reset device (hapus dari `active_show_token_devices`) tetap terpisah dari blokir.
 
-### 5. Halaman `/live?show=<id>` (Player)
-- Auto-unlock dari `?t=<token>` sudah ada → tetap dipakai untuk token baru.
-- **Countdown baru**: bila `unlocked && !liveActive` dan show punya `show_date/show_time`, tampilkan kartu besar berisi:
-  - Judul show, tanggal & jam, lineup avatars.
-  - Hitung mundur Hari : Jam : Menit : Detik sampai jadwal show.
-  - Jika sudah lewat tapi admin belum toggle LIVE: pesan "Menunggu admin memulai siaran…" + countdown jadi 0.
-- Ketika `liveActive` → render `HlsPlayer` / `EmbedPlayer` dari `unlocked.url` / `sources` (sudah ada, dipastikan source valid).
-- Realtime subscribe ke `active_shows` row spesifik supaya saat admin toggle ON player langsung tampil tanpa reload.
-
-### 6. Memastikan embed benar-benar tampil
-- `ShowLiveControl.save` saat ini meng-update kolom dengan benar—konfirmasi `live_url` & `live_sources` tidak terhapus saat toggle.
-- Tambah validasi sederhana: jika `is_live=true` tapi `live_url` & `live_sources` kosong → tampilkan warning di admin sebelum save.
-- `EmbedPlayer` untuk type `youtube`: pastikan menerima URL penuh atau ID 11-char (sudah ada normalisasi—dipakai apa adanya).
+### 5. Migration
+Tidak ada perubahan skema (`blocked_browsers` sudah ada). Hanya update edge function & UI.
 
 ## Aspek Teknis Singkat
 
 ```text
-active_shows ──┬── admin_alias (baru)
-               └── (kolom live_*/replay_* sudah ada)
-active_show_tokens ── show_id, token, kind, max_devices, revoked
-active_show_token_devices ── token_id, browser_id
+Admin tab "Streaming Show"
+ └── Card (per show)
+      ├── Toggle LIVE (instant update is_live, exclusive)
+      ├── Badge ON AIR
+      └── Edit Detail → ShowLiveControl (URL/sumber/sandi/replay/token)
 
-Bot:
-  /createlink <alias>  →  token personal (1 device)
-  /createpub  <alias>  →  token publik (50 device)
+Live page
+ ├── subscribe active_shows row → re-fetch + silent re-unlock
+ ├── ScheduleCountdown (bg = show.image_url + overlay)
+ └── Player + playlist refresh dari unlocked.sources realtime
 
-Live page flow:
-  status load → token auto-unlock → 
-    enabled? player(embed) : countdown(jadwal show)
+unlock-live edge fn
+ ├── 1. cek blocked_browsers(browser_id) → reason='blocked'
+ ├── 2. lanjut token / password seperti biasa
 ```
 
 ## Yang TIDAK Berubah
-- Halaman replay & player replay tetap utuh.
-- Kartu replay & sumber lama tidak disentuh.
-- `live_config_private` tetap ada untuk kompatibilitas tapi disembunyikan dari UI.
-
-Setelah Anda setuju, saya jalankan migration dulu, baru lanjutkan kode.
+- Replay & semua halaman publik lain.
+- Tabel `live_config_private`, `live_tokens` (legacy, disembunyikan saja).
+- Schema database (tidak ada migration baru).

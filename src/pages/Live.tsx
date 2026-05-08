@@ -14,7 +14,7 @@ import LiveChat from '@/components/LiveChat';
 type SrcType = 'm3u8' | 'youtube' | 'cloudflare';
 interface PublicSource { label: string; type: SrcType }
 interface PrivateSource extends PublicSource { url: string }
-interface LiveStatus { enabled: boolean; title: string; type: string; require_password: boolean; sources: PublicSource[]; lineup: string[]; show_date?: string; show_time?: string }
+interface LiveStatus { enabled: boolean; title: string; type: string; require_password: boolean; sources: PublicSource[]; lineup: string[]; show_date?: string; show_time?: string; image_url?: string }
 interface UnlockedConfig { title: string; type: SrcType; url: string; sources: PrivateSource[]; watermark: string; enabled: boolean }
 
 const SS_KEY_BASE = 'replaytime-live-unlocked';
@@ -26,48 +26,50 @@ const typeLabel = (t: string) => t === 'youtube' ? 'YouTube' : t === 'cloudflare
 
 function pad(n: number) { return String(n).padStart(2, '0'); }
 
-function ScheduleCountdown({ title, showDate, showTime }: { title: string; showDate?: string; showTime?: string }) {
+function ScheduleCountdown({ title, showDate, showTime, imageUrl }: { title: string; showDate?: string; showTime?: string; imageUrl?: string }) {
   const target = showDate && showTime ? new Date(`${showDate}T${showTime}`) : null;
   const [now, setNow] = useState(Date.now());
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
-  if (!target) {
-    return (
-      <div className="rounded-2xl bg-card/60 border border-border p-6 text-center space-y-2">
-        <p className="text-sm font-semibold text-foreground">Live sedang OFF AIR</p>
-        <p className="text-xs text-muted-foreground">Akses Anda valid. Player akan muncul otomatis saat live aktif.</p>
-      </div>
-    );
-  }
-  const diff = target.getTime() - now;
-  const past = diff <= 0;
+
+  const diff = target ? target.getTime() - now : 0;
+  const past = !target || diff <= 0;
   const d = Math.max(0, Math.floor(diff / 86400000));
   const h = Math.max(0, Math.floor((diff % 86400000) / 3600000));
   const m = Math.max(0, Math.floor((diff % 3600000) / 60000));
   const s = Math.max(0, Math.floor((diff % 60000) / 1000));
-  const dateLabel = target.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-  const timeLabel = `${pad(target.getHours())}:${pad(target.getMinutes())} WIB`;
+  const dateLabel = target ? target.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : '';
+  const timeLabel = target ? `${pad(target.getHours())}:${pad(target.getMinutes())} WIB` : '';
+
   return (
-    <div className="rounded-2xl bg-gradient-to-br from-primary/10 via-card to-card border border-primary/30 p-6 text-center space-y-4">
-      <div className="space-y-1">
-        <p className="text-[10px] font-bold tracking-widest text-primary uppercase">Jadwal Live</p>
-        <h3 className="text-xl sm:text-2xl font-bold text-foreground">{title}</h3>
-        <p className="text-sm text-muted-foreground">{dateLabel} • {timeLabel}</p>
-      </div>
-      {past ? (
-        <p className="text-sm font-semibold text-foreground">⏳ Menunggu admin memulai siaran…</p>
-      ) : (
-        <>
-          <p className="text-xs text-muted-foreground">Player akan terbuka otomatis ketika LIVE dimulai</p>
-          <div className="grid grid-cols-4 gap-2 max-w-md mx-auto">
-            {[{v:d,l:'Hari'},{v:h,l:'Jam'},{v:m,l:'Menit'},{v:s,l:'Detik'}].map((u,i)=>(
-              <div key={i} className="rounded-lg bg-primary/10 border border-primary/30 py-3">
-                <div className="text-2xl sm:text-3xl font-bold text-primary tabular-nums">{pad(u.v)}</div>
-                <div className="text-[10px] text-muted-foreground uppercase tracking-wider">{u.l}</div>
-              </div>
-            ))}
-          </div>
-        </>
+    <div className="relative rounded-2xl overflow-hidden border border-primary/30 min-h-[320px]">
+      {imageUrl && (
+        <div
+          className="absolute inset-0 bg-center bg-cover"
+          style={{ backgroundImage: `url(${imageUrl})`, opacity: 0.35 }}
+          aria-hidden
+        />
       )}
+      <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/40 to-black/80" aria-hidden />
+      <div className="relative p-6 sm:p-8 text-center space-y-4">
+        <p className="text-[10px] font-bold tracking-widest text-primary uppercase">Jadwal Live</p>
+        <h3 className="text-xl sm:text-3xl font-bold text-white drop-shadow">{title}</h3>
+        {target && <p className="text-sm sm:text-base text-white/90 drop-shadow">{dateLabel} • {timeLabel}</p>}
+        {past ? (
+          <p className="text-sm sm:text-base font-semibold text-white drop-shadow">⏳ Menunggu admin memulai siaran…</p>
+        ) : (
+          <>
+            <p className="text-xs text-white/80">Player akan terbuka otomatis ketika LIVE dimulai</p>
+            <div className="grid grid-cols-4 gap-2 max-w-md mx-auto">
+              {[{v:d,l:'Hari'},{v:h,l:'Jam'},{v:m,l:'Menit'},{v:s,l:'Detik'}].map((u,i)=>(
+                <div key={i} className="rounded-lg bg-white/10 backdrop-blur border border-white/30 py-3">
+                  <div className="text-2xl sm:text-3xl font-bold text-white tabular-nums drop-shadow">{pad(u.v)}</div>
+                  <div className="text-[10px] text-white/80 uppercase tracking-wider">{u.l}</div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }
@@ -90,9 +92,8 @@ export default function Live() {
 
   const fetchStatus = () => {
     if (showId) {
-      // Active-show LIVE: read from active_shows + RPC for current live
       return supabase.from('active_shows')
-        .select('id,title,is_live,live_auto_schedule,live_type,live_url,live_sources,live_require_password,lineup,show_date,show_time,is_active')
+        .select('id,title,is_live,live_type,live_url,live_sources,live_require_password,lineup,show_date,show_time,is_active,image_url')
         .eq('id', showId).maybeSingle()
         .then(({ data }) => {
           if (!data || !data.is_active) {
@@ -100,19 +101,20 @@ export default function Live() {
             setStatusLoading(false);
             return null;
           }
-          const startMs = new Date(`${data.show_date}T${data.show_time}`).getTime();
-          const nowMs = Date.now();
-          const autoOn = data.live_auto_schedule && nowMs >= startMs && nowMs <= startMs + 8 * 3600 * 1000;
-          const enabled = !!data.is_live || !!autoOn;
+          const enabled = !!data.is_live;
           const pubSources = (Array.isArray(data.live_sources) ? data.live_sources : []).map((s: any) => ({ label: s.label, type: s.type }));
-          setStatus({
-            enabled, title: data.title || 'Live', type: data.live_type || 'm3u8',
-            require_password: data.live_require_password !== false,
-            sources: pubSources,
-            lineup: Array.isArray(data.lineup) ? data.lineup : [],
-            show_date: data.show_date, show_time: data.show_time,
+          let wasOff = false;
+          setStatus(prev => {
+            wasOff = !prev?.enabled;
+            return {
+              enabled, title: data.title || 'Live', type: data.live_type || 'm3u8',
+              require_password: data.live_require_password !== false,
+              sources: pubSources,
+              lineup: Array.isArray(data.lineup) ? data.lineup : [],
+              show_date: data.show_date, show_time: data.show_time,
+              image_url: data.image_url || '',
+            };
           });
-          // If user is unlocked, refresh URL/sources so player shows new embed instantly
           setUnlocked(prev => prev ? {
             ...prev,
             enabled,
@@ -121,6 +123,11 @@ export default function Live() {
             url: data.live_url || '',
             sources: (Array.isArray(data.live_sources) ? data.live_sources : []) as unknown as PrivateSource[],
           } : prev);
+          // When live just toggled on, silently re-call unlock to re-validate (token/blocked)
+          if (enabled && wasOff) {
+            const t = search.get('t');
+            if (t) void doUnlock({ token: t }, true);
+          }
           setStatusLoading(false);
           return data;
         });
@@ -154,7 +161,8 @@ export default function Live() {
         try { sessionStorage.removeItem(`${SS_KEY_BASE}${showId?'-'+showId:''}`); } catch { /* ignore */ }
         setKickedMsg('Akses Anda telah dicabut oleh admin.');
       } else {
-        if (data?.reason === 'device_limit') setPwError('Batas perangkat untuk token ini telah tercapai.');
+        if (data?.reason === 'blocked') setPwError('Perangkat ini telah diblokir oleh admin.');
+        else if (data?.reason === 'device_limit') setPwError('Batas perangkat untuk token ini telah tercapai.');
         else if (data?.reason === 'bad_password') setPwError('Sandi salah.');
         else if (data?.reason === 'revoked') setPwError('Token tidak valid atau telah dicabut.');
         else setPwError('Gagal membuka akses live.');
@@ -193,6 +201,15 @@ export default function Live() {
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'active_show_token_devices' }, () => {
         const t = search.get('t');
         if (t) void doUnlock({ token: t }, true);
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'blocked_browsers', filter: `browser_id=eq.${getBrowserId()}` }, () => {
+        const t = search.get('t');
+        if (t) void doUnlock({ token: t }, true);
+        else if (unlocked) {
+          setUnlocked(null);
+          try { sessionStorage.removeItem(`${SS_KEY_BASE}${showId?'-'+showId:''}`); } catch { /* ignore */ }
+          setKickedMsg('Perangkat ini telah diblokir oleh admin.');
+        }
       })
       .subscribe();
 
@@ -354,6 +371,7 @@ export default function Live() {
                 title={status?.title || unlocked.title || 'Live'}
                 showDate={status?.show_date}
                 showTime={status?.show_time}
+                imageUrl={status?.image_url}
               />
             )}
 

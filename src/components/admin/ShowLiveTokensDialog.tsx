@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import { Plus, Trash2, Copy, Ban, RotateCcw, Smartphone } from 'lucide-react';
+import { Plus, Trash2, Copy, Ban, RotateCcw, Smartphone, ShieldOff, ShieldCheck } from 'lucide-react';
 
 type Token = {
   id: string;
@@ -29,6 +29,7 @@ interface Props {
 export default function ShowLiveTokensDialog({ open, onOpenChange, showId, showTitle }: Props) {
   const [tokens, setTokens] = useState<Token[]>([]);
   const [devices, setDevices] = useState<Record<string, Device[]>>({});
+  const [blocked, setBlocked] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(false);
   const [label, setLabel] = useState('');
   const [maxDevices, setMaxDevices] = useState(1);
@@ -56,6 +57,17 @@ export default function ShowLiveTokensDialog({ open, onOpenChange, showId, showT
     }
     setTokens((list ?? []) as Token[]);
     setDevices(grouped);
+    // Load block status for all browser_ids in devices
+    const allBids = Array.from(new Set(Object.values(grouped).flat().map(d => d.browser_id)));
+    const blkMap: Record<string, boolean> = {};
+    if (allBids.length) {
+      const { data: blks } = await supabase
+        .from('blocked_browsers')
+        .select('browser_id,unblocked')
+        .in('browser_id', allBids);
+      (blks ?? []).forEach((b: any) => { blkMap[b.browser_id] = !b.unblocked; });
+    }
+    setBlocked(blkMap);
     setLoading(false);
   };
 
@@ -95,6 +107,25 @@ export default function ShowLiveTokensDialog({ open, onOpenChange, showId, showT
 
   const removeDevice = async (deviceId: string) => {
     await supabase.from('active_show_token_devices').delete().eq('id', deviceId);
+    load();
+  };
+
+  const blockBrowser = async (browser_id: string) => {
+    if (!confirm('Blokir perangkat ini? User tidak bisa akses live (semua show) sampai dibuka admin.')) return;
+    // upsert: jika sudah ada (unblocked), set unblocked=false; jika belum, insert
+    const { data: existing } = await supabase.from('blocked_browsers').select('id').eq('browser_id', browser_id).maybeSingle();
+    if (existing) {
+      await supabase.from('blocked_browsers').update({ unblocked: false, reason: 'admin_block' }).eq('id', existing.id);
+    } else {
+      await supabase.from('blocked_browsers').insert({ browser_id, reason: 'admin_block', unblocked: false });
+    }
+    toast({ title: 'Perangkat diblokir' });
+    load();
+  };
+
+  const unblockBrowser = async (browser_id: string) => {
+    await supabase.from('blocked_browsers').update({ unblocked: true }).eq('browser_id', browser_id);
+    toast({ title: 'Blokir dibuka' });
     load();
   };
 
@@ -178,18 +209,30 @@ export default function ShowLiveTokensDialog({ open, onOpenChange, showId, showT
                   <div className="border-t border-border pt-2 space-y-1">
                     {devs.length === 0 ? (
                       <p className="text-[11px] text-muted-foreground italic">Belum ada perangkat terhubung.</p>
-                    ) : devs.map(d => (
-                      <div key={d.id} className="flex items-center gap-2 text-[11px] bg-secondary/30 rounded p-1.5">
+                    ) : devs.map(d => {
+                      const isBlk = !!blocked[d.browser_id];
+                      return (
+                      <div key={d.id} className={`flex items-center gap-2 text-[11px] rounded p-1.5 ${isBlk ? 'bg-destructive/10 border border-destructive/30' : 'bg-secondary/30'}`}>
                         <Smartphone className="w-3 h-3 text-muted-foreground shrink-0" />
                         <div className="flex-1 min-w-0">
-                          <code className="break-all text-foreground">{d.browser_id.slice(0, 20)}…</code>
+                          <code className="break-all text-foreground">{d.browser_id.slice(0, 20)}…{isBlk && <Badge variant="destructive" className="ml-1 text-[9px]">DIBLOKIR</Badge>}</code>
                           <p className="text-[10px] text-muted-foreground">{new Date(d.created_at).toLocaleString('id-ID')}</p>
                         </div>
-                        <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-destructive" onClick={() => removeDevice(d.id)}>
+                        {isBlk ? (
+                          <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-green-600" title="Buka blokir" onClick={() => unblockBrowser(d.browser_id)}>
+                            <ShieldCheck className="w-3 h-3" />
+                          </Button>
+                        ) : (
+                          <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-orange-600" title="Blokir perangkat" onClick={() => blockBrowser(d.browser_id)}>
+                            <ShieldOff className="w-3 h-3" />
+                          </Button>
+                        )}
+                        <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-destructive" title="Reset device" onClick={() => removeDevice(d.id)}>
                           <Trash2 className="w-3 h-3" />
                         </Button>
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
