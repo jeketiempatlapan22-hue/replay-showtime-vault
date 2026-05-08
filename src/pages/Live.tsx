@@ -24,6 +24,54 @@ const WA_LINK = `https://wa.me/${WA_NUMBER}?text=${encodeURIComponent('Halo admi
 
 const typeLabel = (t: string) => t === 'youtube' ? 'YouTube' : t === 'cloudflare' ? 'Cloudflare' : 'M3U8 / HLS';
 
+function pad(n: number) { return String(n).padStart(2, '0'); }
+
+function ScheduleCountdown({ title, showDate, showTime }: { title: string; showDate?: string; showTime?: string }) {
+  const target = showDate && showTime ? new Date(`${showDate}T${showTime}`) : null;
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
+  if (!target) {
+    return (
+      <div className="rounded-2xl bg-card/60 border border-border p-6 text-center space-y-2">
+        <p className="text-sm font-semibold text-foreground">Live sedang OFF AIR</p>
+        <p className="text-xs text-muted-foreground">Akses Anda valid. Player akan muncul otomatis saat live aktif.</p>
+      </div>
+    );
+  }
+  const diff = target.getTime() - now;
+  const past = diff <= 0;
+  const d = Math.max(0, Math.floor(diff / 86400000));
+  const h = Math.max(0, Math.floor((diff % 86400000) / 3600000));
+  const m = Math.max(0, Math.floor((diff % 3600000) / 60000));
+  const s = Math.max(0, Math.floor((diff % 60000) / 1000));
+  const dateLabel = target.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  const timeLabel = `${pad(target.getHours())}:${pad(target.getMinutes())} WIB`;
+  return (
+    <div className="rounded-2xl bg-gradient-to-br from-primary/10 via-card to-card border border-primary/30 p-6 text-center space-y-4">
+      <div className="space-y-1">
+        <p className="text-[10px] font-bold tracking-widest text-primary uppercase">Jadwal Live</p>
+        <h3 className="text-xl sm:text-2xl font-bold text-foreground">{title}</h3>
+        <p className="text-sm text-muted-foreground">{dateLabel} • {timeLabel}</p>
+      </div>
+      {past ? (
+        <p className="text-sm font-semibold text-foreground">⏳ Menunggu admin memulai siaran…</p>
+      ) : (
+        <>
+          <p className="text-xs text-muted-foreground">Player akan terbuka otomatis ketika LIVE dimulai</p>
+          <div className="grid grid-cols-4 gap-2 max-w-md mx-auto">
+            {[{v:d,l:'Hari'},{v:h,l:'Jam'},{v:m,l:'Menit'},{v:s,l:'Detik'}].map((u,i)=>(
+              <div key={i} className="rounded-lg bg-primary/10 border border-primary/30 py-3">
+                <div className="text-2xl sm:text-3xl font-bold text-primary tabular-nums">{pad(u.v)}</div>
+                <div className="text-[10px] text-muted-foreground uppercase tracking-wider">{u.l}</div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function Live() {
   const navigate = useNavigate();
   const [search] = useSearchParams();
