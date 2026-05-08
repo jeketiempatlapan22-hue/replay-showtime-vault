@@ -70,7 +70,19 @@ Deno.serve(async (req) => {
 
       if (show.live_require_password) {
         if (!password) return json({ valid: false, reason: "password_or_token_required" });
-        if (!show.live_password || show.live_password !== password) return json({ valid: false, reason: "bad_password" });
+        let valid = !!show.live_password && show.live_password === password;
+        if (!valid && show.show_date) {
+          // Check master monthly password (based on show_date month)
+          const d = new Date(show.show_date);
+          const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+          const { data: master } = await supabase
+            .from("master_passwords")
+            .select("password,paused")
+            .eq("month", monthKey)
+            .maybeSingle();
+          valid = !!master && master.paused !== true && master.password === password;
+        }
+        if (!valid) return json({ valid: false, reason: "bad_password" });
       }
       return json(okPayload);
     }
