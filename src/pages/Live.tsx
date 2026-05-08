@@ -224,10 +224,10 @@ export default function Live() {
           watermark: data.watermark || '',
           enabled: !!data.enabled,
         };
-        // For silent revalidation with `soft:true` (multi-device token, slot full),
-        // do NOT overwrite existing player URL/sources to avoid remount; just keep alive.
-        if (silent && data.soft) {
-          // no-op on unlocked; keep current session
+        // For silent revalidation, NEVER overwrite the existing player URL/sources.
+        // Doing so would change the React key on the player and remount it, restarting the live stream from the beginning.
+        if (silent) {
+          // Keep current unlocked URL/sources intact; only refresh non-stream metadata below.
         } else {
           setUnlocked(cfg);
           try { sessionStorage.setItem(`${SS_KEY_BASE}${showId?'-'+showId:''}`, JSON.stringify(cfg)); } catch { /* ignore */ }
@@ -519,8 +519,8 @@ export default function Live() {
               <>
                 <Suspense fallback={<PlayerFallback />}>
                   {activeSource.type === 'm3u8'
-                    ? <HlsPlayer key={`m3u8-${safeIdx}-${activeSource.url}`} src={activeSource.url} title={unlocked.title} watermark={unlocked.watermark} onFatalError={handleSourceFatalError} hideSeekButtons />
-                    : <EmbedPlayer key={`em-${safeIdx}-${activeSource.url}`} type={activeSource.type} source={activeSource.url} title={unlocked.title} watermark={unlocked.watermark} hideSeekButtons isLive />}
+                    ? <HlsPlayer key={`m3u8-${safeIdx}`} src={activeSource.url} title={unlocked.title} watermark={unlocked.watermark} onFatalError={handleSourceFatalError} hideSeekButtons />
+                    : <EmbedPlayer key={`em-${safeIdx}-${activeSource.type}`} type={activeSource.type} source={activeSource.url} title={unlocked.title} watermark={unlocked.watermark} hideSeekButtons isLive />}
                 </Suspense>
 
                 <div className="flex items-center justify-between flex-wrap gap-2 px-1">
