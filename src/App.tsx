@@ -64,6 +64,7 @@ const App = () => (
               <Route path="/live" element={<Live />} />
               <Route path="/auth" element={<Auth />} />
               <Route path="/akses" element={<Akses />} />
+              <Route path="/shows" element={<Shows />} />
               <Route path="/adpan" element={<Admin />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
