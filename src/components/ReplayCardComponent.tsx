@@ -1,11 +1,14 @@
-import { useState } from 'react';
-import { Lock, Unlock, Play, Calendar, Users, Tag, Star, Tv, Bookmark, BookmarkCheck } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Lock, Unlock, Play, Calendar, Users, Tag, Star, Tv, Bookmark, BookmarkCheck, ShoppingCart, Copy } from 'lucide-react';
 import { type ReplayRow, verifyPassword } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import MemberAvatar from '@/components/MemberAvatar';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import BuyShowDialog from '@/components/BuyShowDialog';
+import { getReplayPurchase } from '@/lib/purchases';
+import { toast } from '@/hooks/use-toast';
 
 const CRITERIA_LABELS: Record<string, string> = {
   reguler: 'Reguler', sts: 'STS', last_show: 'Last Show', aniv: 'Anniversary', special: 'Show Spesial',
