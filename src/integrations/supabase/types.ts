@@ -23,6 +23,11 @@ export type Database = {
           image_url: string
           is_active: boolean
           lineup: string[]
+          pakasir_amount: number
+          price_replay: number
+          price_show: number
+          replay_enabled: boolean
+          replay_id: string | null
           show_date: string
           show_time: string
           sort_order: number
@@ -37,6 +42,11 @@ export type Database = {
           image_url?: string
           is_active?: boolean
           lineup?: string[]
+          pakasir_amount?: number
+          price_replay?: number
+          price_show?: number
+          replay_enabled?: boolean
+          replay_id?: string | null
           show_date: string
           show_time?: string
           sort_order?: number
@@ -51,6 +61,11 @@ export type Database = {
           image_url?: string
           is_active?: boolean
           lineup?: string[]
+          pakasir_amount?: number
+          price_replay?: number
+          price_show?: number
+          replay_enabled?: boolean
+          replay_id?: string | null
           show_date?: string
           show_time?: string
           sort_order?: number
