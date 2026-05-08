@@ -37,15 +37,28 @@ export default function ActiveShowCard({ show, index = 0 }: { show: ActiveShow; 
   const navigate = useNavigate();
   const [buyOpen, setBuyOpen] = useState(false);
   const [buyMode, setBuyMode] = useState<'show' | 'replay'>('show');
+  const [inlinePlayerOpen, setInlinePlayerOpen] = useState(false);
   const formattedDate = target.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
   const formattedTime = `${pad(target.getHours())}:${pad(target.getMinutes())} WIB`;
 
-  const replayMode = show.replay_enabled && !!show.replay_id;
+  // Replay routing: prefer inline replay_mode (m3u8/youtube), else legacy replay_id route
+  const inlineReplay = !!show.replay_mode && (!!show.replay_m3u8_url || !!show.replay_youtube_url);
+  const replayMode = inlineReplay || (show.replay_enabled && !!show.replay_id);
   const showPriced = (show.price_show || 0) > 0 && (show.pakasir_amount || 0) > 0;
   const replayPriced = (show.price_replay || 0) > 0 && (show.pakasir_amount || 0) > 0;
 
+  // LIVE detection
+  const startMs = target.getTime();
+  const nowMs = Date.now();
+  const autoLive = !!show.live_auto_schedule && nowMs >= startMs && nowMs <= startMs + 8 * 3600 * 1000;
+  const isLiveNow = !!show.is_live || autoLive;
+
   const openBuy = (mode: 'show' | 'replay') => { setBuyMode(mode); setBuyOpen(true); };
-  const goReplay = () => { if (show.replay_id) navigate(`/replay/${show.replay_id}`); };
+  const goReplay = () => {
+    if (inlineReplay) { setInlinePlayerOpen(true); return; }
+    if (show.replay_id) navigate(`/replay/${show.replay_id}`);
+  };
+  const goLive = () => navigate(`/live?show=${show.id}`);
 
   return (
     <div
