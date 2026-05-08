@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Calendar, Clock, Tag, Users, Radio, ShoppingCart, PlayCircle, X } from 'lucide-react';
+import { Calendar, Clock, Tag, Users, Radio, ShoppingCart, PlayCircle, X, Lock } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
@@ -52,6 +52,18 @@ export default function ActiveShowCard({ show, index = 0 }: { show: ActiveShow; 
   const nowMs = Date.now();
   const autoLive = !!show.live_auto_schedule && nowMs >= startMs && nowMs <= startMs + 8 * 3600 * 1000;
   const isLiveNow = !!show.is_live || autoLive;
+
+  // Per-show unlock check (sessionStorage written by /live page after password/token success)
+  const [hasAccess, setHasAccess] = useState(false);
+  useEffect(() => {
+    try { setHasAccess(!!sessionStorage.getItem(`replaytime-live-unlocked-${show.id}`)); } catch { /* ignore */ }
+    const onStorage = () => {
+      try { setHasAccess(!!sessionStorage.getItem(`replaytime-live-unlocked-${show.id}`)); } catch { /* ignore */ }
+    };
+    window.addEventListener('storage', onStorage);
+    window.addEventListener('focus', onStorage);
+    return () => { window.removeEventListener('storage', onStorage); window.removeEventListener('focus', onStorage); };
+  }, [show.id]);
 
   const openBuy = (mode: 'show' | 'replay') => { setBuyMode(mode); setBuyOpen(true); };
   const goReplay = () => {
@@ -142,9 +154,15 @@ export default function ActiveShowCard({ show, index = 0 }: { show: ActiveShow; 
         {/* Action buttons */}
         <div className="pt-2 space-y-2">
           {isLiveNow && (
-            <Button className="w-full gap-2 bg-red-600 hover:bg-red-700 text-white" onClick={goLive}>
-              <Radio className="w-4 h-4" /> Tonton Live
-            </Button>
+            hasAccess ? (
+              <Button className="w-full gap-2 bg-red-600 hover:bg-red-700 text-white" onClick={goLive}>
+                <Radio className="w-4 h-4" /> Tonton Live
+              </Button>
+            ) : (
+              <Button variant="secondary" className="w-full gap-2" onClick={goLive}>
+                <Lock className="w-4 h-4" /> Masukkan Sandi
+              </Button>
+            )
           )}
           {replayMode ? (
             replayPriced ? (
