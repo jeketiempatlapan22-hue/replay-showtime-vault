@@ -73,33 +73,45 @@ function buildAttractiveTokenMessage(opts: {
   liveUrl: string;
   showDate?: string;
 }) {
-  const dateLine = opts.showDate ? `📅 ${opts.showDate}` : '';
   const header = opts.kind === 'personal'
-    ? '✨🔐 *TOKEN SATUAN REPLAYTIME* 🔐✨'
+    ? '🔐 *TOKEN SATUAN — REPLAYTIME*'
     : opts.kind === 'replay'
-      ? '🎉✨ *TOKEN REPLAY KAMU SUDAH SIAP!* ✨🎉'
-      : '✨🎬 *TOKEN AKSES REPLAYTIME* 🎬✨';
+      ? '🎬 *TOKEN REPLAY — REPLAYTIME*'
+      : '🎁 *TOKEN AKSES — REPLAYTIME*';
+
   const accessLine = opts.kind === 'personal'
-    ? '👤 *Token Pribadi* — terkunci untuk *1 perangkat pertama* yang membuka.'
-    : '🔓 *Token Multi-Device* — bisa dibuka di banyak perangkat sekaligus.';
+    ? '👤  *Token Pribadi* — hanya untuk *1 perangkat pertama* yang membuka link.'
+    : '🔓  *Token Multi-Device* — bisa dibuka di banyak perangkat.';
+
   const closing = opts.kind === 'personal'
-    ? '⚠️ Jangan dibagikan ke orang lain — perangkat lain tidak akan bisa membuka.\n💖 Selamat menonton!'
-    : '💖 Selamat menonton, semoga makin seru ya!';
-  return [
-    header,
-    '',
-    `🎤 *${opts.title}*`,
-    dateLine,
-    '',
-    '🎁 Selamat! Link ini bisa digunakan untuk *menonton Live* sekaligus *membuka Replay*.',
-    '👉 Cukup *klik link*-nya, langsung tayang — tanpa kode tambahan.',
-    '',
-    accessLine,
-    `🔗 ${opts.link}`,
-    opts.liveUrl ? `📺 Live: ${opts.liveUrl}` : '',
-    '',
-    closing,
-  ].filter(Boolean).join('\n');
+    ? '⚠️  Mohon *jangan dibagikan* — perangkat lain tidak akan bisa membuka.'
+    : '✨  Selamat menonton, semoga makin seru!';
+
+  const lines: string[] = [];
+  lines.push(header);
+  lines.push('━━━━━━━━━━━━━━━━━━━━');
+  lines.push('');
+  lines.push(`🎤  *${opts.title}*`);
+  if (opts.showDate) lines.push(`📅  ${opts.showDate}`);
+  lines.push('');
+  lines.push('💡  *Cukup klik link di bawah* — langsung masuk ke halaman replay,');
+  lines.push('     tanpa perlu memasukkan kode apa pun.');
+  lines.push('');
+  lines.push('🔗  *Link Akses Replay:*');
+  lines.push(opts.link);
+  lines.push('');
+  if (opts.liveUrl) {
+    lines.push('📺  *Bonus:* link yang sama juga bisa untuk *Live*');
+    lines.push(`     ${opts.liveUrl}`);
+    lines.push('');
+  }
+  lines.push(accessLine);
+  lines.push('');
+  lines.push('━━━━━━━━━━━━━━━━━━━━');
+  lines.push(closing);
+  lines.push('');
+  lines.push('— ReplayTime 💖');
+  return lines.join('\n');
 }
 
 async function createTokenInline(
