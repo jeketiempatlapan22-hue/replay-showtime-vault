@@ -177,7 +177,6 @@ Deno.serve(async (req) => {
         }).join('\n\n');
       }
     } else if (cmd === '/buattoken') {
-      const origin = map.get('site_origin') || '';
       if (!arg) {
         const { data: replays } = await admin
           .from('replays')
@@ -193,27 +192,16 @@ Deno.serve(async (req) => {
       } else {
         const code = arg.trim().toLowerCase();
         const { data: matches } = await admin
-          .from('replays')
-          .select('id,title,access_token')
-          .ilike('id', `${code}%`)
-          .limit(2);
-        if (!matches?.length) {
-          reply = `❌ Replay dengan kode *${code}* tidak ditemukan.`;
-        } else if (matches.length > 1) {
-          reply = `⚠️ Kode *${code}* ambigu (${matches.length} match). Gunakan kode lebih panjang.`;
-        } else {
+          .from('replays').select('id,title').ilike('id', `${code}%`).limit(2);
+        if (!matches?.length) reply = `❌ Replay dengan kode *${code}* tidak ditemukan.`;
+        else if (matches.length > 1) reply = `⚠️ Kode *${code}* ambigu (${matches.length} match). Gunakan kode lebih panjang.`;
+        else {
           const r = matches[0];
-          let token = r.access_token;
-          if (!token) {
-            token = crypto.randomUUID().replace(/-/g, '').slice(0, 24);
-            await admin.from('replays').update({ access_token: token }).eq('id', r.id);
-          }
-          const link = `${origin}/akses?token=${token}&replay=${r.id}`;
-          reply = `✅ *Token Replay*\n\n${r.title}\n🔗 ${link}\n\n_Bagikan link ini ke pembeli._`;
-          await admin.from('token_deliveries').insert({
-            phone: phoneNorm, replay_id: r.id, replay_title: r.title,
-            access_token: token, link, source: 'bot', requested_by: phoneNorm,
+          const res = await callCreateToken({
+            kind: 'master', replay_id: r.id, source: 'bot', requested_by: phoneNorm,
+            label: `Bot ${phoneNorm}`,
           });
+          reply = res.ok && res.message ? res.message : `❌ Gagal membuat token master. ${res.error || ''}`.trim();
         }
       }
     } else if (cmd === '/token') {
