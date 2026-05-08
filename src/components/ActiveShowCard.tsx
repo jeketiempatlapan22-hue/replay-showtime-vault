@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Calendar, Clock, Tag, Users, Radio } from 'lucide-react';
+import { Calendar, Clock, Tag, Users, Radio, ShoppingCart, PlayCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import MemberAvatar from '@/components/MemberAvatar';
+import BuyShowDialog from '@/components/BuyShowDialog';
 import { type ActiveShow, getShowDateTime } from '@/lib/activeShows';
+import { useNavigate } from 'react-router-dom';
 
 const CATEGORY_LABELS: Record<string, string> = {
   reguler: 'Reguler', sts: 'STS', last_show: 'Last Show', aniv: 'Anniversary', special: 'Show Spesial',
@@ -28,8 +31,18 @@ function useCountdown(target: Date) {
 export default function ActiveShowCard({ show, index = 0 }: { show: ActiveShow; index?: number }) {
   const target = getShowDateTime(show);
   const cd = useCountdown(target);
+  const navigate = useNavigate();
+  const [buyOpen, setBuyOpen] = useState(false);
+  const [buyMode, setBuyMode] = useState<'show' | 'replay'>('show');
   const formattedDate = target.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
   const formattedTime = `${pad(target.getHours())}:${pad(target.getMinutes())} WIB`;
+
+  const replayMode = show.replay_enabled && !!show.replay_id;
+  const showPriced = (show.price_show || 0) > 0 && (show.pakasir_amount || 0) > 0;
+  const replayPriced = (show.price_replay || 0) > 0 && (show.pakasir_amount || 0) > 0;
+
+  const openBuy = (mode: 'show' | 'replay') => { setBuyMode(mode); setBuyOpen(true); };
+  const goReplay = () => { if (show.replay_id) navigate(`/replay/${show.replay_id}`); };
 
   return (
     <div
@@ -109,7 +122,39 @@ export default function ActiveShowCard({ show, index = 0 }: { show: ActiveShow; 
             </>
           )}
         </div>
+
+        {/* Action buttons */}
+        <div className="pt-2 space-y-2">
+          {replayMode ? (
+            replayPriced ? (
+              <Button className="w-full gap-2" onClick={() => openBuy('replay')}>
+                <PlayCircle className="w-4 h-4" />
+                Tonton Replay · Rp {show.price_replay.toLocaleString('id-ID')}
+              </Button>
+            ) : (
+              <Button className="w-full gap-2" variant="secondary" onClick={goReplay}>
+                <PlayCircle className="w-4 h-4" />
+                Tonton Replay
+              </Button>
+            )
+          ) : showPriced ? (
+            <Button className="w-full gap-2" onClick={() => openBuy('show')}>
+              <ShoppingCart className="w-4 h-4" />
+              Beli Show · Rp {show.price_show.toLocaleString('id-ID')}
+            </Button>
+          ) : null}
+        </div>
       </div>
+
+      <BuyShowDialog
+        open={buyOpen}
+        onOpenChange={setBuyOpen}
+        showId={show.id}
+        showTitle={show.title}
+        amount={show.pakasir_amount}
+        itemTitle={buyMode === 'replay' ? `Replay: ${show.title}` : `Show: ${show.title}`}
+        replayId={buyMode === 'replay' ? show.replay_id : null}
+      />
     </div>
   );
 }
