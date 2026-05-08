@@ -391,7 +391,7 @@ Deno.serve(async (req) => {
   }
 
   // Admin-only commands
-  const ADMIN_ONLY = new Set(['/buattoken', '/createtoken', '/createtokenrep']);
+  const ADMIN_ONLY = new Set(['/buattoken', '/createtoken', '/createtokenrep', '/createlink', '/createpub']);
   let isBotAdmin = false;
   if (ADMIN_ONLY.has(cmd)) {
     const { data: ba } = await admin
@@ -553,6 +553,59 @@ Deno.serve(async (req) => {
             settingsMap: map as Map<string, string>,
           });
           reply = res.ok && res.message ? res.message : `❌ Gagal membuat token satuan. ${res.error || ''}`.trim();
+        }
+      }
+    } else if (cmd === '/createlink' || cmd === '/createpub') {
+      const parts = arg.split(/\s+/).filter(Boolean);
+      const code = (parts[0] || '').toLowerCase();
+      const label = parts.slice(1).join(' ').trim();
+      const isPublic = cmd === '/createpub';
+      if (!code) {
+        const { data: shows } = await admin
+          .from('active_shows').select('id,title,show_date,show_time,admin_alias,is_live,live_auto_schedule')
+          .eq('is_active', true).order('show_date', { ascending: false }).limit(10);
+        const lines = (shows ?? []).map((s: any) => {
+          const aliasLine = s.admin_alias ? `\n  🏷️ alias: \`${s.admin_alias}\`` : '';
+          const liveTag = s.is_live ? ' 🔴 LIVE' : (s.live_auto_schedule ? ' ⏰ AUTO' : '');
+          return `• \`${s.id.slice(0,8)}\` — ${s.title}${liveTag}\n  📅 ${s.show_date} ${String(s.show_time).slice(0,5)}${aliasLine}`;
+        });
+        reply = `ℹ️ Format: *${cmd} <kode|alias> [label]*\n_${isPublic ? 'Token publik (multi-device)' : 'Token satuan (1 device)'} untuk akses LIVE per show._\n\n` +
+          (lines.length ? `🎤 *DAFTAR SHOW AKTIF*\n\n${lines.join('\n\n')}` : '📭 Belum ada show aktif.');
+      } else {
+        const { data: byAlias } = await admin
+          .from('active_shows').select('id,title,show_date,show_time').ilike('admin_alias', code).limit(2);
+        let matches = byAlias ?? [];
+        if (!matches.length) {
+          const { data: byId } = await admin
+            .from('active_shows').select('id,title,show_date,show_time').ilike('id', `${code}%`).limit(2);
+          matches = byId ?? [];
+        }
+        if (!matches.length) reply = `❌ Show dengan kode/alias *${code}* tidak ditemukan.`;
+        else if (matches.length > 1) reply = `⚠️ Kode *${code}* ambigu. Pakai alias unik atau id lebih panjang.`;
+        else {
+          const s: any = matches[0];
+          const token = newToken();
+          const maxDevices = isPublic ? 50 : 1;
+          const { error } = await admin.from('active_show_tokens').insert({
+            show_id: s.id, token, kind: isPublic ? 'public' : 'personal',
+            max_devices: maxDevices, label: label || `Bot ${phoneNorm}`,
+          });
+          if (error) {
+            reply = `❌ Gagal membuat token. ${error.message}`;
+          } else {
+            const origin = (map.get('site_origin') || 'https://replaytime.lovable.app').replace(/\/+$/, '');
+            const link = `${origin}/live?show=${s.id}&t=${token}`;
+            const header = isPublic ? '🎁 *TOKEN LIVE PUBLIK*' : '🔐 *TOKEN LIVE SATUAN*';
+            const access = isPublic ? `🔓 Bisa dibuka di ${maxDevices} perangkat.` : '👤 Hanya untuk *1 perangkat pertama*.';
+            reply = [
+              header, '━━━━━━━━━━━━━━━━━━━━', '',
+              `🎤  *${s.title}*`,
+              `📅  ${s.show_date} ${String(s.show_time).slice(0,5)}`, '',
+              '🔗  *Link Akses Live:*', link, '',
+              access, '', '━━━━━━━━━━━━━━━━━━━━',
+              '— ReplayTime 💖',
+            ].join('\n');
+          }
         }
       }
     }

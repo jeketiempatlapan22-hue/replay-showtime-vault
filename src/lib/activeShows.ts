@@ -16,6 +16,7 @@ export interface ActiveShow {
   pakasir_amount: number;
   replay_id: string | null;
   replay_enabled: boolean;
+  admin_alias?: string | null;
   // LIVE controls
   is_live?: boolean;
   live_auto_schedule?: boolean;
@@ -37,7 +38,7 @@ export async function getActiveShows(adminMode = false): Promise<ActiveShow[]> {
   if (!adminMode) query = query.eq('is_active', true);
   const { data, error } = await query.order('sort_order').order('show_date');
   if (error) { console.error(error); return []; }
-  return (data || []) as ActiveShow[];
+  return (data || []) as unknown as ActiveShow[];
 }
 
 export async function upsertActiveShow(show: Partial<ActiveShow> & { id?: string }) {

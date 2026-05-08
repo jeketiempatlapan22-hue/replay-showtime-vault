@@ -14,7 +14,7 @@ import LiveChat from '@/components/LiveChat';
 type SrcType = 'm3u8' | 'youtube' | 'cloudflare';
 interface PublicSource { label: string; type: SrcType }
 interface PrivateSource extends PublicSource { url: string }
-interface LiveStatus { enabled: boolean; title: string; type: string; require_password: boolean; sources: PublicSource[]; lineup: string[] }
+interface LiveStatus { enabled: boolean; title: string; type: string; require_password: boolean; sources: PublicSource[]; lineup: string[]; show_date?: string; show_time?: string }
 interface UnlockedConfig { title: string; type: SrcType; url: string; sources: PrivateSource[]; watermark: string; enabled: boolean }
 
 const SS_KEY_BASE = 'replaytime-live-unlocked';
@@ -23,6 +23,54 @@ const WA_NUMBER = '6288809048431';
 const WA_LINK = `https://wa.me/${WA_NUMBER}?text=${encodeURIComponent('Halo admin, saya ingin beli akses show live.')}`;
 
 const typeLabel = (t: string) => t === 'youtube' ? 'YouTube' : t === 'cloudflare' ? 'Cloudflare' : 'M3U8 / HLS';
+
+function pad(n: number) { return String(n).padStart(2, '0'); }
+
+function ScheduleCountdown({ title, showDate, showTime }: { title: string; showDate?: string; showTime?: string }) {
+  const target = showDate && showTime ? new Date(`${showDate}T${showTime}`) : null;
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
+  if (!target) {
+    return (
+      <div className="rounded-2xl bg-card/60 border border-border p-6 text-center space-y-2">
+        <p className="text-sm font-semibold text-foreground">Live sedang OFF AIR</p>
+        <p className="text-xs text-muted-foreground">Akses Anda valid. Player akan muncul otomatis saat live aktif.</p>
+      </div>
+    );
+  }
+  const diff = target.getTime() - now;
+  const past = diff <= 0;
+  const d = Math.max(0, Math.floor(diff / 86400000));
+  const h = Math.max(0, Math.floor((diff % 86400000) / 3600000));
+  const m = Math.max(0, Math.floor((diff % 3600000) / 60000));
+  const s = Math.max(0, Math.floor((diff % 60000) / 1000));
+  const dateLabel = target.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  const timeLabel = `${pad(target.getHours())}:${pad(target.getMinutes())} WIB`;
+  return (
+    <div className="rounded-2xl bg-gradient-to-br from-primary/10 via-card to-card border border-primary/30 p-6 text-center space-y-4">
+      <div className="space-y-1">
+        <p className="text-[10px] font-bold tracking-widest text-primary uppercase">Jadwal Live</p>
+        <h3 className="text-xl sm:text-2xl font-bold text-foreground">{title}</h3>
+        <p className="text-sm text-muted-foreground">{dateLabel} • {timeLabel}</p>
+      </div>
+      {past ? (
+        <p className="text-sm font-semibold text-foreground">⏳ Menunggu admin memulai siaran…</p>
+      ) : (
+        <>
+          <p className="text-xs text-muted-foreground">Player akan terbuka otomatis ketika LIVE dimulai</p>
+          <div className="grid grid-cols-4 gap-2 max-w-md mx-auto">
+            {[{v:d,l:'Hari'},{v:h,l:'Jam'},{v:m,l:'Menit'},{v:s,l:'Detik'}].map((u,i)=>(
+              <div key={i} className="rounded-lg bg-primary/10 border border-primary/30 py-3">
+                <div className="text-2xl sm:text-3xl font-bold text-primary tabular-nums">{pad(u.v)}</div>
+                <div className="text-[10px] text-muted-foreground uppercase tracking-wider">{u.l}</div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
 
 export default function Live() {
   const navigate = useNavigate();
@@ -62,6 +110,7 @@ export default function Live() {
             require_password: data.live_require_password !== false,
             sources: pubSources,
             lineup: Array.isArray(data.lineup) ? data.lineup : [],
+            show_date: data.show_date, show_time: data.show_time,
           });
           setStatusLoading(false);
           return data;
@@ -116,6 +165,7 @@ export default function Live() {
 
     const cfgChannel = supabase.channel('live-config-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'live_config_private' }, () => { fetchStatus(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'active_shows', ...(showId ? { filter: `id=eq.${showId}` } : {}) }, () => { fetchStatus(); })
       .subscribe();
 
     const tokChannel = supabase.channel('live-tokens-realtime')
@@ -283,10 +333,11 @@ export default function Live() {
                   : <EmbedPlayer key={`em-${safeIdx}-${activeSource.url}`} type={activeSource.type} source={activeSource.url} title={unlocked.title} watermark={unlocked.watermark} />}
               </>
             ) : (
-              <div className="rounded-2xl bg-card/60 border border-border p-6 text-center space-y-2">
-                <p className="text-sm font-semibold text-foreground">Live sedang OFF AIR</p>
-                <p className="text-xs text-muted-foreground">Akses Anda valid. Player akan muncul otomatis saat live aktif.</p>
-              </div>
+              <ScheduleCountdown
+                title={status?.title || unlocked.title || 'Live'}
+                showDate={status?.show_date}
+                showTime={status?.show_time}
+              />
             )}
 
             {/* LINEUP */}
