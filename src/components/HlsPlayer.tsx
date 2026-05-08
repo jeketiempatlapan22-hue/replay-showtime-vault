@@ -46,6 +46,8 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
 
   const initialVolume = (() => { try { const v = parseFloat(localStorage.getItem('replaytime-volume') || ''); return isFinite(v) ? Math.max(0, Math.min(1, v)) : 1; } catch { return 1; } })();
   const initialMuted = (() => { try { return localStorage.getItem('replaytime-muted') === '1'; } catch { return false; } })();
+  const initialVolumeRef = useRef(initialVolume);
+  const initialMutedRef = useRef(initialMuted);
   const savedQualityHeight = (() => { try { const v = parseInt(localStorage.getItem('replaytime-quality-height') || '', 10); return isFinite(v) ? v : null; } catch { return null; } })();
   const userQualityRef = useRef<number | null>(savedQualityHeight);
 
@@ -130,8 +132,8 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
 
     video.preload = 'auto';
     video.autoplay = true;
-    video.volume = initialVolume;
-    video.muted = initialMuted;
+    video.volume = initialVolumeRef.current;
+    video.muted = initialMutedRef.current;
     video.setAttribute('playsinline', 'true');
 
     const safePlay = () => {
@@ -364,7 +366,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
       // Reset native source to prevent leaked playback when switching providers
       try { video.removeAttribute('src'); video.load(); } catch { /* ignore */ }
     };
-  }, [src, initialMuted, initialVolume]);
+  }, [src]);
 
   const selectQuality = (levelIndex: number) => {
     if (!hlsRef.current) return;
