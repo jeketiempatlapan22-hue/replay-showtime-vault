@@ -166,6 +166,38 @@ export default function BotAdmin() {
         </Button>
       </div>
 
+      {/* Bot Admins whitelist */}
+      <div className="bg-card border border-border rounded-xl p-4 space-y-3">
+        <h3 className="font-semibold">Admin Bot WhatsApp</h3>
+        <p className="text-xs text-muted-foreground">
+          Hanya nomor di daftar ini yang dapat menjalankan command admin seperti <code>/buattoken</code>.
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <Input placeholder="08xxxx atau 628xxxx" value={newPhone} onChange={(e) => setNewPhone(e.target.value)} />
+          <Input placeholder="Label (opsional)" value={newLabel} onChange={(e) => setNewLabel(e.target.value)} />
+          <Button onClick={addAdmin}><Plus className="w-4 h-4 mr-1" />Tambah Admin</Button>
+        </div>
+        <div className="space-y-2">
+          {admins.length === 0 ? (
+            <p className="text-xs text-muted-foreground italic">Belum ada admin bot.</p>
+          ) : admins.map((a) => (
+            <div key={a.id} className="flex items-center gap-2 border border-border rounded-lg p-2 bg-secondary/30">
+              <div className="flex-1 min-w-0">
+                <p className="font-mono text-sm">+{a.phone}</p>
+                {a.label && <p className="text-xs text-muted-foreground">{a.label}</p>}
+              </div>
+              <label className="flex items-center gap-2 text-xs">
+                <Switch checked={a.enabled} onCheckedChange={() => toggleAdmin(a)} />
+                Aktif
+              </label>
+              <Button size="icon" variant="outline" onClick={() => removeAdmin(a.id)}>
+                <Trash2 className="w-4 h-4" />
+              </Button>
+            </div>
+          ))}
+        </div>
+      </div>
+
       {/* Commands editor */}
       <div className="bg-card border border-border rounded-xl p-4 space-y-3">
         <div className="flex items-center justify-between">
