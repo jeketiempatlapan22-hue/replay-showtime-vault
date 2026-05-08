@@ -16,6 +16,7 @@ interface PublicSource { label: string; type: SrcType }
 interface PrivateSource extends PublicSource { url: string }
 interface LiveStatus { enabled: boolean; title: string; type: string; require_password: boolean; sources: PublicSource[]; lineup: string[]; show_date?: string; show_time?: string; image_url?: string }
 interface UnlockedConfig { title: string; type: SrcType; url: string; sources: PrivateSource[]; watermark: string; enabled: boolean }
+type SourceLike = Partial<Record<keyof PrivateSource, unknown>>;
 
 const SS_KEY_BASE = 'replaytime-live-unlocked';
 const SS_SRC_KEY = 'replaytime-live-source-idx';
@@ -23,6 +24,21 @@ const WA_NUMBER = '6288809048431';
 const WA_LINK = `https://wa.me/${WA_NUMBER}?text=${encodeURIComponent('Halo admin, saya ingin beli akses show live.')}`;
 
 const typeLabel = (t: string) => t === 'youtube' ? 'YouTube' : t === 'cloudflare' ? 'Cloudflare' : 'M3U8 / HLS';
+
+const isSrcType = (value: unknown): value is SrcType => value === 'm3u8' || value === 'youtube' || value === 'cloudflare';
+const asSourceLike = (value: unknown): SourceLike | null => value && typeof value === 'object' ? value as SourceLike : null;
+const toPublicSources = (value: unknown): PublicSource[] => Array.isArray(value)
+  ? value.flatMap((item) => {
+    const source = asSourceLike(item);
+    return source ? [{ label: String(source.label || ''), type: isSrcType(source.type) ? source.type : 'm3u8' }] : [];
+  })
+  : [];
+const toPrivateSources = (value: unknown): PrivateSource[] => Array.isArray(value)
+  ? value.flatMap((item) => {
+    const source = asSourceLike(item);
+    return source ? [{ label: String(source.label || ''), type: isSrcType(source.type) ? source.type : 'm3u8', url: String(source.url || '') }] : [];
+  })
+  : [];
 
 function pad(n: number) { return String(n).padStart(2, '0'); }
 
@@ -102,7 +118,7 @@ export default function Live() {
             return null;
           }
           const enabled = !!data.is_live;
-          const pubSources = (Array.isArray(data.live_sources) ? data.live_sources : []).map((s: any) => ({ label: s.label, type: s.type }));
+          const pubSources = toPublicSources(data.live_sources);
           let wasOff = false;
           setStatus(prev => {
             wasOff = !prev?.enabled;
@@ -121,7 +137,7 @@ export default function Live() {
             title: data.title || prev.title,
             type: (data.live_type as SrcType) || prev.type,
             url: data.live_url || '',
-            sources: (Array.isArray(data.live_sources) ? data.live_sources : []) as unknown as PrivateSource[],
+            sources: toPrivateSources(data.live_sources),
           } : prev);
           // When live just toggled on, silently re-call unlock to re-validate (token/blocked)
           if (enabled && wasOff) {
@@ -133,11 +149,11 @@ export default function Live() {
         });
     }
     return supabase.rpc('get_live_status').then(({ data }) => {
-      const row: any = Array.isArray(data) ? data[0] : data;
+      const row = Array.isArray(data) ? data[0] : data;
       setStatus(row ? {
         enabled: !!row.enabled, title: row.title || 'Live', type: row.type || 'm3u8',
         require_password: row.require_password !== false,
-        sources: Array.isArray(row.sources) ? row.sources : [],
+        sources: toPublicSources(row.sources),
         lineup: Array.isArray(row.lineup) ? row.lineup : [],
       } : { enabled: false, title: 'Live', type: 'm3u8', require_password: true, sources: [], lineup: [] });
       setStatusLoading(false);
@@ -248,7 +264,7 @@ export default function Live() {
     void doUnlock({ password: pwInput.trim() });
   };
 
-  const liveActive = unlocked?.enabled ?? status?.enabled ?? false;
+  const liveActive = !!(status?.enabled || unlocked?.enabled);
 
   return (
     <div className="min-h-screen bg-background relative z-10">
