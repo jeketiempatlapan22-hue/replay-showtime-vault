@@ -134,6 +134,8 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
   useEffect(() => {
     markReady(false);
     setIsPlaying(false);
+    autoMuteAppliedRef.current = false;
+    userUnmutedRef.current = false;
 
     setDuration(0);
     setCurrentTime(0);
