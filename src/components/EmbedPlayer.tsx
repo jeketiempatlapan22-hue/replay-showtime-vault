@@ -384,7 +384,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
           <button onClick={togglePlay} aria-label={isPlaying ? 'Pause' : 'Play'} className="p-2.5 landscape:p-3 text-white hover:text-primary active:scale-95 transition-all">
             {isPlaying ? <Pause className="w-5 h-5 landscape:w-6 landscape:h-6" /> : <Play className="w-5 h-5 landscape:w-6 landscape:h-6" />}
           </button>
-          {type === 'youtube' && (
+          {type === 'youtube' && !hideSeekButtons && (
             <>
               <button onClick={() => skip(-10)} aria-label="Mundur 10 detik" className="p-2.5 landscape:p-3 text-white hover:text-primary active:scale-95 transition-all">
                 <SkipBack className="w-5 h-5 landscape:w-6 landscape:h-6" />
