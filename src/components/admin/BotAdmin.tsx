@@ -36,7 +36,7 @@ export default function BotAdmin() {
   const [botTestPhone, setBotTestPhone] = useState('+62 888-0904-8431');
   const [botTestCommand, setBotTestCommand] = useState('/menu');
   const [botTesting, setBotTesting] = useState(false);
-  const [botTestResult, setBotTestResult] = useState<{ ok?: boolean; reply?: string; reason?: string; command?: string } | null>(null);
+  const [botTestResult, setBotTestResult] = useState<{ ok?: boolean; reply?: string; reason?: string; command?: string; delivered?: boolean } | null>(null);
   const [copiedWebhook, setCopiedWebhook] = useState(false);
   const [admins, setAdmins] = useState<BotAdminRow[]>([]);
   const [newPhone, setNewPhone] = useState('');
@@ -136,10 +136,10 @@ export default function BotAdmin() {
     try {
       const { data, error } = await supabase.functions.invoke('fonnte-webhook', {
         headers: { 'x-bot-test': 'true' },
-        body: { sender: phone, message, test: true },
+        body: { sender: phone, message, test: true, deliver: true },
       });
       if (error) throw error;
-      setBotTestResult(data as { ok?: boolean; reply?: string; reason?: string; command?: string });
+      setBotTestResult(data as { ok?: boolean; reply?: string; reason?: string; command?: string; delivered?: boolean });
       toast({ title: (data as { ok?: boolean })?.ok ? 'Uji bot berhasil' : 'Uji bot selesai', description: message });
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'gagal';
@@ -198,7 +198,7 @@ export default function BotAdmin() {
       <div className="bg-card border border-border rounded-xl p-4 space-y-3">
         <div>
           <h3 className="font-semibold">Uji Bot</h3>
-          <p className="text-xs text-muted-foreground">Simulasikan command masuk dan tampilkan balasan bot tanpa menunggu webhook WhatsApp.</p>
+          <p className="text-xs text-muted-foreground">Kirim command uji ke nomor WhatsApp dan tampilkan balasan yang dibuat bot.</p>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
           <Input placeholder="08xxxx" value={botTestPhone} onChange={(e) => setBotTestPhone(e.target.value)} />
@@ -211,7 +211,7 @@ export default function BotAdmin() {
           <div className="border border-border rounded-lg bg-secondary/30 p-3 space-y-2">
             <div className="flex items-center justify-between gap-2">
               <p className="text-xs font-semibold">Hasil balasan</p>
-              <span className="text-[11px] text-muted-foreground">{botTestResult.ok ? 'OK' : botTestResult.reason || 'Gagal'}</span>
+              <span className="text-[11px] text-muted-foreground">{botTestResult.ok ? (botTestResult.delivered ? 'Terkirim' : 'OK') : botTestResult.reason || 'Gagal'}</span>
             </div>
             <pre className="whitespace-pre-wrap break-words text-xs font-mono leading-relaxed text-foreground">{botTestResult.reply || botTestResult.reason || 'Tidak ada balasan.'}</pre>
           </div>
