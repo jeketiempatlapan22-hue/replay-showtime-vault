@@ -77,7 +77,7 @@ Deno.serve(async (req) => {
       if (mtoken) {
         const r = await verifyMembership(supabase, mtoken, mpassword || "", browser_id || "");
         if (!r.ok) return json({ valid: false, reason: r.reason });
-        return json({ ...okPayload, watermark: `MB-${String(mtoken).slice(-4).toUpperCase()}` });
+        return json({ ...okPayload, watermark: `MB-${String(mtoken).slice(-4).toUpperCase()}`, membership: membershipInfo(r.token) });
       }
 
       if (token) {
