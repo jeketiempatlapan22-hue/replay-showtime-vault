@@ -117,6 +117,7 @@ export default function Live() {
 
     const cfgChannel = supabase.channel('live-config-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'live_config_private' }, () => { fetchStatus(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'active_shows', ...(showId ? { filter: `id=eq.${showId}` } : {}) }, () => { fetchStatus(); })
       .subscribe();
 
     const tokChannel = supabase.channel('live-tokens-realtime')
