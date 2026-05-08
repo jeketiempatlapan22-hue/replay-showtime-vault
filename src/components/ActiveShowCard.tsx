@@ -53,6 +53,18 @@ export default function ActiveShowCard({ show, index = 0 }: { show: ActiveShow; 
   const autoLive = !!show.live_auto_schedule && nowMs >= startMs && nowMs <= startMs + 8 * 3600 * 1000;
   const isLiveNow = !!show.is_live || autoLive;
 
+  // Per-show unlock check (sessionStorage written by /live page after password/token success)
+  const [hasAccess, setHasAccess] = useState(false);
+  useEffect(() => {
+    try { setHasAccess(!!sessionStorage.getItem(`replaytime-live-unlocked-${show.id}`)); } catch { /* ignore */ }
+    const onStorage = () => {
+      try { setHasAccess(!!sessionStorage.getItem(`replaytime-live-unlocked-${show.id}`)); } catch { /* ignore */ }
+    };
+    window.addEventListener('storage', onStorage);
+    window.addEventListener('focus', onStorage);
+    return () => { window.removeEventListener('storage', onStorage); window.removeEventListener('focus', onStorage); };
+  }, [show.id]);
+
   const openBuy = (mode: 'show' | 'replay') => { setBuyMode(mode); setBuyOpen(true); };
   const goReplay = () => {
     if (inlineReplay) { setInlinePlayerOpen(true); return; }
