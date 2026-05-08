@@ -100,10 +100,10 @@ Deno.serve(async (req) => {
     // Likely unique violation → already processed recently
     return new Response('ok', { headers: corsHeaders });
   }
-  // Janitor: prune entries older than 5 minutes
+  // Janitor: prune entries older than 30 seconds (short window so commands aren't blocked)
   await admin.from('bot_inbox_dedup')
     .delete()
-    .lt('received_at', new Date(Date.now() - 5 * 60_000).toISOString());
+    .lt('received_at', new Date(Date.now() - 30_000).toISOString());
 
   // Per-phone rate limit: max 1 reply per 8 seconds
   const RL_WINDOW_MS = 8000;
