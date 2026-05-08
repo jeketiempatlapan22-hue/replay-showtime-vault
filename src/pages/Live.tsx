@@ -119,7 +119,7 @@ export default function Live() {
             title: data.title || prev.title,
             type: (data.live_type as SrcType) || prev.type,
             url: data.live_url || '',
-            sources: (Array.isArray(data.live_sources) ? data.live_sources : []) as PrivateSource[],
+            sources: (Array.isArray(data.live_sources) ? data.live_sources : []) as unknown as PrivateSource[],
           } : prev);
           setStatusLoading(false);
           return data;
