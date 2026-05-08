@@ -123,6 +123,7 @@ Deno.serve(async (req) => {
         valid: true, enabled, title: cfg.title, type: cfg.type, url: cfg.url,
         sources: Array.isArray(cfg.sources) ? cfg.sources : [],
         watermark: `MB-${String(mtoken).slice(-4).toUpperCase()}`,
+        membership: membershipInfo(r.token),
       });
     }
 
