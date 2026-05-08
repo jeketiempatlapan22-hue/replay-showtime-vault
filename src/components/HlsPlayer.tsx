@@ -197,11 +197,12 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
         enableWorker: true,
         // Disable LL-HLS auto-detection: it caused stalls/restarts on regular streams whose URL contains "live"
         lowLatencyMode: false,
-        // Buffer tuning untuk playback halus
-        backBufferLength: 90,
-        maxBufferLength: 90,
-        maxMaxBufferLength: 180,
-        maxBufferSize: 120 * 1000 * 1000,
+        // Buffer tuning: konservatif untuk sesi panjang (7+ jam) di perangkat mobile.
+        // Back buffer pendek untuk menahan memory growth, max buffer cukup untuk smooth playback.
+        backBufferLength: 30,
+        maxBufferLength: 30,
+        maxMaxBufferLength: 60,
+        maxBufferSize: 30 * 1000 * 1000,
         maxBufferHole: 0.75,
         highBufferWatchdogPeriod: 2,
         nudgeOffset: 0.1,
