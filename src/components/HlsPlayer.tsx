@@ -10,6 +10,7 @@ interface Props {
   watermark?: string;
   onFatalError?: () => void;
   onPipChange?: (active: boolean) => void;
+  hideSeekButtons?: boolean;
 }
 
 export interface HlsPlayerHandle {
@@ -32,7 +33,7 @@ interface QualityLevel {
   bitrate?: number;
 }
 
-const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, onFatalError, onPipChange }, ref) => {
+const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, onFatalError, onPipChange, hideSeekButtons = false }, ref) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const hideControlsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -45,7 +46,17 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
   const onFatalErrorRef = useRef(onFatalError);
 
   const initialVolume = (() => { try { const v = parseFloat(localStorage.getItem('replaytime-volume') || ''); return isFinite(v) ? Math.max(0, Math.min(1, v)) : 1; } catch { return 1; } })();
-  const initialMuted = (() => { try { return localStorage.getItem('replaytime-muted') === '1'; } catch { return false; } })();
+  // Default unmuted; one-time per session, clear stale persisted mute so user starts with sound on.
+  const initialMuted = (() => {
+    try {
+      if (!sessionStorage.getItem('replaytime-mute-reset')) {
+        localStorage.removeItem('replaytime-muted');
+        sessionStorage.setItem('replaytime-mute-reset', '1');
+        return false;
+      }
+      return localStorage.getItem('replaytime-muted') === '1';
+    } catch { return false; }
+  })();
   const initialVolumeRef = useRef(initialVolume);
   const initialMutedRef = useRef(initialMuted);
   const savedQualityHeight = (() => { try { const v = parseInt(localStorage.getItem('replaytime-quality-height') || '', 10); return isFinite(v) ? v : null; } catch { return null; } })();
@@ -609,12 +620,16 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
             <button type="button" onClick={togglePlay} className="p-2 text-white hover:text-primary transition-colors" aria-label={isPlaying ? 'Pause' : 'Play'}>
               {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
             </button>
-            <button type="button" onClick={() => seek(-10)} disabled={isLiveStream} className="p-2 text-white hover:text-primary transition-colors disabled:opacity-40 disabled:hover:text-current" aria-label="Mundur 10 detik" title="Mundur 10 detik">
-              <RotateCcw className="w-5 h-5" />
-            </button>
-            <button type="button" onClick={() => seek(10)} disabled={isLiveStream} className="p-2 text-white hover:text-primary transition-colors disabled:opacity-40 disabled:hover:text-current" aria-label="Maju 10 detik" title="Maju 10 detik">
-              <RotateCw className="w-5 h-5" />
-            </button>
+            {!hideSeekButtons && (
+              <>
+                <button type="button" onClick={() => seek(-10)} disabled={isLiveStream} className="p-2 text-white hover:text-primary transition-colors disabled:opacity-40 disabled:hover:text-current" aria-label="Mundur 10 detik" title="Mundur 10 detik">
+                  <RotateCcw className="w-5 h-5" />
+                </button>
+                <button type="button" onClick={() => seek(10)} disabled={isLiveStream} className="p-2 text-white hover:text-primary transition-colors disabled:opacity-40 disabled:hover:text-current" aria-label="Maju 10 detik" title="Maju 10 detik">
+                  <RotateCw className="w-5 h-5" />
+                </button>
+              </>
+            )}
 
             <div className="flex items-center gap-1 group/volume">
               <button type="button" onClick={toggleMute} className="p-2 text-white hover:text-primary transition-colors" aria-label={muted ? 'Unmute' : 'Mute'}>

@@ -8,6 +8,7 @@ interface Props {
   source: string; // youtube id or url, cloudflare uid
   title: string;
   watermark?: string;
+  hideSeekButtons?: boolean;
 }
 
 interface YoutubePlayerApi {
@@ -43,7 +44,7 @@ function extractCloudflareUid(raw: string): string {
 const VOL_KEY = 'replaytime-volume';
 const MUTED_KEY = 'replaytime-muted';
 
-export default function EmbedPlayer({ type, source, title, watermark }: Props) {
+export default function EmbedPlayer({ type, source, title, watermark, hideSeekButtons = false }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const ytMountRef = useRef<HTMLDivElement>(null);
@@ -52,7 +53,17 @@ export default function EmbedPlayer({ type, source, title, watermark }: Props) {
   const [ready, setReady] = useState(false);
   const [useYoutubeFallback, setUseYoutubeFallback] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
-  const initialMuted = (() => { try { return localStorage.getItem(MUTED_KEY) === '1'; } catch { return false; } })();
+  // Default unmuted: clear stale persisted mute one time per session.
+  const initialMuted = (() => {
+    try {
+      if (!sessionStorage.getItem('replaytime-mute-reset')) {
+        localStorage.removeItem(MUTED_KEY);
+        sessionStorage.setItem('replaytime-mute-reset', '1');
+        return false;
+      }
+      return localStorage.getItem(MUTED_KEY) === '1';
+    } catch { return false; }
+  })();
   const initialVolume = (() => { try { const v = parseFloat(localStorage.getItem(VOL_KEY) || ''); return isFinite(v) ? Math.max(0, Math.min(1, v)) : 1; } catch { return 1; } })();
   const [muted, setMuted] = useState(initialMuted);
   const [volume, setVolume] = useState(initialVolume);
@@ -373,7 +384,7 @@ export default function EmbedPlayer({ type, source, title, watermark }: Props) {
           <button onClick={togglePlay} aria-label={isPlaying ? 'Pause' : 'Play'} className="p-2.5 landscape:p-3 text-white hover:text-primary active:scale-95 transition-all">
             {isPlaying ? <Pause className="w-5 h-5 landscape:w-6 landscape:h-6" /> : <Play className="w-5 h-5 landscape:w-6 landscape:h-6" />}
           </button>
-          {type === 'youtube' && (
+          {type === 'youtube' && !hideSeekButtons && (
             <>
               <button onClick={() => skip(-10)} aria-label="Mundur 10 detik" className="p-2.5 landscape:p-3 text-white hover:text-primary active:scale-95 transition-all">
                 <SkipBack className="w-5 h-5 landscape:w-6 landscape:h-6" />

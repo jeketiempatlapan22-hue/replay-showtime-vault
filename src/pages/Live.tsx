@@ -370,7 +370,7 @@ export default function Live() {
               </div>
               <h2 className="text-2xl font-bold text-foreground">Akses Live Terkunci</h2>
               <p className="text-sm text-muted-foreground">
-                Masukkan <span className="font-semibold text-foreground">sandi akses</span> di bawah, atau hubungi admin untuk membeli show.
+                Masukkan <span className="font-semibold text-foreground">sandi satuan show</span> atau <span className="font-semibold text-foreground">sandi master bulanan</span>, atau hubungi admin untuk membeli show.
               </p>
             </div>
 
@@ -423,8 +423,8 @@ export default function Live() {
               <>
                 <Suspense fallback={<PlayerFallback />}>
                   {activeSource.type === 'm3u8'
-                    ? <HlsPlayer key={`m3u8-${safeIdx}-${activeSource.url}`} src={activeSource.url} title={unlocked.title} watermark={unlocked.watermark} onFatalError={handleSourceFatalError} />
-                    : <EmbedPlayer key={`em-${safeIdx}-${activeSource.url}`} type={activeSource.type} source={activeSource.url} title={unlocked.title} watermark={unlocked.watermark} />}
+                    ? <HlsPlayer key={`m3u8-${safeIdx}-${activeSource.url}`} src={activeSource.url} title={unlocked.title} watermark={unlocked.watermark} onFatalError={handleSourceFatalError} hideSeekButtons />
+                    : <EmbedPlayer key={`em-${safeIdx}-${activeSource.url}`} type={activeSource.type} source={activeSource.url} title={unlocked.title} watermark={unlocked.watermark} hideSeekButtons />}
                 </Suspense>
 
                 <div className="flex items-center justify-between flex-wrap gap-2 px-1">

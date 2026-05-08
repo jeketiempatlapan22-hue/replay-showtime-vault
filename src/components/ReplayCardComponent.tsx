@@ -44,6 +44,7 @@ export default function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWa
   const [checking, setChecking] = useState(false);
   const [buyOpen, setBuyOpen] = useState(false);
   const [purchasedToken, setPurchasedToken] = useState<string>('');
+  const [imgLoaded, setImgLoaded] = useState(false);
 
   // Sync purchase state from localStorage
   useEffect(() => {
@@ -121,17 +122,19 @@ export default function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWa
         className="group relative rounded-xl overflow-hidden border border-border bg-card/80 backdrop-blur-sm hover:border-primary/50 transition-all duration-300 hover:shadow-lg hover:shadow-primary/10 hover:-translate-y-1 animate-fade-up opacity-0"
         style={{ animationDelay: `${index * 80}ms`, animationFillMode: 'forwards' }}
       >
-        <div className="relative aspect-video overflow-hidden">
-          {replay.image_url ? (
-            <>
-              <img src={replay.image_url} alt={replay.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-              <img src={thumbnailUrl} alt="" className="absolute inset-0 w-full h-full object-cover opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-            </>
-          ) : (
-            <div className="w-full h-full bg-secondary flex items-center justify-center">
-              <img src={thumbnailUrl} alt={replay.title} className="w-full h-full object-cover" />
-            </div>
+        <div className="relative aspect-video overflow-hidden bg-muted">
+          {!imgLoaded && (
+            <div className="absolute inset-0 bg-muted animate-pulse" aria-hidden />
           )}
+          <img
+            src={thumbnailUrl}
+            alt={replay.title}
+            loading="lazy"
+            decoding="async"
+            onLoad={() => setImgLoaded(true)}
+            onError={() => setImgLoaded(true)}
+            className={`w-full h-full object-cover group-hover:scale-105 transition-all duration-500 ${imgLoaded ? 'opacity-100' : 'opacity-0'}`}
+          />
           {!isUnlocked && (
             <div className="absolute inset-0 bg-background/70 backdrop-blur-sm flex items-center justify-center">
               <Lock className="w-10 h-10 text-primary animate-pulse" />
