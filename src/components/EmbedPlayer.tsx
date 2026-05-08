@@ -184,12 +184,21 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
             markReady(true);
             try {
               ytPlayerRef.current.setVolume?.(Math.round(volumeRef.current * 100));
-              // Embed dimulai muted agar autoplay stabil; user bisa aktifkan suara lewat tombol hint.
-              ytPlayerRef.current.mute?.();
-              if (!mutedRef.current) {
-                mutedRef.current = true;
-                setMuted(true);
+              if (userUnmutedRef.current) {
+                // User already activated sound — keep it on.
+                ytPlayerRef.current.unMute?.();
+                mutedRef.current = false;
+                setMuted(false);
+                setShowHint(false);
+              } else {
+                // Embed dimulai muted agar autoplay stabil; user bisa aktifkan suara lewat tombol hint.
+                ytPlayerRef.current.mute?.();
+                if (!mutedRef.current) {
+                  mutedRef.current = true;
+                  setMuted(true);
+                }
                 setShowHint(true);
+                autoMuteAppliedRef.current = true;
               }
               ytPlayerRef.current.playVideo?.();
             } catch { /* ignore */ }
