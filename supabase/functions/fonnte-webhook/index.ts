@@ -319,7 +319,7 @@ Deno.serve(async (req) => {
   await admin.from('wa_outbox').insert({
     phone: phoneNorm,
     message: finalReply,
-    status: sendResult.ok ? (testMode ? 'test' : 'sent') : 'failed',
+    status: sendResult.ok ? 'sent' : 'failed',
     error: sendResult.ok ? null : sendResult.error,
     fonnte_response: sendResult.data as Record<string, unknown> | undefined,
   });
