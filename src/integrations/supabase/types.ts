@@ -14,8 +14,79 @@ export type Database = {
   }
   public: {
     Tables: {
+      active_show_token_devices: {
+        Row: {
+          browser_id: string
+          created_at: string
+          id: string
+          token_id: string
+        }
+        Insert: {
+          browser_id: string
+          created_at?: string
+          id?: string
+          token_id: string
+        }
+        Update: {
+          browser_id?: string
+          created_at?: string
+          id?: string
+          token_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "active_show_token_devices_token_id_fkey"
+            columns: ["token_id"]
+            isOneToOne: false
+            referencedRelation: "active_show_tokens"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      active_show_tokens: {
+        Row: {
+          created_at: string
+          id: string
+          kind: string
+          label: string
+          max_devices: number
+          revoked: boolean
+          show_id: string
+          token: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          kind?: string
+          label?: string
+          max_devices?: number
+          revoked?: boolean
+          show_id: string
+          token: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          kind?: string
+          label?: string
+          max_devices?: number
+          revoked?: boolean
+          show_id?: string
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "active_show_tokens_show_id_fkey"
+            columns: ["show_id"]
+            isOneToOne: false
+            referencedRelation: "active_shows"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       active_shows: {
         Row: {
+          admin_alias: string | null
           category: string
           created_at: string
           description: string
@@ -45,6 +116,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          admin_alias?: string | null
           category?: string
           created_at?: string
           description?: string
@@ -74,6 +146,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          admin_alias?: string | null
           category?: string
           created_at?: string
           description?: string
