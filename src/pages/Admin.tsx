@@ -610,6 +610,7 @@ export default function Admin() {
                 { v: 'members', label: 'Member', Icon: Users },
                 { v: 'bot', label: 'Bot WhatsApp', Icon: Bot },
                 { v: 'history', label: 'Riwayat Token', Icon: History },
+                { v: 'membership', label: 'Membership', Icon: Users },
                 { v: 'preview', label: 'Preview', Icon: Eye },
                 { v: 'comments', label: 'Komentar', Icon: MessageCircle },
                 { v: 'security', label: 'Blokir', Icon: ShieldCheck },
