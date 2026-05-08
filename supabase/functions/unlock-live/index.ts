@@ -143,22 +143,32 @@ Deno.serve(async (req) => {
       if (!browser_id) return json({ valid: false, reason: "no_device" });
       const { data: existing } = await supabase
         .from("live_token_devices").select("id").eq("token_id", t.id).eq("browser_id", browser_id).maybeSingle();
+      const isMulti = (t.max_devices || 1) > 1;
+      const okBody = {
+        valid: true, enabled, title: cfg.title, type: cfg.type, url: cfg.url,
+        sources: Array.isArray(cfg.sources) ? cfg.sources : [],
+        watermark: `RT-${String(token).slice(-4).toUpperCase()}`,
+        token_kind: isMulti ? 'public' : 'personal',
+        max_devices: t.max_devices || 1,
+      };
       if (!existing) {
         const { count } = await supabase
           .from("live_token_devices").select("id", { count: "exact", head: true }).eq("token_id", t.id);
-        if ((count || 0) >= t.max_devices) return json({ valid: false, reason: "device_limit" });
+        if ((count || 0) >= t.max_devices) {
+          if (isMulti && isSilent) return json({ ...okBody, soft: true });
+          return json({ valid: false, reason: "device_limit" });
+        }
         const { error: insErr } = await supabase.from("live_token_devices").insert({ token_id: t.id, browser_id });
         if (insErr) {
           const { data: re } = await supabase
             .from("live_token_devices").select("id").eq("token_id", t.id).eq("browser_id", browser_id).maybeSingle();
-          if (!re) return json({ valid: false, reason: "device_limit" });
+          if (!re) {
+            if (isMulti && isSilent) return json({ ...okBody, soft: true });
+            return json({ valid: false, reason: "device_limit" });
+          }
         }
       }
-      return json({
-        valid: true, enabled, title: cfg.title, type: cfg.type, url: cfg.url,
-        sources: Array.isArray(cfg.sources) ? cfg.sources : [],
-        watermark: `RT-${String(token).slice(-4).toUpperCase()}`,
-      });
+      return json(okBody);
     }
 
     if (password) {
