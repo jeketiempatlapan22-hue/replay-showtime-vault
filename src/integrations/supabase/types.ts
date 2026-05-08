@@ -170,6 +170,21 @@ export type Database = {
         }
         Relationships: []
       }
+      bot_rate_limit: {
+        Row: {
+          last_sent_at: string
+          phone: string
+        }
+        Insert: {
+          last_sent_at?: string
+          phone: string
+        }
+        Update: {
+          last_sent_at?: string
+          phone?: string
+        }
+        Relationships: []
+      }
       comments: {
         Row: {
           created_at: string
@@ -508,6 +523,65 @@ export type Database = {
             columns: ["replay_id"]
             isOneToOne: false
             referencedRelation: "replays"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      replay_personal_tokens: {
+        Row: {
+          created_at: string
+          id: string
+          label: string
+          max_devices: number
+          replay_id: string
+          revoked: boolean
+          token: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          label?: string
+          max_devices?: number
+          replay_id: string
+          revoked?: boolean
+          token: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          label?: string
+          max_devices?: number
+          replay_id?: string
+          revoked?: boolean
+          token?: string
+        }
+        Relationships: []
+      }
+      replay_token_devices: {
+        Row: {
+          browser_id: string
+          created_at: string
+          id: string
+          token_id: string
+        }
+        Insert: {
+          browser_id: string
+          created_at?: string
+          id?: string
+          token_id: string
+        }
+        Update: {
+          browser_id?: string
+          created_at?: string
+          id?: string
+          token_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "replay_token_devices_token_id_fkey"
+            columns: ["token_id"]
+            isOneToOne: false
+            referencedRelation: "replay_personal_tokens"
             referencedColumns: ["id"]
           },
         ]
