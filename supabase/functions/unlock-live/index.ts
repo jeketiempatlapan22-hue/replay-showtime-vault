@@ -17,6 +17,17 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
+    // ===== Global block check by browser_id =====
+    if (browser_id) {
+      const { data: blk } = await supabase
+        .from("blocked_browsers")
+        .select("id,unblocked")
+        .eq("browser_id", browser_id)
+        .eq("unblocked", false)
+        .maybeSingle();
+      if (blk) return json({ valid: false, reason: "blocked" });
+    }
+
     // ===== Branch A: per-show live (active_shows) =====
     if (show_id) {
       const { data: show } = await supabase
