@@ -72,7 +72,7 @@ export default function LiveChat() {
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'live_messages' }, (payload) => {
         const m = payload.new as Msg;
         if (m.pinned) setPinned(prev => [m, ...prev.filter(x => x.id !== m.id)]);
-        else setMessages(prev => [...prev.filter(x => x.id !== m.id), m].slice(-30));
+        else setMessages(prev => [m, ...prev.filter(x => x.id !== m.id)].slice(0, 30));
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'live_messages' }, (payload) => {
         const m = payload.new as Msg;
