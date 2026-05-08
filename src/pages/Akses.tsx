@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Loader2, PlayCircle, ShieldCheck, Lock, Calendar, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
