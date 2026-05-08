@@ -9,19 +9,23 @@ const json = (b: unknown, status = 200) =>
   new Response(JSON.stringify(b), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
 async function bindMembershipDevice(supabase: any, tokenRow: any, browser_id: string) {
-  if (!browser_id) return { ok: false, reason: "no_device" };
+  if (!browser_id || browser_id.length < 6) return { ok: false, reason: "no_device" };
   const { data: existing } = await supabase
-    .from("membership_token_devices").select("id").eq("token_id", tokenRow.id).eq("browser_id", browser_id).maybeSingle();
+    .from("membership_token_devices").select("id,browser_id").eq("token_id", tokenRow.id).maybeSingle();
   if (existing) {
+    if (existing.browser_id !== browser_id) return { ok: false, reason: "device_limit" };
     await supabase.from("membership_token_devices").update({ last_seen: new Date().toISOString() }).eq("id", existing.id);
     return { ok: true };
   }
-  const { count } = await supabase
-    .from("membership_token_devices").select("id", { count: "exact", head: true }).eq("token_id", tokenRow.id);
-  if ((count || 0) >= 1) return { ok: false, reason: "device_limit" };
   const { error } = await supabase.from("membership_token_devices").insert({ token_id: tokenRow.id, browser_id });
   if (error) return { ok: false, reason: "device_limit" };
   return { ok: true };
+}
+
+function membershipInfo(t: any) {
+  const max = t.manual_resets_max || 3;
+  const used = t.manual_resets_used || 0;
+  return { expires_at: t.expires_at, resets_used: used, resets_max: max, remaining: Math.max(0, max - used), includes_replays: !!t.includes_replays };
 }
 
 async function verifyMembership(supabase: any, mtoken: string, mpassword: string, browser_id: string) {
