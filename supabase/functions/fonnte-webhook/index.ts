@@ -314,10 +314,19 @@ Deno.serve(async (req) => {
   }
 
 
-  await sendFonnte(phoneNorm, reply || '✅ OK');
+  const finalReply = reply || '✅ OK';
+  const sendResult = testMode ? { ok: true, data: { skipped: true, reason: 'test_mode' } } : await sendFonnte(phoneNorm, finalReply);
   await admin.from('wa_outbox').insert({
-    phone: phoneNorm, message: reply, status: 'sent',
+    phone: phoneNorm,
+    message: finalReply,
+    status: sendResult.ok ? (testMode ? 'test' : 'sent') : 'failed',
+    error: sendResult.ok ? null : sendResult.error,
+    fonnte_response: sendResult.data as Record<string, unknown> | undefined,
   });
+
+  if (testMode) {
+    return json({ ok: true, phone: phoneNorm, command: cmd, reply: finalReply });
+  }
 
   return new Response('ok', { headers: corsHeaders });
 });
