@@ -147,8 +147,12 @@ Deno.serve(async (req) => {
             token = crypto.randomUUID().replace(/-/g, '').slice(0, 24);
             await admin.from('replays').update({ access_token: token }).eq('id', r.id);
           }
-          const link = `${origin}/?token=${token}&replay=${r.id}`;
+          const link = `${origin}/akses?token=${token}&replay=${r.id}`;
           reply = `✅ *Token Replay*\n\n${r.title}\n🔗 ${link}\n\n_Bagikan link ini ke pembeli._`;
+          await admin.from('token_deliveries').insert({
+            phone: phoneNorm, replay_id: r.id, replay_title: r.title,
+            access_token: token, link, source: 'bot', requested_by: phoneNorm,
+          });
         }
       }
     } else if (cmd === '/token') {
@@ -167,8 +171,13 @@ Deno.serve(async (req) => {
         else if (!order.access_token) reply = `⚠️ Order *${arg}* belum memiliki token. Hubungi admin.`;
         else {
           const origin = map.get('site_origin') || buildBaseUrl();
-          const link = `${origin}/?token=${order.access_token}${order.replay_id ? `&replay=${order.replay_id}` : ''}`;
+          const link = `${origin}/akses?token=${order.access_token}${order.replay_id ? `&replay=${order.replay_id}` : ''}`;
           reply = `✅ *Token Anda*\n\n${order.item_title}\n🔗 ${link}\n\n_Klik link untuk membuka._`;
+          await admin.from('token_deliveries').insert({
+            phone: phoneNorm, replay_id: order.replay_id, replay_title: order.item_title,
+            order_id: order.id, access_token: order.access_token, link,
+            source: 'bot', requested_by: phoneNorm,
+          });
         }
       }
     }

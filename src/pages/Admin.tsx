@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, Trash2, Edit2, Key, Save, Palette, MessageCircle, LogOut, Eye, Send, List, Settings, ShieldCheck, Unlock as UnlockIcon, Link2, Copy, X, Radio, RefreshCw, Users, Upload, Search, ArrowUpDown, Sparkles, Calendar, Bot } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Edit2, Key, Save, Palette, MessageCircle, LogOut, Eye, Send, List, Settings, ShieldCheck, Unlock as UnlockIcon, Link2, Copy, X, Radio, RefreshCw, Users, Upload, Search, ArrowUpDown, Sparkles, Calendar, Bot, History } from 'lucide-react';
 import BotAdmin from '@/components/admin/BotAdmin';
+import TokenHistoryAdmin from '@/components/admin/TokenHistoryAdmin';
 import { getMembers, upsertMember, deleteMember, uploadMemberPhoto, type Member } from '@/lib/members';
 import { getActiveShows, upsertActiveShow, deleteActiveShow, type ActiveShow } from '@/lib/activeShows';
 import { Switch } from '@/components/ui/switch';
@@ -564,12 +565,13 @@ export default function Admin() {
       {/* Tabs */}
       <div className="max-w-6xl mx-auto px-2 sm:px-4 py-4">
         <Tabs defaultValue="replays" className="w-full">
-          <TabsList className="grid w-full grid-cols-5 sm:grid-cols-9 mb-4">
+          <TabsList className="grid w-full grid-cols-5 sm:grid-cols-10 mb-4">
             <TabsTrigger value="replays" className="text-[10px] sm:text-sm gap-1"><List className="w-3.5 h-3.5 hidden sm:block" />Replay</TabsTrigger>
             <TabsTrigger value="shows" className="text-[10px] sm:text-sm gap-1"><Sparkles className="w-3.5 h-3.5 hidden sm:block" />Show</TabsTrigger>
             <TabsTrigger value="live" className="text-[10px] sm:text-sm gap-1"><Radio className="w-3.5 h-3.5 hidden sm:block" />Live</TabsTrigger>
             <TabsTrigger value="members" className="text-[10px] sm:text-sm gap-1"><Users className="w-3.5 h-3.5 hidden sm:block" />Member</TabsTrigger>
             <TabsTrigger value="bot" className="text-[10px] sm:text-sm gap-1"><Bot className="w-3.5 h-3.5 hidden sm:block" />Bot WA</TabsTrigger>
+            <TabsTrigger value="history" className="text-[10px] sm:text-sm gap-1"><History className="w-3.5 h-3.5 hidden sm:block" />Riwayat</TabsTrigger>
             <TabsTrigger value="preview" className="text-[10px] sm:text-sm gap-1"><Eye className="w-3.5 h-3.5 hidden sm:block" />Preview</TabsTrigger>
             <TabsTrigger value="comments" className="text-[10px] sm:text-sm gap-1"><MessageCircle className="w-3.5 h-3.5 hidden sm:block" />Komentar</TabsTrigger>
             <TabsTrigger value="security" className="text-[10px] sm:text-sm gap-1"><ShieldCheck className="w-3.5 h-3.5 hidden sm:block" />Blokir</TabsTrigger>
@@ -577,6 +579,7 @@ export default function Admin() {
           </TabsList>
 
           <TabsContent value="bot"><BotAdmin /></TabsContent>
+          <TabsContent value="history"><TokenHistoryAdmin /></TabsContent>
 
           {/* ===== REPLAYS TAB ===== */}
           <TabsContent value="replays">
