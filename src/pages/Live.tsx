@@ -519,8 +519,8 @@ export default function Live() {
               <>
                 <Suspense fallback={<PlayerFallback />}>
                   {activeSource.type === 'm3u8'
-                    ? <HlsPlayer key={`m3u8-${safeIdx}-${activeSource.url}`} src={activeSource.url} title={unlocked.title} watermark={unlocked.watermark} onFatalError={handleSourceFatalError} hideSeekButtons />
-                    : <EmbedPlayer key={`em-${safeIdx}-${activeSource.url}`} type={activeSource.type} source={activeSource.url} title={unlocked.title} watermark={unlocked.watermark} hideSeekButtons isLive />}
+                    ? <HlsPlayer key={`m3u8-${safeIdx}`} src={activeSource.url} title={unlocked.title} watermark={unlocked.watermark} onFatalError={handleSourceFatalError} hideSeekButtons />
+                    : <EmbedPlayer key={`em-${safeIdx}-${activeSource.type}`} type={activeSource.type} source={activeSource.url} title={unlocked.title} watermark={unlocked.watermark} hideSeekButtons isLive />}
                 </Suspense>
 
                 <div className="flex items-center justify-between flex-wrap gap-2 px-1">
