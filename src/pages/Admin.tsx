@@ -1406,6 +1406,15 @@ export default function Admin() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {personalTokenReplay && (
+        <ReplayPersonalTokensDialog
+          open={!!personalTokenReplay}
+          onOpenChange={(v) => { if (!v) setPersonalTokenReplay(null); }}
+          replayId={personalTokenReplay.id}
+          replayTitle={personalTokenReplay.title}
+        />
+      )}
     </div>
   );
 }
