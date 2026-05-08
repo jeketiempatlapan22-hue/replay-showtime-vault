@@ -180,6 +180,23 @@ export default function Live() {
     });
   };
 
+  const reasonMessage = (reason?: string): string => {
+    switch (reason) {
+      case 'blocked': return 'Perangkat ini telah diblokir oleh admin.';
+      case 'device_limit': return 'Token ini sudah terikat ke perangkat lain. Klik "Reset perangkat membership saya" jika ingin pindah perangkat.';
+      case 'no_device': return 'ID perangkat tidak terdeteksi. Aktifkan penyimpanan browser lalu muat ulang halaman.';
+      case 'bad_password': return 'Sandi salah.';
+      case 'bad_membership_password': return 'Sandi membership salah.';
+      case 'revoked': return 'Token tidak valid atau telah dicabut.';
+      case 'expired': return 'Membership Anda telah berakhir. Silakan perpanjang ke admin.';
+      case 'not_started': return 'Membership belum aktif (belum mencapai waktu mulai).';
+      case 'scope': return 'Membership ini tidak mencakup akses replay.';
+      case 'off': return 'Live belum aktif.';
+      case 'password_or_token_required': return 'Masukkan sandi atau gunakan link token.';
+      default: return 'Gagal membuka akses live.';
+    }
+  };
+
   const doUnlock = async (opts: { token?: string; password?: string; mtoken?: string; mpassword?: string }, silent = false) => {
     if (!silent) { setSubmitting(true); setPwError(''); }
     try {
@@ -196,18 +213,16 @@ export default function Live() {
           enabled: !!data.enabled,
         };
         setUnlocked(cfg);
+        if (data.membership) setMembership(data.membership as MembershipInfo);
         setKickedMsg('');
         try { sessionStorage.setItem(`${SS_KEY_BASE}${showId?'-'+showId:''}`, JSON.stringify(cfg)); } catch { /* ignore */ }
       } else if (silent) {
         setUnlocked(null);
+        setMembership(null);
         try { sessionStorage.removeItem(`${SS_KEY_BASE}${showId?'-'+showId:''}`); } catch { /* ignore */ }
         setKickedMsg('Akses Anda telah dicabut oleh admin.');
       } else {
-        if (data?.reason === 'blocked') setPwError('Perangkat ini telah diblokir oleh admin.');
-        else if (data?.reason === 'device_limit') setPwError('Batas perangkat untuk token ini telah tercapai.');
-        else if (data?.reason === 'bad_password') setPwError('Sandi salah.');
-        else if (data?.reason === 'revoked') setPwError('Token tidak valid atau telah dicabut.');
-        else setPwError('Gagal membuka akses live.');
+        setPwError(reasonMessage(data?.reason));
       }
     } catch {
       if (!silent) setPwError('Gagal terhubung ke server.');
