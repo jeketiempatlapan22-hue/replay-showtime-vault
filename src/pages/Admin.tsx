@@ -114,7 +114,7 @@ export default function Admin() {
   const refreshActiveShows = () => getActiveShows(true).then(setActiveShows);
 
   const resetShowForm = () => {
-    setShowForm({ title: '', show_date: '', show_time: '19:00', lineup: '', category: 'reguler', description: '', image_url: '', sort_order: 0, is_active: true });
+    setShowForm({ title: '', show_date: '', show_time: '19:00', lineup: '', category: 'reguler', description: '', image_url: '', sort_order: 0, is_active: true, price_show: 0, price_replay: 0, pakasir_amount: 0, replay_id: '', replay_enabled: false });
     setShowEditing(false);
   };
 
@@ -135,6 +135,11 @@ export default function Admin() {
         image_url: showForm.image_url.trim(),
         sort_order: Number(showForm.sort_order) || 0,
         is_active: showForm.is_active,
+        price_show: Number(showForm.price_show) || 0,
+        price_replay: Number(showForm.price_replay) || 0,
+        pakasir_amount: Number(showForm.pakasir_amount) || 0,
+        replay_id: showForm.replay_id || null,
+        replay_enabled: showForm.replay_enabled,
       });
       toast({ title: showForm.id ? 'Show diperbarui' : 'Show ditambahkan' });
       resetShowForm();
@@ -149,6 +154,9 @@ export default function Admin() {
       id: s.id, title: s.title, show_date: s.show_date, show_time: s.show_time,
       lineup: s.lineup.join(', '), category: s.category, description: s.description,
       image_url: s.image_url, sort_order: s.sort_order, is_active: s.is_active,
+      price_show: s.price_show ?? 0, price_replay: s.price_replay ?? 0,
+      pakasir_amount: s.pakasir_amount ?? 0, replay_id: s.replay_id ?? '',
+      replay_enabled: s.replay_enabled ?? false,
     });
     setShowEditing(true);
     window.scrollTo({ top: 0, behavior: 'smooth' });
