@@ -146,11 +146,11 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
     if (!trimmed) { setPwError('Sandi wajib diisi.'); return; }
     setPwChecking(true);
     setPwError('');
-    const src = await getReplaySource(replay.id, { password: trimmed });
+    const res = await getReplaySource(replay.id, { password: trimmed });
     setPwChecking(false);
-    if (src) {
+    if (res.data) {
       try { sessionStorage.setItem(`replaytime-pw-${replay.id}`, trimmed); } catch { /* ignore */ }
-      setSource(src);
+      setSource(res.data);
       setNeedsPassword(false);
       setPwInput('');
     } else {
