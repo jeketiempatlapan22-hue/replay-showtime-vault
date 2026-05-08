@@ -30,6 +30,9 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
   const [status, setStatus] = useState<Status>('form');
   const [orderId, setOrderId] = useState<string | null>(null);
   const [qrUrl, setQrUrl] = useState<string>('');
+  const [qrString, setQrString] = useState<string>('');
+  const [qrDataUrl, setQrDataUrl] = useState<string>('');
+  const [totalPayment, setTotalPayment] = useState<number>(0);
   const [pakasirOrderId, setPakasirOrderId] = useState<string>('');
   const [accessToken, setAccessToken] = useState<string>('');
   const [createdAt, setCreatedAt] = useState<number>(0);
