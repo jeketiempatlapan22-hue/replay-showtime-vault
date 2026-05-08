@@ -3,7 +3,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-bot-test',
 };
 
 const json = (body: unknown, status = 200) =>
@@ -125,12 +125,12 @@ Deno.serve(async (req) => {
   const phoneNorm = normalizePhone(phone);
   const deviceNorm = normalizePhone(device);
 
-  // Anti-loop: ignore echoes of bot's own outbound messages
-  if (!testMode && fromMe) return new Response('ok', { headers: corsHeaders });
-  if (!testMode && deviceNorm && deviceNorm === phoneNorm) return new Response('ok', { headers: corsHeaders });
-
   // Only process commands starting with '/' — silently ignore other chatter
   if (!text.startsWith('/')) return debug('not_a_command', { phone: phoneNorm, text });
+
+  // Anti-loop: ignore echoes, but still allow slash commands from the device owner/self chat.
+  if (!testMode && fromMe && !text.startsWith('/')) return new Response('ok', { headers: corsHeaders });
+  if (!testMode && deviceNorm && deviceNorm === phoneNorm && !text.startsWith('/')) return new Response('ok', { headers: corsHeaders });
 
   // Dedup: same phone+message within ~20s = duplicate webhook delivery from Fonnte.
   // Prune FIRST so genuine repeated commands (>20s apart) are not blocked.
