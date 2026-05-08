@@ -30,24 +30,33 @@ function buildBaseUrl() {
   return '';
 }
 
+async function sha1(input: string) {
+  const buf = await crypto.subtle.digest('SHA-1', new TextEncoder().encode(input));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'POST') return new Response('ok', { headers: corsHeaders });
 
   const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 
-  // Fonnte sends as multipart/form-data or x-www-form-urlencoded
-  let phone = '', text = '';
+  // Fonnte sends as multipart/form-data, x-www-form-urlencoded, or json
+  let phone = '', text = '', device = '', fromMe = false;
   try {
     const ct = req.headers.get('content-type') || '';
     if (ct.includes('application/json')) {
       const j = await req.json();
-      phone = String(j.sender ?? j.device ?? j.from ?? '');
+      phone = String(j.sender ?? j.from ?? '');
+      device = String(j.device ?? '');
       text = String(j.message ?? j.text ?? '').trim();
+      fromMe = j.fromMe === true || j.fromMe === 'true' || j.from_me === true;
     } else {
       const fd = await req.formData();
       phone = String(fd.get('sender') ?? fd.get('from') ?? '');
+      device = String(fd.get('device') ?? '');
       text = String(fd.get('message') ?? fd.get('text') ?? '').trim();
+      fromMe = String(fd.get('fromMe') ?? fd.get('from_me') ?? '') === 'true';
     }
   } catch {
     return new Response('ok', { headers: corsHeaders });
@@ -56,6 +65,29 @@ Deno.serve(async (req) => {
   if (!phone || !text) return new Response('ok', { headers: corsHeaders });
 
   const phoneNorm = normalizePhone(phone);
+  const deviceNorm = normalizePhone(device);
+
+  // Anti-loop: ignore echoes of bot's own outbound messages
+  if (fromMe) return new Response('ok', { headers: corsHeaders });
+  if (deviceNorm && deviceNorm === phoneNorm) return new Response('ok', { headers: corsHeaders });
+
+  // Only process commands starting with '/' — silently ignore other chatter
+  if (!text.startsWith('/')) return new Response('ok', { headers: corsHeaders });
+
+  // Dedup: same phone+message within 60s = duplicate webhook delivery
+  const hash = await sha1(text);
+  const { error: dupErr } = await admin
+    .from('bot_inbox_dedup')
+    .insert({ phone: phoneNorm, message_hash: hash });
+  if (dupErr) {
+    // Likely unique violation → already processed recently
+    return new Response('ok', { headers: corsHeaders });
+  }
+  // Janitor: prune entries older than 5 minutes
+  await admin.from('bot_inbox_dedup')
+    .delete()
+    .lt('received_at', new Date(Date.now() - 5 * 60_000).toISOString());
+
   const lower = text.toLowerCase();
   const [cmd, ...rest] = lower.split(/\s+/);
   const arg = rest.join(' ').trim();
