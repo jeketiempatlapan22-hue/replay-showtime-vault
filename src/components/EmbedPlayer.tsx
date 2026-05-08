@@ -96,17 +96,8 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
   useEffect(() => { isPlayingRef.current = isPlaying; }, [isPlaying]);
 
   const toggleControls = useCallback(() => {
-    setShowControls(prev => {
-      const next = !prev;
-      if (next) {
-        if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
-        hideTimerRef.current = setTimeout(() => {
-          setShowControls(p => (isPlayingRef.current ? false : p));
-        }, 3000);
-      } else if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
-      return next;
-    });
-  }, []);
+    resetHideTimer();
+  }, [resetHideTimer]);
 
   useEffect(() => {
     resetHideTimer();
@@ -146,11 +137,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
       setUseYoutubeFallback(true);
       markReady(true);
       setIsPlaying(true);
-      if (!mutedRef.current) {
-        setMuted(true);
-        setShowHint(true);
-      }
-    }, 7000);
+    }, 15000);
 
     const init = () => {
       if (cancelled || !ytMountRef.current) return;
@@ -186,14 +173,14 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
             try {
               ytPlayerRef.current.setVolume?.(Math.round(volumeRef.current * 100));
               if (mutedRef.current) ytPlayerRef.current.mute?.(); else ytPlayerRef.current.unMute?.();
-              ytPlayerRef.current.playVideo();
+              ytPlayerRef.current.playVideo?.();
               setTimeout(() => {
                 try {
-                  const state = ytPlayerRef.current.getPlayerState();
+                  const state = ytPlayerRef.current?.getPlayerState?.();
                   if (state !== 1 && !mutedRef.current) {
-                    ytPlayerRef.current.mute();
+                    ytPlayerRef.current?.mute?.();
                     setMuted(true);
-                    ytPlayerRef.current.playVideo();
+                    ytPlayerRef.current?.playVideo?.();
                     setShowHint(true);
                   }
                 } catch { /* ignore */ }
@@ -274,8 +261,12 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
     try { localStorage.setItem(MUTED_KEY, m ? '1' : '0'); } catch { /* ignore */ }
     if (type === 'youtube') {
       const p = ytPlayerRef.current;
+      if (useYoutubeFallback) {
+        setShowHint(false);
+        return;
+      }
       if (!p || typeof p.mute !== 'function') return;
-      if (m) p.mute(); else { p.unMute(); p.setVolume(Math.round(volume * 100)); }
+      if (m) p.mute(); else { p.unMute?.(); p.setVolume?.(Math.round(volume * 100)); p.playVideo?.(); }
     } else {
       cfPost(m ? 'mute' : 'unmute');
     }
@@ -289,6 +280,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
     if (v > 0 && muted) { setMuted(false); try { localStorage.setItem(MUTED_KEY, '0'); } catch { /* ignore */ } }
     if (type === 'youtube') {
       const p = ytPlayerRef.current;
+      if (useYoutubeFallback) return;
       if (!p || typeof p.setVolume !== 'function') return;
       p.setVolume(Math.round(v * 100));
       if (v > 0) p.unMute();
