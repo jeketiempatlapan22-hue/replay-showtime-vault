@@ -70,11 +70,16 @@ export default function EmbedPlayer({ type, source, title, watermark }: Props) {
   useEffect(() => { mutedRef.current = muted; }, [muted]);
   useEffect(() => { volumeRef.current = volume; }, [volume]);
 
-  // YouTube IFrame API — instantiate via div mount so YT injects an iframe sized 100% inside our container
+  // YouTube IFrame API — instantiate via div mount so YT injects an iframe sized 100% inside our container.
+  // Penting: untuk replay, seek bar/durasi mengandalkan IFrame API. Jadi kita TIDAK auto-fallback hanya
+  // karena timer pendek — fallback iframe (tanpa API) hanya dipakai bila API gagal (onError) atau setelah
+  // safety timeout panjang.
   useEffect(() => {
     setReady(false);
     setIsPlaying(false);
     setUseYoutubeFallback(false);
+    setDuration(0);
+    setCurrentTime(0);
     if (ytFallbackTimerRef.current) clearTimeout(ytFallbackTimerRef.current);
     if (type !== 'youtube') {
       const id = setTimeout(() => { setReady(true); setIsPlaying(true); }, 600);
@@ -86,10 +91,9 @@ export default function EmbedPlayer({ type, source, title, watermark }: Props) {
       return;
     }
     let cancelled = false;
-    // Shorter fallback so user is never stuck on "Menghubungkan ke pemutar".
-    // 1.5s is enough to attempt IFrame API; otherwise we use the iframe embed which is very reliable.
+    // Safety net: kalau API benar-benar gagal load (script blocked / network), pakai fallback iframe.
     ytFallbackTimerRef.current = setTimeout(() => {
-      if (cancelled) return;
+      if (cancelled || ready) return;
       setUseYoutubeFallback(true);
       setReady(true);
       setIsPlaying(true);
@@ -97,7 +101,7 @@ export default function EmbedPlayer({ type, source, title, watermark }: Props) {
         setMuted(true);
         setShowHint(true);
       }
-    }, 1500);
+    }, 7000);
 
     const init = () => {
       if (cancelled || !ytMountRef.current) return;
