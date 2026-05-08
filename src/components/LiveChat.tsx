@@ -23,7 +23,27 @@ export default function LiveChat() {
   const [sending, setSending] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminUsername, setAdminUsername] = useState('Admin');
+  const [nameModalOpen, setNameModalOpen] = useState(false);
+  const [nameInput, setNameInput] = useState('');
+  const [nameError, setNameError] = useState('');
   const listRef = useRef<HTMLDivElement>(null);
+
+  // Force username modal until user enters a name (per-browser, localStorage).
+  useEffect(() => {
+    if (isAdmin) return;
+    if (!name.trim()) { setNameInput(''); setNameModalOpen(true); }
+  }, [isAdmin, name]);
+
+  const saveName = () => {
+    const v = nameInput.trim();
+    if (v.length < 2) { setNameError('Nama minimal 2 karakter.'); return; }
+    if (v.length > 40) { setNameError('Nama maksimal 40 karakter.'); return; }
+    setName(v);
+    try { localStorage.setItem('replaytime-name', v); } catch { /* ignore */ }
+    setNameError('');
+    setNameModalOpen(false);
+  };
+  const openChangeName = () => { setNameInput(name); setNameError(''); setNameModalOpen(true); };
 
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
