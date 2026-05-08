@@ -55,7 +55,7 @@ async function callCreateToken(payload: Record<string, unknown>): Promise<{ ok: 
   try {
     const res = await fetch(url, {
       method: 'POST',
-      headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
+      headers: { 'Authorization': `Bearer ${key}`, 'apikey': key, 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
     const j = await res.json().catch(() => ({}));
@@ -169,7 +169,7 @@ Deno.serve(async (req) => {
       inboxId = String(j.inboxid ?? j.inbox_id ?? j.id ?? '');
       fromMe = j.fromMe === true || j.fromMe === 'true' || j.from_me === true;
       deliverTest = j.deliver === true || j.deliver === 'true' || j.test_deliver === true;
-    } else {
+    } else if (ct.includes('multipart/form-data') || ct.includes('application/x-www-form-urlencoded')) {
       const fd = await req.formData();
       phone = String(fd.get('sender') ?? fd.get('from') ?? fd.get('phone') ?? fd.get('target') ?? '');
       device = String(fd.get('device') ?? fd.get('device_number') ?? '');
@@ -177,6 +177,19 @@ Deno.serve(async (req) => {
       inboxId = String(fd.get('inboxid') ?? fd.get('inbox_id') ?? fd.get('id') ?? '');
       fromMe = String(fd.get('fromMe') ?? fd.get('from_me') ?? '') === 'true';
       deliverTest = String(fd.get('deliver') ?? fd.get('test_deliver') ?? '') === 'true';
+    } else {
+      const raw = (await req.text()).trim();
+      try {
+        const j = pickWebhookPayload(JSON.parse(raw));
+        phone = String(j.sender ?? j.from ?? j.phone ?? j.target ?? '');
+        device = String(j.device ?? j.device_number ?? '');
+        text = String(j.message ?? j.text ?? j.body ?? j.caption ?? '').trim();
+        inboxId = String(j.inboxid ?? j.inbox_id ?? j.id ?? '');
+        fromMe = j.fromMe === true || j.fromMe === 'true' || j.from_me === true;
+        deliverTest = j.deliver === true || j.deliver === 'true' || j.test_deliver === true;
+      } catch {
+        text = raw;
+      }
     }
   } catch {
     return debug('bad_payload');
