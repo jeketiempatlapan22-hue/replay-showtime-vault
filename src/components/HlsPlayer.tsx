@@ -421,7 +421,16 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
     const onPlay = () => setIsPlaying(true);
     const onPause = () => setIsPlaying(false);
     const onTimeUpdate = () => setCurrentTime(video.currentTime);
-    const onDurationChange = () => setDuration(video.duration);
+    const onDurationChange = () => {
+      const nextDuration = video.duration;
+      if (!Number.isFinite(nextDuration) || nextDuration <= 0) {
+        setDuration(0);
+        isLiveRef.current = true;
+        setIsLiveStream(true);
+        return;
+      }
+      setDuration(nextDuration);
+    };
     const onWaiting = () => {
       // mid-play stall (not initial)
       if (!loadingRef.current) setBuffering(true);
@@ -639,7 +648,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
             <input
               type="range"
               min={0}
-              max={duration || 0}
+              max={isLiveStream ? 1 : Math.max(1, duration || 1)}
               step={0.1}
               value={isLiveStream ? 0 : currentTime}
               onChange={seekTo}
