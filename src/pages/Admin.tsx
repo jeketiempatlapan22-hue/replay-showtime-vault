@@ -558,10 +558,43 @@ export default function Admin() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
+      {/* Header with hamburger */}
       <div className="sticky top-0 z-20 bg-card/90 backdrop-blur border-b border-border px-3 sm:px-6 py-3 flex items-center gap-2 sm:gap-3">
-        <Button variant="ghost" size="icon" onClick={() => navigate('/')} className="shrink-0"><ArrowLeft className="w-5 h-5" /></Button>
-        <h1 className="text-lg sm:text-xl font-bold font-sans text-foreground flex-1 min-w-0 truncate">Admin Panel</h1>
+        <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
+          <SheetTrigger asChild>
+            <Button variant="ghost" size="icon" className="shrink-0" title="Menu"><Menu className="w-5 h-5" /></Button>
+          </SheetTrigger>
+          <SheetContent side="left" className="w-72 p-0">
+            <SheetHeader className="p-4 border-b border-border">
+              <SheetTitle>Admin Panel</SheetTitle>
+            </SheetHeader>
+            <nav className="p-2">
+              {[
+                { v: 'replays', label: 'Replay', Icon: List },
+                { v: 'shows', label: 'Show Aktif', Icon: Sparkles },
+                { v: 'live', label: 'Live', Icon: Radio },
+                { v: 'members', label: 'Member', Icon: Users },
+                { v: 'bot', label: 'Bot WhatsApp', Icon: Bot },
+                { v: 'history', label: 'Riwayat Token', Icon: History },
+                { v: 'preview', label: 'Preview', Icon: Eye },
+                { v: 'comments', label: 'Komentar', Icon: MessageCircle },
+                { v: 'security', label: 'Blokir', Icon: ShieldCheck },
+                { v: 'settings', label: 'Setelan', Icon: Settings },
+              ].map(({ v, label, Icon }) => (
+                <button
+                  key={v}
+                  onClick={() => { setActiveTab(v); setMenuOpen(false); }}
+                  className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm transition-colors ${activeTab === v ? 'bg-primary/15 text-primary font-medium' : 'text-foreground hover:bg-secondary'}`}
+                >
+                  <Icon className="w-4 h-4" />
+                  <span>{label}</span>
+                </button>
+              ))}
+            </nav>
+          </SheetContent>
+        </Sheet>
+        <Button variant="ghost" size="icon" onClick={() => navigate('/')} className="shrink-0" title="Beranda"><ArrowLeft className="w-5 h-5" /></Button>
+        <h1 className="text-base sm:text-xl font-bold font-sans text-foreground flex-1 min-w-0 truncate">Admin · {({ replays: 'Replay', shows: 'Show', live: 'Live', members: 'Member', bot: 'Bot WA', history: 'Riwayat', preview: 'Preview', comments: 'Komentar', security: 'Blokir', settings: 'Setelan' } as Record<string, string>)[activeTab]}</h1>
         <div className="flex items-center gap-1 sm:gap-2 shrink-0">
           <Button size="sm" onClick={() => { resetForm(); setShowAddDialog(true); }} className="text-xs sm:text-sm">
             <Plus className="w-4 h-4 sm:mr-1" /> <span className="hidden sm:inline">Tambah</span>
@@ -570,20 +603,10 @@ export default function Admin() {
         </div>
       </div>
 
-      {/* Tabs */}
       <div className="max-w-6xl mx-auto px-2 sm:px-4 py-4">
-        <Tabs defaultValue="replays" className="w-full">
-          <TabsList className="grid w-full grid-cols-5 sm:grid-cols-10 mb-4">
-            <TabsTrigger value="replays" className="text-[10px] sm:text-sm gap-1"><List className="w-3.5 h-3.5 hidden sm:block" />Replay</TabsTrigger>
-            <TabsTrigger value="shows" className="text-[10px] sm:text-sm gap-1"><Sparkles className="w-3.5 h-3.5 hidden sm:block" />Show</TabsTrigger>
-            <TabsTrigger value="live" className="text-[10px] sm:text-sm gap-1"><Radio className="w-3.5 h-3.5 hidden sm:block" />Live</TabsTrigger>
-            <TabsTrigger value="members" className="text-[10px] sm:text-sm gap-1"><Users className="w-3.5 h-3.5 hidden sm:block" />Member</TabsTrigger>
-            <TabsTrigger value="bot" className="text-[10px] sm:text-sm gap-1"><Bot className="w-3.5 h-3.5 hidden sm:block" />Bot WA</TabsTrigger>
-            <TabsTrigger value="history" className="text-[10px] sm:text-sm gap-1"><History className="w-3.5 h-3.5 hidden sm:block" />Riwayat</TabsTrigger>
-            <TabsTrigger value="preview" className="text-[10px] sm:text-sm gap-1"><Eye className="w-3.5 h-3.5 hidden sm:block" />Preview</TabsTrigger>
-            <TabsTrigger value="comments" className="text-[10px] sm:text-sm gap-1"><MessageCircle className="w-3.5 h-3.5 hidden sm:block" />Komentar</TabsTrigger>
-            <TabsTrigger value="security" className="text-[10px] sm:text-sm gap-1"><ShieldCheck className="w-3.5 h-3.5 hidden sm:block" />Blokir</TabsTrigger>
-            <TabsTrigger value="settings" className="text-[10px] sm:text-sm gap-1"><Settings className="w-3.5 h-3.5 hidden sm:block" />Setelan</TabsTrigger>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="hidden">
+            <TabsTrigger value="replays" /><TabsTrigger value="shows" /><TabsTrigger value="live" /><TabsTrigger value="members" /><TabsTrigger value="bot" /><TabsTrigger value="history" /><TabsTrigger value="preview" /><TabsTrigger value="comments" /><TabsTrigger value="security" /><TabsTrigger value="settings" />
           </TabsList>
 
           <TabsContent value="bot"><BotAdmin /></TabsContent>
