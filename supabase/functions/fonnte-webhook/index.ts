@@ -535,9 +535,10 @@ Deno.serve(async (req) => {
         else if (matches.length > 1) reply = `⚠️ Kode *${code}* ambigu. Gunakan kode lebih panjang atau alias unik.`;
         else {
           const r = matches[0];
-          const res = await callCreateToken({
-            kind: 'personal', replay_id: r.id, source: 'bot', requested_by: phoneNorm,
-            label: label || `Bot ${phoneNorm}`, max_devices: 1,
+          const res = await createTokenInline(admin, {
+            kind: 'personal', replayId: r.id, requestedBy: phoneNorm,
+            label: label || `Bot ${phoneNorm}`, maxDevices: 1,
+            settingsMap: map as Map<string, string>,
           });
           reply = res.ok && res.message ? res.message : `❌ Gagal membuat token satuan. ${res.error || ''}`.trim();
         }
