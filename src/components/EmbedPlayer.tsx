@@ -96,17 +96,8 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
   useEffect(() => { isPlayingRef.current = isPlaying; }, [isPlaying]);
 
   const toggleControls = useCallback(() => {
-    setShowControls(prev => {
-      const next = !prev;
-      if (next) {
-        if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
-        hideTimerRef.current = setTimeout(() => {
-          setShowControls(p => (isPlayingRef.current ? false : p));
-        }, 3000);
-      } else if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
-      return next;
-    });
-  }, []);
+    resetHideTimer();
+  }, [resetHideTimer]);
 
   useEffect(() => {
     resetHideTimer();
@@ -146,11 +137,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
       setUseYoutubeFallback(true);
       markReady(true);
       setIsPlaying(true);
-      if (!mutedRef.current) {
-        setMuted(true);
-        setShowHint(true);
-      }
-    }, 7000);
+    }, 15000);
 
     const init = () => {
       if (cancelled || !ytMountRef.current) return;
@@ -186,14 +173,14 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
             try {
               ytPlayerRef.current.setVolume?.(Math.round(volumeRef.current * 100));
               if (mutedRef.current) ytPlayerRef.current.mute?.(); else ytPlayerRef.current.unMute?.();
-              ytPlayerRef.current.playVideo();
+              ytPlayerRef.current.playVideo?.();
               setTimeout(() => {
                 try {
-                  const state = ytPlayerRef.current.getPlayerState();
+                  const state = ytPlayerRef.current?.getPlayerState?.();
                   if (state !== 1 && !mutedRef.current) {
-                    ytPlayerRef.current.mute();
+                    ytPlayerRef.current?.mute?.();
                     setMuted(true);
-                    ytPlayerRef.current.playVideo();
+                    ytPlayerRef.current?.playVideo?.();
                     setShowHint(true);
                   }
                 } catch { /* ignore */ }
@@ -274,8 +261,15 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
     try { localStorage.setItem(MUTED_KEY, m ? '1' : '0'); } catch { /* ignore */ }
     if (type === 'youtube') {
       const p = ytPlayerRef.current;
+      if (useYoutubeFallback) {
+        if (iframeRef.current && ytId) {
+          iframeRef.current.src = `https://www.youtube-nocookie.com/embed/${ytId}?rel=0&modestbranding=1&playsinline=1&autoplay=1&mute=${m ? 1 : 0}&controls=0&fs=0&iv_load_policy=3&disablekb=1&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`;
+        }
+        setShowHint(false);
+        return;
+      }
       if (!p || typeof p.mute !== 'function') return;
-      if (m) p.mute(); else { p.unMute(); p.setVolume(Math.round(volume * 100)); }
+      if (m) p.mute(); else { p.unMute?.(); p.setVolume?.(Math.round(volume * 100)); p.playVideo?.(); }
     } else {
       cfPost(m ? 'mute' : 'unmute');
     }
@@ -289,6 +283,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
     if (v > 0 && muted) { setMuted(false); try { localStorage.setItem(MUTED_KEY, '0'); } catch { /* ignore */ } }
     if (type === 'youtube') {
       const p = ytPlayerRef.current;
+      if (useYoutubeFallback) return;
       if (!p || typeof p.setVolume !== 'function') return;
       p.setVolume(Math.round(v * 100));
       if (v > 0) p.unMute();
@@ -340,7 +335,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
   };
 
   const ytEmbedUrl = ytId
-    ? `https://www.youtube-nocookie.com/embed/${ytId}?rel=0&modestbranding=1&playsinline=1&autoplay=1&mute=${muted || showHint || useYoutubeFallback ? 1 : 0}&controls=0&fs=0&iv_load_policy=3&disablekb=1&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`
+    ? `https://www.youtube-nocookie.com/embed/${ytId}?rel=0&modestbranding=1&playsinline=1&autoplay=1&mute=${muted || showHint ? 1 : 0}&controls=0&fs=0&iv_load_policy=3&disablekb=1&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`
     : '';
   const cfEmbedUrl = cfUid
     ? `https://iframe.videodelivery.net/${cfUid}?autoplay=true&controls=false&preload=auto&muted=${muted}`
@@ -349,8 +344,8 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
   return (
     <div
       ref={containerRef}
-      className={`relative w-full overflow-hidden rounded-xl bg-black select-none ${showControls || !isPlaying ? '' : 'cursor-none'}`}
-      style={{ paddingBottom: isFullscreen ? '0' : '56.25%', height: isFullscreen ? '100%' : undefined }}
+      className={`relative w-full overflow-hidden rounded-xl bg-black select-none ${isFullscreen ? 'h-dvh' : ''} ${showControls || !isPlaying ? '' : 'cursor-none'}`}
+      style={{ paddingBottom: isFullscreen ? '0' : '56.25%', height: isFullscreen ? '100dvh' : undefined }}
       onContextMenu={(e) => e.preventDefault()}
       onMouseMove={resetHideTimer}
       onTouchStart={resetHideTimer}
@@ -417,15 +412,15 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
 
       {/* Controls */}
       <div
-        className={`absolute inset-x-0 bottom-0 z-10 px-3 pb-3 pt-8 bg-gradient-to-t from-black/80 to-transparent transition-opacity duration-300 ${
+        className={`absolute inset-x-0 bottom-0 z-10 px-2 sm:px-3 pb-2 sm:pb-3 pt-8 bg-gradient-to-t from-black/80 to-transparent transition-opacity duration-300 ${
           showControls || !isPlaying ? 'opacity-100' : 'opacity-0 pointer-events-none'
         }`}
         style={{ touchAction: 'manipulation' }}
         onClick={(e) => e.stopPropagation()}
       >
         {type === 'youtube' && duration > 0 && (
-          <div className="flex items-center gap-2 mb-2 text-white text-[11px] landscape:text-xs tabular-nums" onClick={(e) => e.stopPropagation()}>
-            <span>{fmtTime(currentTime)}</span>
+          <div className="flex items-center gap-1.5 sm:gap-2 mb-2 text-white text-[10px] sm:text-xs tabular-nums" onClick={(e) => e.stopPropagation()}>
+            <span className="w-10 sm:w-14 text-left shrink-0">{fmtTime(currentTime)}</span>
             <input
               type="range"
               min={0}
@@ -435,38 +430,40 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
               onChange={(e) => { setSeeking(true); setCurrentTime(Number(e.target.value)); }}
               onPointerDown={(e) => { e.stopPropagation(); setSeeking(true); }}
               onPointerUp={(e) => { e.stopPropagation(); seekTo(Number((e.target as HTMLInputElement).value)); setSeeking(false); resetHideTimer(); }}
-              onMouseUp={(e) => { seekTo(Number((e.target as HTMLInputElement).value)); setSeeking(false); }}
-              onTouchEnd={(e) => { seekTo(Number((e.target as HTMLInputElement).value)); setSeeking(false); }}
+              onMouseUp={(e) => { e.stopPropagation(); seekTo(Number((e.target as HTMLInputElement).value)); setSeeking(false); }}
+              onTouchEnd={(e) => { e.stopPropagation(); seekTo(Number((e.target as HTMLInputElement).value)); setSeeking(false); }}
               aria-label="Seek"
-              className="flex-1 h-2 accent-primary cursor-pointer"
+              className="min-w-0 flex-1 h-2 accent-primary cursor-pointer"
               style={{ touchAction: 'manipulation' }}
             />
-            <span>{fmtTime(duration)}</span>
+            <span className="w-10 sm:w-14 text-right shrink-0">{fmtTime(duration)}</span>
           </div>
         )}
-        <div className="flex items-center gap-2 landscape:gap-3" onClick={(e) => e.stopPropagation()}>
-          <button onClick={(e) => { e.stopPropagation(); togglePlay(); resetHideTimer(); }} aria-label={isPlaying ? 'Pause' : 'Play'} className="p-2.5 landscape:p-3 text-white hover:text-primary active:scale-95 transition-all">
+        <div className="flex items-center gap-1 sm:gap-2 min-w-0" onClick={(e) => e.stopPropagation()}>
+          <button onClick={(e) => { e.stopPropagation(); togglePlay(); resetHideTimer(); }} aria-label={isPlaying ? 'Pause' : 'Play'} className="p-2 sm:p-2.5 landscape:p-3 text-white hover:text-primary active:scale-95 transition-all shrink-0">
             {isPlaying ? <Pause className="w-5 h-5 landscape:w-6 landscape:h-6" /> : <Play className="w-5 h-5 landscape:w-6 landscape:h-6" />}
           </button>
           {type === 'youtube' && !hideSeekButtons && (
             <>
-              <button onClick={(e) => { e.stopPropagation(); skip(-10); resetHideTimer(); }} aria-label="Mundur 10 detik" className="p-2.5 landscape:p-3 text-white hover:text-primary active:scale-95 transition-all">
+              <button onClick={(e) => { e.stopPropagation(); skip(-10); resetHideTimer(); }} aria-label="Mundur 10 detik" className="p-2 sm:p-2.5 landscape:p-3 text-white hover:text-primary active:scale-95 transition-all shrink-0">
                 <SkipBack className="w-5 h-5 landscape:w-6 landscape:h-6" />
               </button>
-              <button onClick={(e) => { e.stopPropagation(); skip(10); resetHideTimer(); }} aria-label="Maju 10 detik" className="p-2.5 landscape:p-3 text-white hover:text-primary active:scale-95 transition-all">
+              <button onClick={(e) => { e.stopPropagation(); skip(10); resetHideTimer(); }} aria-label="Maju 10 detik" className="p-2 sm:p-2.5 landscape:p-3 text-white hover:text-primary active:scale-95 transition-all shrink-0">
                 <SkipForward className="w-5 h-5 landscape:w-6 landscape:h-6" />
               </button>
             </>
           )}
-          <button onClick={(e) => { e.stopPropagation(); toggleMute(); resetHideTimer(); }} aria-label={muted ? 'Unmute' : 'Mute'} className="p-2.5 landscape:p-3 text-white hover:text-primary active:scale-95 transition-all">
+          <button onClick={(e) => { e.stopPropagation(); toggleMute(); resetHideTimer(); }} aria-label={muted ? 'Unmute' : 'Mute'} className="p-2 sm:p-2.5 landscape:p-3 text-white hover:text-primary active:scale-95 transition-all shrink-0">
             {muted || volume === 0 ? <VolumeX className="w-5 h-5 landscape:w-6 landscape:h-6" /> : <Volume2 className="w-5 h-5 landscape:w-6 landscape:h-6" />}
           </button>
           <input
             type="range" min={0} max={1} step={0.05}
             value={muted ? 0 : volume}
-            onChange={changeVolume}
+            onChange={(e) => { e.stopPropagation(); changeVolume(e); }}
+            onPointerDown={(e) => e.stopPropagation()}
+            onPointerUp={(e) => e.stopPropagation()}
             aria-label="Volume"
-            className="w-24 h-2 accent-primary cursor-pointer"
+            className="w-14 sm:w-24 h-2 accent-primary cursor-pointer shrink-0"
             style={{ touchAction: 'manipulation' }}
           />
           <div className="flex-1" />

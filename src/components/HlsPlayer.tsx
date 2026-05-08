@@ -292,8 +292,13 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
         safePlay();
       });
       hls.on(Hls.Events.LEVEL_LOADED, (_, data) => {
-        isLiveRef.current = !!data.details?.live;
-        setIsLiveStream(!!data.details?.live);
+        const live = !!data.details?.live;
+        isLiveRef.current = live;
+        setIsLiveStream(live);
+        if (!live) {
+          const vodDuration = typeof data.details?.totalduration === 'number' ? data.details.totalduration : video.duration;
+          if (Number.isFinite(vodDuration) && vodDuration > 0) setDuration(vodDuration);
+        }
       });
       hls.on(Hls.Events.LEVEL_SWITCHED, (_, data) => {
         if (hls && hls.autoLevelEnabled) {
@@ -425,11 +430,11 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
       const nextDuration = video.duration;
       if (!Number.isFinite(nextDuration) || nextDuration <= 0) {
         setDuration(0);
-        isLiveRef.current = true;
-        setIsLiveStream(true);
+        if (isLiveRef.current) setIsLiveStream(true);
         return;
       }
       setDuration(nextDuration);
+      if (!isLiveRef.current) setIsLiveStream(false);
     };
     const onWaiting = () => {
       // mid-play stall (not initial)
@@ -441,7 +446,8 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
       // Reset recovery counter on successful playback so future hiccups can recover too
       recoveryAttemptsRef.current = 0;
     };
-    const onCanPlay = () => setBuffering(false);
+    const onCanPlay = () => { setLoading(false); setBuffering(false); };
+    const onLoadedMetadata = () => onDurationChange();
     const onProgress = () => {
       lastProgressRef.current = { time: video.currentTime, checkedAt: Date.now(), recoveries: 0 };
     };
@@ -454,6 +460,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
     video.addEventListener('pause', onPause);
     video.addEventListener('timeupdate', onTimeUpdate);
     video.addEventListener('durationchange', onDurationChange);
+    video.addEventListener('loadedmetadata', onLoadedMetadata);
     video.addEventListener('waiting', onWaiting);
     video.addEventListener('playing', onPlaying);
     video.addEventListener('canplay', onCanPlay);
@@ -465,6 +472,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
       video.removeEventListener('pause', onPause);
       video.removeEventListener('timeupdate', onTimeUpdate);
       video.removeEventListener('durationchange', onDurationChange);
+      video.removeEventListener('loadedmetadata', onLoadedMetadata);
       video.removeEventListener('waiting', onWaiting);
       video.removeEventListener('playing', onPlaying);
       video.removeEventListener('canplay', onCanPlay);
@@ -489,20 +497,8 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
   }, []);
 
   const toggleControls = useCallback(() => {
-    setShowControls(prev => {
-      const next = !prev;
-      if (next) {
-        if (hideControlsTimerRef.current) clearTimeout(hideControlsTimerRef.current);
-        hideControlsTimerRef.current = setTimeout(() => {
-          const v = videoRef.current;
-          if (v && !v.paused && !v.ended) setShowControls(false);
-        }, 3000);
-      } else if (hideControlsTimerRef.current) {
-        clearTimeout(hideControlsTimerRef.current);
-      }
-      return next;
-    });
-  }, []);
+    resetHideTimer();
+  }, [resetHideTimer]);
 
   useEffect(() => {
     resetHideTimer();
@@ -527,15 +523,18 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
   const seek = (delta: number) => {
     const video = videoRef.current;
     if (!video || isLiveStream) return;
-    if (!Number.isFinite(video.duration) || video.duration <= 0) return;
-    video.currentTime = Math.max(0, Math.min(video.duration, video.currentTime + delta));
+    const limit = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : duration;
+    if (!Number.isFinite(limit) || limit <= 0) return;
+    video.currentTime = Math.max(0, Math.min(limit, video.currentTime + delta));
     resetHideTimer();
   };
 
   const seekTo = (e: React.ChangeEvent<HTMLInputElement>) => {
     const video = videoRef.current;
-    if (!video || isLiveStream || !Number.isFinite(video.duration) || video.duration <= 0) return;
-    video.currentTime = Math.max(0, Math.min(video.duration, Number(e.target.value)));
+    if (!video || isLiveStream) return;
+    const limit = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : duration;
+    if (!Number.isFinite(limit) || limit <= 0) return;
+    video.currentTime = Math.max(0, Math.min(limit, Number(e.target.value)));
     setCurrentTime(video.currentTime);
     resetHideTimer();
   };
@@ -554,7 +553,10 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
     const video = videoRef.current;
     if (!video) return;
     video.muted = !video.muted;
-    if (!video.muted) setNeedsUnmute(false);
+    if (!video.muted) {
+      setNeedsUnmute(false);
+      if (video.paused) video.play().catch(() => {});
+    }
     try { localStorage.setItem('replaytime-muted', video.muted ? '1' : '0'); } catch { /* ignore */ }
   };
 
@@ -575,8 +577,8 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
   return (
     <div
       ref={containerRef}
-      className={`relative w-full overflow-hidden rounded-xl bg-black group/player ${showControls || !isPlaying ? '' : 'cursor-none'}`}
-      style={{ paddingBottom: isFullscreen ? '0' : '56.25%', height: isFullscreen ? '100%' : undefined }}
+      className={`relative w-full overflow-hidden rounded-xl bg-black group/player ${isFullscreen ? 'h-dvh' : ''} ${showControls || !isPlaying ? '' : 'cursor-none'}`}
+      style={{ paddingBottom: isFullscreen ? '0' : '56.25%', height: isFullscreen ? '100dvh' : undefined }}
       onMouseMove={resetHideTimer}
       onTouchStart={resetHideTimer}
     >
@@ -642,9 +644,9 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
           </button>
         )}
 
-        <div className="relative z-10 px-3 sm:px-4 pb-3 sm:pb-4 space-y-2" onClick={(e) => e.stopPropagation()}>
-          <div className="flex items-center gap-2 text-white text-xs">
-            <span className="tabular-nums">{isLiveStream ? 'LIVE' : formatTime(currentTime)}</span>
+        <div className="relative z-10 px-2 sm:px-4 pb-2 sm:pb-4 space-y-2" onClick={(e) => e.stopPropagation()}>
+          <div className="flex items-center gap-1.5 sm:gap-2 text-white text-[10px] sm:text-xs min-w-0">
+            <span className="w-10 sm:w-14 text-left shrink-0 tabular-nums">{isLiveStream ? 'LIVE' : formatTime(currentTime)}</span>
             <input
               type="range"
               min={0}
@@ -655,7 +657,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
               onPointerDown={(e) => e.stopPropagation()}
               onPointerUp={(e) => e.stopPropagation()}
               disabled={isLiveStream}
-              className="flex-1 h-1.5 accent-primary cursor-pointer disabled:cursor-default disabled:opacity-70"
+              className="min-w-0 flex-1 h-2 accent-primary cursor-pointer disabled:cursor-default disabled:opacity-70"
               style={{
                 background: isLiveStream
                   ? 'linear-gradient(to right, hsl(var(--primary)) 0%, hsl(var(--primary)) 100%)'
@@ -666,25 +668,25 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
                 appearance: 'none',
               }}
             />
-            <span className="tabular-nums">{isLiveStream ? 'ON AIR' : formatTime(duration)}</span>
+            <span className="w-10 sm:w-14 text-right shrink-0 tabular-nums">{isLiveStream ? 'ON AIR' : formatTime(duration)}</span>
           </div>
 
-          <div className="flex items-center gap-1 sm:gap-2">
-            <button type="button" onClick={(e) => { e.stopPropagation(); togglePlay(); }} className="p-2 text-white hover:text-primary transition-colors" aria-label={isPlaying ? 'Pause' : 'Play'}>
+          <div className="flex items-center gap-0.5 sm:gap-2 min-w-0">
+            <button type="button" onClick={(e) => { e.stopPropagation(); togglePlay(); }} className="p-2 text-white hover:text-primary transition-colors shrink-0" aria-label={isPlaying ? 'Pause' : 'Play'}>
               {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
             </button>
             {!hideSeekButtons && (
               <>
-                <button type="button" onClick={(e) => { e.stopPropagation(); seek(-10); }} disabled={isLiveStream} className="p-2 text-white hover:text-primary transition-colors disabled:opacity-40 disabled:hover:text-current" aria-label="Mundur 10 detik" title="Mundur 10 detik">
+                <button type="button" onClick={(e) => { e.stopPropagation(); seek(-10); }} disabled={isLiveStream} className="p-2 text-white hover:text-primary transition-colors disabled:opacity-40 disabled:hover:text-current shrink-0" aria-label="Mundur 10 detik" title="Mundur 10 detik">
                   <RotateCcw className="w-5 h-5" />
                 </button>
-                <button type="button" onClick={(e) => { e.stopPropagation(); seek(10); }} disabled={isLiveStream} className="p-2 text-white hover:text-primary transition-colors disabled:opacity-40 disabled:hover:text-current" aria-label="Maju 10 detik" title="Maju 10 detik">
+                <button type="button" onClick={(e) => { e.stopPropagation(); seek(10); }} disabled={isLiveStream} className="p-2 text-white hover:text-primary transition-colors disabled:opacity-40 disabled:hover:text-current shrink-0" aria-label="Maju 10 detik" title="Maju 10 detik">
                   <RotateCw className="w-5 h-5" />
                 </button>
               </>
             )}
 
-            <div className="flex items-center gap-1 group/volume">
+            <div className="flex items-center gap-0.5 sm:gap-1 group/volume shrink-0">
               <button type="button" onClick={(e) => { e.stopPropagation(); toggleMute(); resetHideTimer(); }} className="p-2 text-white hover:text-primary transition-colors" aria-label={muted ? 'Unmute' : 'Mute'}>
                 {muted || volume === 0 ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
               </button>
@@ -697,7 +699,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
                 onChange={changeVolume}
                 onPointerDown={(e) => e.stopPropagation()}
                 onPointerUp={(e) => e.stopPropagation()}
-                className="w-16 sm:w-20 h-1 accent-primary cursor-pointer hidden sm:block"
+                className="w-14 sm:w-20 h-2 accent-primary cursor-pointer hidden min-[360px]:block"
               />
             </div>
 

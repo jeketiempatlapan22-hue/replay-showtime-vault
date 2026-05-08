@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { supabase } from '@/integrations/supabase/client';
 import { getBrowserId } from '@/lib/browserId';
 import MemberAvatar from '@/components/MemberAvatar';
+import { useAutoHideOnInteraction } from '@/hooks/useAutoHideOnInteraction';
 
 // Lazy-load player & chat: bundle awal lebih kecil, terutama di mobile.
 const HlsPlayer = lazy(() => import('@/components/HlsPlayer'));
@@ -119,6 +120,7 @@ export default function Live() {
   const [submitting, setSubmitting] = useState(false);
   const [kickedMsg, setKickedMsg] = useState('');
   const [failedSourceKeys, setFailedSourceKeys] = useState<string[]>([]);
+  const navVisible = useAutoHideOnInteraction(!!unlocked, 3000);
   const [sourceIdx, setSourceIdx] = useState<number>(() => {
     try { return Math.max(0, Number(sessionStorage.getItem(SS_SRC_KEY) || '0')); } catch { return 0; }
   });
@@ -395,7 +397,7 @@ export default function Live() {
 
   return (
     <div className="min-h-screen bg-background relative z-10">
-      <div className="sticky top-0 z-20 bg-card/90 backdrop-blur border-b border-border px-2 sm:px-4 py-2 sm:py-3 flex items-center gap-2 sm:gap-3">
+      <div className={`sticky top-0 z-20 bg-card/90 backdrop-blur border-b border-border px-2 sm:px-4 py-2 sm:py-3 flex items-center gap-2 sm:gap-3 transition-all duration-300 ${navVisible ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0 pointer-events-none'}`}>
         <Button variant="ghost" size="icon" onClick={() => navigate('/')} className="shrink-0"><ArrowLeft className="w-5 h-5" /></Button>
         <div className="flex-1 min-w-0 flex items-center gap-2 flex-wrap">
           {liveActive ? (
@@ -416,7 +418,7 @@ export default function Live() {
         </div>
       </div>
 
-      <div className="w-full max-w-5xl mx-auto px-2 sm:px-4 py-4 space-y-3">
+      <div className="w-full max-w-screen-2xl mx-auto px-2 sm:px-4 lg:px-6 py-3 sm:py-4 space-y-3">
         {statusLoading ? (
           <div className="flex items-center justify-center py-20"><Loader2 className="w-10 h-10 text-primary animate-spin" /></div>
         ) : !unlocked ? (
