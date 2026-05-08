@@ -16,6 +16,18 @@ export interface ActiveShow {
   pakasir_amount: number;
   replay_id: string | null;
   replay_enabled: boolean;
+  // LIVE controls
+  is_live?: boolean;
+  live_auto_schedule?: boolean;
+  live_url?: string;
+  live_type?: 'm3u8' | 'youtube';
+  live_sources?: { label: string; type: 'm3u8' | 'youtube' | 'cloudflare'; url: string }[];
+  live_password?: string;
+  live_require_password?: boolean;
+  // Replay-mode (inline)
+  replay_mode?: boolean;
+  replay_m3u8_url?: string;
+  replay_youtube_url?: string;
   created_at?: string;
   updated_at?: string;
 }
