@@ -327,21 +327,51 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
     return onFullscreenChange(onChange);
   }, []);
 
-  // Poll YT time/duration (skip for live: no scrubbing, no seeks)
+  // Poll YT time/duration. Untuk live: hanya pakai untuk DETEKSI (duration=0/Infinity sambil currentTime maju),
+  // tidak menulis state seek/duration agar tidak memicu UI scrub & tidak menyebabkan reload/restart.
   useEffect(() => {
-    if (type !== 'youtube' || !ready || isLive) return;
+    if (type !== 'youtube' || !ready) return;
+    let liveProbeHits = 0;
     const id = setInterval(() => {
       const p = ytPlayerRef.current;
-      if (!p || seeking) return;
+      if (!p) return;
       try {
-        const d = p.getDuration?.() || 0;
-        const t = p.getCurrentTime?.() || 0;
+        const d = p.getDuration?.() ?? 0;
+        const t = p.getCurrentTime?.() ?? 0;
+        const looksLive = !Number.isFinite(d) || d === 0;
+        if (looksLive && t > 0) {
+          liveProbeHits += 1;
+          if (liveProbeHits >= 2 && !detectedLive) setDetectedLive(true);
+        } else if (!looksLive && d > 0) {
+          liveProbeHits = 0;
+          if (detectedLive && !isLive) setDetectedLive(false);
+        }
+        if (liveActive) return; // skip duration/seek state untuk live
+        if (seeking) return;
         if (d && d !== duration) setDuration(d);
         setCurrentTime(t);
       } catch { /* ignore */ }
-    }, 500);
+    }, 1000);
     return () => clearInterval(id);
-  }, [ready, type, seeking, duration, isLive]);
+  }, [ready, type, seeking, duration, isLive, detectedLive, liveActive]);
+
+  // Saat YouTube live berakhir (state=0/ENDED): jangan restart, cukup tandai sebagai berakhir.
+  useEffect(() => {
+    if (type !== 'youtube' || !liveActive) return;
+    const interval = setInterval(() => {
+      const p = ytPlayerRef.current;
+      if (!p) return;
+      try {
+        const state = p.getPlayerState?.();
+        // 0 = ENDED. Untuk YT live, state ENDED berarti broadcaster mengakhiri siaran.
+        if (state === 0 && !liveEndedRef.current) {
+          liveEndedRef.current = true;
+          setIsPlaying(false);
+        }
+      } catch { /* ignore */ }
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [type, liveActive]);
 
   const seekTo = (t: number) => {
     const p = ytPlayerRef.current;
