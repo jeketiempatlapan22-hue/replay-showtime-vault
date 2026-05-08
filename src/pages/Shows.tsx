@@ -48,7 +48,7 @@ export default function Shows() {
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-30 backdrop-blur-md bg-background/80 border-b border-border">
         <div className="container mx-auto px-3 sm:px-4 py-3 flex items-center gap-2">
-          <HamburgerMenu />
+          <HamburgerMenu whatsappNumber={waNumber} whatsappLink={waLink} lightMode={lightMode} onToggleMode={() => setLightMode(v => !v)} />
           <Button variant="ghost" size="icon" onClick={() => navigate('/')} className="shrink-0" title="Kembali">
             <ArrowLeft className="w-5 h-5" />
           </Button>
