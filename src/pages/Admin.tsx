@@ -736,6 +736,36 @@ export default function Admin() {
                     <span className="text-sm">Tampilkan di landing</span>
                   </div>
                 </div>
+                <div className="grid grid-cols-2 gap-3 pt-2 border-t border-border/40">
+                  <div>
+                    <Label>Harga Show (Rp)</Label>
+                    <Input type="number" min={0} value={showForm.price_show} onChange={e => setShowForm({ ...showForm, price_show: Number(e.target.value) })} placeholder="0" />
+                  </div>
+                  <div>
+                    <Label>Harga Replay (Rp)</Label>
+                    <Input type="number" min={0} value={showForm.price_replay} onChange={e => setShowForm({ ...showForm, price_replay: Number(e.target.value) })} placeholder="0" />
+                  </div>
+                </div>
+                <div>
+                  <Label>Pakasir Amount (Rp) — nominal QRIS dinamis</Label>
+                  <Input type="number" min={0} value={showForm.pakasir_amount} onChange={e => setShowForm({ ...showForm, pakasir_amount: Number(e.target.value) })} placeholder="Misal: 25000" />
+                  <p className="text-[11px] text-muted-foreground mt-1">Kosongkan/0 untuk pakai harga di atas. Nominal aktual yang ditagihkan ke user.</p>
+                </div>
+                <div>
+                  <Label>Replay Terkait</Label>
+                  <select value={showForm.replay_id} onChange={e => setShowForm({ ...showForm, replay_id: e.target.value })}
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+                    <option value="">— Belum ada replay —</option>
+                    {replays.map(r => <option key={r.id} value={r.id}>{r.title} ({r.date})</option>)}
+                  </select>
+                </div>
+                <div className="flex items-center justify-between p-3 rounded-lg bg-secondary/40 border border-border">
+                  <div>
+                    <Label className="text-sm">Aktifkan Mode Replay</Label>
+                    <p className="text-[11px] text-muted-foreground">Saat ON, kartu show otomatis arahkan ke halaman replay terkait.</p>
+                  </div>
+                  <Switch checked={showForm.replay_enabled} onCheckedChange={v => setShowForm({ ...showForm, replay_enabled: v })} disabled={!showForm.replay_id} />
+                </div>
                 <div className="flex gap-2 pt-2">
                   <Button onClick={handleSaveShow} className="flex-1"><Save className="w-4 h-4 mr-2" />{showEditing ? 'Update' : 'Tambah'}</Button>
                   {showEditing && <Button variant="outline" onClick={resetShowForm}>Batal</Button>}
