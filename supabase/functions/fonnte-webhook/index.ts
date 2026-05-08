@@ -180,14 +180,17 @@ Deno.serve(async (req) => {
       if (!arg) {
         const { data: replays } = await admin
           .from('replays')
-          .select('id,title,date,show_name')
+          .select('id,title,date,admin_alias')
           .order('date', { ascending: false })
           .limit(8);
         if (!replays?.length) {
           reply = '📭 Belum ada replay tersimpan.';
         } else {
-          reply = '🎬 *DAFTAR REPLAY TERBARU*\n\nGunakan: */buattoken <kode>*\nKode = 8 karakter pertama ID.\n\n' +
-            replays.map((r) => `• \`${r.id.slice(0,8)}\` — ${r.title}\n  📅 ${r.date}`).join('\n\n');
+          reply = '🎬 *DAFTAR REPLAY TERBARU*\n\nGunakan: */buattoken <kode|alias>*\n_Kode = 8 karakter pertama ID, atau alias admin._\n\n' +
+            replays.map((r: any) => {
+              const aliasLine = r.admin_alias ? `\n  🏷️ alias: \`${r.admin_alias}\`` : '';
+              return `• \`${r.id.slice(0,8)}\` — ${r.title}\n  📅 ${r.date}${aliasLine}`;
+            }).join('\n\n');
         }
       } else {
         const code = arg.trim().toLowerCase();
