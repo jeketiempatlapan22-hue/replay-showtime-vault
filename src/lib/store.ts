@@ -99,6 +99,7 @@ export async function addReplay(replay: {
   featured_member: string; lineup: string[];
   password: string; youtube_id: string; image_url: string;
   source_type?: string; m3u8_url?: string; show_time?: string;
+  admin_alias?: string;
 }) {
   const { error } = await supabase.from('replays').insert(replay);
   if (error) throw error;
