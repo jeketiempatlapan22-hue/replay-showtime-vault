@@ -223,10 +223,39 @@ export default function EmbedPlayer({ type, source, title, watermark }: Props) {
 
       {/* Controls */}
       <div className="absolute inset-x-0 bottom-0 z-10 px-3 pb-3 pt-8 bg-gradient-to-t from-black/80 to-transparent" style={{ touchAction: 'manipulation' }}>
+        {type === 'youtube' && duration > 0 && (
+          <div className="flex items-center gap-2 mb-2 text-white text-[11px] landscape:text-xs tabular-nums" onClick={(e) => e.stopPropagation()}>
+            <span>{fmtTime(currentTime)}</span>
+            <input
+              type="range"
+              min={0}
+              max={duration}
+              step={0.1}
+              value={Math.min(currentTime, duration)}
+              onChange={(e) => { setSeeking(true); setCurrentTime(Number(e.target.value)); }}
+              onMouseUp={(e) => { seekTo(Number((e.target as HTMLInputElement).value)); setSeeking(false); }}
+              onTouchEnd={(e) => { seekTo(Number((e.target as HTMLInputElement).value)); setSeeking(false); }}
+              aria-label="Seek"
+              className="flex-1 h-2 accent-primary cursor-pointer"
+              style={{ touchAction: 'manipulation' }}
+            />
+            <span>{fmtTime(duration)}</span>
+          </div>
+        )}
         <div className="flex items-center gap-2 landscape:gap-3" onClick={(e) => e.stopPropagation()}>
           <button onClick={togglePlay} aria-label={isPlaying ? 'Pause' : 'Play'} className="p-2.5 landscape:p-3 text-white hover:text-primary active:scale-95 transition-all">
             {isPlaying ? <Pause className="w-5 h-5 landscape:w-6 landscape:h-6" /> : <Play className="w-5 h-5 landscape:w-6 landscape:h-6" />}
           </button>
+          {type === 'youtube' && (
+            <>
+              <button onClick={() => skip(-10)} aria-label="Mundur 10 detik" className="p-2.5 landscape:p-3 text-white hover:text-primary active:scale-95 transition-all">
+                <SkipBack className="w-5 h-5 landscape:w-6 landscape:h-6" />
+              </button>
+              <button onClick={() => skip(10)} aria-label="Maju 10 detik" className="p-2.5 landscape:p-3 text-white hover:text-primary active:scale-95 transition-all">
+                <SkipForward className="w-5 h-5 landscape:w-6 landscape:h-6" />
+              </button>
+            </>
+          )}
           <button onClick={toggleMute} aria-label={muted ? 'Unmute' : 'Mute'} className="p-2.5 landscape:p-3 text-white hover:text-primary active:scale-95 transition-all">
             {muted || volume === 0 ? <VolumeX className="w-5 h-5 landscape:w-6 landscape:h-6" /> : <Volume2 className="w-5 h-5 landscape:w-6 landscape:h-6" />}
           </button>
