@@ -152,14 +152,13 @@ export default function LiveChat() {
     if (!msg || sending) return;
     if (!isAdmin && !name.trim()) { openChangeName(); return; }
     const rl = checkRate(msg);
-    if (!rl.ok) {
-      if (rl.waitSec) startCooldown(rl.waitSec);
-      // soft toast via alert-style inline; reuse nameError-like channel by injecting a transient message
-      // Use console-free UI: set sending false and show via toast import? Avoid extra deps — use window.alert as last resort.
-      // Better: surface inline by setting nameError-like state. Add toast via existing hook:
+    if (rl.ok === false) {
+      const waitSec = rl.waitSec;
+      const reason = rl.reason;
+      if (waitSec) startCooldown(waitSec);
       try {
         const { toast } = await import('@/hooks/use-toast');
-        toast({ title: 'Pesan ditolak', description: rl.reason, variant: 'destructive' });
+        toast({ title: 'Pesan ditolak', description: reason, variant: 'destructive' });
       } catch { /* ignore */ }
       return;
     }
