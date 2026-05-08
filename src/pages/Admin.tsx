@@ -346,8 +346,25 @@ export default function Admin() {
 
   const handleSaveReplay = async () => {
     const isYoutube = form.sourceType === 'youtube';
-    const hasSources = form.sources.length > 0;
-    const fallbackOk = isYoutube ? !!form.youtubeId : !!form.m3u8Url;
+    // Normalisasi URL/ID YouTube ke ID 11 karakter
+    const normalizedYoutubeId = isYoutube ? (parseYouTubeId(form.youtubeId) || '') : '';
+    if (isYoutube && form.youtubeId.trim() && !normalizedYoutubeId) {
+      toast({ title: 'YouTube tidak valid', description: 'Format YouTube fallback tidak dikenali. Periksa link/ID.', variant: 'destructive' });
+      return;
+    }
+    // Normalisasi setiap source playlist bertipe youtube
+    const normalizedSources = form.sources.map(s => {
+      if (s.type !== 'youtube') return s;
+      const id = parseYouTubeId(s.url) || '';
+      return { ...s, url: id };
+    });
+    const invalidYt = form.sources.find(s => s.type === 'youtube' && s.url.trim() && !parseYouTubeId(s.url));
+    if (invalidYt) {
+      toast({ title: 'YouTube tidak valid', description: `Playlist "${invalidYt.label || 'tanpa label'}" memiliki format YouTube yang tidak dikenali.`, variant: 'destructive' });
+      return;
+    }
+    const hasSources = normalizedSources.length > 0;
+    const fallbackOk = isYoutube ? !!normalizedYoutubeId : !!form.m3u8Url;
     if (!form.title || !form.date || !form.password || (!hasSources && !fallbackOk)) {
       toast({ title: 'Error', description: 'Judul, tanggal, sandi, dan minimal 1 sumber video wajib diisi!', variant: 'destructive' });
       return;
@@ -359,11 +376,11 @@ export default function Admin() {
         featured_member: showFeaturedMember ? form.featuredMember : '',
         lineup: lineupArr, password: form.password,
         admin_alias: form.adminAlias.trim(),
-        youtube_id: isYoutube ? form.youtubeId : '',
+        youtube_id: normalizedYoutubeId,
         image_url: form.imageUrl,
         source_type: form.sourceType,
         m3u8_url: isYoutube ? '' : form.m3u8Url,
-        sources: form.sources as any,
+        sources: normalizedSources as any,
       };
       if (editingReplay) {
         await updateReplay(editingReplay.id, payload);
