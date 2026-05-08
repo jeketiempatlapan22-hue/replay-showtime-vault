@@ -439,7 +439,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
         style={{ touchAction: 'manipulation' }}
         onClick={(e) => e.stopPropagation()}
       >
-        {type === 'youtube' && (
+        {type === 'youtube' && !isLive && (
           <div className="flex items-center gap-1.5 sm:gap-2 mb-2 text-white text-[10px] sm:text-xs tabular-nums" onClick={(e) => e.stopPropagation()}>
             <span className="w-10 sm:w-14 text-left shrink-0">{duration > 0 ? fmtTime(currentTime) : '--:--'}</span>
             <input
