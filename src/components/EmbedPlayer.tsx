@@ -192,23 +192,25 @@ export default function EmbedPlayer({ type, source, title, watermark }: Props) {
       )}
 
       {/* Controls */}
-      <div className="absolute inset-x-0 bottom-0 z-10 px-3 pb-3 pt-8 bg-gradient-to-t from-black/80 to-transparent">
-        <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-          <button onClick={togglePlay} className="p-2 text-white hover:text-primary transition-colors">
-            {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
+      <div className="absolute inset-x-0 bottom-0 z-10 px-3 pb-3 pt-8 bg-gradient-to-t from-black/80 to-transparent" style={{ touchAction: 'manipulation' }}>
+        <div className="flex items-center gap-2 landscape:gap-3" onClick={(e) => e.stopPropagation()}>
+          <button onClick={togglePlay} aria-label={isPlaying ? 'Pause' : 'Play'} className="p-2.5 landscape:p-3 text-white hover:text-primary active:scale-95 transition-all">
+            {isPlaying ? <Pause className="w-5 h-5 landscape:w-6 landscape:h-6" /> : <Play className="w-5 h-5 landscape:w-6 landscape:h-6" />}
           </button>
-          <button onClick={toggleMute} className="p-2 text-white hover:text-primary transition-colors">
-            {muted || volume === 0 ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+          <button onClick={toggleMute} aria-label={muted ? 'Unmute' : 'Mute'} className="p-2.5 landscape:p-3 text-white hover:text-primary active:scale-95 transition-all">
+            {muted || volume === 0 ? <VolumeX className="w-5 h-5 landscape:w-6 landscape:h-6" /> : <Volume2 className="w-5 h-5 landscape:w-6 landscape:h-6" />}
           </button>
           <input
             type="range" min={0} max={1} step={0.05}
             value={muted ? 0 : volume}
             onChange={changeVolume}
-            className="w-20 h-1 accent-primary cursor-pointer"
+            aria-label="Volume"
+            className="w-24 h-2 accent-primary cursor-pointer"
+            style={{ touchAction: 'manipulation' }}
           />
           <div className="flex-1" />
-          <button onClick={toggleFullscreen} className="p-2 text-white hover:text-primary transition-colors">
-            {isFullscreen ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
+          <button onClick={toggleFullscreen} aria-label="Fullscreen" className="p-2.5 landscape:p-3 text-white hover:text-primary active:scale-95 transition-all">
+            {isFullscreen ? <Minimize className="w-5 h-5 landscape:w-6 landscape:h-6" /> : <Maximize className="w-5 h-5 landscape:w-6 landscape:h-6" />}
           </button>
         </div>
       </div>
