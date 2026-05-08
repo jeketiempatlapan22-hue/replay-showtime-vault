@@ -575,6 +575,45 @@ export type Database = {
         }
         Relationships: []
       }
+      token_deliveries: {
+        Row: {
+          access_token: string
+          id: string
+          link: string
+          order_id: string | null
+          phone: string
+          replay_id: string | null
+          replay_title: string
+          requested_by: string
+          sent_at: string
+          source: string
+        }
+        Insert: {
+          access_token: string
+          id?: string
+          link?: string
+          order_id?: string | null
+          phone: string
+          replay_id?: string | null
+          replay_title?: string
+          requested_by?: string
+          sent_at?: string
+          source?: string
+        }
+        Update: {
+          access_token?: string
+          id?: string
+          link?: string
+          order_id?: string | null
+          phone?: string
+          replay_id?: string | null
+          replay_title?: string
+          requested_by?: string
+          sent_at?: string
+          source?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           id: string
