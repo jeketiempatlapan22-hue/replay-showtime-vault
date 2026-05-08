@@ -224,6 +224,7 @@ export default function ActiveShowCard({ show, index = 0 }: { show: ActiveShow; 
         amount={show.pakasir_amount}
         itemTitle={buyMode === 'replay' ? `Replay: ${show.title}` : `Show: ${show.title}`}
         replayId={buyMode === 'replay' ? show.replay_id : null}
+        kind={buyMode === 'replay' ? 'replay' : 'show'}
       />
     </div>
   );
