@@ -74,6 +74,38 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [seeking, setSeeking] = useState(false);
+  const [showControls, setShowControls] = useState(true);
+  const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const resetHideTimer = useCallback(() => {
+    setShowControls(true);
+    if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+    hideTimerRef.current = setTimeout(() => {
+      // Only hide while actually playing
+      setShowControls(prev => (isPlayingRef.current ? false : prev));
+    }, 3000);
+  }, []);
+
+  const isPlayingRef = useRef(false);
+  useEffect(() => { isPlayingRef.current = isPlaying; }, [isPlaying]);
+
+  const toggleControls = useCallback(() => {
+    setShowControls(prev => {
+      const next = !prev;
+      if (next) {
+        if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+        hideTimerRef.current = setTimeout(() => {
+          setShowControls(p => (isPlayingRef.current ? false : p));
+        }, 3000);
+      } else if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    resetHideTimer();
+    return () => { if (hideTimerRef.current) clearTimeout(hideTimerRef.current); };
+  }, [resetHideTimer]);
 
   const ytId = type === 'youtube' ? extractYoutubeId(source) : '';
   const cfUid = type === 'cloudflare' ? extractCloudflareUid(source) : '';
