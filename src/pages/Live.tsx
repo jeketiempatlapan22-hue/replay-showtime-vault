@@ -421,9 +421,11 @@ export default function Live() {
           <>
             {liveActive && activeSource ? (
               <>
-                {activeSource.type === 'm3u8'
-                  ? <HlsPlayer key={`m3u8-${safeIdx}-${activeSource.url}`} src={activeSource.url} title={unlocked.title} watermark={unlocked.watermark} onFatalError={handleSourceFatalError} />
-                  : <EmbedPlayer key={`em-${safeIdx}-${activeSource.url}`} type={activeSource.type} source={activeSource.url} title={unlocked.title} watermark={unlocked.watermark} />}
+                <Suspense fallback={<PlayerFallback />}>
+                  {activeSource.type === 'm3u8'
+                    ? <HlsPlayer key={`m3u8-${safeIdx}-${activeSource.url}`} src={activeSource.url} title={unlocked.title} watermark={unlocked.watermark} onFatalError={handleSourceFatalError} />
+                    : <EmbedPlayer key={`em-${safeIdx}-${activeSource.url}`} type={activeSource.type} source={activeSource.url} title={unlocked.title} watermark={unlocked.watermark} />}
+                </Suspense>
 
                 <div className="flex items-center justify-between flex-wrap gap-2 px-1">
                   <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-500/10 border border-red-500/30 text-red-500 text-xs font-semibold">
