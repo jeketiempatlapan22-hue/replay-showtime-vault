@@ -18,10 +18,14 @@ export function useAutoHideOnInteraction(enabled = true, delay = 3000) {
 
     showTemporarily();
     window.addEventListener('pointerdown', showTemporarily, { capture: true, passive: true });
+    window.addEventListener('click', showTemporarily, { capture: true, passive: true });
+    window.addEventListener('touchstart', showTemporarily, { capture: true, passive: true });
     window.addEventListener('keydown', showTemporarily, { capture: true });
     return () => {
       if (timer) clearTimeout(timer);
       window.removeEventListener('pointerdown', showTemporarily, { capture: true });
+      window.removeEventListener('click', showTemporarily, { capture: true });
+      window.removeEventListener('touchstart', showTemporarily, { capture: true });
       window.removeEventListener('keydown', showTemporarily, { capture: true });
     };
   }, [delay, enabled]);

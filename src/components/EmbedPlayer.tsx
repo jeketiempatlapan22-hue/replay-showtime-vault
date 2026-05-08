@@ -51,7 +51,6 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
   const ytFallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const readyRef = useRef(false);
   const [ready, setReady] = useState(false);
-  const [useYoutubeFallback, setUseYoutubeFallback] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   // Default unmuted: clear stale persisted mute one time per session.
   const initialMuted = (() => {
@@ -126,7 +125,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
   useEffect(() => {
     markReady(false);
     setIsPlaying(false);
-    setUseYoutubeFallback(false);
+
     setDuration(0);
     setCurrentTime(0);
     if (ytFallbackTimerRef.current) clearTimeout(ytFallbackTimerRef.current);
@@ -230,11 +229,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
   const togglePlay = () => {
     if (type === 'youtube') {
       const p = ytPlayerRef.current;
-      if (useYoutubeFallback) {
-        if (iframeRef.current) iframeRef.current.src = isPlaying ? 'about:blank' : ytEmbedUrl;
-        setIsPlaying(!isPlaying);
-        return;
-      }
+      // No fallback path needed: iframe is rendered immediately, API attaches in place.
       if (!p || typeof p.pauseVideo !== 'function') return;
       try {
         const state = p.getPlayerState?.();
@@ -259,13 +254,6 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
     try { localStorage.setItem(MUTED_KEY, m ? '1' : '0'); } catch { /* ignore */ }
     if (type === 'youtube') {
       const p = ytPlayerRef.current;
-      if (useYoutubeFallback) {
-        if (iframeRef.current && ytId) {
-          iframeRef.current.src = `https://www.youtube-nocookie.com/embed/${ytId}?rel=0&modestbranding=1&playsinline=1&autoplay=1&mute=${m ? 1 : 0}&controls=0&fs=0&iv_load_policy=3&disablekb=1&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`;
-        }
-        setShowHint(false);
-        return;
-      }
       if (!p || typeof p.mute !== 'function') {
         if (iframeRef.current && ytId) {
           iframeRef.current.src = `https://www.youtube-nocookie.com/embed/${ytId}?rel=0&modestbranding=1&playsinline=1&autoplay=1&mute=${m ? 1 : 0}&controls=0&fs=0&iv_load_policy=3&disablekb=1&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`;
@@ -287,7 +275,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
     if (v > 0 && muted) { setMuted(false); try { localStorage.setItem(MUTED_KEY, '0'); } catch { /* ignore */ } }
     if (type === 'youtube') {
       const p = ytPlayerRef.current;
-      if (useYoutubeFallback) return;
+
       if (!p || typeof p.setVolume !== 'function') {
         if (v > 0 && iframeRef.current && ytId) {
           iframeRef.current.src = `https://www.youtube-nocookie.com/embed/${ytId}?rel=0&modestbranding=1&playsinline=1&autoplay=1&mute=0&controls=0&fs=0&iv_load_policy=3&disablekb=1&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`;
@@ -325,7 +313,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
 
   const seekTo = (t: number) => {
     const p = ytPlayerRef.current;
-    if (!p || useYoutubeFallback || !duration) return;
+    if (!p || !duration) return;
     const target = Math.max(0, Math.min(duration, t));
     try { p.seekTo(target, true); setCurrentTime(target); } catch { /* ignore */ }
   };
@@ -424,25 +412,26 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
         style={{ touchAction: 'manipulation' }}
         onClick={(e) => e.stopPropagation()}
       >
-        {type === 'youtube' && duration > 0 && (
+        {type === 'youtube' && (
           <div className="flex items-center gap-1.5 sm:gap-2 mb-2 text-white text-[10px] sm:text-xs tabular-nums" onClick={(e) => e.stopPropagation()}>
-            <span className="w-10 sm:w-14 text-left shrink-0">{fmtTime(currentTime)}</span>
+            <span className="w-10 sm:w-14 text-left shrink-0">{duration > 0 ? fmtTime(currentTime) : '--:--'}</span>
             <input
               type="range"
               min={0}
-              max={duration}
+              max={duration > 0 ? duration : 1}
               step={0.1}
-              value={Math.min(currentTime, duration)}
+              value={duration > 0 ? Math.min(currentTime, duration) : 0}
+              disabled={duration <= 0}
               onChange={(e) => { setSeeking(true); setCurrentTime(Number(e.target.value)); }}
               onPointerDown={(e) => { e.stopPropagation(); setSeeking(true); }}
               onPointerUp={(e) => { e.stopPropagation(); seekTo(Number((e.target as HTMLInputElement).value)); setSeeking(false); resetHideTimer(); }}
               onMouseUp={(e) => { e.stopPropagation(); seekTo(Number((e.target as HTMLInputElement).value)); setSeeking(false); }}
               onTouchEnd={(e) => { e.stopPropagation(); seekTo(Number((e.target as HTMLInputElement).value)); setSeeking(false); }}
               aria-label="Seek"
-              className="min-w-0 flex-1 h-2 accent-primary cursor-pointer"
+              className="min-w-0 flex-1 h-2 accent-primary cursor-pointer disabled:opacity-60"
               style={{ touchAction: 'manipulation' }}
             />
-            <span className="w-10 sm:w-14 text-right shrink-0">{fmtTime(duration)}</span>
+            <span className="w-10 sm:w-14 text-right shrink-0">{duration > 0 ? fmtTime(duration) : '--:--'}</span>
           </div>
         )}
         <div className="flex items-center gap-1 sm:gap-2 min-w-0" onClick={(e) => e.stopPropagation()}>
