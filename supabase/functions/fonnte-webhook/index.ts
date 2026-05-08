@@ -91,19 +91,19 @@ Deno.serve(async (req) => {
   // Only process commands starting with '/' — silently ignore other chatter
   if (!text.startsWith('/')) return new Response('ok', { headers: corsHeaders });
 
-  // Dedup: same phone+message within 60s = duplicate webhook delivery
+  // Dedup: same phone+message within ~20s = duplicate webhook delivery from Fonnte.
+  // Prune FIRST so genuine repeated commands (>20s apart) are not blocked.
   const hash = await sha1(text);
+  await admin.from('bot_inbox_dedup')
+    .delete()
+    .lt('received_at', new Date(Date.now() - 20_000).toISOString());
   const { error: dupErr } = await admin
     .from('bot_inbox_dedup')
     .insert({ phone: phoneNorm, message_hash: hash });
   if (dupErr) {
-    // Likely unique violation → already processed recently
+    // Likely unique violation → already processed in last 20s
     return new Response('ok', { headers: corsHeaders });
   }
-  // Janitor: prune entries older than 5 minutes
-  await admin.from('bot_inbox_dedup')
-    .delete()
-    .lt('received_at', new Date(Date.now() - 5 * 60_000).toISOString());
 
   // Per-phone rate limit: max 1 reply per 8 seconds
   const RL_WINDOW_MS = 8000;
@@ -180,21 +180,31 @@ Deno.serve(async (req) => {
       if (!arg) {
         const { data: replays } = await admin
           .from('replays')
-          .select('id,title,date,show_name')
+          .select('id,title,date,admin_alias')
           .order('date', { ascending: false })
           .limit(8);
         if (!replays?.length) {
           reply = '📭 Belum ada replay tersimpan.';
         } else {
-          reply = '🎬 *DAFTAR REPLAY TERBARU*\n\nGunakan: */buattoken <kode>*\nKode = 8 karakter pertama ID.\n\n' +
-            replays.map((r) => `• \`${r.id.slice(0,8)}\` — ${r.title}\n  📅 ${r.date}`).join('\n\n');
+          reply = '🎬 *DAFTAR REPLAY TERBARU*\n\nGunakan: */buattoken <kode|alias>*\n_Kode = 8 karakter pertama ID, atau alias admin._\n\n' +
+            replays.map((r: any) => {
+              const aliasLine = r.admin_alias ? `\n  🏷️ alias: \`${r.admin_alias}\`` : '';
+              return `• \`${r.id.slice(0,8)}\` — ${r.title}\n  📅 ${r.date}${aliasLine}`;
+            }).join('\n\n');
         }
       } else {
         const code = arg.trim().toLowerCase();
-        const { data: matches } = await admin
-          .from('replays').select('id,title').ilike('id', `${code}%`).limit(2);
-        if (!matches?.length) reply = `❌ Replay dengan kode *${code}* tidak ditemukan.`;
-        else if (matches.length > 1) reply = `⚠️ Kode *${code}* ambigu (${matches.length} match). Gunakan kode lebih panjang.`;
+        // Lookup: by admin_alias (exact, case-insensitive) OR by id prefix
+        const { data: byAlias } = await admin
+          .from('replays').select('id,title').ilike('admin_alias', code).limit(2);
+        let matches = byAlias ?? [];
+        if (!matches.length) {
+          const { data: byId } = await admin
+            .from('replays').select('id,title').ilike('id', `${code}%`).limit(2);
+          matches = byId ?? [];
+        }
+        if (!matches.length) reply = `❌ Replay dengan kode/alias *${code}* tidak ditemukan.`;
+        else if (matches.length > 1) reply = `⚠️ Kode *${code}* ambigu (${matches.length} match). Gunakan kode lebih panjang atau alias unik.`;
         else {
           const r = matches[0];
           const res = await callCreateToken({
@@ -234,12 +244,18 @@ Deno.serve(async (req) => {
       const code = (parts[0] || '').toLowerCase();
       const label = parts.slice(1).join(' ').trim();
       if (!code) {
-        reply = 'ℹ️ Format: */tokensatuan <kode> [label]*\n_Kode = 8 karakter pertama ID replay._\nKetik */buattoken* untuk melihat daftar replay.';
+        reply = 'ℹ️ Format: */tokensatuan <kode|alias> [label]*\n_Kode = 8 karakter pertama ID replay, atau alias admin._\nKetik */buattoken* untuk melihat daftar replay.';
       } else {
-        const { data: matches } = await admin
-          .from('replays').select('id,title').ilike('id', `${code}%`).limit(2);
-        if (!matches?.length) reply = `❌ Replay dengan kode *${code}* tidak ditemukan.`;
-        else if (matches.length > 1) reply = `⚠️ Kode *${code}* ambigu. Gunakan kode lebih panjang.`;
+        const { data: byAlias } = await admin
+          .from('replays').select('id,title').ilike('admin_alias', code).limit(2);
+        let matches = byAlias ?? [];
+        if (!matches.length) {
+          const { data: byId } = await admin
+            .from('replays').select('id,title').ilike('id', `${code}%`).limit(2);
+          matches = byId ?? [];
+        }
+        if (!matches.length) reply = `❌ Replay dengan kode/alias *${code}* tidak ditemukan.`;
+        else if (matches.length > 1) reply = `⚠️ Kode *${code}* ambigu. Gunakan kode lebih panjang atau alias unik.`;
         else {
           const r = matches[0];
           const res = await callCreateToken({

@@ -1,0 +1,2 @@
+ALTER TABLE public.replays ADD COLUMN IF NOT EXISTS admin_alias text NOT NULL DEFAULT '';
+CREATE UNIQUE INDEX IF NOT EXISTS replays_admin_alias_unique ON public.replays (lower(admin_alias)) WHERE admin_alias <> '';

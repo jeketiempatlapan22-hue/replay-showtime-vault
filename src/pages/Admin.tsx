@@ -58,7 +58,7 @@ export default function Admin() {
   const [editingReplay, setEditingReplay] = useState<ReplayRow | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ReplayRow | null>(null);
 
-  const [form, setForm] = useState({ title: '', showName: '', date: '', showTime: '19:00', criteria: 'reguler', featuredMember: '', lineup: '', password: '', youtubeId: '', imageUrl: '', sourceType: 'youtube', m3u8Url: '', sources: [] as PlaylistSource[] });
+  const [form, setForm] = useState({ title: '', showName: '', date: '', showTime: '19:00', criteria: 'reguler', featuredMember: '', lineup: '', password: '', adminAlias: '', youtubeId: '', imageUrl: '', sourceType: 'youtube', m3u8Url: '', sources: [] as PlaylistSource[] });
   const [liveChatEnabled, setLiveChatEnabled] = useState(true);
 
   const [mpYear, setMpYear] = useState(String(new Date().getFullYear()));
@@ -326,7 +326,7 @@ export default function Admin() {
   const handleLogout = async () => { await supabase.auth.signOut(); setIsLoggedIn(false); };
 
   const resetForm = () => {
-    setForm({ title: '', showName: '', date: '', showTime: '19:00', criteria: 'reguler', featuredMember: '', lineup: '', password: '', youtubeId: '', imageUrl: '', sourceType: 'youtube', m3u8Url: '', sources: [] });
+    setForm({ title: '', showName: '', date: '', showTime: '19:00', criteria: 'reguler', featuredMember: '', lineup: '', password: '', adminAlias: '', youtubeId: '', imageUrl: '', sourceType: 'youtube', m3u8Url: '', sources: [] });
     setEditingReplay(null);
   };
 
@@ -344,6 +344,7 @@ export default function Admin() {
         title: form.title, show_name: form.showName, date: form.date, show_time: form.showTime + ':00', criteria: form.criteria,
         featured_member: showFeaturedMember ? form.featuredMember : '',
         lineup: lineupArr, password: form.password,
+        admin_alias: form.adminAlias.trim(),
         youtube_id: isYoutube ? form.youtubeId : '',
         image_url: form.imageUrl,
         source_type: form.sourceType,
@@ -369,7 +370,9 @@ export default function Admin() {
     setEditingReplay(r);
     setForm({
       title: r.title, showName: r.show_name, date: r.date, showTime: (r.show_time || '19:00:00').slice(0, 5), criteria: r.criteria,
-      featuredMember: r.featured_member, lineup: r.lineup.join(', '), password: r.password, youtubeId: r.youtube_id, imageUrl: r.image_url,
+      featuredMember: r.featured_member, lineup: r.lineup.join(', '), password: r.password,
+      adminAlias: ((r as any).admin_alias as string) || '',
+      youtubeId: r.youtube_id, imageUrl: r.image_url,
       sourceType: (r as any).source_type || 'youtube', m3u8Url: (r as any).m3u8_url || '',
       sources: Array.isArray((r as any).sources) ? (r as any).sources : [],
     });
@@ -1400,6 +1403,17 @@ export default function Admin() {
             </div>
             <div><Label>Foto Kartu</Label><ImagePicker value={form.imageUrl} onChange={url => setForm(f => ({ ...f, imageUrl: url }))} /></div>
             <div><Label>Sandi *</Label><Input placeholder="Sandi untuk replay ini" value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} /></div>
+            <div>
+              <Label>Alias Admin <span className="text-xs text-muted-foreground">(rahasia, hanya admin)</span></Label>
+              <Input
+                placeholder="cth: aniv2024 — kode pendek untuk panggil di bot WhatsApp"
+                value={form.adminAlias}
+                onChange={e => setForm(f => ({ ...f, adminAlias: e.target.value.replace(/\s+/g, '') }))}
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Tidak ditampilkan ke pengguna. Bisa dipakai di bot: <code>/buattoken &lt;alias&gt;</code> atau <code>/tokensatuan &lt;alias&gt;</code>.
+              </p>
+            </div>
             <Button className="w-full" onClick={handleSaveReplay}>
               <Save className="w-4 h-4 mr-2" /> {editingReplay ? 'Simpan Perubahan' : 'Tambah Replay'}
             </Button>
