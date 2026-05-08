@@ -98,6 +98,18 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
     resetHideTimer();
   }, [resetHideTimer]);
 
+  const handleFrameLoaded = useCallback(() => {
+    markReady(true);
+    setIsPlaying(true);
+    // Browser autoplay is most reliable when embeds start muted. Show the same tap-to-unmute flow
+    // instead of reloading the iframe or leaving the user behind a loading overlay.
+    if (!mutedRef.current) {
+      mutedRef.current = true;
+      setMuted(true);
+      setShowHint(true);
+    }
+  }, [markReady]);
+
   useEffect(() => {
     resetHideTimer();
     return () => { if (hideTimerRef.current) clearTimeout(hideTimerRef.current); };
@@ -341,7 +353,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
           <iframe
             ref={iframeRef}
             src={ytEmbedUrl}
-            onLoad={() => { markReady(true); setIsPlaying(true); }}
+            onLoad={handleFrameLoaded}
             className="absolute inset-0 w-full h-full pointer-events-none"
             title={title}
             allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
@@ -358,7 +370,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
         <iframe
           ref={iframeRef}
           src={cfEmbedUrl}
-          onLoad={() => { setReady(true); setIsPlaying(true); }}
+          onLoad={handleFrameLoaded}
           className="absolute inset-0 w-full h-full pointer-events-none"
           title={title}
           allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
