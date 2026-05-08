@@ -297,20 +297,20 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
   const changeVolume = (e: React.ChangeEvent<HTMLInputElement>) => {
     const v = Number(e.target.value);
     setVolume(v);
+    volumeRef.current = v;
     try { localStorage.setItem(VOL_KEY, String(v)); } catch { /* ignore */ }
-    if (v > 0 && muted) { setMuted(false); try { localStorage.setItem(MUTED_KEY, '0'); } catch { /* ignore */ } }
+    if (v > 0 && muted) {
+      setMuted(false);
+      mutedRef.current = false;
+      userUnmutedRef.current = true;
+      setShowHint(false);
+      try { localStorage.setItem(MUTED_KEY, '0'); } catch { /* ignore */ }
+    }
     if (type === 'youtube') {
-      const p = ytPlayerRef.current;
-
-      if (!p || typeof p.setVolume !== 'function') {
-        if (v > 0 && iframeRef.current && ytId) {
-          iframeRef.current.src = `https://www.youtube-nocookie.com/embed/${ytId}?rel=0&modestbranding=1&playsinline=1&autoplay=1&mute=0&controls=0&fs=0&iv_load_policy=3&disablekb=1&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`;
-          setShowHint(false);
-        }
-        return;
-      }
-      p.setVolume(Math.round(v * 100));
-      if (v > 0) p.unMute();
+      withYtPlayer((p) => {
+        p.setVolume?.(Math.round(v * 100));
+        if (v > 0) p.unMute?.();
+      });
     } else {
       cfPost('setVolume', v);
     }
