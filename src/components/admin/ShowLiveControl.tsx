@@ -64,13 +64,46 @@ export default function ShowLiveControl({ showId, showTitle }: Props) {
 
   const addSource = () => {
     if (!newLabel.trim() || !newUrl.trim()) return;
-    setLiveSources(prev => [...prev, { label: newLabel.trim().slice(0, 80), type: newType, url: newUrl.trim() }]);
+    if (newType === 'youtube' && !parseYouTubeId(newUrl)) {
+      toast({ title: 'YouTube tidak valid', description: 'Format YouTube tidak dikenali. Periksa link/ID.', variant: 'destructive' });
+      return;
+    }
+    const url = newType === 'youtube' ? (parseYouTubeId(newUrl) || '') : newUrl.trim();
+    setLiveSources(prev => [...prev, { label: newLabel.trim().slice(0, 80), type: newType, url }]);
     setNewLabel(''); setNewUrl(''); setNewType('m3u8');
   };
 
   const removeSource = (i: number) => setLiveSources(prev => prev.filter((_, idx) => idx !== i));
 
   const save = async () => {
+    // Normalisasi YouTube ke ID 11 karakter & validasi
+    let normalizedLiveUrl = liveUrl.trim();
+    if (liveType === 'youtube' && normalizedLiveUrl) {
+      const id = parseYouTubeId(normalizedLiveUrl);
+      if (!id) {
+        toast({ title: 'YouTube tidak valid', description: 'Live URL Utama: format YouTube tidak dikenali.', variant: 'destructive' });
+        return;
+      }
+      normalizedLiveUrl = id;
+    }
+    let normalizedReplayYt = replayYt.trim();
+    if (normalizedReplayYt) {
+      const id = parseYouTubeId(normalizedReplayYt);
+      if (!id) {
+        toast({ title: 'YouTube tidak valid', description: 'Replay YouTube: format tidak dikenali.', variant: 'destructive' });
+        return;
+      }
+      normalizedReplayYt = id;
+    }
+    const normalizedSources = liveSources.map(s => s.type === 'youtube'
+      ? { ...s, url: parseYouTubeId(s.url) || s.url }
+      : s);
+    const invalidYt = liveSources.find(s => s.type === 'youtube' && s.url && !parseYouTubeId(s.url));
+    if (invalidYt) {
+      toast({ title: 'YouTube tidak valid', description: `Sumber "${invalidYt.label}" memiliki YouTube tidak dikenali.`, variant: 'destructive' });
+      return;
+    }
+
     setSaving(true);
     try {
       // Pastikan hanya satu show yang is_live = true
@@ -80,16 +113,19 @@ export default function ShowLiveControl({ showId, showTitle }: Props) {
       const { error } = await supabase.from('active_shows').update({
         is_live: isLive,
         live_auto_schedule: autoSchedule,
-        live_url: liveUrl.trim(),
+        live_url: normalizedLiveUrl,
         live_type: liveType,
-        live_sources: liveSources,
+        live_sources: normalizedSources,
         live_password: livePassword,
         live_require_password: requirePw,
         replay_mode: replayMode,
         replay_m3u8_url: replayM3u8.trim(),
-        replay_youtube_url: replayYt.trim(),
+        replay_youtube_url: normalizedReplayYt,
       } as any).eq('id', showId);
       if (error) throw error;
+      setLiveUrl(normalizedLiveUrl);
+      setReplayYt(normalizedReplayYt);
+      setLiveSources(normalizedSources);
       toast({ title: 'Pengaturan Live & Replay tersimpan' });
     } catch (e: any) {
       toast({ title: 'Gagal menyimpan', description: e.message, variant: 'destructive' });
