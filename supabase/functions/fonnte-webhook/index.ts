@@ -241,12 +241,18 @@ Deno.serve(async (req) => {
       const code = (parts[0] || '').toLowerCase();
       const label = parts.slice(1).join(' ').trim();
       if (!code) {
-        reply = 'ℹ️ Format: */tokensatuan <kode> [label]*\n_Kode = 8 karakter pertama ID replay._\nKetik */buattoken* untuk melihat daftar replay.';
+        reply = 'ℹ️ Format: */tokensatuan <kode|alias> [label]*\n_Kode = 8 karakter pertama ID replay, atau alias admin._\nKetik */buattoken* untuk melihat daftar replay.';
       } else {
-        const { data: matches } = await admin
-          .from('replays').select('id,title').ilike('id', `${code}%`).limit(2);
-        if (!matches?.length) reply = `❌ Replay dengan kode *${code}* tidak ditemukan.`;
-        else if (matches.length > 1) reply = `⚠️ Kode *${code}* ambigu. Gunakan kode lebih panjang.`;
+        const { data: byAlias } = await admin
+          .from('replays').select('id,title').ilike('admin_alias', code).limit(2);
+        let matches = byAlias ?? [];
+        if (!matches.length) {
+          const { data: byId } = await admin
+            .from('replays').select('id,title').ilike('id', `${code}%`).limit(2);
+          matches = byId ?? [];
+        }
+        if (!matches.length) reply = `❌ Replay dengan kode/alias *${code}* tidak ditemukan.`;
+        else if (matches.length > 1) reply = `⚠️ Kode *${code}* ambigu. Gunakan kode lebih panjang atau alias unik.`;
         else {
           const r = matches[0];
           const res = await callCreateToken({
