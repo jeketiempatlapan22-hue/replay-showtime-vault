@@ -8,6 +8,7 @@ interface Props {
   source: string; // youtube id or url, cloudflare uid
   title: string;
   watermark?: string;
+  hideSeekButtons?: boolean;
 }
 
 interface YoutubePlayerApi {
