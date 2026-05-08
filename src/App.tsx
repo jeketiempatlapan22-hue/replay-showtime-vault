@@ -15,6 +15,7 @@ import Live from "./pages/Live";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import Akses from "./pages/Akses";
+import Shows from "./pages/Shows";
 
 const queryClient = new QueryClient();
 
@@ -63,6 +64,7 @@ const App = () => (
               <Route path="/live" element={<Live />} />
               <Route path="/auth" element={<Auth />} />
               <Route path="/akses" element={<Akses />} />
+              <Route path="/shows" element={<Shows />} />
               <Route path="/adpan" element={<Admin />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
