@@ -136,6 +136,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
     setIsLiveStream(false);
     recoveryAttemptsRef.current = 0;
     isLiveRef.current = false;
+    initialLiveEdgeSyncRef.current = false;
     lastProgressRef.current = { time: 0, checkedAt: Date.now(), recoveries: 0 };
     if (stallWatchdogRef.current) clearInterval(stallWatchdogRef.current);
     let hls: Hls | null = null;
