@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Calendar, Clock, Tag, Users, Radio } from 'lucide-react';
+import { Calendar, Clock, Tag, Users, Radio, ShoppingCart, PlayCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import MemberAvatar from '@/components/MemberAvatar';
+import BuyShowDialog from '@/components/BuyShowDialog';
 import { type ActiveShow, getShowDateTime } from '@/lib/activeShows';
+import { useNavigate } from 'react-router-dom';
 
 const CATEGORY_LABELS: Record<string, string> = {
   reguler: 'Reguler', sts: 'STS', last_show: 'Last Show', aniv: 'Anniversary', special: 'Show Spesial',
