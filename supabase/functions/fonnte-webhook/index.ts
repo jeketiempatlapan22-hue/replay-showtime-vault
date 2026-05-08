@@ -262,7 +262,7 @@ Deno.serve(async (req) => {
       }
     }
   }
-  }
+
 
   await sendFonnte(phoneNorm, reply || '✅ OK');
   await admin.from('wa_outbox').insert({
