@@ -31,20 +31,40 @@ Deno.serve(async (req) => {
       const autoOn = show.live_auto_schedule && nowMs >= startMs && nowMs <= startMs + 8 * 3600 * 1000;
       const enabled = !!show.is_live || !!autoOn;
 
-      if (show.live_require_password) {
-        if (!password) return json({ valid: false, reason: "password_or_token_required" });
-        if (!show.live_password || show.live_password !== password) return json({ valid: false, reason: "bad_password" });
-      }
-
-      return json({
+      const okPayload = {
         valid: true,
         enabled,
         title: show.title,
         type: show.live_type || "m3u8",
         url: show.live_url || "",
         sources: Array.isArray(show.live_sources) ? show.live_sources : [],
+        show_date: show.show_date,
+        show_time: show.show_time,
         watermark: `RT-${String(show.id).slice(0, 4).toUpperCase()}`,
-      });
+      };
+
+      // Token-based unlock for this show
+      if (token) {
+        const { data: t } = await supabase
+          .from("active_show_tokens").select("*").eq("token", token).eq("show_id", show_id).maybeSingle();
+        if (!t || t.revoked) return json({ valid: false, reason: "revoked" });
+        if (!browser_id) return json({ valid: false, reason: "no_device" });
+        const { data: existing } = await supabase
+          .from("active_show_token_devices").select("id").eq("token_id", t.id).eq("browser_id", browser_id).maybeSingle();
+        if (!existing) {
+          const { count } = await supabase
+            .from("active_show_token_devices").select("id", { count: "exact", head: true }).eq("token_id", t.id);
+          if ((count || 0) >= t.max_devices) return json({ valid: false, reason: "device_limit" });
+          await supabase.from("active_show_token_devices").insert({ token_id: t.id, browser_id });
+        }
+        return json({ ...okPayload, watermark: `RT-${String(token).slice(-4).toUpperCase()}` });
+      }
+
+      if (show.live_require_password) {
+        if (!password) return json({ valid: false, reason: "password_or_token_required" });
+        if (!show.live_password || show.live_password !== password) return json({ valid: false, reason: "bad_password" });
+      }
+      return json(okPayload);
     }
 
     // ===== Branch B: legacy live_config_private =====
