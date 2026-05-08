@@ -90,10 +90,10 @@ export default function Live() {
         const cfg: UnlockedConfig = { title: data.title, type: data.type, url: data.url, sources: Array.isArray(data.sources) ? data.sources : [], watermark: data.watermark || '', enabled: !!data.enabled };
         setUnlocked(cfg);
         setKickedMsg('');
-        try { sessionStorage.setItem(SS_KEY, JSON.stringify(cfg)); } catch { /* ignore */ }
+        try { sessionStorage.setItem(`${SS_KEY_BASE}${showId?'-'+showId:''}`, JSON.stringify(cfg)); } catch { /* ignore */ }
       } else if (silent) {
         setUnlocked(null);
-        try { sessionStorage.removeItem(SS_KEY); } catch { /* ignore */ }
+        try { sessionStorage.removeItem(`${SS_KEY_BASE}${showId?'-'+showId:''}`); } catch { /* ignore */ }
         setKickedMsg('Akses Anda telah dicabut oleh admin.');
       } else {
         if (data?.reason === 'device_limit') setPwError('Batas perangkat untuk token ini telah tercapai.');
@@ -110,7 +110,7 @@ export default function Live() {
   useEffect(() => {
     fetchStatus();
     try {
-      const cached = sessionStorage.getItem(SS_KEY);
+      const cached = sessionStorage.getItem(`${SS_KEY_BASE}${showId?'-'+showId:''}`);
       if (cached) setUnlocked(JSON.parse(cached));
     } catch { /* ignore */ }
 
