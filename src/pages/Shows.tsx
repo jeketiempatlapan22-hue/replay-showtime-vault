@@ -12,6 +12,26 @@ export default function Shows() {
   const navigate = useNavigate();
   const [shows, setShows] = useState<ActiveShow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [waNumber, setWaNumber] = useState('');
+  const [waLink, setWaLink] = useState('');
+  const [lightMode, setLightMode] = useState(() => { try { return localStorage.getItem('replaytime-mode') === 'light'; } catch { return false; } });
+
+  useEffect(() => {
+    try {
+      const root = document.documentElement;
+      root.classList.toggle('light', lightMode);
+      localStorage.setItem('replaytime-mode', lightMode ? 'light' : 'dark');
+    } catch { /* ignore */ }
+  }, [lightMode]);
+
+  useEffect(() => {
+    supabase.from('site_settings').select('key,value').then(({ data }) => {
+      const s: Record<string, string> = {};
+      (data || []).forEach((r: any) => { s[r.key] = r.value; });
+      setWaNumber(s.whatsapp_number || '');
+      setWaLink(s.whatsapp_link || '');
+    });
+  }, []);
 
   useEffect(() => {
     let mounted = true;
