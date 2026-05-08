@@ -9,6 +9,7 @@ interface Props {
   title: string;
   watermark?: string;
   hideSeekButtons?: boolean;
+  isLive?: boolean;
 }
 
 interface YoutubePlayerApi {
