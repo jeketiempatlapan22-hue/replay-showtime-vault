@@ -75,7 +75,7 @@ export default function CommentSection({ replayId }: CommentSectionProps) {
       .eq('replay_id', replayId)
       .order('created_at', { ascending: false })
       .limit(30);
-    if (data) setComments([...data].reverse());
+    if (data) setComments(data);
   };
 
   useEffect(() => {
@@ -85,8 +85,8 @@ export default function CommentSection({ replayId }: CommentSectionProps) {
       .channel(`comments-${replayId}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'comments', filter: `replay_id=eq.${replayId}` }, (payload) => {
         setComments(prev => {
-          const next = [...prev, payload.new as Comment];
-          return next.length > 30 ? next.slice(next.length - 30) : next;
+          const next = [payload.new as Comment, ...prev];
+          return next.length > 30 ? next.slice(0, 30) : next;
         });
       })
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'comments', filter: `replay_id=eq.${replayId}` }, (payload) => {
