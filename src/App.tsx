@@ -15,6 +15,7 @@ import Live from "./pages/Live";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import Akses from "./pages/Akses";
+import Shows from "./pages/Shows";
 
 const queryClient = new QueryClient();
 
