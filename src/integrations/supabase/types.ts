@@ -86,6 +86,42 @@ export type Database = {
         }
         Relationships: []
       }
+      bot_commands: {
+        Row: {
+          created_at: string
+          description: string
+          enabled: boolean
+          id: string
+          is_dynamic: boolean
+          response_template: string
+          sort_order: number
+          trigger: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string
+          enabled?: boolean
+          id?: string
+          is_dynamic?: boolean
+          response_template?: string
+          sort_order?: number
+          trigger: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          enabled?: boolean
+          id?: string
+          is_dynamic?: boolean
+          response_template?: string
+          sort_order?: number
+          trigger?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       comments: {
         Row: {
           created_at: string
@@ -315,6 +351,60 @@ export type Database = {
         }
         Relationships: []
       }
+      orders: {
+        Row: {
+          access_token: string | null
+          amount: number
+          created_at: string
+          id: string
+          item_title: string
+          paid_at: string | null
+          pakasir_order_id: string | null
+          pakasir_qr_url: string
+          replay_id: string | null
+          show_id: string | null
+          status: string
+          token_sent_at: string | null
+          updated_at: string
+          user_id: string | null
+          user_phone: string
+        }
+        Insert: {
+          access_token?: string | null
+          amount?: number
+          created_at?: string
+          id?: string
+          item_title?: string
+          paid_at?: string | null
+          pakasir_order_id?: string | null
+          pakasir_qr_url?: string
+          replay_id?: string | null
+          show_id?: string | null
+          status?: string
+          token_sent_at?: string | null
+          updated_at?: string
+          user_id?: string | null
+          user_phone: string
+        }
+        Update: {
+          access_token?: string | null
+          amount?: number
+          created_at?: string
+          id?: string
+          item_title?: string
+          paid_at?: string | null
+          pakasir_order_id?: string | null
+          pakasir_qr_url?: string
+          replay_id?: string | null
+          show_id?: string | null
+          status?: string
+          token_sent_at?: string | null
+          updated_at?: string
+          user_id?: string | null
+          user_phone?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
@@ -475,6 +565,47 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      wa_outbox: {
+        Row: {
+          created_at: string
+          error: string | null
+          fonnte_response: Json | null
+          id: string
+          message: string
+          phone: string
+          related_order_id: string | null
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          error?: string | null
+          fonnte_response?: Json | null
+          id?: string
+          message: string
+          phone: string
+          related_order_id?: string | null
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          error?: string | null
+          fonnte_response?: Json | null
+          id?: string
+          message?: string
+          phone?: string
+          related_order_id?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wa_outbox_related_order_id_fkey"
+            columns: ["related_order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
