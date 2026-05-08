@@ -35,6 +35,23 @@ async function sha1(input: string) {
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
+async function callCreateToken(payload: Record<string, unknown>): Promise<{ ok: boolean; message?: string; error?: string }> {
+  const url = `${Deno.env.get('SUPABASE_URL')}/functions/v1/create-token`;
+  const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok || !j.ok) return { ok: false, error: j.error || `http_${res.status}` };
+    return { ok: true, message: j.message };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : 'fetch_failed' };
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'POST') return new Response('ok', { headers: corsHeaders });
