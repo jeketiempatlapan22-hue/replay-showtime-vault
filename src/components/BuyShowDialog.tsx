@@ -129,10 +129,11 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
       const { data, error } = await supabase.functions.invoke('create-pakasir-order', {
         body: {
           phone: norm,
-          show_id: showId,
-          replay_id: replayId || null,
+          show_id: kind === 'replay_only' ? undefined : showId,
+          replay_id: replayId || undefined,
           item_title: itemTitle,
           amount,
+          kind,
         },
       });
       if (error) throw error;
