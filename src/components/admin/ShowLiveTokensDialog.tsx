@@ -57,6 +57,17 @@ export default function ShowLiveTokensDialog({ open, onOpenChange, showId, showT
     }
     setTokens((list ?? []) as Token[]);
     setDevices(grouped);
+    // Load block status for all browser_ids in devices
+    const allBids = Array.from(new Set(Object.values(grouped).flat().map(d => d.browser_id)));
+    const blkMap: Record<string, boolean> = {};
+    if (allBids.length) {
+      const { data: blks } = await supabase
+        .from('blocked_browsers')
+        .select('browser_id,unblocked')
+        .in('browser_id', allBids);
+      (blks ?? []).forEach((b: any) => { blkMap[b.browser_id] = !b.unblocked; });
+    }
+    setBlocked(blkMap);
     setLoading(false);
   };
 
