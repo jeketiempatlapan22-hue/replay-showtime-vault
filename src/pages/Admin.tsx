@@ -1319,6 +1319,7 @@ export default function Admin() {
                       value={s.url}
                       onChange={e => setForm(f => ({ ...f, sources: f.sources.map((x, i) => i === idx ? { ...x, url: e.target.value } : x) }))} />
                   )}
+                </div>
               ))}
             </div>
 
