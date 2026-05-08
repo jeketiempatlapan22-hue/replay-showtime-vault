@@ -25,7 +25,7 @@ export default function LiveWatermark({ code }: Props) {
       <span
         className="text-[10px] sm:text-xs md:text-sm font-mono font-bold tracking-wider whitespace-nowrap"
         style={{
-          color: 'rgba(255,255,255,0.35)',
+          color: 'rgba(255,255,255,0.30)',
           textShadow: '0 1px 3px rgba(0,0,0,0.9), 0 0 6px rgba(0,0,0,0.6)',
         }}
       >
