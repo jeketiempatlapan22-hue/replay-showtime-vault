@@ -6,6 +6,12 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const json = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
+
 function normalizePhone(raw: string) {
   const d = String(raw).replace(/\D/g, '');
   if (!d) return '';
@@ -13,16 +19,23 @@ function normalizePhone(raw: string) {
   return d;
 }
 
-async function sendFonnte(phone: string, message: string) {
+async function sendFonnte(phone: string, message: string): Promise<{ ok: boolean; data?: unknown; error?: string }> {
   const token = Deno.env.get('FONNTE_TOKEN');
-  if (!token) return;
+  if (!token) return { ok: false, error: 'FONNTE_TOKEN not configured' };
   const form = new FormData();
   form.append('target', normalizePhone(phone));
   form.append('message', message);
   form.append('countryCode', '62');
-  await fetch('https://api.fonnte.com/send', {
-    method: 'POST', headers: { Authorization: token }, body: form,
-  }).catch(() => null);
+  try {
+    const res = await fetch('https://api.fonnte.com/send', {
+      method: 'POST', headers: { Authorization: token }, body: form,
+    });
+    const data = await res.json().catch(() => ({}));
+    const ok = res.ok && (data as { status?: boolean })?.status !== false;
+    return { ok, data, error: ok ? undefined : JSON.stringify(data) };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : 'send_failed' };
+  }
 }
 
 function buildBaseUrl() {
@@ -49,6 +62,26 @@ async function callCreateToken(payload: Record<string, unknown>): Promise<{ ok: 
     return { ok: true, message: j.message };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : 'fetch_failed' };
+  }
+}
+
+async function isAuthorizedTestRequest(authHeader: string, admin: ReturnType<typeof createClient>) {
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+  const bearer = authHeader.replace(/^Bearer\s+/i, '');
+  if (bearer && bearer === serviceKey) return true;
+  if (!bearer) return false;
+
+  try {
+    const userClient = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const { data: claims } = await userClient.auth.getClaims(bearer);
+    const userId = claims?.claims?.sub;
+    if (!userId) return false;
+    const { data: isAdmin } = await admin.rpc('has_role', { _user_id: userId, _role: 'admin' });
+    return !!isAdmin;
+  } catch {
+    return false;
   }
 }
 
