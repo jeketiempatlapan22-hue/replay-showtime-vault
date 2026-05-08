@@ -44,7 +44,7 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
     if (!open) {
       setStatus('form');
       setOrderId(null);
-      setQrUrl('');
+      setQrUrl(''); setQrString(''); setQrDataUrl(''); setTotalPayment(0);
       setPakasirOrderId('');
       setAccessToken('');
       setCreatedAt(0);
