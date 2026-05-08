@@ -161,7 +161,8 @@ export default function Live() {
         try { sessionStorage.removeItem(`${SS_KEY_BASE}${showId?'-'+showId:''}`); } catch { /* ignore */ }
         setKickedMsg('Akses Anda telah dicabut oleh admin.');
       } else {
-        if (data?.reason === 'device_limit') setPwError('Batas perangkat untuk token ini telah tercapai.');
+        if (data?.reason === 'blocked') setPwError('Perangkat ini telah diblokir oleh admin.');
+        else if (data?.reason === 'device_limit') setPwError('Batas perangkat untuk token ini telah tercapai.');
         else if (data?.reason === 'bad_password') setPwError('Sandi salah.');
         else if (data?.reason === 'revoked') setPwError('Token tidak valid atau telah dicabut.');
         else setPwError('Gagal membuka akses live.');
