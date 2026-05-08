@@ -120,6 +120,7 @@ export default function Live() {
   const [submitting, setSubmitting] = useState(false);
   const [kickedMsg, setKickedMsg] = useState('');
   const [failedSourceKeys, setFailedSourceKeys] = useState<string[]>([]);
+  const [tokenInfo, setTokenInfo] = useState<{ kind: string; max_devices: number } | null>(null);
   const navVisible = useAutoHideOnInteraction(!!unlocked, 3000);
   const [sourceIdx, setSourceIdx] = useState<number>(() => {
     try { return Math.max(0, Number(sessionStorage.getItem(SS_SRC_KEY) || '0')); } catch { return 0; }
@@ -212,7 +213,7 @@ export default function Live() {
     if (!silent) { setSubmitting(true); setPwError(''); }
     try {
       const { data } = await supabase.functions.invoke('unlock-live', {
-        body: { ...opts, browser_id: getBrowserId(), show_id: showId || undefined },
+        body: { ...opts, browser_id: getBrowserId(), show_id: showId || undefined, silent },
       });
       if (data?.valid) {
         const cfg: UnlockedConfig = {
@@ -223,15 +224,29 @@ export default function Live() {
           watermark: data.watermark || '',
           enabled: !!data.enabled,
         };
-        setUnlocked(cfg);
+        // For silent revalidation with `soft:true` (multi-device token, slot full),
+        // do NOT overwrite existing player URL/sources to avoid remount; just keep alive.
+        if (silent && data.soft) {
+          // no-op on unlocked; keep current session
+        } else {
+          setUnlocked(cfg);
+          try { sessionStorage.setItem(`${SS_KEY_BASE}${showId?'-'+showId:''}`, JSON.stringify(cfg)); } catch { /* ignore */ }
+        }
         if (data.membership) setMembership(data.membership as MembershipInfo);
+        if (data.token_kind || data.max_devices) {
+          setTokenInfo({ kind: String(data.token_kind || 'personal'), max_devices: Number(data.max_devices || 1) });
+        }
         setKickedMsg('');
-        try { sessionStorage.setItem(`${SS_KEY_BASE}${showId?'-'+showId:''}`, JSON.stringify(cfg)); } catch { /* ignore */ }
       } else if (silent) {
-        setUnlocked(null);
-        setMembership(null);
-        try { sessionStorage.removeItem(`${SS_KEY_BASE}${showId?'-'+showId:''}`); } catch { /* ignore */ }
-        setKickedMsg('Akses Anda telah dicabut oleh admin.');
+        // Only kick on hard security reasons. Other transient/server errors must NOT log user out.
+        const reason = data?.reason;
+        if (reason === 'revoked' || reason === 'blocked') {
+          setUnlocked(null);
+          setMembership(null);
+          try { sessionStorage.removeItem(`${SS_KEY_BASE}${showId?'-'+showId:''}`); } catch { /* ignore */ }
+          setKickedMsg(reasonMessage(reason));
+        }
+        // device_limit / off / network: ignore silently — keep user inside.
       } else {
         setPwError(reasonMessage(data?.reason));
       }
@@ -485,12 +500,16 @@ export default function Live() {
               <p className="text-center text-[11px] text-muted-foreground">+62 888-0904-8431</p>
 
               <div className="pt-3 border-t border-border">
-                <Button type="button" variant="ghost" size="sm" className="w-full text-xs" onClick={handleSelfReset}>
-                  Reset perangkat membership saya
-                </Button>
-                <p className="text-[10px] text-muted-foreground text-center mt-1">
-                  Gunakan jika ingin pindah browser/device. Maks. 3x reset manual; otomatis reset tiap 00:00 WIB.
-                </p>
+                {(!tokenInfo || (tokenInfo.kind !== 'public' && tokenInfo.max_devices <= 1)) && (
+                  <>
+                    <Button type="button" variant="ghost" size="sm" className="w-full text-xs" onClick={handleSelfReset}>
+                      Reset perangkat membership saya
+                    </Button>
+                    <p className="text-[10px] text-muted-foreground text-center mt-1">
+                      Gunakan jika ingin pindah browser/device. Maks. 3x reset manual; otomatis reset tiap 00:00 WIB.
+                    </p>
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -525,9 +544,11 @@ export default function Live() {
                         Reset perangkat: <span className="font-mono text-foreground">{membership.resets_used}/{membership.resets_max}</span> terpakai · Sisa <span className="font-mono text-foreground">{membership.remaining}</span>
                       </div>
                     </div>
-                    <Button type="button" variant="outline" size="sm" onClick={handleSelfReset} disabled={membership.remaining <= 0}>
-                      Reset perangkat ini
-                    </Button>
+                    {(!tokenInfo || (tokenInfo.kind !== 'public' && tokenInfo.max_devices <= 1)) && (
+                      <Button type="button" variant="outline" size="sm" onClick={handleSelfReset} disabled={membership.remaining <= 0}>
+                        Reset perangkat ini
+                      </Button>
+                    )}
                   </div>
                 )}
 

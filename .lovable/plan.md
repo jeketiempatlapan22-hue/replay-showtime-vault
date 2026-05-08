@@ -1,53 +1,49 @@
 ## Tujuan
-1. Pulihkan tombol "Tap untuk aktifkan suara" + seek bar + tombol seek (±10 dtk) + durasi pada EmbedPlayer YouTube (replay & show aktif live).
-2. Klik di mana pun pada layar memunculkan navbar dan menyembunyikannya kembali setelah 3 detik.
-3. Responsif konsisten di mobile, PC, TV, dan proyektor — tidak ada tombol/UI yang terpotong.
-4. Embed YouTube/Cloudflare tampil mulus tanpa stuck "Menghubungkan…", lag, atau loncatan posisi.
 
-Tidak ada perubahan logika backend / verifikasi password / membership / RLS / edge functions.
+1. Untuk user yang membuka link dengan token publik atau token multi-device (`max_devices > 1`):
+   - Tidak menampilkan tombol "Reset perangkat" di halaman Live.
+   - Tidak pernah otomatis logout (kicked) saat polling revalidasi token tiap 60 detik, walau baris device-nya dihapus admin atau saat ada race condition.
+2. Live Chat: pesan terbaru selalu terlihat tanpa user perlu scroll. Untuk melihat chat lama, user scroll ke bawah secara manual.
 
----
+## Perubahan
 
-## Perubahan per file
+### A. Edge function — jangan kick token multi-device saat revalidasi senyap
 
-### `src/components/EmbedPlayer.tsx` (utama)
-Player iframe sudah dirender langsung, tapi hint suara dan seek bar hilang karena state `showHint` dan `duration` baru di-set setelah API YouTube siap. Perbaikan:
+**`supabase/functions/unlock-live/index.ts`**
+- Tambahkan parameter opsional `silent: boolean` di body request.
+- Pada cabang `active_show_tokens` (≈ baris 83–97) dan `live_tokens` (≈ baris 132–154):
+  - Jika `t.max_devices > 1` dan device belum terdaftar:
+    - Coba `insert` device baru.
+    - Bila kuota penuh DAN `silent === true` → kembalikan `valid: true` dengan flag `soft: true` (tidak meng-kick user yang sudah terhubung).
+    - Bila kuota penuh dan bukan silent (akses pertama) → tetap `device_limit` seperti sekarang.
+  - Token personal (`max_devices = 1`) tidak berubah.
+- Token revoked / blocked tetap menyebabkan logout (security tetap dijaga).
 
-- **Tap untuk aktifkan suara**: set `showHint=true` segera setelah `iframe.onLoad` saat `mutedRef.current === true` (autoplay paksa mute). Sembunyikan setelah user menekan tombol unmute.
-- **Toggle mute fallback**: Saat YT API belum siap, ubah `iframe.src` (mengganti param `mute=0/1`) — sudah ada, pastikan tetap mempertahankan `currentTime` dengan param `start=`.
-- **Seek bar & durasi**:
-  - Pertahankan polling `getDuration/getCurrentTime` (sudah ada). Tampilkan seek bar segera ketika `type==='youtube'` walau `duration===0` dengan placeholder `--:--` agar UI tidak "loncat" muncul belakangan.
-  - Pastikan tombol `SkipBack`/`SkipForward` tampil untuk YouTube replay (sudah ada via `hideSeekButtons`).
-- **Hapus state mati `useYoutubeFallback`** yang tidak pernah di-set true (mengecoh logika `togglePlay`/`toggleMute`).
-- **Auto-hide kontrol player**: tetap 3 dtk; hentikan `e.stopPropagation` pada wrapper kontrol — gunakan `pointer-events` yang lebih halus agar event `pointerdown` global (capture phase) tetap terdeteksi oleh `useAutoHideOnInteraction`.
-- **Responsivitas**: tambah `landscape:` dan breakpoint `xl:` agar tombol fullscreen/volume tidak terpotong; gunakan `gap-1 xs:gap-2`; volume slider hidden di < 360px.
+### B. Halaman Live — sembunyikan tombol reset & jangan tampilkan kicked
 
-### `src/components/HlsPlayer.tsx`
-- Audit: `e.stopPropagation` pada div control dihapus dari level pembungkus — biarkan tombol-tombolnya saja yang stopPropagation supaya klik area kosong tetap memicu autohide global.
-- Pastikan seek bar VOD tetap berfungsi (tidak diubah perilakunya), hanya bersihkan sedikit styling untuk layar TV (tinggi track 3px → 4px landscape, target tap min 44×44 px).
+**`src/pages/Live.tsx`**
+- Tambahkan state `tokenInfo` (kind, max_devices) yang diisi dari respons `unlock-live` (nilai baru `kind`, `max_devices` ikut dikirim balik dari edge function — non-sensitif).
+- Tombol "Reset perangkat membership saya" (≈ baris 488) dan "Reset perangkat ini" (≈ baris 528):
+  - Sembunyikan jika user mengakses lewat `?t=` (token link), bukan membership.
+  - Tetap tampil hanya saat `mtoken` membership aktif dan `max_devices = 1`.
+- `doUnlock(..., silent=true)` ikut mengirim flag `silent: true` ke edge function.
+- Pada hasil silent dengan `valid: false` namun `reason !== 'revoked'` dan `reason !== 'blocked'`: jangan set `kickedMsg`, jangan hapus `unlocked` — user tetap di dalam.
 
-### `src/hooks/useAutoHideOnInteraction.ts`
-- Tambahkan listener `click` selain `pointerdown` (capture+passive) agar perangkat TV/remote yang hanya mengirim event `click` ikut memicu navbar muncul.
-- Reset timer juga pada `touchstart` & `mousemove` (throttled 500ms).
+### C. Live Chat — pesan terbaru di atas, scroll bawah untuk history
 
-### `src/pages/Live.tsx` & `src/components/YouTubePlayer.tsx`
-- Tidak ubah logika; hanya pastikan kontainer player menggunakan `max-w-screen-2xl` + `w-full` + `aspect-video` agar di TV/proyektor (≥1920px) video memenuhi tanpa terpotong, dan pada mobile sempit (<360px) padding lateral berkurang menjadi `px-1`.
-- Pada `Live.tsx`, hapus `e.stopPropagation` pada wrapper status/info card supaya klik di area mana pun tetap memunculkan navbar.
+**`src/components/LiveChat.tsx`**
+- Pada `refresh()`: hilangkan `.reverse()` agar `messages` urut dari paling baru ke paling lama.
+- Realtime `INSERT`: prepend pesan baru → `[m, ...prev].slice(0, 30)`.
+- Pinned banner tetap di paling atas.
+- Daftar pesan menggunakan order normal (atas = terbaru). Container tetap scrollable; user scroll ke bawah untuk membaca chat lama.
+- Hapus efek auto-scroll ke bawah (tidak diperlukan lagi). Tambah efek ringan: bila scrollTop user ≤ 40px (sedang di atas), pastikan `scrollTop = 0` saat ada pesan baru, sehingga pesan terbaru selalu terlihat tanpa mengganggu user yang sedang membaca history.
 
-### `src/components/ActiveShowCard.tsx`
-- DialogContent inline player live: ubah ke `w-[calc(100vw-0.5rem)] sm:w-[calc(100vw-2rem)] max-w-[1600px]` + `max-h-[100dvh]` agar di TV tidak terpotong; tambah `aspect-video` pada wrapper player.
+## Catatan
 
----
-
-## Cara verifikasi
-- Buka `/live?show=…` (YouTube source) → player langsung tampil, "Tap untuk aktifkan suara" muncul, klik aktifkan suara, seek bar + tombol ±10s + durasi tampil setelah API ready (≤3 dtk).
-- Buka kartu Show Aktif yang sedang live (YouTube) di Index → player inline punya semua kontrol sama.
-- Klik area mana pun pada halaman saat menonton → navbar muncul, hilang 3 dtk kemudian.
-- Resize preview: 320, 414, 768, 1280, 1920, 2560 — tidak ada tombol terpotong.
-- Tidak ada error baru di console; status `200` untuk semua request.
-
-## Apa yang TIDAK diubah
-- Edge functions (`unlock-live`, `verify-password`, dst.)
-- Skema database / RLS
-- Logika membership, token, device-binding, atau viewer counter
-- HLS player engine (hls.js config)
+- Tidak ada perubahan skema database.
+- Field `kind` & `max_devices` token bukan rahasia; aman dikirim balik dari edge function untuk dipakai UI.
+- Verifikasi setelah implementasi:
+  1. Buka link token publik (`max_devices > 1`) di 2 device → tombol reset tidak muncul, kedua sesi tetap stabil >2 menit.
+  2. Admin hapus baris device dari token publik → user tidak terpental.
+  3. Live chat: kirim pesan dari device lain → muncul di atas tanpa harus scroll.
+  4. Scroll ke bawah di live chat → riwayat lama terlihat, posisi tidak terganggu saat ada pesan baru.

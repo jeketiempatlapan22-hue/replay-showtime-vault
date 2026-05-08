@@ -60,7 +60,8 @@ export default function LiveChat() {
       supabase.from('live_messages').select('*').eq('pinned', false).order('created_at', { ascending: false }).limit(30),
     ]);
     setPinned((pins || []) as Msg[]);
-    setMessages(((list || []) as Msg[]).reverse());
+    // Newest first — user sees latest without scrolling; scroll down for older messages.
+    setMessages(((list || []) as Msg[]));
   };
 
   useEffect(() => {
@@ -71,7 +72,7 @@ export default function LiveChat() {
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'live_messages' }, (payload) => {
         const m = payload.new as Msg;
         if (m.pinned) setPinned(prev => [m, ...prev.filter(x => x.id !== m.id)]);
-        else setMessages(prev => [...prev.filter(x => x.id !== m.id), m].slice(-30));
+        else setMessages(prev => [m, ...prev.filter(x => x.id !== m.id)].slice(0, 30));
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'live_messages' }, (payload) => {
         const m = payload.new as Msg;
@@ -91,9 +92,11 @@ export default function LiveChat() {
   useEffect(() => {
     const el = listRef.current;
     if (!el) return;
-    // Auto-scroll only if user is already near bottom; preserve position if scrolled up.
-    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
-    if (nearBottom) el.scrollTop = el.scrollHeight;
+    // Newest message is at the top. If user is near top, keep them pinned to top so
+    // the latest message is always visible. If they scrolled down to read older
+    // messages, don't disturb their position.
+    const nearTop = el.scrollTop < 40;
+    if (nearTop) el.scrollTop = 0;
   }, [messages.length]);
 
   // Rate limit per browser (client-side, anti-spam):
