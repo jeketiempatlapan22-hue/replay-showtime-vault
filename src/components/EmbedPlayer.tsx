@@ -146,6 +146,36 @@ export default function EmbedPlayer({ type, source, title, watermark }: Props) {
     return onFullscreenChange(onChange);
   }, []);
 
+  // Poll YT time/duration
+  useEffect(() => {
+    if (type !== 'youtube' || !ready) return;
+    const id = setInterval(() => {
+      const p = ytPlayerRef.current;
+      if (!p || seeking) return;
+      try {
+        const d = p.getDuration?.() || 0;
+        const t = p.getCurrentTime?.() || 0;
+        if (d && d !== duration) setDuration(d);
+        setCurrentTime(t);
+      } catch { /* ignore */ }
+    }, 500);
+    return () => clearInterval(id);
+  }, [ready, type, seeking, duration]);
+
+  const seekTo = (t: number) => {
+    const p = ytPlayerRef.current;
+    if (!p) return;
+    try { p.seekTo(Math.max(0, Math.min(duration || t, t)), true); setCurrentTime(t); } catch { /* ignore */ }
+  };
+  const skip = (delta: number) => seekTo((currentTime || 0) + delta);
+  const fmtTime = (s: number) => {
+    if (!isFinite(s) || s < 0) s = 0;
+    const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = Math.floor(s % 60);
+    const mm = String(m).padStart(h ? 2 : 1, '0');
+    const ss = String(sec).padStart(2, '0');
+    return h ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
+  };
+
   const toggleFullscreen = () => {
     if (!containerRef.current) return;
     if (!isFullscreenActive()) requestFs(containerRef.current);
