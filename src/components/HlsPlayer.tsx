@@ -305,6 +305,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
         const live = !!data.details?.live;
         isLiveRef.current = live;
         setIsLiveStream(live);
+        if (live) seekToLiveEdgeOnce(data.details?.edge);
         if (!live) {
           const vodDuration = typeof data.details?.totalduration === 'number' ? data.details.totalduration : video.duration;
           if (Number.isFinite(vodDuration) && vodDuration > 0) setDuration(vodDuration);
@@ -346,8 +347,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
 
           if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
             try {
-              // Resume from current position; for live, -1 jumps to live edge (not start)
-              hls?.startLoad(-1);
+              hls?.startLoad(isLiveRef.current ? -1 : resumePosition());
               if (wasPlaying) video.play().catch(() => {});
               return;
             } catch { /* ignore */ }
