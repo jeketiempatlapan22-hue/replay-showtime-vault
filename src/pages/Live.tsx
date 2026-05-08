@@ -152,23 +152,21 @@ export default function Live() {
               image_url: data.image_url || '',
             };
           });
-          // Pertahankan URL privat yang sudah aktif agar player tidak remount/loncat ke awal
-          // saat admin mengubah row. Tapi jika belum ada URL (mis. live baru saja diaktifkan)
-          // ATAU live baru transisi off→on, gunakan URL/sources dari tabel publik supaya
-          // player benar-benar mulai (active_shows.live_url & live_sources publik dapat dibaca).
+          // JANGAN PERNAH menimpa URL yang sudah aktif — itu akan me-remount player dan
+          // memutar video live dari awal. URL hanya diisi saat player belum punya URL sama
+          // sekali (mis. saat live baru saja diaktifkan dan unlocked belum membawa URL).
           const pubMain = (data.live_url || '').trim();
           const pubPrivSources = toPrivateSources(data.live_sources);
           setUnlocked(prev => {
             if (!prev) return prev;
-            const needsUrlRefresh = wasOff && enabled;
             const hasNoUrl = !prev.url && (prev.sources || []).length === 0;
             return {
               ...prev,
               enabled,
               title: data.title || prev.title,
               type: (data.live_type as SrcType) || prev.type,
-              url: (needsUrlRefresh || hasNoUrl) && pubMain ? pubMain : prev.url,
-              sources: (needsUrlRefresh || hasNoUrl) && pubPrivSources.length ? pubPrivSources : prev.sources,
+              url: hasNoUrl && pubMain ? pubMain : prev.url,
+              sources: hasNoUrl && pubPrivSources.length ? pubPrivSources : prev.sources,
             };
           });
           // When live just toggled on, silently re-call unlock to re-validate (token/blocked)
