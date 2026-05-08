@@ -105,15 +105,16 @@ export default function Admin() {
 
   // Active shows state
   const [activeShows, setActiveShows] = useState<ActiveShow[]>([]);
-  const [showForm, setShowForm] = useState<{ id?: string; title: string; show_date: string; show_time: string; lineup: string; category: string; description: string; image_url: string; sort_order: number; is_active: boolean }>({
+  const [showForm, setShowForm] = useState<{ id?: string; title: string; show_date: string; show_time: string; lineup: string; category: string; description: string; image_url: string; sort_order: number; is_active: boolean; price_show: number; price_replay: number; pakasir_amount: number; replay_id: string; replay_enabled: boolean }>({
     title: '', show_date: '', show_time: '19:00', lineup: '', category: 'reguler', description: '', image_url: '', sort_order: 0, is_active: true,
+    price_show: 0, price_replay: 0, pakasir_amount: 0, replay_id: '', replay_enabled: false,
   });
   const [showEditing, setShowEditing] = useState(false);
 
   const refreshActiveShows = () => getActiveShows(true).then(setActiveShows);
 
   const resetShowForm = () => {
-    setShowForm({ title: '', show_date: '', show_time: '19:00', lineup: '', category: 'reguler', description: '', image_url: '', sort_order: 0, is_active: true });
+    setShowForm({ title: '', show_date: '', show_time: '19:00', lineup: '', category: 'reguler', description: '', image_url: '', sort_order: 0, is_active: true, price_show: 0, price_replay: 0, pakasir_amount: 0, replay_id: '', replay_enabled: false });
     setShowEditing(false);
   };
 
@@ -134,6 +135,11 @@ export default function Admin() {
         image_url: showForm.image_url.trim(),
         sort_order: Number(showForm.sort_order) || 0,
         is_active: showForm.is_active,
+        price_show: Number(showForm.price_show) || 0,
+        price_replay: Number(showForm.price_replay) || 0,
+        pakasir_amount: Number(showForm.pakasir_amount) || 0,
+        replay_id: showForm.replay_id || null,
+        replay_enabled: showForm.replay_enabled,
       });
       toast({ title: showForm.id ? 'Show diperbarui' : 'Show ditambahkan' });
       resetShowForm();
@@ -148,6 +154,9 @@ export default function Admin() {
       id: s.id, title: s.title, show_date: s.show_date, show_time: s.show_time,
       lineup: s.lineup.join(', '), category: s.category, description: s.description,
       image_url: s.image_url, sort_order: s.sort_order, is_active: s.is_active,
+      price_show: s.price_show ?? 0, price_replay: s.price_replay ?? 0,
+      pakasir_amount: s.pakasir_amount ?? 0, replay_id: s.replay_id ?? '',
+      replay_enabled: s.replay_enabled ?? false,
     });
     setShowEditing(true);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -726,6 +735,36 @@ export default function Admin() {
                     <Switch checked={showForm.is_active} onCheckedChange={v => setShowForm({ ...showForm, is_active: v })} />
                     <span className="text-sm">Tampilkan di landing</span>
                   </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3 pt-2 border-t border-border/40">
+                  <div>
+                    <Label>Harga Show (Rp)</Label>
+                    <Input type="number" min={0} value={showForm.price_show} onChange={e => setShowForm({ ...showForm, price_show: Number(e.target.value) })} placeholder="0" />
+                  </div>
+                  <div>
+                    <Label>Harga Replay (Rp)</Label>
+                    <Input type="number" min={0} value={showForm.price_replay} onChange={e => setShowForm({ ...showForm, price_replay: Number(e.target.value) })} placeholder="0" />
+                  </div>
+                </div>
+                <div>
+                  <Label>Pakasir Amount (Rp) — nominal QRIS dinamis</Label>
+                  <Input type="number" min={0} value={showForm.pakasir_amount} onChange={e => setShowForm({ ...showForm, pakasir_amount: Number(e.target.value) })} placeholder="Misal: 25000" />
+                  <p className="text-[11px] text-muted-foreground mt-1">Kosongkan/0 untuk pakai harga di atas. Nominal aktual yang ditagihkan ke user.</p>
+                </div>
+                <div>
+                  <Label>Replay Terkait</Label>
+                  <select value={showForm.replay_id} onChange={e => setShowForm({ ...showForm, replay_id: e.target.value })}
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+                    <option value="">— Belum ada replay —</option>
+                    {replays.map(r => <option key={r.id} value={r.id}>{r.title} ({r.date})</option>)}
+                  </select>
+                </div>
+                <div className="flex items-center justify-between p-3 rounded-lg bg-secondary/40 border border-border">
+                  <div>
+                    <Label className="text-sm">Aktifkan Mode Replay</Label>
+                    <p className="text-[11px] text-muted-foreground">Saat ON, kartu show otomatis arahkan ke halaman replay terkait.</p>
+                  </div>
+                  <Switch checked={showForm.replay_enabled} onCheckedChange={v => setShowForm({ ...showForm, replay_enabled: v })} disabled={!showForm.replay_id} />
                 </div>
                 <div className="flex gap-2 pt-2">
                   <Button onClick={handleSaveShow} className="flex-1"><Save className="w-4 h-4 mr-2" />{showEditing ? 'Update' : 'Tambah'}</Button>

@@ -11,6 +11,11 @@ export interface ActiveShow {
   image_url: string;
   sort_order: number;
   is_active: boolean;
+  price_show: number;
+  price_replay: number;
+  pakasir_amount: number;
+  replay_id: string | null;
+  replay_enabled: boolean;
   created_at?: string;
   updated_at?: string;
 }
