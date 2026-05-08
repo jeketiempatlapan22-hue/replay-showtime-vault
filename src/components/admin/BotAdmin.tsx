@@ -18,6 +18,15 @@ type BotCommand = {
   sort_order: number;
 };
 
+type BotAdminRow = { id: string; phone: string; label: string; enabled: boolean };
+
+function normalizePhone(raw: string) {
+  const d = raw.replace(/\D/g, '');
+  if (!d) return '';
+  if (d.startsWith('0')) return '62' + d.slice(1);
+  return d;
+}
+
 export default function BotAdmin() {
   const [commands, setCommands] = useState<BotCommand[]>([]);
   const [loading, setLoading] = useState(true);
@@ -25,6 +34,9 @@ export default function BotAdmin() {
   const [testMsg, setTestMsg] = useState('Halo dari ReplayTime ✨');
   const [sending, setSending] = useState(false);
   const [copiedWebhook, setCopiedWebhook] = useState(false);
+  const [admins, setAdmins] = useState<BotAdminRow[]>([]);
+  const [newPhone, setNewPhone] = useState('');
+  const [newLabel, setNewLabel] = useState('');
 
   const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
   const fonnteWebhook = `https://${projectId}.supabase.co/functions/v1/fonnte-webhook`;
@@ -32,12 +44,35 @@ export default function BotAdmin() {
 
   const load = async () => {
     setLoading(true);
-    const { data } = await supabase.from('bot_commands').select('*').order('sort_order');
-    setCommands((data ?? []) as BotCommand[]);
+    const [{ data: cmds }, { data: ads }] = await Promise.all([
+      supabase.from('bot_commands').select('*').order('sort_order'),
+      supabase.from('bot_admins').select('*').order('created_at'),
+    ]);
+    setCommands((cmds ?? []) as BotCommand[]);
+    setAdmins((ads ?? []) as BotAdminRow[]);
     setLoading(false);
   };
 
   useEffect(() => { load(); }, []);
+
+  const addAdmin = async () => {
+    const phone = normalizePhone(newPhone);
+    if (!phone) { toast({ title: 'Nomor tidak valid', variant: 'destructive' }); return; }
+    const { error } = await supabase.from('bot_admins').insert({ phone, label: newLabel || '' });
+    if (error) toast({ title: 'Gagal', description: error.message, variant: 'destructive' });
+    else { setNewPhone(''); setNewLabel(''); load(); toast({ title: 'Admin bot ditambahkan' }); }
+  };
+
+  const toggleAdmin = async (a: BotAdminRow) => {
+    await supabase.from('bot_admins').update({ enabled: !a.enabled }).eq('id', a.id);
+    load();
+  };
+
+  const removeAdmin = async (id: string) => {
+    if (!confirm('Hapus admin bot ini?')) return;
+    await supabase.from('bot_admins').delete().eq('id', id);
+    load();
+  };
 
   const save = async (c: BotCommand) => {
     const { error } = await supabase.from('bot_commands').update({
