@@ -1330,7 +1330,7 @@ export default function Admin() {
                 </button>
               </div>
               {form.sourceType === 'youtube' ? (
-                <Input placeholder="YouTube ID (fallback)" value={form.youtubeId} onChange={e => setForm(f => ({ ...f, youtubeId: e.target.value }))} />
+                <YouTubeIdInput value={form.youtubeId} onChange={(v) => setForm(f => ({ ...f, youtubeId: v }))} placeholder="URL YouTube atau ID 11 karakter (fallback)" />
               ) : (
                 <Input placeholder="Link M3U8 (fallback)" value={form.m3u8Url} onChange={e => setForm(f => ({ ...f, m3u8Url: e.target.value }))} />
               )}
