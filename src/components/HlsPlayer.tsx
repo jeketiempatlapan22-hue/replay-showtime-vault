@@ -203,6 +203,13 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
       }, 4000);
     };
 
+    // Detect weak network → start bandwidth estimate low so ABR picks 360p/270p first
+    const conn = (navigator as Navigator & { connection?: { effectiveType?: string; downlink?: number; saveData?: boolean } }).connection;
+    const effective = conn?.effectiveType || '';
+    const downlink = typeof conn?.downlink === 'number' ? conn.downlink : 99;
+    const isWeak = /^(slow-2g|2g|3g)$/i.test(effective) || downlink < 1.5 || conn?.saveData === true;
+    const initialBwEstimate = isWeak ? 250_000 : 700_000;
+
     if (Hls.isSupported()) {
       hls = new Hls({
         enableWorker: true,
@@ -221,7 +228,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
         // ABR: mulai dari kualitas terendah supaya cepat play, lalu naikkan
         startLevel: -1,
         autoStartLoad: true,
-        abrEwmaDefaultEstimate: 700_000,
+        abrEwmaDefaultEstimate: initialBwEstimate,
         abrBandWidthFactor: 0.75,
         abrBandWidthUpFactor: 0.55,
         abrMaxWithRealBitrate: true,
