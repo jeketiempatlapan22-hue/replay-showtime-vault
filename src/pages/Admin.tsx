@@ -766,6 +766,9 @@ export default function Admin() {
                   </div>
                   <Switch checked={showForm.replay_enabled} onCheckedChange={v => setShowForm({ ...showForm, replay_enabled: v })} disabled={!showForm.replay_id} />
                 </div>
+                {showEditing && showForm.id && (
+                  <ShowLiveControl showId={showForm.id} showTitle={showForm.title} />
+                )}
                 <div className="flex gap-2 pt-2">
                   <Button onClick={handleSaveShow} className="flex-1"><Save className="w-4 h-4 mr-2" />{showEditing ? 'Update' : 'Tambah'}</Button>
                   {showEditing && <Button variant="outline" onClick={resetShowForm}>Batal</Button>}
