@@ -204,31 +204,20 @@ export default function Live() {
       if (cached) setUnlocked(JSON.parse(cached));
     } catch { /* ignore */ }
 
-    const cfgChannel = supabase.channel('live-config-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'live_config_private' }, () => { fetchStatus(); })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'active_shows', ...(showId ? { filter: `id=eq.${showId}` } : {}) }, () => { fetchStatus(); })
-      .subscribe();
+    // Scope realtime subscriptions narrowly to reduce server load with many concurrent users.
+    const tParam = search.get('t');
+    const bid = getBrowserId();
+    const cfgChannel = showId
+      ? supabase.channel(`live-cfg:${showId}`)
+          .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'active_shows', filter: `id=eq.${showId}` }, () => { fetchStatus(); })
+          .subscribe()
+      : supabase.channel('live-cfg:global')
+          .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'live_config_private' }, () => { fetchStatus(); })
+          .subscribe();
 
-    const tokChannel = supabase.channel('live-tokens-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'live_tokens' }, () => {
-        const t = search.get('t');
-        if (t) void doUnlock({ token: t }, true);
-      })
-      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'live_token_devices' }, () => {
-        const t = search.get('t');
-        if (t) void doUnlock({ token: t }, true);
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'active_show_tokens' }, () => {
-        const t = search.get('t');
-        if (t) void doUnlock({ token: t }, true);
-      })
-      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'active_show_token_devices' }, () => {
-        const t = search.get('t');
-        if (t) void doUnlock({ token: t }, true);
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'blocked_browsers', filter: `browser_id=eq.${getBrowserId()}` }, () => {
-        const t = search.get('t');
-        if (t) void doUnlock({ token: t }, true);
+    const tokChannel = supabase.channel(`live-blk:${bid}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'blocked_browsers', filter: `browser_id=eq.${bid}` }, () => {
+        if (tParam) void doUnlock({ token: tParam }, true);
         else if (unlocked) {
           setUnlocked(null);
           try { sessionStorage.removeItem(`${SS_KEY_BASE}${showId?'-'+showId:''}`); } catch { /* ignore */ }
@@ -237,7 +226,13 @@ export default function Live() {
       })
       .subscribe();
 
+    // Lightweight token revalidation: poll every 60s instead of subscribing to entire token tables.
+    const revalidate = window.setInterval(() => {
+      if (tParam && document.visibilityState === 'visible') void doUnlock({ token: tParam }, true);
+    }, 60000);
+
     return () => {
+      window.clearInterval(revalidate);
       supabase.removeChannel(cfgChannel);
       supabase.removeChannel(tokChannel);
     };
