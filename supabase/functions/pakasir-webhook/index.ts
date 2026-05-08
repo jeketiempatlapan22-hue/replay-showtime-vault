@@ -82,7 +82,7 @@ Deno.serve(async (req) => {
   const { data: settings } = await admin.from('site_settings').select('key,value').eq('key', 'site_origin').maybeSingle();
   const origin = settings?.value || '';
   const replayPart = order.replay_id ? `&replay=${order.replay_id}` : '';
-  const link = `${origin}/?token=${accessToken}${replayPart}`;
+  const link = `${origin}/akses?token=${accessToken}${replayPart}`;
 
   const message =
     `✅ *Pembayaran Berhasil*\n\n` +
@@ -94,6 +94,11 @@ Deno.serve(async (req) => {
   const sent = await sendFonnte(order.user_phone, message);
 
   await admin.from('orders').update({ token_sent_at: new Date().toISOString() }).eq('id', order.id);
+  await admin.from('token_deliveries').insert({
+    phone: order.user_phone, replay_id: order.replay_id, replay_title: order.item_title,
+    order_id: order.id, access_token: accessToken, link,
+    source: 'pakasir', requested_by: 'pakasir-webhook',
+  });
   await admin.from('wa_outbox').insert({
     phone: order.user_phone, message, status: sent.ok ? 'sent' : 'failed',
     error: sent.ok ? null : JSON.stringify(sent.data),
