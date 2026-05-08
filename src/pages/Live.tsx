@@ -45,7 +45,10 @@ function pad(n: number) { return String(n).padStart(2, '0'); }
 function ScheduleCountdown({ title, showDate, showTime, imageUrl }: { title: string; showDate?: string; showTime?: string; imageUrl?: string }) {
   const target = showDate && showTime ? new Date(`${showDate}T${showTime}`) : null;
   const [now, setNow] = useState(Date.now());
-  useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
+  useEffect(() => {
+    const t = setInterval(() => { if (document.visibilityState === 'visible') setNow(Date.now()); }, 1000);
+    return () => clearInterval(t);
+  }, []);
 
   const diff = target ? target.getTime() - now : 0;
   const past = !target || diff <= 0;
