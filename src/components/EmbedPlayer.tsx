@@ -269,7 +269,7 @@ export default function EmbedPlayer({ type, source, title, watermark }: Props) {
   };
 
   const ytEmbedUrl = ytId
-    ? `https://www.youtube-nocookie.com/embed/${ytId}?rel=0&modestbranding=1&playsinline=1&autoplay=1&controls=0&fs=0&iv_load_policy=3&disablekb=1&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`
+    ? `https://www.youtube-nocookie.com/embed/${ytId}?rel=0&modestbranding=1&playsinline=1&autoplay=1&mute=${muted || showHint || useYoutubeFallback ? 1 : 0}&controls=0&fs=0&iv_load_policy=3&disablekb=1&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`
     : '';
   const cfEmbedUrl = cfUid
     ? `https://iframe.videodelivery.net/${cfUid}?autoplay=true&controls=false&preload=auto&muted=${muted}`
