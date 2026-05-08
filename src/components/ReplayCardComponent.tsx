@@ -44,6 +44,7 @@ export default function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWa
   const [checking, setChecking] = useState(false);
   const [buyOpen, setBuyOpen] = useState(false);
   const [purchasedToken, setPurchasedToken] = useState<string>('');
+  const [imgLoaded, setImgLoaded] = useState(false);
 
   // Sync purchase state from localStorage
   useEffect(() => {
