@@ -285,10 +285,11 @@ export default function Live() {
                   : <EmbedPlayer key={`em-${safeIdx}-${activeSource.url}`} type={activeSource.type} source={activeSource.url} title={unlocked.title} watermark={unlocked.watermark} />}
               </>
             ) : (
-              <div className="rounded-2xl bg-card/60 border border-border p-6 text-center space-y-2">
-                <p className="text-sm font-semibold text-foreground">Live sedang OFF AIR</p>
-                <p className="text-xs text-muted-foreground">Akses Anda valid. Player akan muncul otomatis saat live aktif.</p>
-              </div>
+              <ScheduleCountdown
+                title={status?.title || unlocked.title || 'Live'}
+                showDate={status?.show_date}
+                showTime={status?.show_time}
+              />
             )}
 
             {/* LINEUP */}
