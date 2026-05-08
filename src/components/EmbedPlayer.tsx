@@ -212,6 +212,13 @@ export default function EmbedPlayer({ type, source, title, watermark }: Props) {
 
       {watermark && <LiveWatermark code={watermark} />}
 
+      {!ready && (
+        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-black/70 backdrop-blur-sm animate-fade-in pointer-events-none">
+          <div className="w-12 h-12 rounded-full border-4 border-white/20 border-t-primary animate-spin" />
+          <div className="text-white/90 text-xs font-medium tracking-wide">Menghubungkan ke pemutar…</div>
+        </div>
+      )}
+
       {showHint && (
         <button
           onClick={toggleMute}
