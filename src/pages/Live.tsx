@@ -258,6 +258,10 @@ export default function Live() {
     return [main, ...extras];
   }, [unlocked]);
 
+  useEffect(() => {
+    setFailedSourceKeys([]);
+  }, [unlocked?.url, unlocked?.sources]);
+
   const safeIdx = Math.min(sourceIdx, Math.max(0, allSources.length - 1));
   const activeSource = allSources[safeIdx];
   const sourceKey = (source: PrivateSource, index: number) => `${index}:${source.type}:${source.url}`;
@@ -368,7 +372,7 @@ export default function Live() {
             {liveActive && activeSource ? (
               <>
                 {activeSource.type === 'm3u8'
-                  ? <HlsPlayer key={`m3u8-${safeIdx}-${activeSource.url}`} src={activeSource.url} title={unlocked.title} watermark={unlocked.watermark} />
+                  ? <HlsPlayer key={`m3u8-${safeIdx}-${activeSource.url}`} src={activeSource.url} title={unlocked.title} watermark={unlocked.watermark} onFatalError={handleSourceFatalError} />
                   : <EmbedPlayer key={`em-${safeIdx}-${activeSource.url}`} type={activeSource.type} source={activeSource.url} title={unlocked.title} watermark={unlocked.watermark} />}
 
                 <div className="flex items-center justify-between flex-wrap gap-2 px-1">
