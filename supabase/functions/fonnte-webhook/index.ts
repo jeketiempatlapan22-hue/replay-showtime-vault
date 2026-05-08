@@ -610,7 +610,6 @@ Deno.serve(async (req) => {
       }
     }
   }
-  }
 
 
   const finalReply = reply || '✅ OK';
