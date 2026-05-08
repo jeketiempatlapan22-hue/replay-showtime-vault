@@ -22,17 +22,28 @@ function normalizePhone(raw: string) {
 async function sendFonnte(phone: string, message: string, inboxId = ''): Promise<{ ok: boolean; data?: unknown; error?: string }> {
   const token = Deno.env.get('FONNTE_TOKEN');
   if (!token) return { ok: false, error: 'FONNTE_TOKEN not configured' };
-  const form = new FormData();
-  form.append('target', normalizePhone(phone));
-  form.append('message', message);
-  form.append('countryCode', '62');
-  if (/^\d+$/.test(inboxId)) form.append('inboxid', inboxId);
+  const buildForm = (withInbox: boolean) => {
+    const form = new FormData();
+    form.append('target', normalizePhone(phone));
+    form.append('message', message);
+    form.append('countryCode', '62');
+    if (withInbox && /^\d+$/.test(inboxId)) form.append('inboxid', inboxId);
+    return form;
+  };
   try {
-    const res = await fetch('https://api.fonnte.com/send', {
-      method: 'POST', headers: { Authorization: token }, body: form,
+    let res = await fetch('https://api.fonnte.com/send', {
+      method: 'POST', headers: { Authorization: token }, body: buildForm(true),
     });
-    const data = await res.json().catch(() => ({}));
-    const ok = res.ok && (data as { status?: boolean })?.status !== false;
+    let data = await res.json().catch(() => ({}));
+    let ok = res.ok && (data as { status?: boolean })?.status !== false;
+    const reason = String((data as { reason?: string })?.reason || '').toLowerCase();
+    if (!ok && inboxId && (reason.includes('inbox') || reason.includes('body'))) {
+      res = await fetch('https://api.fonnte.com/send', {
+        method: 'POST', headers: { Authorization: token }, body: buildForm(false),
+      });
+      data = await res.json().catch(() => ({}));
+      ok = res.ok && (data as { status?: boolean })?.status !== false;
+    }
     return { ok, data, error: ok ? undefined : JSON.stringify(data) };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : 'send_failed' };
