@@ -91,7 +91,7 @@ export default function EmbedPlayer({ type, source, title, watermark }: Props) {
 
     const init = () => {
       if (cancelled || !ytMountRef.current) return;
-      const YT = (window as any).YT;
+      const YT = (window as YoutubeWindow).YT;
       if (!YT?.Player) { setTimeout(init, 200); return; }
       ytPlayerRef.current = new YT.Player(ytMountRef.current, {
         videoId: ytId,
@@ -134,7 +134,7 @@ export default function EmbedPlayer({ type, source, title, watermark }: Props) {
               }, 800);
             } catch { /* ignore */ }
           },
-          onStateChange: (e: any) => {
+          onStateChange: (e: { data: number }) => {
             setIsPlaying(e.data === 1);
           },
           onError: () => {
@@ -147,17 +147,18 @@ export default function EmbedPlayer({ type, source, title, watermark }: Props) {
       });
     };
 
-    if (!(window as any).YT) {
+    if (!(window as YoutubeWindow).YT) {
       const existing = document.querySelector('script[src="https://www.youtube.com/iframe_api"]');
       if (!existing) {
         const tag = document.createElement('script');
         tag.src = 'https://www.youtube.com/iframe_api';
         document.head.appendChild(tag);
       }
-      const prev = (window as any).onYouTubeIframeAPIReady;
-      (window as any).onYouTubeIframeAPIReady = () => { try { prev?.(); } catch { /* ignore */ } init(); };
+      const ytWindow = window as YoutubeWindow;
+      const prev = ytWindow.onYouTubeIframeAPIReady;
+      ytWindow.onYouTubeIframeAPIReady = () => { try { prev?.(); } catch { /* ignore */ } init(); };
       // Also poll in case API was already loading
-      const poll = setInterval(() => { if ((window as any).YT?.Player) { clearInterval(poll); init(); } }, 200);
+      const poll = setInterval(() => { if ((window as YoutubeWindow).YT?.Player) { clearInterval(poll); init(); } }, 200);
       setTimeout(() => clearInterval(poll), 10000);
     } else {
       init();
@@ -170,7 +171,7 @@ export default function EmbedPlayer({ type, source, title, watermark }: Props) {
   }, [ytId, type]);
 
   // Cloudflare via Stream SDK postMessage (basic play/pause/volume via iframe contentWindow)
-  const cfPost = (event: string, value?: any) => {
+  const cfPost = (event: string, value?: number) => {
     if (!iframeRef.current?.contentWindow) return;
     iframeRef.current.contentWindow.postMessage({ event: 'command', func: event, args: value !== undefined ? [value] : [] }, '*');
   };
