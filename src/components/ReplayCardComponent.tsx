@@ -35,11 +35,46 @@ function highlightText(text: string, query: string) {
   );
 }
 
+const REPLAY_DEFAULT_PRICE = 2000;
+
 export default function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWatch, onUnlockAndWatch, index = 0, isBookmarked, onToggleBookmark, searchQuery = '' }: Props) {
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [checking, setChecking] = useState(false);
+  const [buyOpen, setBuyOpen] = useState(false);
+  const [purchasedToken, setPurchasedToken] = useState<string>('');
+
+  // Sync purchase state from localStorage
+  useEffect(() => {
+    const refresh = () => {
+      const p = getReplayPurchase(replay.id);
+      setPurchasedToken(p?.token || '');
+    };
+    refresh();
+    window.addEventListener('storage', refresh);
+    window.addEventListener('focus', refresh);
+    window.addEventListener('replaytime-purchases-updated', refresh);
+    return () => {
+      window.removeEventListener('storage', refresh);
+      window.removeEventListener('focus', refresh);
+      window.removeEventListener('replaytime-purchases-updated', refresh);
+    };
+  }, [replay.id]);
+
+  const isPurchased = !!purchasedToken;
+
+  // After purchase, treat as unlocked & store token in sessionStorage so player can fetch source.
+  useEffect(() => {
+    if (isPurchased) {
+      try { sessionStorage.setItem(`replaytime-tok-${replay.id}`, purchasedToken); } catch { /* ignore */ }
+      if (!isUnlocked) onUnlock(replay.id);
+    }
+  }, [isPurchased, purchasedToken, replay.id, isUnlocked, onUnlock]);
+
+  const copyToken = async () => {
+    try { await navigator.clipboard.writeText(purchasedToken); toast({ title: 'Sandi disalin' }); } catch { /* ignore */ }
+  };
 
   const handleSubmitPassword = async () => {
     if (checking) return;
