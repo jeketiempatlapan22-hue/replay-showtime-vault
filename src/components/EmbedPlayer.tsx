@@ -28,6 +28,7 @@ const MUTED_KEY = 'replaytime-muted';
 export default function EmbedPlayer({ type, source, title, watermark }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const ytMountRef = useRef<HTMLDivElement>(null);
   const ytPlayerRef = useRef<any>(null);
   const [ready, setReady] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -44,31 +45,47 @@ export default function EmbedPlayer({ type, source, title, watermark }: Props) {
   const ytId = type === 'youtube' ? extractYoutubeId(source) : '';
   const cfUid = type === 'cloudflare' ? extractCloudflareUid(source) : '';
 
-  // YouTube IFrame API
+  // YouTube IFrame API — instantiate via div mount so YT injects an iframe sized 100% inside our container
   useEffect(() => {
     if (type !== 'youtube') { setReady(true); return; }
     if (!ytId) return;
     let cancelled = false;
 
     const init = () => {
-      if (cancelled || !iframeRef.current) return;
+      if (cancelled || !ytMountRef.current) return;
       const YT = (window as any).YT;
       if (!YT?.Player) { setTimeout(init, 200); return; }
-      ytPlayerRef.current = new YT.Player(iframeRef.current, {
+      ytPlayerRef.current = new YT.Player(ytMountRef.current, {
+        videoId: ytId,
+        width: '100%',
+        height: '100%',
+        host: 'https://www.youtube-nocookie.com',
+        playerVars: {
+          rel: 0, modestbranding: 1, playsinline: 1, autoplay: 1,
+          controls: 0, fs: 0, iv_load_policy: 3, disablekb: 1,
+          enablejsapi: 1, origin: window.location.origin,
+        },
         events: {
           onReady: () => {
             if (cancelled) return;
+            // Force injected iframe to fill container & block native clicks
+            try {
+              const ifr = ytPlayerRef.current?.getIframe?.();
+              if (ifr) {
+                ifr.setAttribute('style', 'position:absolute;inset:0;width:100%;height:100%;border:0;pointer-events:none;');
+                ifr.setAttribute('allow', 'autoplay; encrypted-media; picture-in-picture; fullscreen');
+                ifr.setAttribute('allowfullscreen', 'true');
+              }
+            } catch { /* ignore */ }
             setReady(true);
             try {
               ytPlayerRef.current.setVolume(Math.round(volume * 100));
               if (muted) ytPlayerRef.current.mute(); else ytPlayerRef.current.unMute();
-              const p = ytPlayerRef.current.playVideo();
-              // detect autoplay block
+              ytPlayerRef.current.playVideo();
               setTimeout(() => {
                 try {
                   const state = ytPlayerRef.current.getPlayerState();
                   if (state !== 1 && !muted) {
-                    // try muted autoplay fallback (do NOT persist forced mute)
                     ytPlayerRef.current.mute();
                     setMuted(true);
                     ytPlayerRef.current.playVideo();
@@ -81,15 +98,23 @@ export default function EmbedPlayer({ type, source, title, watermark }: Props) {
           onStateChange: (e: any) => {
             setIsPlaying(e.data === 1);
           },
+          onError: () => { /* swallow to avoid blank */ },
         },
       });
     };
 
     if (!(window as any).YT) {
-      const tag = document.createElement('script');
-      tag.src = 'https://www.youtube.com/iframe_api';
-      document.head.appendChild(tag);
-      (window as any).onYouTubeIframeAPIReady = init;
+      const existing = document.querySelector('script[src="https://www.youtube.com/iframe_api"]');
+      if (!existing) {
+        const tag = document.createElement('script');
+        tag.src = 'https://www.youtube.com/iframe_api';
+        document.head.appendChild(tag);
+      }
+      const prev = (window as any).onYouTubeIframeAPIReady;
+      (window as any).onYouTubeIframeAPIReady = () => { try { prev?.(); } catch { /* ignore */ } init(); };
+      // Also poll in case API was already loading
+      const poll = setInterval(() => { if ((window as any).YT?.Player) { clearInterval(poll); init(); } }, 200);
+      setTimeout(() => clearInterval(poll), 10000);
     } else {
       init();
     }
@@ -197,16 +222,20 @@ export default function EmbedPlayer({ type, source, title, watermark }: Props) {
       style={{ paddingBottom: isFullscreen ? '0' : '56.25%', height: isFullscreen ? '100%' : undefined }}
       onContextMenu={(e) => e.preventDefault()}
     >
-      <iframe
-        ref={iframeRef}
-        src={type === 'youtube' ? ytEmbedUrl : cfEmbedUrl}
-        className="absolute inset-0 w-full h-full pointer-events-none"
-        title={title}
-        allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
-        allowFullScreen
-        referrerPolicy="strict-origin-when-cross-origin"
-        style={{ border: 0 }}
-      />
+      {type === 'youtube' ? (
+        <div ref={ytMountRef} className="absolute inset-0 w-full h-full" />
+      ) : (
+        <iframe
+          ref={iframeRef}
+          src={cfEmbedUrl}
+          className="absolute inset-0 w-full h-full pointer-events-none"
+          title={title}
+          allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+          allowFullScreen
+          referrerPolicy="strict-origin-when-cross-origin"
+          style={{ border: 0 }}
+        />
+      )}
 
       {/* Anti-click overlay - covers entire iframe to block YouTube logo / Watch on YT button. Click does NOT toggle play. */}
       <div className="absolute inset-0" onClick={(e) => e.preventDefault()} />
