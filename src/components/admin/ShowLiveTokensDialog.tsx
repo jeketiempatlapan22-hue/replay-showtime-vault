@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import { Plus, Trash2, Copy, Ban, RotateCcw, Smartphone } from 'lucide-react';
+import { Plus, Trash2, Copy, Ban, RotateCcw, Smartphone, ShieldOff, ShieldCheck } from 'lucide-react';
 
 type Token = {
   id: string;
