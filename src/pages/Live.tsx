@@ -284,15 +284,23 @@ export default function Live() {
   const handleSelfReset = async () => {
     const mt = search.get('mtoken') || prompt('Masukkan token membership:') || '';
     if (!mt) return;
-    const mp = search.get('mp') || prompt('Masukkan sandi membership:') || '';
+    const mp = search.get('mp') || search.get('mpassword') || prompt('Masukkan sandi membership:') || '';
     if (!mp) return;
+    if (!confirm('Reset perangkat akan memutus akses dari perangkat lama dan menggunakan 1 kuota reset manual. Lanjutkan?')) return;
     try {
-      const { data } = await supabase.functions.invoke('membership-self-reset', { body: { mtoken: mt, mpassword: mp } });
+      const { data } = await supabase.functions.invoke('membership-self-reset', {
+        body: { mtoken: mt, mpassword: mp, browser_id: getBrowserId() },
+      });
       if (data?.ok) {
         setPwError('');
-        alert(`Perangkat berhasil direset. Sisa kuota reset: ${data.remaining}`);
+        if (typeof data.used === 'number' && typeof data.max === 'number') {
+          setMembership((prev) => prev ? { ...prev, resets_used: data.used, resets_max: data.max, remaining: data.remaining } : prev);
+        }
+        alert(`Perangkat berhasil direset. Sisa kuota reset manual: ${data.remaining}/${data.max}.`);
+        // Re-unlock with new device
+        void doUnlock({ mtoken: mt, mpassword: mp });
       } else {
-        alert(`Reset gagal: ${data?.reason || 'unknown'}`);
+        alert(`Reset gagal: ${reasonMessage(data?.reason)}`);
       }
     } catch {
       alert('Gagal terhubung ke server.');
