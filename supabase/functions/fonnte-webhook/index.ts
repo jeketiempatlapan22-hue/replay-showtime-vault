@@ -158,21 +158,23 @@ Deno.serve(async (req) => {
   }
 
   // Fonnte sends as multipart/form-data, x-www-form-urlencoded, or json
-  let phone = '', text = '', device = '', fromMe = false, deliverTest = false;
+  let phone = '', text = '', device = '', inboxId = '', fromMe = false, deliverTest = false;
   try {
     const ct = req.headers.get('content-type') || '';
     if (ct.includes('application/json')) {
-      const j = await req.json();
-      phone = String(j.sender ?? j.from ?? '');
-      device = String(j.device ?? '');
-      text = String(j.message ?? j.text ?? '').trim();
+      const j = pickWebhookPayload(await req.json());
+      phone = String(j.sender ?? j.from ?? j.phone ?? j.target ?? '');
+      device = String(j.device ?? j.device_number ?? '');
+      text = String(j.message ?? j.text ?? j.body ?? j.caption ?? '').trim();
+      inboxId = String(j.inboxid ?? j.inbox_id ?? j.id ?? '');
       fromMe = j.fromMe === true || j.fromMe === 'true' || j.from_me === true;
       deliverTest = j.deliver === true || j.deliver === 'true' || j.test_deliver === true;
     } else {
       const fd = await req.formData();
-      phone = String(fd.get('sender') ?? fd.get('from') ?? '');
-      device = String(fd.get('device') ?? '');
-      text = String(fd.get('message') ?? fd.get('text') ?? '').trim();
+      phone = String(fd.get('sender') ?? fd.get('from') ?? fd.get('phone') ?? fd.get('target') ?? '');
+      device = String(fd.get('device') ?? fd.get('device_number') ?? '');
+      text = String(fd.get('message') ?? fd.get('text') ?? fd.get('body') ?? fd.get('caption') ?? '').trim();
+      inboxId = String(fd.get('inboxid') ?? fd.get('inbox_id') ?? fd.get('id') ?? '');
       fromMe = String(fd.get('fromMe') ?? fd.get('from_me') ?? '') === 'true';
       deliverTest = String(fd.get('deliver') ?? fd.get('test_deliver') ?? '') === 'true';
     }
@@ -184,9 +186,23 @@ Deno.serve(async (req) => {
 
   const phoneNorm = normalizePhone(phone);
   const deviceNorm = normalizePhone(device);
+  const commandPreview = text.toLowerCase().split(/\s+/)[0] || '';
+
+  await logBotEvent(admin, {
+    phone: phoneNorm,
+    device: deviceNorm,
+    message: text,
+    command: commandPreview,
+    inboxId,
+    fromMe,
+    eventName: 'received',
+  });
 
   // Only process commands starting with '/' — silently ignore other chatter
-  if (!text.startsWith('/')) return debug('not_a_command', { phone: phoneNorm, text });
+  if (!text.startsWith('/')) {
+    await logBotEvent(admin, { phone: phoneNorm, device: deviceNorm, message: text, command: commandPreview, inboxId, fromMe, eventName: 'ignored_not_command' });
+    return debug('not_a_command', { phone: phoneNorm, text });
+  }
 
   // Anti-loop: ignore echoes, but still allow slash commands from the device owner/self chat.
   if (!testMode && fromMe && !text.startsWith('/')) return new Response('ok', { headers: corsHeaders });
