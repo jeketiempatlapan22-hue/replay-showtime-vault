@@ -122,7 +122,39 @@ export default function ActiveShowCard({ show, index = 0 }: { show: ActiveShow; 
             </>
           )}
         </div>
+
+        {/* Action buttons */}
+        <div className="pt-2 space-y-2">
+          {replayMode ? (
+            replayPriced ? (
+              <Button className="w-full gap-2" onClick={() => openBuy('replay')}>
+                <PlayCircle className="w-4 h-4" />
+                Tonton Replay · Rp {show.price_replay.toLocaleString('id-ID')}
+              </Button>
+            ) : (
+              <Button className="w-full gap-2" variant="secondary" onClick={goReplay}>
+                <PlayCircle className="w-4 h-4" />
+                Tonton Replay
+              </Button>
+            )
+          ) : showPriced ? (
+            <Button className="w-full gap-2" onClick={() => openBuy('show')}>
+              <ShoppingCart className="w-4 h-4" />
+              Beli Show · Rp {show.price_show.toLocaleString('id-ID')}
+            </Button>
+          ) : null}
+        </div>
       </div>
+
+      <BuyShowDialog
+        open={buyOpen}
+        onOpenChange={setBuyOpen}
+        showId={show.id}
+        showTitle={show.title}
+        amount={show.pakasir_amount}
+        itemTitle={buyMode === 'replay' ? `Replay: ${show.title}` : `Show: ${show.title}`}
+        replayId={buyMode === 'replay' ? show.replay_id : null}
+      />
     </div>
   );
 }
