@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react';
-import { Calendar, Clock, Tag, Users, Radio, ShoppingCart, PlayCircle } from 'lucide-react';
+import { Calendar, Clock, Tag, Users, Radio, ShoppingCart, PlayCircle, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 import MemberAvatar from '@/components/MemberAvatar';
 import BuyShowDialog from '@/components/BuyShowDialog';
+import HlsPlayer from '@/components/HlsPlayer';
+import EmbedPlayer from '@/components/EmbedPlayer';
 import { type ActiveShow, getShowDateTime } from '@/lib/activeShows';
 import { useNavigate } from 'react-router-dom';
 
@@ -34,15 +37,28 @@ export default function ActiveShowCard({ show, index = 0 }: { show: ActiveShow; 
   const navigate = useNavigate();
   const [buyOpen, setBuyOpen] = useState(false);
   const [buyMode, setBuyMode] = useState<'show' | 'replay'>('show');
+  const [inlinePlayerOpen, setInlinePlayerOpen] = useState(false);
   const formattedDate = target.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
   const formattedTime = `${pad(target.getHours())}:${pad(target.getMinutes())} WIB`;
 
-  const replayMode = show.replay_enabled && !!show.replay_id;
+  // Replay routing: prefer inline replay_mode (m3u8/youtube), else legacy replay_id route
+  const inlineReplay = !!show.replay_mode && (!!show.replay_m3u8_url || !!show.replay_youtube_url);
+  const replayMode = inlineReplay || (show.replay_enabled && !!show.replay_id);
   const showPriced = (show.price_show || 0) > 0 && (show.pakasir_amount || 0) > 0;
   const replayPriced = (show.price_replay || 0) > 0 && (show.pakasir_amount || 0) > 0;
 
+  // LIVE detection
+  const startMs = target.getTime();
+  const nowMs = Date.now();
+  const autoLive = !!show.live_auto_schedule && nowMs >= startMs && nowMs <= startMs + 8 * 3600 * 1000;
+  const isLiveNow = !!show.is_live || autoLive;
+
   const openBuy = (mode: 'show' | 'replay') => { setBuyMode(mode); setBuyOpen(true); };
-  const goReplay = () => { if (show.replay_id) navigate(`/replay/${show.replay_id}`); };
+  const goReplay = () => {
+    if (inlineReplay) { setInlinePlayerOpen(true); return; }
+    if (show.replay_id) navigate(`/replay/${show.replay_id}`);
+  };
+  const goLive = () => navigate(`/live?show=${show.id}`);
 
   return (
     <div
@@ -55,7 +71,7 @@ export default function ActiveShowCard({ show, index = 0 }: { show: ActiveShow; 
           <div className="absolute top-2 left-2">
             <Badge variant="secondary" className="text-xs">{CATEGORY_LABELS[show.category] || show.category}</Badge>
           </div>
-          {cd.live && (
+          {(isLiveNow || cd.live) && (
             <div className="absolute top-2 right-2">
               <Badge className="bg-red-600 text-white border-0 gap-1 animate-pulse">
                 <Radio className="w-3 h-3" /> LIVE
@@ -125,6 +141,11 @@ export default function ActiveShowCard({ show, index = 0 }: { show: ActiveShow; 
 
         {/* Action buttons */}
         <div className="pt-2 space-y-2">
+          {isLiveNow && (
+            <Button className="w-full gap-2 bg-red-600 hover:bg-red-700 text-white" onClick={goLive}>
+              <Radio className="w-4 h-4" /> Tonton Live
+            </Button>
+          )}
           {replayMode ? (
             replayPriced ? (
               <Button className="w-full gap-2" onClick={() => openBuy('replay')}>
@@ -145,6 +166,22 @@ export default function ActiveShowCard({ show, index = 0 }: { show: ActiveShow; 
           ) : null}
         </div>
       </div>
+
+      {/* Inline replay player dialog */}
+      {inlineReplay && (
+        <Dialog open={inlinePlayerOpen} onOpenChange={setInlinePlayerOpen}>
+          <DialogContent className="max-w-4xl p-0 overflow-hidden bg-black border-border">
+            <button onClick={() => setInlinePlayerOpen(false)} className="absolute top-2 right-2 z-50 w-8 h-8 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80">
+              <X className="w-4 h-4" />
+            </button>
+            {show.replay_m3u8_url
+              ? <HlsPlayer src={show.replay_m3u8_url} title={show.title} />
+              : show.replay_youtube_url
+                ? <EmbedPlayer type="youtube" source={show.replay_youtube_url} title={show.title} />
+                : null}
+          </DialogContent>
+        </Dialog>
+      )}
 
       <BuyShowDialog
         open={buyOpen}

@@ -17,7 +17,7 @@ interface PrivateSource extends PublicSource { url: string }
 interface LiveStatus { enabled: boolean; title: string; type: string; require_password: boolean; sources: PublicSource[]; lineup: string[] }
 interface UnlockedConfig { title: string; type: SrcType; url: string; sources: PrivateSource[]; watermark: string; enabled: boolean }
 
-const SS_KEY = 'replaytime-live-unlocked';
+const SS_KEY_BASE = 'replaytime-live-unlocked';
 const SS_SRC_KEY = 'replaytime-live-source-idx';
 const WA_NUMBER = '6288809048431';
 const WA_LINK = `https://wa.me/${WA_NUMBER}?text=${encodeURIComponent('Halo admin, saya ingin beli akses show live.')}`;
@@ -38,32 +38,62 @@ export default function Live() {
     try { return Math.max(0, Number(sessionStorage.getItem(SS_SRC_KEY) || '0')); } catch { return 0; }
   });
 
-  const fetchStatus = () => supabase.rpc('get_live_status').then(({ data }) => {
-    const row: any = Array.isArray(data) ? data[0] : data;
-    setStatus(row ? {
-      enabled: !!row.enabled, title: row.title || 'Live', type: row.type || 'm3u8',
-      require_password: row.require_password !== false,
-      sources: Array.isArray(row.sources) ? row.sources : [],
-      lineup: Array.isArray(row.lineup) ? row.lineup : [],
-    } : { enabled: false, title: 'Live', type: 'm3u8', require_password: true, sources: [], lineup: [] });
-    setStatusLoading(false);
-    return row;
-  });
+  const showId = search.get('show') || '';
+
+  const fetchStatus = () => {
+    if (showId) {
+      // Active-show LIVE: read from active_shows + RPC for current live
+      return supabase.from('active_shows')
+        .select('id,title,is_live,live_auto_schedule,live_type,live_require_password,live_sources,lineup,show_date,show_time,is_active')
+        .eq('id', showId).maybeSingle()
+        .then(({ data }) => {
+          if (!data || !data.is_active) {
+            setStatus({ enabled: false, title: 'Live', type: 'm3u8', require_password: true, sources: [], lineup: [] });
+            setStatusLoading(false);
+            return null;
+          }
+          const startMs = new Date(`${data.show_date}T${data.show_time}`).getTime();
+          const nowMs = Date.now();
+          const autoOn = data.live_auto_schedule && nowMs >= startMs && nowMs <= startMs + 8 * 3600 * 1000;
+          const enabled = !!data.is_live || !!autoOn;
+          const pubSources = (Array.isArray(data.live_sources) ? data.live_sources : []).map((s: any) => ({ label: s.label, type: s.type }));
+          setStatus({
+            enabled, title: data.title || 'Live', type: data.live_type || 'm3u8',
+            require_password: data.live_require_password !== false,
+            sources: pubSources,
+            lineup: Array.isArray(data.lineup) ? data.lineup : [],
+          });
+          setStatusLoading(false);
+          return data;
+        });
+    }
+    return supabase.rpc('get_live_status').then(({ data }) => {
+      const row: any = Array.isArray(data) ? data[0] : data;
+      setStatus(row ? {
+        enabled: !!row.enabled, title: row.title || 'Live', type: row.type || 'm3u8',
+        require_password: row.require_password !== false,
+        sources: Array.isArray(row.sources) ? row.sources : [],
+        lineup: Array.isArray(row.lineup) ? row.lineup : [],
+      } : { enabled: false, title: 'Live', type: 'm3u8', require_password: true, sources: [], lineup: [] });
+      setStatusLoading(false);
+      return row;
+    });
+  };
 
   const doUnlock = async (opts: { token?: string; password?: string }, silent = false) => {
     if (!silent) { setSubmitting(true); setPwError(''); }
     try {
       const { data } = await supabase.functions.invoke('unlock-live', {
-        body: { ...opts, browser_id: getBrowserId() },
+        body: { ...opts, browser_id: getBrowserId(), show_id: showId || undefined },
       });
       if (data?.valid) {
         const cfg: UnlockedConfig = { title: data.title, type: data.type, url: data.url, sources: Array.isArray(data.sources) ? data.sources : [], watermark: data.watermark || '', enabled: !!data.enabled };
         setUnlocked(cfg);
         setKickedMsg('');
-        try { sessionStorage.setItem(SS_KEY, JSON.stringify(cfg)); } catch { /* ignore */ }
+        try { sessionStorage.setItem(`${SS_KEY_BASE}${showId?'-'+showId:''}`, JSON.stringify(cfg)); } catch { /* ignore */ }
       } else if (silent) {
         setUnlocked(null);
-        try { sessionStorage.removeItem(SS_KEY); } catch { /* ignore */ }
+        try { sessionStorage.removeItem(`${SS_KEY_BASE}${showId?'-'+showId:''}`); } catch { /* ignore */ }
         setKickedMsg('Akses Anda telah dicabut oleh admin.');
       } else {
         if (data?.reason === 'device_limit') setPwError('Batas perangkat untuk token ini telah tercapai.');
@@ -80,7 +110,7 @@ export default function Live() {
   useEffect(() => {
     fetchStatus();
     try {
-      const cached = sessionStorage.getItem(SS_KEY);
+      const cached = sessionStorage.getItem(`${SS_KEY_BASE}${showId?'-'+showId:''}`);
       if (cached) setUnlocked(JSON.parse(cached));
     } catch { /* ignore */ }
 

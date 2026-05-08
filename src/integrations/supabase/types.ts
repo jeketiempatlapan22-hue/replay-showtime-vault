@@ -22,12 +22,22 @@ export type Database = {
           id: string
           image_url: string
           is_active: boolean
+          is_live: boolean
           lineup: string[]
+          live_auto_schedule: boolean
+          live_password: string
+          live_require_password: boolean
+          live_sources: Json
+          live_type: string
+          live_url: string
           pakasir_amount: number
           price_replay: number
           price_show: number
           replay_enabled: boolean
           replay_id: string | null
+          replay_m3u8_url: string
+          replay_mode: boolean
+          replay_youtube_url: string
           show_date: string
           show_time: string
           sort_order: number
@@ -41,12 +51,22 @@ export type Database = {
           id?: string
           image_url?: string
           is_active?: boolean
+          is_live?: boolean
           lineup?: string[]
+          live_auto_schedule?: boolean
+          live_password?: string
+          live_require_password?: boolean
+          live_sources?: Json
+          live_type?: string
+          live_url?: string
           pakasir_amount?: number
           price_replay?: number
           price_show?: number
           replay_enabled?: boolean
           replay_id?: string | null
+          replay_m3u8_url?: string
+          replay_mode?: boolean
+          replay_youtube_url?: string
           show_date: string
           show_time?: string
           sort_order?: number
@@ -60,12 +80,22 @@ export type Database = {
           id?: string
           image_url?: string
           is_active?: boolean
+          is_live?: boolean
           lineup?: string[]
+          live_auto_schedule?: boolean
+          live_password?: string
+          live_require_password?: boolean
+          live_sources?: Json
+          live_type?: string
+          live_url?: string
           pakasir_amount?: number
           price_replay?: number
           price_show?: number
           replay_enabled?: boolean
           replay_id?: string | null
+          replay_m3u8_url?: string
+          replay_mode?: boolean
+          replay_youtube_url?: string
           show_date?: string
           show_time?: string
           sort_order?: number
@@ -839,6 +869,24 @@ export type Database = {
         }[]
       }
       email_for_phone: { Args: { _phone: string }; Returns: string }
+      get_active_live: {
+        Args: never
+        Returns: {
+          category: string
+          id: string
+          image_url: string
+          is_live: boolean
+          lineup: string[]
+          live_auto_schedule: boolean
+          live_require_password: boolean
+          live_sources: Json
+          live_type: string
+          replay_mode: boolean
+          show_date: string
+          show_time: string
+          title: string
+        }[]
+      }
       get_live_status: {
         Args: never
         Returns: {

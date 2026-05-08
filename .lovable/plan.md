@@ -1,104 +1,68 @@
-## Goals
+# Live Scheduling + Replay Mode dari Admin Panel
 
-1. Stop bot WhatsApp dari spam/balasan beruntun ke nomor yang sama.
-2. Tambah jenis token replay baru: **token satuan** (1 user, 1 device).
-3. Pertahankan **token master publik** (link yang bisa dibuka banyak orang) yang sudah ada.
-4. Bot bisa membuat kedua jenis token via WhatsApp.
-5. Rapikan halaman Admin dengan menu hamburger (drawer) menggantikan deretan tab.
-6. Jangan ganggu pemutaran replay yang sudah berjalan.
+## Jawaban singkat
+**Bisa, dan aman.** Semua perubahan bersifat *additive* — kita hanya **menambah** kolom & UI baru, tidak mengubah kontrak data tabel `replays`, komponen `ReplayCardComponent`, `EmbedPlayer`, `HlsPlayer`, atau halaman replay yang ada. Halaman/kartu replay lama tetap pakai sumber lama (`replays.*`); fitur baru ini hidup di tabel `active_shows` + halaman `/live`.
 
----
+## Yang akan dibuat
 
-## 1. Rate limit bot per nomor
+### 1. Skema database (migration additive ke `active_shows`)
+Tambah kolom (semua nullable / default aman):
+- `is_live boolean default false` — flag "show ini sedang LIVE sekarang"
+- `live_auto_schedule boolean default false` — kalau true, server menganggap LIVE saat now ≥ show_date+show_time
+- `live_url text default ''` + `live_type text default 'm3u8'` (`m3u8` | `youtube`)
+- `live_sources jsonb default '[]'` — multi-server (label/type/url) seperti referensi
+- `live_password text default ''` + `live_require_password boolean default true`
+- `replay_mode boolean default false` — saat true, kartu jadi mode replay
+- `replay_m3u8_url text default ''`
+- `replay_youtube_url text default ''`
 
-**Database — migrasi baru:**
+Plus RPC `get_active_live()` (SECURITY DEFINER) yang mengembalikan show LIVE aktif (memilih row pertama dengan `is_live=true` ATAU `live_auto_schedule=true AND now() between start..start+8h`) — tanpa membocorkan password/url mentah; URL dikeluarkan hanya lewat edge function `unlock-live` setelah verifikasi password/token (pola yang sudah ada).
+
+Constraint: hanya satu row boleh punya `is_live=true` (partial unique index).
+
+### 2. Edge function `unlock-live` (update)
+Saat ini baca dari `live_config_private`. Tambah cabang baru: jika request menyertakan `show_id`, cari row di `active_shows`, cek `is_live` / `live_auto_schedule`, lalu kembalikan `title`, `type`, `url`, `sources`. Cabang lama tetap jalan → backward compatible.
+
+### 3. Admin UI baru: `src/components/admin/ShowLiveControl.tsx`
+Dipanggil dari editor show di `Admin.tsx` (di dalam dialog "Edit Show"). Berisi:
+- Toggle **"Sedang LIVE"** + toggle **"Live Otomatis sesuai jadwal"** (pakai `show_date` + `show_time` yang sudah ada).
+- Field **Live URL** + dropdown tipe (`m3u8` / `youtube`).
+- Repeater **Sumber Video** (label, type, url) — meniru screenshot referensi (drag-handle ringan, badge tipe, tombol hapus).
+- Field **Sandi Akses LIVE** + toggle "wajib sandi".
+- Section **Mode Replay**: toggle `replay_mode`, dua input — `replay_m3u8_url` & `replay_youtube_url`. Saat `replay_mode=true`, tombol "Tonton Replay" di kartu memutar URL ini langsung lewat `HlsPlayer`/`EmbedPlayer` tanpa menyentuh tabel `replays`.
+
+### 4. Halaman `/live` (update kecil)
+`src/pages/Live.tsx` saat ini ambil dari `live_config_private`. Tambahkan: pertama coba ambil show LIVE dari `active_shows` via RPC; kalau ada → judul = `active_shows.title`, sumber = `live_sources`. Kalau tidak ada → fallback ke perilaku lama (`live_config_private`). Ini tidak memutus token reseller / akses lama.
+
+### 5. `ActiveShowCard` (update kecil, frontend-only)
+- Kalau `replay_mode=true` & ada `replay_m3u8_url`/`replay_youtube_url` → tombol membuka modal player ringan langsung (HlsPlayer untuk m3u8, EmbedPlayer untuk YT). **Tidak** mengubah path lama `replay_id → /replay/:id`.
+- Kalau `is_live` (atau `live_auto_schedule` aktif & jadwal jalan) → badge LIVE + tombol "Tonton Live" → navigate ke `/live?show=<id>`.
+
+## Mengapa aman untuk replay yang sudah ada
+- Tabel `replays`, halaman `Index.tsx`, `ReplayCardComponent`, player replay, sistem komentar, sistem rating, `/replay/:id` **tidak disentuh**.
+- Kolom baru di `active_shows` semuanya punya default → row lama tetap valid.
+- `live_config_private` & flow token reseller/password lama tetap jalan sebagai fallback.
+- Tidak ada perubahan RLS pada tabel selain menambah policy SELECT untuk kolom baru (sudah `Anyone can view active shows`).
+
+## Detail teknis ringkas
+```text
+active_shows  ──┬── kartu di /shows & beranda (existing)
+                ├── live_* fields  ─► /live (baru, fallback ke live_config_private)
+                └── replay_mode + replay_*_url ─► player inline di kartu (baru)
+
+replays (tidak diubah) ─► /replay/:id (existing, tetap jalan)
 ```
-CREATE TABLE bot_rate_limit (
-  phone text PRIMARY KEY,
-  last_sent_at timestamptz NOT NULL DEFAULT now()
-);
-ALTER TABLE bot_rate_limit ENABLE ROW LEVEL SECURITY;
--- (no public policies; service role only)
-```
 
-**Edge function `fonnte-webhook`:**
-- Setelah dedup, sebelum membalas: cek `bot_rate_limit.phone = phoneNorm`.
-- Bila `now() - last_sent_at < 8 detik` → return tanpa membalas (silent drop).
-- Bila lolos → upsert `last_sent_at = now()` dan lanjut proses.
-- Janitor: hapus baris > 10 menit.
+File yang akan ditambah/diubah:
+- migration SQL (tambah kolom + RPC + partial unique index)
+- `supabase/functions/unlock-live/index.ts` (cabang `show_id`)
+- `src/components/admin/ShowLiveControl.tsx` (baru)
+- `src/pages/Admin.tsx` (panggil ShowLiveControl di dialog edit show)
+- `src/lib/activeShows.ts` (tipe + helper field baru)
+- `src/pages/Live.tsx` (prefer active_shows kalau ada)
+- `src/components/ActiveShowCard.tsx` (handle replay_mode & is_live)
 
-Kombinasi dengan `bot_inbox_dedup` yang sudah ada memastikan: webhook duplikat diabaikan, dan kalau pun lolos, satu nomor maksimal dapat 1 balasan per 8 detik.
-
----
-
-## 2. Token satuan replay (1 user / 1 device)
-
-Token master publik yang sudah ada (`replays.access_token`) tetap dipertahankan apa adanya — link ini bisa dibuka banyak orang dan banyak device.
-
-**Tabel baru:**
-```
-CREATE TABLE replay_personal_tokens (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  replay_id uuid NOT NULL,
-  token text NOT NULL UNIQUE,
-  label text DEFAULT '',
-  max_devices int NOT NULL DEFAULT 1,
-  revoked boolean NOT NULL DEFAULT false,
-  created_at timestamptz DEFAULT now()
-);
-
-CREATE TABLE replay_token_devices (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  token_id uuid NOT NULL REFERENCES replay_personal_tokens(id) ON DELETE CASCADE,
-  browser_id text NOT NULL,
-  created_at timestamptz DEFAULT now(),
-  UNIQUE(token_id, browser_id)
-);
-```
-RLS: admin-only ALL untuk kedua tabel; insert device dilakukan oleh service role di edge function.
-
-**Edge function `get-replay-source` (update):**
-- Kalau `access_token` cocok dengan `replays.access_token` → master path (perilaku lama, tanpa device lock).
-- Kalau tidak cocok, lookup di `replay_personal_tokens`:
-  - jika ditemukan, tidak revoked, dan `replay_id` cocok → wajib `browser_id` di body. Cek/insert ke `replay_token_devices` mirip pola `unlock-live`. Bila count ≥ `max_devices` dan device belum terdaftar → tolak (`device_limit`).
-  - Bila lolos → kembalikan source (sama format seperti master).
-
-**Frontend `Akses.tsx` & `Index.tsx`:**
-- `Akses.tsx` menerima token apa pun. Validasi ringan: cek `replays.id`. Tidak lagi memblokir bila `access_token != token` (token bisa berasal dari `replay_personal_tokens`). Validasi penuh tetap dilakukan server-side oleh `get-replay-source`.
-- Saat panggil `getReplaySource`, kirim juga `browser_id` (dari `getBrowserId()`) supaya device-lock berfungsi. Kalau response `device_limit`, tampilkan toast "Token sudah dipakai di perangkat lain".
-
-Halaman replay/embed/HLS/YouTube tidak diubah — flow tetap "sessionStorage token → fetch source → render player".
-
-**Admin UI — sub-section di tab Replay:**
-- Pada baris setiap replay, tombol "Token Satuan" buka dialog: list token personal (label, dipakai/limit, revoke, copy link `/akses?token=...&replay=...`, hapus) + form tambah (label + max_devices, default 1).
-
----
-
-## 3. Bot bisa buat kedua jenis token
-
-Tambahkan command (insert ke `bot_commands`):
-- `/buattoken <kode>` (sudah ada) → master publik (perilaku lama, tetap).
-- `/tokensatuan <kode> [label]` → buat 1 token personal (max_devices=1), balas link `/akses`.
-  - Tetap admin-only (`bot_admins` whitelist).
-  - Catat ke `token_deliveries` dengan `source='bot'`.
-- `/menu` di-update agar menampilkan command baru.
-
----
-
-## 4. Admin panel: menu hamburger
-
-**Perubahan `src/pages/Admin.tsx`:**
-- Hapus `TabsList` panjang (10 trigger).
-- Ganti dengan: tombol hamburger di header → buka `Sheet` (`@/components/ui/sheet`) dari kiri berisi daftar menu vertikal (Replay, Show, Live, Member, Bot WA, Riwayat, Preview, Komentar, Blokir, Setelan), tiap item dengan icon + label.
-- Header juga menampilkan label tab aktif (mis. "Admin · Replay").
-- Pertahankan komponen `Tabs` tapi controlled via state `activeTab`; klik di drawer set state lalu tutup drawer.
-- `TabsContent` masing-masing tetap dirender seperti sekarang — tidak menyentuh isi tab supaya tidak ada regresi.
-
----
-
-## Technical details
-
-- Files diubah: `supabase/functions/fonnte-webhook/index.ts`, `supabase/functions/get-replay-source/index.ts`, `src/pages/Akses.tsx`, `src/pages/Index.tsx` (kirim browser_id), `src/pages/Admin.tsx` (drawer + sub-dialog token satuan), `src/components/admin/BotAdmin.tsx` (seed command baru).
-- Files baru: 1 migrasi (3 tabel + RLS + seed `bot_commands` `/tokensatuan`), `src/components/admin/ReplayPersonalTokensDialog.tsx`.
-- Tidak menyentuh `YouTubePlayer`, `HlsPlayer`, `EmbedPlayer`, `ReplayCardComponent` — pemutaran replay tidak terganggu.
-- Memori `mem://security/source-protection` tetap valid: `youtube_id` / `m3u8_url` hanya keluar via `get-replay-source` setelah validasi.
+## Yang TIDAK dilakukan
+- Tidak menghapus/mengubah `live_config_private`.
+- Tidak mengubah skema/komponen replay lama.
+- Tidak mengubah flow QRIS/Pakasir & dialog beli yang sudah ada (tetap kompatibel).

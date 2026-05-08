@@ -4,6 +4,7 @@ import { ArrowLeft, Plus, Trash2, Edit2, Key, Save, Palette, MessageCircle, LogO
 import BotAdmin from '@/components/admin/BotAdmin';
 import TokenHistoryAdmin from '@/components/admin/TokenHistoryAdmin';
 import ReplayPersonalTokensDialog from '@/components/admin/ReplayPersonalTokensDialog';
+import ShowLiveControl from '@/components/admin/ShowLiveControl';
 import { getMembers, upsertMember, deleteMember, uploadMemberPhoto, type Member } from '@/lib/members';
 import { getActiveShows, upsertActiveShow, deleteActiveShow, type ActiveShow } from '@/lib/activeShows';
 import { Switch } from '@/components/ui/switch';
@@ -766,6 +767,9 @@ export default function Admin() {
                   </div>
                   <Switch checked={showForm.replay_enabled} onCheckedChange={v => setShowForm({ ...showForm, replay_enabled: v })} disabled={!showForm.replay_id} />
                 </div>
+                {showEditing && showForm.id && (
+                  <ShowLiveControl showId={showForm.id} showTitle={showForm.title} />
+                )}
                 <div className="flex gap-2 pt-2">
                   <Button onClick={handleSaveShow} className="flex-1"><Save className="w-4 h-4 mr-2" />{showEditing ? 'Update' : 'Tambah'}</Button>
                   {showEditing && <Button variant="outline" onClick={resetShowForm}>Batal</Button>}
