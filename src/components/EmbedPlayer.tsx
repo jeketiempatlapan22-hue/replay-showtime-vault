@@ -159,9 +159,15 @@ export default function EmbedPlayer({ type, source, title, watermark }: Props) {
   const togglePlay = () => {
     if (type === 'youtube') {
       const p = ytPlayerRef.current;
+      if (useYoutubeFallback) {
+        if (iframeRef.current) iframeRef.current.src = isPlaying ? 'about:blank' : ytEmbedUrl;
+        setIsPlaying(!isPlaying);
+        return;
+      }
       if (!p || typeof p.pauseVideo !== 'function') return;
       if (isPlaying) p.pauseVideo(); else p.playVideo();
     } else {
+      if (iframeRef.current) iframeRef.current.src = isPlaying ? 'about:blank' : cfEmbedUrl;
       cfPost(isPlaying ? 'pause' : 'play');
       setIsPlaying(!isPlaying);
     }
