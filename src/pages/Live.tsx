@@ -202,6 +202,15 @@ export default function Live() {
         const t = search.get('t');
         if (t) void doUnlock({ token: t }, true);
       })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'blocked_browsers', filter: `browser_id=eq.${getBrowserId()}` }, () => {
+        const t = search.get('t');
+        if (t) void doUnlock({ token: t }, true);
+        else if (unlocked) {
+          setUnlocked(null);
+          try { sessionStorage.removeItem(`${SS_KEY_BASE}${showId?'-'+showId:''}`); } catch { /* ignore */ }
+          setKickedMsg('Perangkat ini telah diblokir oleh admin.');
+        }
+      })
       .subscribe();
 
     return () => {
