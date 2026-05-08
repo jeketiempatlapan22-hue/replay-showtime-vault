@@ -258,7 +258,20 @@ export default function EmbedPlayer({ type, source, title, watermark }: Props) {
       onContextMenu={(e) => e.preventDefault()}
     >
       {type === 'youtube' ? (
-        <div ref={ytMountRef} className="absolute inset-0 w-full h-full" />
+        useYoutubeFallback ? (
+          <iframe
+            ref={iframeRef}
+            src={ytEmbedUrl}
+            className="absolute inset-0 w-full h-full pointer-events-none"
+            title={title}
+            allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+            allowFullScreen
+            referrerPolicy="strict-origin-when-cross-origin"
+            style={{ border: 0 }}
+          />
+        ) : (
+          <div ref={ytMountRef} className="absolute inset-0 w-full h-full" />
+        )
       ) : (
         <iframe
           ref={iframeRef}
