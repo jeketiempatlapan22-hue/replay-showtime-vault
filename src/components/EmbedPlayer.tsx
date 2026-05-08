@@ -9,6 +9,7 @@ interface Props {
   title: string;
   watermark?: string;
   hideSeekButtons?: boolean;
+  isLive?: boolean;
 }
 
 interface YoutubePlayerApi {
@@ -44,7 +45,7 @@ function extractCloudflareUid(raw: string): string {
 const VOL_KEY = 'replaytime-volume';
 const MUTED_KEY = 'replaytime-muted';
 
-export default function EmbedPlayer({ type, source, title, watermark, hideSeekButtons = false }: Props) {
+export default function EmbedPlayer({ type, source, title, watermark, hideSeekButtons = false, isLive = false }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const ytPlayerRef = useRef<YoutubePlayerApi | null>(null);
@@ -321,9 +322,9 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
     return onFullscreenChange(onChange);
   }, []);
 
-  // Poll YT time/duration
+  // Poll YT time/duration (skip for live: no scrubbing, no seeks)
   useEffect(() => {
-    if (type !== 'youtube' || !ready) return;
+    if (type !== 'youtube' || !ready || isLive) return;
     const id = setInterval(() => {
       const p = ytPlayerRef.current;
       if (!p || seeking) return;
@@ -335,7 +336,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
       } catch { /* ignore */ }
     }, 500);
     return () => clearInterval(id);
-  }, [ready, type, seeking, duration]);
+  }, [ready, type, seeking, duration, isLive]);
 
   const seekTo = (t: number) => {
     const p = ytPlayerRef.current;
@@ -438,7 +439,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
         style={{ touchAction: 'manipulation' }}
         onClick={(e) => e.stopPropagation()}
       >
-        {type === 'youtube' && (
+        {type === 'youtube' && !isLive && (
           <div className="flex items-center gap-1.5 sm:gap-2 mb-2 text-white text-[10px] sm:text-xs tabular-nums" onClick={(e) => e.stopPropagation()}>
             <span className="w-10 sm:w-14 text-left shrink-0">{duration > 0 ? fmtTime(currentTime) : '--:--'}</span>
             <input
