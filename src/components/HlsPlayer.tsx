@@ -203,6 +203,13 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
       }, 4000);
     };
 
+    // Detect weak network → start bandwidth estimate low so ABR picks 360p/270p first
+    const conn = (navigator as Navigator & { connection?: { effectiveType?: string; downlink?: number; saveData?: boolean } }).connection;
+    const effective = conn?.effectiveType || '';
+    const downlink = typeof conn?.downlink === 'number' ? conn.downlink : 99;
+    const isWeak = /^(slow-2g|2g|3g)$/i.test(effective) || downlink < 1.5 || conn?.saveData === true;
+    const initialBwEstimate = isWeak ? 250_000 : 700_000;
+
     if (Hls.isSupported()) {
       hls = new Hls({
         enableWorker: true,
@@ -221,7 +228,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
         // ABR: mulai dari kualitas terendah supaya cepat play, lalu naikkan
         startLevel: -1,
         autoStartLoad: true,
-        abrEwmaDefaultEstimate: 700_000,
+        abrEwmaDefaultEstimate: initialBwEstimate,
         abrBandWidthFactor: 0.75,
         abrBandWidthUpFactor: 0.55,
         abrMaxWithRealBitrate: true,
@@ -273,6 +280,14 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
             hls.capLevelToPlayerSize = false;
             setCurrentQuality(match.index);
           }
+        } else if (isWeak && hls) {
+          // Weak network: cap ABR ceiling to lowest rendition <= 360p (fallback 270p) until network improves.
+          // User can still pick higher manually; this only sets the *cap*, not a hard lock.
+          const capCandidate = manifestLevels
+            .map((lvl, i) => ({ i, h: lvl.height || 0 }))
+            .filter(x => x.h > 0 && x.h <= 360)
+            .sort((a, b) => b.h - a.h)[0];
+          if (capCandidate) hls.autoLevelCapping = capCandidate.i;
         }
         safePlay();
       });
@@ -463,8 +478,25 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
     setShowControls(true);
     if (hideControlsTimerRef.current) clearTimeout(hideControlsTimerRef.current);
     hideControlsTimerRef.current = setTimeout(() => {
-      if (videoRef.current && !videoRef.current.paused) setShowControls(false);
+      const v = videoRef.current;
+      if (v && !v.paused && !v.ended) setShowControls(false);
     }, 3000);
+  }, []);
+
+  const toggleControls = useCallback(() => {
+    setShowControls(prev => {
+      const next = !prev;
+      if (next) {
+        if (hideControlsTimerRef.current) clearTimeout(hideControlsTimerRef.current);
+        hideControlsTimerRef.current = setTimeout(() => {
+          const v = videoRef.current;
+          if (v && !v.paused && !v.ended) setShowControls(false);
+        }, 3000);
+      } else if (hideControlsTimerRef.current) {
+        clearTimeout(hideControlsTimerRef.current);
+      }
+      return next;
+    });
   }, []);
 
   useEffect(() => {
@@ -477,8 +509,9 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
   const togglePlay = () => {
     const video = videoRef.current;
     if (!video) return;
-    if (video.paused) video.play().catch(() => {});
-    else video.pause();
+    if (video.paused) { video.play().catch(() => {}); }
+    else { video.pause(); }
+    resetHideTimer();
   };
 
   const seek = (delta: number) => {
@@ -528,7 +561,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
   return (
     <div
       ref={containerRef}
-      className="relative w-full overflow-hidden rounded-xl bg-black group/player"
+      className={`relative w-full overflow-hidden rounded-xl bg-black group/player ${showControls || !isPlaying ? '' : 'cursor-none'}`}
       style={{ paddingBottom: isFullscreen ? '0' : '56.25%', height: isFullscreen ? '100%' : undefined }}
       onMouseMove={resetHideTimer}
       onTouchStart={resetHideTimer}
@@ -537,7 +570,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
         ref={videoRef}
         className="absolute inset-0 w-full h-full"
         playsInline
-        onClick={resetHideTimer}
+        onClick={toggleControls}
         title={title}
       />
       {watermark && <LiveWatermark code={watermark} />}
@@ -562,7 +595,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
       {needsUnmute && muted && (
         <button
           type="button"
-          onClick={toggleMute}
+          onClick={(e) => { e.stopPropagation(); toggleMute(); }}
           className="absolute top-3 left-1/2 -translate-x-1/2 z-30 px-4 py-2 rounded-full bg-primary text-primary-foreground text-xs font-semibold shadow-lg animate-fade-in"
         >
           🔊 Tap untuk aktifkan suara
@@ -572,10 +605,14 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
       {/* Controls overlay */}
       <div
         className={`absolute inset-0 flex flex-col justify-end transition-opacity duration-300 ${
-          showControls || !isPlaying ? 'opacity-100' : 'opacity-0'
+          showControls || !isPlaying ? 'opacity-100' : 'opacity-0 pointer-events-none'
         }`}
         style={{
           background: 'linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 50%, rgba(0,0,0,0.3) 100%)',
+        }}
+        onClick={(e) => {
+          // Click on the empty overlay area (not on a control) toggles controls.
+          if (e.target === e.currentTarget) toggleControls();
         }}
       >
         {!isPlaying && !loading && (

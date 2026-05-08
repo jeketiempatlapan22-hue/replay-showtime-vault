@@ -89,7 +89,11 @@ export default function LiveChat() {
   }, []);
 
   useEffect(() => {
-    if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight;
+    const el = listRef.current;
+    if (!el) return;
+    // Auto-scroll only if user is already near bottom; preserve position if scrolled up.
+    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    if (nearBottom) el.scrollTop = el.scrollHeight;
   }, [messages.length]);
 
   // Rate limit per browser (client-side, anti-spam):

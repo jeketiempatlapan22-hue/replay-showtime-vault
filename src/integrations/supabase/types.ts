@@ -571,6 +571,92 @@ export type Database = {
         }
         Relationships: []
       }
+      membership_token_devices: {
+        Row: {
+          browser_id: string
+          created_at: string
+          id: string
+          last_seen: string
+          token_id: string
+        }
+        Insert: {
+          browser_id: string
+          created_at?: string
+          id?: string
+          last_seen?: string
+          token_id: string
+        }
+        Update: {
+          browser_id?: string
+          created_at?: string
+          id?: string
+          last_seen?: string
+          token_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "membership_token_devices_token_id_fkey"
+            columns: ["token_id"]
+            isOneToOne: false
+            referencedRelation: "membership_tokens"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      membership_tokens: {
+        Row: {
+          created_at: string
+          created_by: string
+          duration_days: number
+          expires_at: string
+          id: string
+          includes_replays: boolean
+          label: string
+          manual_resets_max: number
+          manual_resets_used: number
+          password: string
+          phone: string
+          revoked: boolean
+          starts_at: string
+          token: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string
+          duration_days?: number
+          expires_at: string
+          id?: string
+          includes_replays?: boolean
+          label?: string
+          manual_resets_max?: number
+          manual_resets_used?: number
+          password?: string
+          phone?: string
+          revoked?: boolean
+          starts_at?: string
+          token: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          duration_days?: number
+          expires_at?: string
+          id?: string
+          includes_replays?: boolean
+          label?: string
+          manual_resets_max?: number
+          manual_resets_used?: number
+          password?: string
+          phone?: string
+          revoked?: boolean
+          starts_at?: string
+          token?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       orders: {
         Row: {
           access_token: string | null
