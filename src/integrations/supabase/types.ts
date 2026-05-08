@@ -243,6 +243,27 @@ export type Database = {
         }
         Relationships: []
       }
+      login_attempts: {
+        Row: {
+          attempted_at: string
+          id: string
+          identifier: string
+          success: boolean
+        }
+        Insert: {
+          attempted_at?: string
+          id?: string
+          identifier: string
+          success?: boolean
+        }
+        Update: {
+          attempted_at?: string
+          id?: string
+          identifier?: string
+          success?: boolean
+        }
+        Relationships: []
+      }
       master_passwords: {
         Row: {
           created_at: string
@@ -460,6 +481,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      check_login_lock: {
+        Args: { _identifier: string }
+        Returns: {
+          fail_count: number
+          locked: boolean
+          seconds_remaining: number
+        }[]
+      }
       email_for_phone: { Args: { _phone: string }; Returns: string }
       get_live_status: {
         Args: never
@@ -481,6 +510,10 @@ export type Database = {
       }
       increment_view_count: { Args: { _replay_id: string }; Returns: number }
       phone_exists: { Args: { _phone: string }; Returns: boolean }
+      record_login_attempt: {
+        Args: { _identifier: string; _success: boolean }
+        Returns: undefined
+      }
     }
     Enums: {
       app_role: "admin" | "user"
