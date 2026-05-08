@@ -364,7 +364,9 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
           )}
 
           <div className="mt-6 sm:mt-8 pt-4 sm:pt-6 border-t border-border">
-            <CommentSection replayId={replay.id} />
+            <Suspense fallback={<div className="py-6 flex justify-center"><Loader2 className="w-5 h-5 text-primary animate-spin" /></div>}>
+              <CommentSection replayId={replay.id} />
+            </Suspense>
           </div>
         </div>
       </div>
