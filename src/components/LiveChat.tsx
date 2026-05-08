@@ -268,14 +268,14 @@ export default function LiveChat() {
           <Input
             value={text}
             onChange={e => setText(e.target.value.slice(0, 500))}
-            onKeyDown={e => e.key === 'Enter' && canChat && send()}
+            onKeyDown={e => e.key === 'Enter' && canChat && cooldownLeft === 0 && send()}
             onFocus={() => { if (!canChat) openChangeName(); }}
-            placeholder={canChat ? 'Ketik pesan...' : 'Masukkan nama untuk berinteraksi'}
+            placeholder={cooldownLeft > 0 ? `Tunggu ${cooldownLeft} detik…` : (canChat ? 'Ketik pesan...' : 'Masukkan nama untuk berinteraksi')}
             className="h-9 text-sm bg-background"
-            disabled={!canChat}
+            disabled={!canChat || cooldownLeft > 0}
           />
-          <Button size="icon" onClick={send} disabled={sending || !text.trim() || !canChat} className="h-9 w-9 shrink-0">
-            <Send className="w-4 h-4" />
+          <Button size="icon" onClick={send} disabled={sending || !text.trim() || !canChat || cooldownLeft > 0} className="h-9 w-9 shrink-0">
+            {cooldownLeft > 0 ? <span className="text-[10px] font-bold">{cooldownLeft}</span> : <Send className="w-4 h-4" />}
           </Button>
         </div>
       </div>
