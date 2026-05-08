@@ -791,23 +791,49 @@ export default function Admin() {
                 ) : (
                   <div className="space-y-2">
                     {activeShows.map(s => (
-                      <div key={s.id} className="p-2 sm:p-3 rounded-lg bg-secondary/50 border border-border flex items-center gap-3">
-                        {s.image_url && <img src={s.image_url} alt="" className="w-12 h-8 sm:w-16 sm:h-10 rounded object-cover shrink-0" />}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <p className="font-medium text-sm sm:text-base truncate">{s.title}</p>
-                            {!s.is_active && <Badge variant="outline" className="text-[10px]">Off</Badge>}
+                      <div key={s.id} className={`p-2 sm:p-3 rounded-lg border space-y-2 ${s.is_live ? 'bg-red-500/10 border-red-500/40' : 'bg-secondary/50 border-border'}`}>
+                        <div className="flex items-center gap-3">
+                          {s.image_url && <img src={s.image_url} alt="" className="w-12 h-8 sm:w-16 sm:h-10 rounded object-cover shrink-0" />}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="font-medium text-sm sm:text-base truncate">{s.title}</p>
+                              {s.is_live && <Badge className="text-[10px] bg-red-600 text-white animate-pulse"><Radio className="w-2.5 h-2.5 mr-0.5 inline" />ON AIR</Badge>}
+                              {!s.is_active && <Badge variant="outline" className="text-[10px]">Off</Badge>}
+                            </div>
+                            <p className="text-xs text-muted-foreground truncate">
+                              <Calendar className="w-3 h-3 inline mr-1" />
+                              {new Date(`${s.show_date}T${s.show_time}`).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })}
+                              {' · '}{getCriteriaLabel(s.category)}
+                              {s.lineup.length > 0 && ` · ${s.lineup.length} member`}
+                            </p>
                           </div>
-                          <p className="text-xs text-muted-foreground truncate">
-                            <Calendar className="w-3 h-3 inline mr-1" />
-                            {new Date(`${s.show_date}T${s.show_time}`).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })}
-                            {' · '}{getCriteriaLabel(s.category)}
-                            {s.lineup.length > 0 && ` · ${s.lineup.length} member`}
-                          </p>
+                          <div className="flex gap-1 shrink-0">
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditShow(s)} title="Edit"><Edit2 className="w-4 h-4" /></Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteShow(s.id)} title="Hapus"><Trash2 className="w-4 h-4" /></Button>
+                          </div>
                         </div>
-                        <div className="flex gap-1 shrink-0">
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditShow(s)}><Edit2 className="w-4 h-4" /></Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteShow(s.id)}><Trash2 className="w-4 h-4" /></Button>
+                        <div className="flex items-center gap-2 flex-wrap pt-2 border-t border-border/40">
+                          <div className="flex items-center gap-2 px-2 py-1 rounded bg-card border border-border">
+                            <Radio className={`w-3.5 h-3.5 ${s.is_live ? 'text-red-500' : 'text-muted-foreground'}`} />
+                            <span className="text-xs font-medium">LIVE</span>
+                            <Switch
+                              checked={!!s.is_live}
+                              onCheckedChange={async (v) => {
+                                if (v) {
+                                  await supabase.from('active_shows').update({ is_live: false }).neq('id', s.id).eq('is_live', true);
+                                }
+                                const { error } = await supabase.from('active_shows').update({ is_live: v }).eq('id', s.id);
+                                if (error) toast({ title: 'Gagal', description: error.message, variant: 'destructive' });
+                                else { toast({ title: v ? `🔴 ${s.title} sedang LIVE` : 'Live dinonaktifkan' }); refreshShows(); }
+                              }}
+                            />
+                          </div>
+                          <Button variant="outline" size="sm" className="h-7 text-[11px]" onClick={() => window.open(`/live?show=${s.id}`, '_blank')}>
+                            <Eye className="w-3 h-3 mr-1" />Buka Player
+                          </Button>
+                          <Button variant="outline" size="sm" className="h-7 text-[11px]" onClick={() => { handleEditShow(s); }}>
+                            <Settings className="w-3 h-3 mr-1" />Detail Live & Token
+                          </Button>
                         </div>
                       </div>
                     ))}
