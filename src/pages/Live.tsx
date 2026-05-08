@@ -248,7 +248,7 @@ export default function Live() {
     void doUnlock({ password: pwInput.trim() });
   };
 
-  const liveActive = unlocked?.enabled ?? status?.enabled ?? false;
+  const liveActive = !!(status?.enabled || unlocked?.enabled);
 
   return (
     <div className="min-h-screen bg-background relative z-10">
