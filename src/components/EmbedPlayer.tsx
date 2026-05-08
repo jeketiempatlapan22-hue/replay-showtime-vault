@@ -92,6 +92,11 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
 
   const isPlayingRef = useRef(false);
   useEffect(() => { isPlayingRef.current = isPlaying; }, [isPlaying]);
+  // Track whether autoplay-mute coercion has already run for the current source so that
+  // subsequent iframe.onLoad / YT onReady events don't re-force mute (and re-show the hint)
+  // after the user has already interacted.
+  const autoMuteAppliedRef = useRef(false);
+  const userUnmutedRef = useRef(false);
 
   const toggleControls = useCallback(() => {
     resetHideTimer();
@@ -100,11 +105,15 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
   const handleFrameLoaded = useCallback(() => {
     markReady(true);
     setIsPlaying(true);
-    // Browser autoplay is most reliable when embeds start muted. Show the same tap-to-unmute flow
-    // instead of reloading the iframe or leaving the user behind a loading overlay.
+    // Apply autoplay-mute coercion only ONCE per source. Once the user has unmuted, never force mute again.
+    if (autoMuteAppliedRef.current || userUnmutedRef.current) return;
+    autoMuteAppliedRef.current = true;
     if (!mutedRef.current) {
       mutedRef.current = true;
       setMuted(true);
+      setShowHint(true);
+    } else {
+      // Persisted-mute case: still show the hint so user can unmute easily.
       setShowHint(true);
     }
   }, [markReady]);
@@ -125,6 +134,8 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
   useEffect(() => {
     markReady(false);
     setIsPlaying(false);
+    autoMuteAppliedRef.current = false;
+    userUnmutedRef.current = false;
 
     setDuration(0);
     setCurrentTime(0);
@@ -173,12 +184,21 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
             markReady(true);
             try {
               ytPlayerRef.current.setVolume?.(Math.round(volumeRef.current * 100));
-              // Embed dimulai muted agar autoplay stabil; user bisa aktifkan suara lewat tombol hint.
-              ytPlayerRef.current.mute?.();
-              if (!mutedRef.current) {
-                mutedRef.current = true;
-                setMuted(true);
+              if (userUnmutedRef.current) {
+                // User already activated sound — keep it on.
+                ytPlayerRef.current.unMute?.();
+                mutedRef.current = false;
+                setMuted(false);
+                setShowHint(false);
+              } else {
+                // Embed dimulai muted agar autoplay stabil; user bisa aktifkan suara lewat tombol hint.
+                ytPlayerRef.current.mute?.();
+                if (!mutedRef.current) {
+                  mutedRef.current = true;
+                  setMuted(true);
+                }
                 setShowHint(true);
+                autoMuteAppliedRef.current = true;
               }
               ytPlayerRef.current.playVideo?.();
             } catch { /* ignore */ }
@@ -226,21 +246,30 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
     iframeRef.current.contentWindow.postMessage({ event: 'command', func: event, args: value !== undefined ? [value] : [] }, '*');
   };
 
+  const withYtPlayer = (action: (p: YoutubePlayerApi) => void) => {
+    const apply = (attempt = 0) => {
+      const p = ytPlayerRef.current;
+      if (p && typeof p.playVideo === 'function') {
+        try { action(p); } catch { /* ignore */ }
+        return;
+      }
+      if (attempt < 20) setTimeout(() => apply(attempt + 1), 100);
+    };
+    apply();
+  };
+
   const togglePlay = () => {
     if (type === 'youtube') {
-      const p = ytPlayerRef.current;
-      // No fallback path needed: iframe is rendered immediately, API attaches in place.
-      if (!p || typeof p.pauseVideo !== 'function') return;
-      try {
+      withYtPlayer((p) => {
         const state = p.getPlayerState?.();
-        if (state === 1 || isPlaying) {
-          p.pauseVideo();
+        if (state === 1 || isPlayingRef.current) {
+          p.pauseVideo?.();
           setIsPlaying(false);
         } else {
-          p.playVideo();
+          p.playVideo?.();
           setIsPlaying(true);
         }
-      } catch { /* ignore */ }
+      });
     } else {
       if (iframeRef.current && iframeRef.current.src === 'about:blank') iframeRef.current.src = cfEmbedUrl;
       cfPost(isPlaying ? 'pause' : 'play');
@@ -251,17 +280,14 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
   const toggleMute = () => {
     const m = !muted;
     setMuted(m);
+    mutedRef.current = m;
+    if (!m) userUnmutedRef.current = true;
     try { localStorage.setItem(MUTED_KEY, m ? '1' : '0'); } catch { /* ignore */ }
     if (type === 'youtube') {
-      const p = ytPlayerRef.current;
-      if (!p || typeof p.mute !== 'function') {
-        if (iframeRef.current && ytId) {
-          iframeRef.current.src = `https://www.youtube-nocookie.com/embed/${ytId}?rel=0&modestbranding=1&playsinline=1&autoplay=1&mute=${m ? 1 : 0}&controls=0&fs=0&iv_load_policy=3&disablekb=1&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`;
-        }
-        if (!m) setShowHint(false);
-        return;
-      }
-      if (m) p.mute(); else { p.unMute?.(); p.setVolume?.(Math.round(volume * 100)); p.playVideo?.(); }
+      withYtPlayer((p) => {
+        if (m) p.mute?.();
+        else { p.unMute?.(); p.setVolume?.(Math.round(volumeRef.current * 100)); p.playVideo?.(); }
+      });
     } else {
       cfPost(m ? 'mute' : 'unmute');
     }
@@ -271,20 +297,20 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
   const changeVolume = (e: React.ChangeEvent<HTMLInputElement>) => {
     const v = Number(e.target.value);
     setVolume(v);
+    volumeRef.current = v;
     try { localStorage.setItem(VOL_KEY, String(v)); } catch { /* ignore */ }
-    if (v > 0 && muted) { setMuted(false); try { localStorage.setItem(MUTED_KEY, '0'); } catch { /* ignore */ } }
+    if (v > 0 && muted) {
+      setMuted(false);
+      mutedRef.current = false;
+      userUnmutedRef.current = true;
+      setShowHint(false);
+      try { localStorage.setItem(MUTED_KEY, '0'); } catch { /* ignore */ }
+    }
     if (type === 'youtube') {
-      const p = ytPlayerRef.current;
-
-      if (!p || typeof p.setVolume !== 'function') {
-        if (v > 0 && iframeRef.current && ytId) {
-          iframeRef.current.src = `https://www.youtube-nocookie.com/embed/${ytId}?rel=0&modestbranding=1&playsinline=1&autoplay=1&mute=0&controls=0&fs=0&iv_load_policy=3&disablekb=1&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`;
-          setShowHint(false);
-        }
-        return;
-      }
-      p.setVolume(Math.round(v * 100));
-      if (v > 0) p.unMute();
+      withYtPlayer((p) => {
+        p.setVolume?.(Math.round(v * 100));
+        if (v > 0) p.unMute?.();
+      });
     } else {
       cfPost('setVolume', v);
     }
