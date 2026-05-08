@@ -335,21 +335,17 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
     >
       {type === 'youtube' ? (
         ytId ? (
-          useYoutubeFallback ? (
-            <iframe
-              ref={iframeRef}
-              src={ytEmbedUrl}
-              onLoad={() => { setReady(true); setIsPlaying(true); }}
-              className="absolute inset-0 w-full h-full pointer-events-none"
-              title={title}
-              allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
-              allowFullScreen
-              referrerPolicy="strict-origin-when-cross-origin"
-              style={{ border: 0 }}
-            />
-          ) : (
-            <div ref={ytMountRef} className="absolute inset-0 w-full h-full" />
-          )
+          <iframe
+            ref={iframeRef}
+            src={ytEmbedUrl}
+            onLoad={() => { markReady(true); setIsPlaying(true); }}
+            className="absolute inset-0 w-full h-full pointer-events-none"
+            title={title}
+            allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+            allowFullScreen
+            referrerPolicy="strict-origin-when-cross-origin"
+            style={{ border: 0 }}
+          />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center bg-black text-white/80 text-sm px-4 text-center">
             Link YouTube tidak valid. Hubungi admin untuk memeriksa sumber.
