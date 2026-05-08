@@ -659,6 +659,9 @@ export default function Admin() {
                                 <Plus className="w-3 h-3 mr-1" />Buat token
                               </Button>
                             )}
+                            <Button variant="outline" size="sm" className="h-6 text-[10px] px-2" onClick={() => setPersonalTokenReplay(r)}>
+                              <Lock className="w-3 h-3 mr-1" />Token satuan
+                            </Button>
                           </div>
                         </div>
                       );
