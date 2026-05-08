@@ -90,6 +90,14 @@ Deno.serve(async (req) => {
   if (req.method !== 'POST') return new Response('ok', { headers: corsHeaders });
 
   const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+  const authHeader = req.headers.get('Authorization') || '';
+  const testMode = req.headers.get('x-bot-test') === 'true';
+  const debug = (reason: string, extra: Record<string, unknown> = {}) =>
+    testMode ? json({ ok: false, reason, ...extra }) : new Response('ok', { headers: corsHeaders });
+
+  if (testMode && !(await isAuthorizedTestRequest(authHeader, admin))) {
+    return json({ ok: false, reason: 'unauthorized' }, 401);
+  }
 
   // Fonnte sends as multipart/form-data, x-www-form-urlencoded, or json
   let phone = '', text = '', device = '', fromMe = false;
@@ -109,46 +117,50 @@ Deno.serve(async (req) => {
       fromMe = String(fd.get('fromMe') ?? fd.get('from_me') ?? '') === 'true';
     }
   } catch {
-    return new Response('ok', { headers: corsHeaders });
+    return debug('bad_payload');
   }
 
-  if (!phone || !text) return new Response('ok', { headers: corsHeaders });
+  if (!phone || !text) return debug('missing_phone_or_text');
 
   const phoneNorm = normalizePhone(phone);
   const deviceNorm = normalizePhone(device);
 
   // Anti-loop: ignore echoes of bot's own outbound messages
-  if (fromMe) return new Response('ok', { headers: corsHeaders });
-  if (deviceNorm && deviceNorm === phoneNorm) return new Response('ok', { headers: corsHeaders });
+  if (!testMode && fromMe) return new Response('ok', { headers: corsHeaders });
+  if (!testMode && deviceNorm && deviceNorm === phoneNorm) return new Response('ok', { headers: corsHeaders });
 
   // Only process commands starting with '/' — silently ignore other chatter
-  if (!text.startsWith('/')) return new Response('ok', { headers: corsHeaders });
+  if (!text.startsWith('/')) return debug('not_a_command', { phone: phoneNorm, text });
 
   // Dedup: same phone+message within ~20s = duplicate webhook delivery from Fonnte.
   // Prune FIRST so genuine repeated commands (>20s apart) are not blocked.
-  const hash = await sha1(text);
-  await admin.from('bot_inbox_dedup')
-    .delete()
-    .lt('received_at', new Date(Date.now() - 20_000).toISOString());
-  const { error: dupErr } = await admin
-    .from('bot_inbox_dedup')
-    .insert({ phone: phoneNorm, message_hash: hash });
-  if (dupErr) {
-    // Likely unique violation → already processed in last 20s
-    return new Response('ok', { headers: corsHeaders });
+  if (!testMode) {
+    const hash = await sha1(text);
+    await admin.from('bot_inbox_dedup')
+      .delete()
+      .lt('received_at', new Date(Date.now() - 20_000).toISOString());
+    const { error: dupErr } = await admin
+      .from('bot_inbox_dedup')
+      .insert({ phone: phoneNorm, message_hash: hash });
+    if (dupErr) {
+      // Likely unique violation → already processed in last 20s
+      return new Response('ok', { headers: corsHeaders });
+    }
   }
 
   // Per-phone rate limit: max 1 reply per 8 seconds
-  const RL_WINDOW_MS = 8000;
-  const { data: rl } = await admin.from('bot_rate_limit')
-    .select('last_sent_at').eq('phone', phoneNorm).maybeSingle();
-  if (rl?.last_sent_at && Date.now() - new Date(rl.last_sent_at).getTime() < RL_WINDOW_MS) {
-    return new Response('ok', { headers: corsHeaders });
+  if (!testMode) {
+    const RL_WINDOW_MS = 8000;
+    const { data: rl } = await admin.from('bot_rate_limit')
+      .select('last_sent_at').eq('phone', phoneNorm).maybeSingle();
+    if (rl?.last_sent_at && Date.now() - new Date(rl.last_sent_at).getTime() < RL_WINDOW_MS) {
+      return new Response('ok', { headers: corsHeaders });
+    }
+    await admin.from('bot_rate_limit').upsert({ phone: phoneNorm, last_sent_at: new Date().toISOString() });
+    // Janitor for rate limit (>10 min)
+    await admin.from('bot_rate_limit').delete()
+      .lt('last_sent_at', new Date(Date.now() - 10 * 60_000).toISOString());
   }
-  await admin.from('bot_rate_limit').upsert({ phone: phoneNorm, last_sent_at: new Date().toISOString() });
-  // Janitor for rate limit (>10 min)
-  await admin.from('bot_rate_limit').delete()
-    .lt('last_sent_at', new Date(Date.now() - 10 * 60_000).toISOString());
 
   const lower = text.toLowerCase();
   const [cmd, ...rest] = lower.split(/\s+/);
