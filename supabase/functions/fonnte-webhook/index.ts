@@ -118,7 +118,7 @@ Deno.serve(async (req) => {
   }
 
   // Admin-only commands
-  const ADMIN_ONLY = new Set(['/buattoken']);
+  const ADMIN_ONLY = new Set(['/buattoken', '/tokensatuan']);
   let isBotAdmin = false;
   if (ADMIN_ONLY.has(cmd)) {
     const { data: ba } = await admin
