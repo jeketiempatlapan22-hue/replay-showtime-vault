@@ -60,20 +60,108 @@ async function sha1(input: string) {
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-async function callCreateToken(payload: Record<string, unknown>): Promise<{ ok: boolean; message?: string; error?: string }> {
-  const url = `${Deno.env.get('SUPABASE_URL')}/functions/v1/create-token`;
-  const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+function newToken(len = 40) {
+  const a = crypto.randomUUID().replace(/-/g, '');
+  const b = crypto.randomUUID().replace(/-/g, '');
+  return (a + b).slice(0, len);
+}
+
+function buildAttractiveTokenMessage(opts: {
+  kind: 'master' | 'personal' | 'replay';
+  title: string;
+  link: string;
+  liveUrl: string;
+  showDate?: string;
+}) {
+  const dateLine = opts.showDate ? `📅 ${opts.showDate}` : '';
+  const header = opts.kind === 'personal'
+    ? '✨🔐 *TOKEN SATUAN REPLAYTIME* 🔐✨'
+    : opts.kind === 'replay'
+      ? '🎉✨ *TOKEN REPLAY KAMU SUDAH SIAP!* ✨🎉'
+      : '✨🎬 *TOKEN AKSES REPLAYTIME* 🎬✨';
+  const accessLine = opts.kind === 'personal'
+    ? '👤 *Token Pribadi* — terkunci untuk *1 perangkat pertama* yang membuka.'
+    : '🔓 *Token Multi-Device* — bisa dibuka di banyak perangkat sekaligus.';
+  const closing = opts.kind === 'personal'
+    ? '⚠️ Jangan dibagikan ke orang lain — perangkat lain tidak akan bisa membuka.\n💖 Selamat menonton!'
+    : '💖 Selamat menonton, semoga makin seru ya!';
+  return [
+    header,
+    '',
+    `🎤 *${opts.title}*`,
+    dateLine,
+    '',
+    '🎁 Selamat! Link ini bisa digunakan untuk *menonton Live* sekaligus *membuka Replay*.',
+    '👉 Cukup *klik link*-nya, langsung tayang — tanpa kode tambahan.',
+    '',
+    accessLine,
+    `🔗 ${opts.link}`,
+    opts.liveUrl ? `📺 Live: ${opts.liveUrl}` : '',
+    '',
+    closing,
+  ].filter(Boolean).join('\n');
+}
+
+async function createTokenInline(
+  admin: ReturnType<typeof createClient>,
+  opts: {
+    kind: 'master' | 'personal' | 'replay';
+    replayId: string;
+    requestedBy: string;
+    label?: string;
+    maxDevices?: number;
+    settingsMap: Map<string, string>;
+  },
+): Promise<{ ok: boolean; message?: string; error?: string }> {
   try {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${key}`, 'apikey': key, 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
+    const { data: replay } = await admin
+      .from('replays').select('id,title,date').eq('id', opts.replayId).maybeSingle();
+    if (!replay) return { ok: false, error: 'replay_not_found' };
+
+    const origin = opts.settingsMap.get('site_origin') || '';
+    const liveUrl = origin ? `${origin}/live` : '';
+    const token = newToken();
+    const isPersonal = opts.kind === 'personal';
+
+    if (isPersonal) {
+      const { error } = await admin.from('replay_personal_tokens').insert({
+        replay_id: opts.replayId,
+        token,
+        label: opts.label || `via bot`,
+        max_devices: Math.max(1, Math.min(10, opts.maxDevices ?? 1)),
+      });
+      if (error) return { ok: false, error: 'personal_create_failed:' + error.message };
+    } else {
+      const { error } = await admin.from('replays')
+        .update({ access_token: token }).eq('id', opts.replayId);
+      if (error) return { ok: false, error: 'master_create_failed:' + error.message };
+    }
+
+    const link = `${origin}/akses?token=${token}&replay=${opts.replayId}`;
+    const showDate = (replay as { date?: string }).date
+      ? new Date((replay as { date: string }).date).toLocaleDateString('id-ID', {
+          day: '2-digit', month: 'long', year: 'numeric',
+        })
+      : '';
+    const message = buildAttractiveTokenMessage({
+      kind: opts.kind,
+      title: (replay as { title: string }).title,
+      link, liveUrl, showDate,
     });
-    const j = await res.json().catch(() => ({}));
-    if (!res.ok || !j.ok) return { ok: false, error: j.error || `http_${res.status}` };
-    return { ok: true, message: j.message };
+
+    await admin.from('token_deliveries').insert({
+      phone: opts.requestedBy,
+      replay_id: opts.replayId,
+      replay_title: (replay as { title: string }).title,
+      access_token: token,
+      link,
+      source: 'bot',
+      requested_by: opts.requestedBy,
+    });
+
+    return { ok: true, message };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : 'fetch_failed' };
+    return { ok: false, error: e instanceof Error ? e.message : 'inline_failed' };
   }
 }
 
@@ -291,7 +379,7 @@ Deno.serve(async (req) => {
   }
 
   // Admin-only commands
-  const ADMIN_ONLY = new Set(['/buattoken', '/tokensatuan']);
+  const ADMIN_ONLY = new Set(['/buattoken', '/tokensatuan', '/createtokenrep']);
   let isBotAdmin = false;
   if (ADMIN_ONLY.has(cmd)) {
     const { data: ba } = await admin
@@ -372,11 +460,35 @@ Deno.serve(async (req) => {
         else if (matches.length > 1) reply = `⚠️ Kode *${code}* ambigu (${matches.length} match). Gunakan kode lebih panjang atau alias unik.`;
         else {
           const r = matches[0];
-          const res = await callCreateToken({
-            kind: 'master', replay_id: r.id, source: 'bot', requested_by: phoneNorm,
-            label: `Bot ${phoneNorm}`,
+          const res = await createTokenInline(admin, {
+            kind: 'master', replayId: r.id, requestedBy: phoneNorm,
+            label: `Bot ${phoneNorm}`, settingsMap: map as Map<string, string>,
           });
           reply = res.ok && res.message ? res.message : `❌ Gagal membuat token master. ${res.error || ''}`.trim();
+        }
+      }
+    } else if (cmd === '/createtokenrep') {
+      const code = arg.trim().toLowerCase();
+      if (!code) {
+        reply = 'ℹ️ Format: */createtokenrep <id|alias>*\n_Pakai alias admin yang Anda set di kartu replay, atau 8 karakter pertama ID._';
+      } else {
+        const { data: byAlias } = await admin
+          .from('replays').select('id,title').ilike('admin_alias', code).limit(2);
+        let matches = byAlias ?? [];
+        if (!matches.length) {
+          const { data: byId } = await admin
+            .from('replays').select('id,title').ilike('id', `${code}%`).limit(2);
+          matches = byId ?? [];
+        }
+        if (!matches.length) reply = `❌ Replay dengan id/alias *${code}* tidak ditemukan.`;
+        else if (matches.length > 1) reply = `⚠️ *${code}* ambigu (${matches.length} match). Pakai alias unik atau id yang lebih panjang.`;
+        else {
+          const r = matches[0];
+          const res = await createTokenInline(admin, {
+            kind: 'replay', replayId: r.id, requestedBy: phoneNorm,
+            label: `Bot ${phoneNorm}`, settingsMap: map as Map<string, string>,
+          });
+          reply = res.ok && res.message ? res.message : `❌ Gagal membuat token replay. ${res.error || ''}`.trim();
         }
       }
     } else if (cmd === '/token') {
@@ -423,9 +535,10 @@ Deno.serve(async (req) => {
         else if (matches.length > 1) reply = `⚠️ Kode *${code}* ambigu. Gunakan kode lebih panjang atau alias unik.`;
         else {
           const r = matches[0];
-          const res = await callCreateToken({
-            kind: 'personal', replay_id: r.id, source: 'bot', requested_by: phoneNorm,
-            label: label || `Bot ${phoneNorm}`, max_devices: 1,
+          const res = await createTokenInline(admin, {
+            kind: 'personal', replayId: r.id, requestedBy: phoneNorm,
+            label: label || `Bot ${phoneNorm}`, maxDevices: 1,
+            settingsMap: map as Map<string, string>,
           });
           reply = res.ok && res.message ? res.message : `❌ Gagal membuat token satuan. ${res.error || ''}`.trim();
         }
