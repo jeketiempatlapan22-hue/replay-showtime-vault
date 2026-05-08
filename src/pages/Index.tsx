@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { Search, X, SlidersHorizontal, ArrowUpDown, Bookmark, ArrowUp, Film } from 'lucide-react';
+import { useState, useEffect, useMemo, useCallback, useRef, lazy, Suspense } from 'react';
+import { Search, X, SlidersHorizontal, ArrowUpDown, Bookmark, ArrowUp, Film, Loader2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -9,7 +9,8 @@ import ReplayCardComponent from '@/components/ReplayCardComponent';
 import ReplayCardSkeleton from '@/components/ReplayCardSkeleton';
 import StatsBar from '@/components/StatsBar';
 import ActiveShowsSection from '@/components/ActiveShowsSection';
-import YouTubePlayer from '@/components/YouTubePlayer';
+// Lazy-load player + komentar — chunk berat hanya dimuat saat user membuka replay.
+const YouTubePlayer = lazy(() => import('@/components/YouTubePlayer'));
 import { getReplaysByMonth, getReplays, getSettings } from '@/lib/store';
 import { type ReplayRow } from '@/lib/store';
 import { supabase } from '@/integrations/supabase/client';
@@ -346,7 +347,9 @@ export default function Index() {
       >
         <div className={displayedReplay ? 'block' : 'hidden'}>
           {displayedReplay && (
-            <YouTubePlayer replay={displayedReplay} onBack={handleClosePlayer} />
+            <Suspense fallback={<div className="flex items-center justify-center py-20"><Loader2 className="w-10 h-10 text-primary animate-spin" /></div>}>
+              <YouTubePlayer replay={displayedReplay} onBack={handleClosePlayer} />
+            </Suspense>
           )}
         </div>
       </div>

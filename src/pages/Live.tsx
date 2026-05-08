@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, lazy, Suspense } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Lock, Loader2, ShoppingBag, MessageCircle, Users, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -6,10 +6,23 @@ import { Input } from '@/components/ui/input';
 
 import { supabase } from '@/integrations/supabase/client';
 import { getBrowserId } from '@/lib/browserId';
-import HlsPlayer from '@/components/HlsPlayer';
-import EmbedPlayer from '@/components/EmbedPlayer';
 import MemberAvatar from '@/components/MemberAvatar';
-import LiveChat from '@/components/LiveChat';
+
+// Lazy-load player & chat: bundle awal lebih kecil, terutama di mobile.
+const HlsPlayer = lazy(() => import('@/components/HlsPlayer'));
+const EmbedPlayer = lazy(() => import('@/components/EmbedPlayer'));
+const LiveChat = lazy(() => import('@/components/LiveChat'));
+
+const PlayerFallback = () => (
+  <div className="aspect-video w-full rounded-2xl bg-card/80 border border-border flex items-center justify-center">
+    <Loader2 className="w-8 h-8 text-primary animate-spin" />
+  </div>
+);
+const ChatFallback = () => (
+  <div className="rounded-2xl bg-card/80 border border-border h-[60vh] min-h-[380px] flex items-center justify-center">
+    <Loader2 className="w-6 h-6 text-primary animate-spin" />
+  </div>
+);
 
 type SrcType = 'm3u8' | 'youtube' | 'cloudflare';
 interface PublicSource { label: string; type: SrcType }
@@ -408,9 +421,11 @@ export default function Live() {
           <>
             {liveActive && activeSource ? (
               <>
-                {activeSource.type === 'm3u8'
-                  ? <HlsPlayer key={`m3u8-${safeIdx}-${activeSource.url}`} src={activeSource.url} title={unlocked.title} watermark={unlocked.watermark} onFatalError={handleSourceFatalError} />
-                  : <EmbedPlayer key={`em-${safeIdx}-${activeSource.url}`} type={activeSource.type} source={activeSource.url} title={unlocked.title} watermark={unlocked.watermark} />}
+                <Suspense fallback={<PlayerFallback />}>
+                  {activeSource.type === 'm3u8'
+                    ? <HlsPlayer key={`m3u8-${safeIdx}-${activeSource.url}`} src={activeSource.url} title={unlocked.title} watermark={unlocked.watermark} onFatalError={handleSourceFatalError} />
+                    : <EmbedPlayer key={`em-${safeIdx}-${activeSource.url}`} type={activeSource.type} source={activeSource.url} title={unlocked.title} watermark={unlocked.watermark} />}
+                </Suspense>
 
                 <div className="flex items-center justify-between flex-wrap gap-2 px-1">
                   <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-500/10 border border-red-500/30 text-red-500 text-xs font-semibold">
@@ -464,7 +479,9 @@ export default function Live() {
             )}
 
             {/* LIVE CHAT */}
-            <LiveChat />
+            <Suspense fallback={<ChatFallback />}>
+              <LiveChat />
+            </Suspense>
           </>
         )}
       </div>
