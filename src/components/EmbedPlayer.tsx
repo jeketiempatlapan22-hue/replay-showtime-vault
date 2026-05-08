@@ -10,6 +10,25 @@ interface Props {
   watermark?: string;
 }
 
+interface YoutubePlayerApi {
+  getIframe?: () => HTMLIFrameElement;
+  setVolume?: (volume: number) => void;
+  mute?: () => void;
+  unMute?: () => void;
+  playVideo?: () => void;
+  pauseVideo?: () => void;
+  destroy?: () => void;
+  getPlayerState?: () => number;
+  getDuration?: () => number;
+  getCurrentTime?: () => number;
+  seekTo?: (seconds: number, allowSeekAhead: boolean) => void;
+}
+
+interface YoutubeWindow extends Window {
+  YT?: { Player: new (element: HTMLElement, options: Record<string, unknown>) => YoutubePlayerApi };
+  onYouTubeIframeAPIReady?: () => void;
+}
+
 function extractYoutubeId(raw: string): string {
   const r = (raw || '').trim();
   const matched = r.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/|v\/))([A-Za-z0-9_-]{11})/)?.[1];
@@ -29,13 +48,17 @@ export default function EmbedPlayer({ type, source, title, watermark }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const ytMountRef = useRef<HTMLDivElement>(null);
-  const ytPlayerRef = useRef<any>(null);
+  const ytPlayerRef = useRef<YoutubePlayerApi | null>(null);
+  const ytFallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [ready, setReady] = useState(false);
+  const [useYoutubeFallback, setUseYoutubeFallback] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const initialMuted = (() => { try { return localStorage.getItem(MUTED_KEY) === '1'; } catch { return false; } })();
   const initialVolume = (() => { try { const v = parseFloat(localStorage.getItem(VOL_KEY) || ''); return isFinite(v) ? Math.max(0, Math.min(1, v)) : 1; } catch { return 1; } })();
   const [muted, setMuted] = useState(initialMuted);
   const [volume, setVolume] = useState(initialVolume);
+  const mutedRef = useRef(initialMuted);
+  const volumeRef = useRef(initialVolume);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showHint, setShowHint] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -45,15 +68,35 @@ export default function EmbedPlayer({ type, source, title, watermark }: Props) {
   const ytId = type === 'youtube' ? extractYoutubeId(source) : '';
   const cfUid = type === 'cloudflare' ? extractCloudflareUid(source) : '';
 
+  useEffect(() => { mutedRef.current = muted; }, [muted]);
+  useEffect(() => { volumeRef.current = volume; }, [volume]);
+
   // YouTube IFrame API — instantiate via div mount so YT injects an iframe sized 100% inside our container
   useEffect(() => {
-    if (type !== 'youtube') { setReady(true); return; }
+    setReady(false);
+    setIsPlaying(false);
+    setUseYoutubeFallback(false);
+    if (ytFallbackTimerRef.current) clearTimeout(ytFallbackTimerRef.current);
+    if (type !== 'youtube') {
+      const id = setTimeout(() => { setReady(true); setIsPlaying(true); }, 900);
+      return () => clearTimeout(id);
+    }
     if (!ytId) return;
     let cancelled = false;
+    ytFallbackTimerRef.current = setTimeout(() => {
+      if (cancelled) return;
+      setUseYoutubeFallback(true);
+      setReady(true);
+      setIsPlaying(true);
+      if (!mutedRef.current) {
+        setMuted(true);
+        setShowHint(true);
+      }
+    }, 3500);
 
     const init = () => {
       if (cancelled || !ytMountRef.current) return;
-      const YT = (window as any).YT;
+      const YT = (window as YoutubeWindow).YT;
       if (!YT?.Player) { setTimeout(init, 200); return; }
       ytPlayerRef.current = new YT.Player(ytMountRef.current, {
         videoId: ytId,
@@ -68,6 +111,7 @@ export default function EmbedPlayer({ type, source, title, watermark }: Props) {
         events: {
           onReady: () => {
             if (cancelled) return;
+            if (ytFallbackTimerRef.current) clearTimeout(ytFallbackTimerRef.current);
             // Force injected iframe to fill container & block native clicks
             try {
               const ifr = ytPlayerRef.current?.getIframe?.();
@@ -79,13 +123,13 @@ export default function EmbedPlayer({ type, source, title, watermark }: Props) {
             } catch { /* ignore */ }
             setReady(true);
             try {
-              ytPlayerRef.current.setVolume(Math.round(volume * 100));
-              if (muted) ytPlayerRef.current.mute(); else ytPlayerRef.current.unMute();
+              ytPlayerRef.current.setVolume?.(Math.round(volumeRef.current * 100));
+              if (mutedRef.current) ytPlayerRef.current.mute?.(); else ytPlayerRef.current.unMute?.();
               ytPlayerRef.current.playVideo();
               setTimeout(() => {
                 try {
                   const state = ytPlayerRef.current.getPlayerState();
-                  if (state !== 1 && !muted) {
+                  if (state !== 1 && !mutedRef.current) {
                     ytPlayerRef.current.mute();
                     setMuted(true);
                     ytPlayerRef.current.playVideo();
@@ -95,34 +139,44 @@ export default function EmbedPlayer({ type, source, title, watermark }: Props) {
               }, 800);
             } catch { /* ignore */ }
           },
-          onStateChange: (e: any) => {
+          onStateChange: (e: { data: number }) => {
             setIsPlaying(e.data === 1);
           },
-          onError: () => { /* swallow to avoid blank */ },
+          onError: () => {
+            if (cancelled) return;
+            setUseYoutubeFallback(true);
+            setReady(true);
+            setIsPlaying(true);
+          },
         },
       });
     };
 
-    if (!(window as any).YT) {
+    if (!(window as YoutubeWindow).YT) {
       const existing = document.querySelector('script[src="https://www.youtube.com/iframe_api"]');
       if (!existing) {
         const tag = document.createElement('script');
         tag.src = 'https://www.youtube.com/iframe_api';
         document.head.appendChild(tag);
       }
-      const prev = (window as any).onYouTubeIframeAPIReady;
-      (window as any).onYouTubeIframeAPIReady = () => { try { prev?.(); } catch { /* ignore */ } init(); };
+      const ytWindow = window as YoutubeWindow;
+      const prev = ytWindow.onYouTubeIframeAPIReady;
+      ytWindow.onYouTubeIframeAPIReady = () => { try { prev?.(); } catch { /* ignore */ } init(); };
       // Also poll in case API was already loading
-      const poll = setInterval(() => { if ((window as any).YT?.Player) { clearInterval(poll); init(); } }, 200);
+      const poll = setInterval(() => { if ((window as YoutubeWindow).YT?.Player) { clearInterval(poll); init(); } }, 200);
       setTimeout(() => clearInterval(poll), 10000);
     } else {
       init();
     }
-    return () => { cancelled = true; try { ytPlayerRef.current?.destroy(); } catch { /* ignore */ } };
+    return () => {
+      cancelled = true;
+      if (ytFallbackTimerRef.current) clearTimeout(ytFallbackTimerRef.current);
+      try { ytPlayerRef.current?.pauseVideo?.(); ytPlayerRef.current?.destroy?.(); } catch { /* ignore */ }
+    };
   }, [ytId, type]);
 
   // Cloudflare via Stream SDK postMessage (basic play/pause/volume via iframe contentWindow)
-  const cfPost = (event: string, value?: any) => {
+  const cfPost = (event: string, value?: number) => {
     if (!iframeRef.current?.contentWindow) return;
     iframeRef.current.contentWindow.postMessage({ event: 'command', func: event, args: value !== undefined ? [value] : [] }, '*');
   };
@@ -130,9 +184,15 @@ export default function EmbedPlayer({ type, source, title, watermark }: Props) {
   const togglePlay = () => {
     if (type === 'youtube') {
       const p = ytPlayerRef.current;
+      if (useYoutubeFallback) {
+        if (iframeRef.current) iframeRef.current.src = isPlaying ? 'about:blank' : ytEmbedUrl;
+        setIsPlaying(!isPlaying);
+        return;
+      }
       if (!p || typeof p.pauseVideo !== 'function') return;
       if (isPlaying) p.pauseVideo(); else p.playVideo();
     } else {
+      if (iframeRef.current) iframeRef.current.src = isPlaying ? 'about:blank' : cfEmbedUrl;
       cfPost(isPlaying ? 'pause' : 'play');
       setIsPlaying(!isPlaying);
     }
@@ -209,7 +269,7 @@ export default function EmbedPlayer({ type, source, title, watermark }: Props) {
   };
 
   const ytEmbedUrl = ytId
-    ? `https://www.youtube-nocookie.com/embed/${ytId}?rel=0&modestbranding=1&playsinline=1&autoplay=1&controls=0&fs=0&iv_load_policy=3&disablekb=1&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`
+    ? `https://www.youtube-nocookie.com/embed/${ytId}?rel=0&modestbranding=1&playsinline=1&autoplay=1&mute=${muted || showHint || useYoutubeFallback ? 1 : 0}&controls=0&fs=0&iv_load_policy=3&disablekb=1&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`
     : '';
   const cfEmbedUrl = cfUid
     ? `https://iframe.videodelivery.net/${cfUid}?autoplay=true&controls=false&preload=auto&muted=${muted}`
@@ -223,7 +283,20 @@ export default function EmbedPlayer({ type, source, title, watermark }: Props) {
       onContextMenu={(e) => e.preventDefault()}
     >
       {type === 'youtube' ? (
-        <div ref={ytMountRef} className="absolute inset-0 w-full h-full" />
+        useYoutubeFallback ? (
+          <iframe
+            ref={iframeRef}
+            src={ytEmbedUrl}
+            className="absolute inset-0 w-full h-full pointer-events-none"
+            title={title}
+            allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+            allowFullScreen
+            referrerPolicy="strict-origin-when-cross-origin"
+            style={{ border: 0 }}
+          />
+        ) : (
+          <div ref={ytMountRef} className="absolute inset-0 w-full h-full" />
+        )
       ) : (
         <iframe
           ref={iframeRef}

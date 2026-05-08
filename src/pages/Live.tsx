@@ -100,6 +100,7 @@ export default function Live() {
   const [pwError, setPwError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [kickedMsg, setKickedMsg] = useState('');
+  const [failedSourceKeys, setFailedSourceKeys] = useState<string[]>([]);
   const [sourceIdx, setSourceIdx] = useState<number>(() => {
     try { return Math.max(0, Number(sessionStorage.getItem(SS_SRC_KEY) || '0')); } catch { return 0; }
   });
@@ -168,7 +169,14 @@ export default function Live() {
         body: { ...opts, browser_id: getBrowserId(), show_id: showId || undefined },
       });
       if (data?.valid) {
-        const cfg: UnlockedConfig = { title: data.title, type: data.type, url: data.url, sources: Array.isArray(data.sources) ? data.sources : [], watermark: data.watermark || '', enabled: !!data.enabled };
+        const cfg: UnlockedConfig = {
+          title: data.title,
+          type: isSrcType(data.type) ? data.type : 'm3u8',
+          url: data.url || '',
+          sources: toPrivateSources(data.sources),
+          watermark: data.watermark || '',
+          enabled: !!data.enabled,
+        };
         setUnlocked(cfg);
         setKickedMsg('');
         try { sessionStorage.setItem(`${SS_KEY_BASE}${showId?'-'+showId:''}`, JSON.stringify(cfg)); } catch { /* ignore */ }
@@ -250,12 +258,24 @@ export default function Live() {
     return [main, ...extras];
   }, [unlocked]);
 
+  useEffect(() => {
+    setFailedSourceKeys([]);
+  }, [unlocked?.url, unlocked?.sources]);
+
   const safeIdx = Math.min(sourceIdx, Math.max(0, allSources.length - 1));
   const activeSource = allSources[safeIdx];
+  const sourceKey = (source: PrivateSource, index: number) => `${index}:${source.type}:${source.url}`;
 
   const selectSource = (i: number) => {
     setSourceIdx(i);
     try { sessionStorage.setItem(SS_SRC_KEY, String(i)); } catch { /* ignore */ }
+  };
+
+  const handleSourceFatalError = () => {
+    const failedKey = activeSource ? sourceKey(activeSource, safeIdx) : '';
+    setFailedSourceKeys(prev => failedKey && !prev.includes(failedKey) ? [...prev, failedKey] : prev);
+    const next = allSources.findIndex((source, index) => index !== safeIdx && !failedSourceKeys.includes(sourceKey(source, index)));
+    if (next >= 0) selectSource(next);
   };
 
   const submitPassword = (e: React.FormEvent) => {
@@ -351,6 +371,10 @@ export default function Live() {
           <>
             {liveActive && activeSource ? (
               <>
+                {activeSource.type === 'm3u8'
+                  ? <HlsPlayer key={`m3u8-${safeIdx}-${activeSource.url}`} src={activeSource.url} title={unlocked.title} watermark={unlocked.watermark} onFatalError={handleSourceFatalError} />
+                  : <EmbedPlayer key={`em-${safeIdx}-${activeSource.url}`} type={activeSource.type} source={activeSource.url} title={unlocked.title} watermark={unlocked.watermark} />}
+
                 <div className="flex items-center justify-between flex-wrap gap-2 px-1">
                   <div className="text-xs text-muted-foreground">
                     Sumber aktif: <span className="font-semibold text-foreground">{activeSource.label || 'Player'}</span>
@@ -365,7 +389,7 @@ export default function Live() {
                   <div className="flex items-center gap-2 overflow-x-auto pb-1">
                     {allSources.map((s, i) => (
                       <button
-                        key={i}
+                        key={`${s.type}-${s.url}-${i}`}
                         type="button"
                         onClick={() => selectSource(i)}
                         className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
@@ -377,10 +401,6 @@ export default function Live() {
                     ))}
                   </div>
                 )}
-
-                {activeSource.type === 'm3u8'
-                  ? <HlsPlayer key={`m3u8-${safeIdx}-${activeSource.url}`} src={activeSource.url} title={unlocked.title} watermark={unlocked.watermark} />
-                  : <EmbedPlayer key={`em-${safeIdx}-${activeSource.url}`} type={activeSource.type} source={activeSource.url} title={unlocked.title} watermark={unlocked.watermark} />}
               </>
             ) : (
               <ScheduleCountdown
