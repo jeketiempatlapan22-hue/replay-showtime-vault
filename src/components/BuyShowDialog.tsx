@@ -62,6 +62,16 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
     if (now - createdAt > EXPIRY_MS) setStatus('expired');
   }, [now, createdAt, status]);
 
+  // Persist purchase locally so user does not need to repurchase next visit.
+  const persistPaid = (token: string) => {
+    if (!token) return;
+    if (kind === 'replay_only' && replayId) {
+      setReplayPurchase(replayId, { token, paidAt: Date.now() });
+    } else if (showId) {
+      setShowPurchase(showId, { token, kind: kind === 'replay' ? 'replay' : 'show', paidAt: Date.now() });
+    }
+  };
+
   // Realtime subscribe to order status when QR shown
   useEffect(() => {
     if (status !== 'qr' || !orderId) return;
@@ -70,7 +80,9 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders', filter: `id=eq.${orderId}` }, (payload: any) => {
         const row = payload?.new;
         if (row?.status === 'paid') {
-          setAccessToken(row.access_token || '');
+          const tok = row.access_token || '';
+          setAccessToken(tok);
+          persistPaid(tok);
           setStatus('paid');
         }
       })
@@ -80,7 +92,9 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
     const poll = setInterval(async () => {
       const { data } = await supabase.from('orders').select('status, access_token').eq('id', orderId).maybeSingle();
       if (data?.status === 'paid') {
-        setAccessToken((data as any).access_token || '');
+        const tok = (data as any).access_token || '';
+        setAccessToken(tok);
+        persistPaid(tok);
         setStatus('paid');
       }
     }, 8000);
@@ -88,6 +102,7 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
       try { supabase.removeChannel(ch); } catch { /* ignore */ }
       clearInterval(poll);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, orderId]);
 
   const normalizePhone = (raw: string) => {
