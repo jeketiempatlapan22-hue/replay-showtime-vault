@@ -434,8 +434,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
         return;
       }
       setDuration(nextDuration);
-      isLiveRef.current = false;
-      setIsLiveStream(false);
+      if (!isLiveRef.current) setIsLiveStream(false);
     };
     const onWaiting = () => {
       // mid-play stall (not initial)
@@ -524,15 +523,18 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
   const seek = (delta: number) => {
     const video = videoRef.current;
     if (!video || isLiveStream) return;
-    if (!Number.isFinite(video.duration) || video.duration <= 0) return;
-    video.currentTime = Math.max(0, Math.min(video.duration, video.currentTime + delta));
+    const limit = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : duration;
+    if (!Number.isFinite(limit) || limit <= 0) return;
+    video.currentTime = Math.max(0, Math.min(limit, video.currentTime + delta));
     resetHideTimer();
   };
 
   const seekTo = (e: React.ChangeEvent<HTMLInputElement>) => {
     const video = videoRef.current;
-    if (!video || isLiveStream || !Number.isFinite(video.duration) || video.duration <= 0) return;
-    video.currentTime = Math.max(0, Math.min(video.duration, Number(e.target.value)));
+    if (!video || isLiveStream) return;
+    const limit = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : duration;
+    if (!Number.isFinite(limit) || limit <= 0) return;
+    video.currentTime = Math.max(0, Math.min(limit, Number(e.target.value)));
     setCurrentTime(video.currentTime);
     resetHideTimer();
   };
