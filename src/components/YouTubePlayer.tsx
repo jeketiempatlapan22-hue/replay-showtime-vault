@@ -79,6 +79,13 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
     try {
       password = sessionStorage.getItem(`replaytime-pw-${replay.id}`) || '';
       token = sessionStorage.getItem(`replaytime-tok-${replay.id}`) || '';
+      if (!token) {
+        const url = new URL(window.location.href);
+        token = url.searchParams.get('token') || '';
+      }
+      if (!token) {
+        token = localStorage.getItem('replaytime-browser-id') || '';
+      }
     } catch { /* ignore */ }
     setActiveToken(token);
 
