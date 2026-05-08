@@ -71,13 +71,14 @@ export default function HamburgerMenu({ whatsappNumber, whatsappLink, lightMode,
         </div>
 
         <nav className="p-4 space-y-2">
-          <a
-            href="https://realstream48.lovable.app"
+          <Link
+            to="/shows"
+            onClick={() => setOpen(false)}
             className="flex items-center gap-3 px-4 py-3 rounded-lg text-foreground hover:bg-secondary transition-colors"
           >
             <Home className="w-5 h-5 text-primary" />
             <span className="font-medium">Beranda</span>
-          </a>
+          </Link>
 
           <Link
             to="/live"
