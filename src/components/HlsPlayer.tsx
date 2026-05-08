@@ -304,12 +304,29 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
       });
       hls.on(Hls.Events.LEVEL_LOADED, (_, data) => {
         const live = !!data.details?.live;
+        const wasLive = isLiveRef.current;
         isLiveRef.current = live;
         setIsLiveStream(live);
-        if (live) seekToLiveEdgeOnce(data.details?.edge);
-        if (!live) {
+        if (live) {
+          seekToLiveEdgeOnce(data.details?.edge);
+        } else {
+          // Transition live -> VOD (e.g. siaran berakhir, manifest #EXT-X-ENDLIST muncul).
+          // Reset edge-sync flag agar pengguna bisa bebas seek di rentang seekable VOD,
+          // perbarui durasi dari totalduration manifest, dan cegah false-fatal pada player.
+          initialLiveEdgeSyncRef.current = false;
+          recoveryAttemptsRef.current = 0;
           const vodDuration = typeof data.details?.totalduration === 'number' ? data.details.totalduration : video.duration;
           if (Number.isFinite(vodDuration) && vodDuration > 0) setDuration(vodDuration);
+          if (wasLive) {
+            // Jangan biarkan posisi tertinggal di luar batas seekable baru.
+            try {
+              const seekable = video.seekable;
+              if (seekable.length) {
+                const end = seekable.end(seekable.length - 1);
+                if (Number.isFinite(end) && video.currentTime > end) video.currentTime = Math.max(0, end - 1);
+              }
+            } catch { /* ignore */ }
+          }
         }
       });
       hls.on(Hls.Events.LEVEL_SWITCHED, (_, data) => {
