@@ -27,6 +27,7 @@ const ChatFallback = () => (
 type SrcType = 'm3u8' | 'youtube' | 'cloudflare';
 interface PublicSource { label: string; type: SrcType }
 interface PrivateSource extends PublicSource { url: string }
+interface MembershipInfo { expires_at?: string; resets_used: number; resets_max: number; remaining: number; includes_replays?: boolean }
 interface LiveStatus { enabled: boolean; title: string; type: string; require_password: boolean; sources: PublicSource[]; lineup: string[]; show_date?: string; show_time?: string; image_url?: string }
 interface UnlockedConfig { title: string; type: SrcType; url: string; sources: PrivateSource[]; watermark: string; enabled: boolean }
 type SourceLike = Partial<Record<keyof PrivateSource, unknown>>;
@@ -112,6 +113,7 @@ export default function Live() {
   const [status, setStatus] = useState<LiveStatus | null>(null);
   const [statusLoading, setStatusLoading] = useState(true);
   const [unlocked, setUnlocked] = useState<UnlockedConfig | null>(null);
+  const [membership, setMembership] = useState<MembershipInfo | null>(null);
   const [pwInput, setPwInput] = useState('');
   const [pwError, setPwError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -178,6 +180,23 @@ export default function Live() {
     });
   };
 
+  const reasonMessage = (reason?: string): string => {
+    switch (reason) {
+      case 'blocked': return 'Perangkat ini telah diblokir oleh admin.';
+      case 'device_limit': return 'Token ini sudah terikat ke perangkat lain. Klik "Reset perangkat membership saya" jika ingin pindah perangkat.';
+      case 'no_device': return 'ID perangkat tidak terdeteksi. Aktifkan penyimpanan browser lalu muat ulang halaman.';
+      case 'bad_password': return 'Sandi salah.';
+      case 'bad_membership_password': return 'Sandi membership salah.';
+      case 'revoked': return 'Token tidak valid atau telah dicabut.';
+      case 'expired': return 'Membership Anda telah berakhir. Silakan perpanjang ke admin.';
+      case 'not_started': return 'Membership belum aktif (belum mencapai waktu mulai).';
+      case 'scope': return 'Membership ini tidak mencakup akses replay.';
+      case 'off': return 'Live belum aktif.';
+      case 'password_or_token_required': return 'Masukkan sandi atau gunakan link token.';
+      default: return 'Gagal membuka akses live.';
+    }
+  };
+
   const doUnlock = async (opts: { token?: string; password?: string; mtoken?: string; mpassword?: string }, silent = false) => {
     if (!silent) { setSubmitting(true); setPwError(''); }
     try {
@@ -194,18 +213,16 @@ export default function Live() {
           enabled: !!data.enabled,
         };
         setUnlocked(cfg);
+        if (data.membership) setMembership(data.membership as MembershipInfo);
         setKickedMsg('');
         try { sessionStorage.setItem(`${SS_KEY_BASE}${showId?'-'+showId:''}`, JSON.stringify(cfg)); } catch { /* ignore */ }
       } else if (silent) {
         setUnlocked(null);
+        setMembership(null);
         try { sessionStorage.removeItem(`${SS_KEY_BASE}${showId?'-'+showId:''}`); } catch { /* ignore */ }
         setKickedMsg('Akses Anda telah dicabut oleh admin.');
       } else {
-        if (data?.reason === 'blocked') setPwError('Perangkat ini telah diblokir oleh admin.');
-        else if (data?.reason === 'device_limit') setPwError('Batas perangkat untuk token ini telah tercapai.');
-        else if (data?.reason === 'bad_password') setPwError('Sandi salah.');
-        else if (data?.reason === 'revoked') setPwError('Token tidak valid atau telah dicabut.');
-        else setPwError('Gagal membuka akses live.');
+        setPwError(reasonMessage(data?.reason));
       }
     } catch {
       if (!silent) setPwError('Gagal terhubung ke server.');
@@ -267,15 +284,23 @@ export default function Live() {
   const handleSelfReset = async () => {
     const mt = search.get('mtoken') || prompt('Masukkan token membership:') || '';
     if (!mt) return;
-    const mp = search.get('mp') || prompt('Masukkan sandi membership:') || '';
+    const mp = search.get('mp') || search.get('mpassword') || prompt('Masukkan sandi membership:') || '';
     if (!mp) return;
+    if (!confirm('Reset perangkat akan memutus akses dari perangkat lama dan menggunakan 1 kuota reset manual. Lanjutkan?')) return;
     try {
-      const { data } = await supabase.functions.invoke('membership-self-reset', { body: { mtoken: mt, mpassword: mp } });
+      const { data } = await supabase.functions.invoke('membership-self-reset', {
+        body: { mtoken: mt, mpassword: mp, browser_id: getBrowserId() },
+      });
       if (data?.ok) {
         setPwError('');
-        alert(`Perangkat berhasil direset. Sisa kuota reset: ${data.remaining}`);
+        if (typeof data.used === 'number' && typeof data.max === 'number') {
+          setMembership((prev) => prev ? { ...prev, resets_used: data.used, resets_max: data.max, remaining: data.remaining } : prev);
+        }
+        alert(`Perangkat berhasil direset. Sisa kuota reset manual: ${data.remaining}/${data.max}.`);
+        // Re-unlock with new device
+        void doUnlock({ mtoken: mt, mpassword: mp });
       } else {
-        alert(`Reset gagal: ${data?.reason || 'unknown'}`);
+        alert(`Reset gagal: ${reasonMessage(data?.reason)}`);
       }
     } catch {
       alert('Gagal terhubung ke server.');
@@ -322,7 +347,7 @@ export default function Live() {
   const showKey = search.get('show') || 'global';
   const [viewerCount, setViewerCount] = useState<number>(0);
   useEffect(() => {
-    if (!liveActive) return;
+    if (!liveActive) { setViewerCount(0); return; }
     const bid = getBrowserId();
     const channel = supabase.channel(`live-viewers:${showKey}`, {
       config: { presence: { key: bid } },
@@ -334,24 +359,35 @@ export default function Live() {
         pending = null;
         try {
           const state = channel.presenceState() as Record<string, unknown[]>;
+          // Each unique presence key (browser_id) counts once even with multiple tabs
           const unique = new Set<string>();
-          for (const k of Object.keys(state)) if (k) unique.add(k);
+          for (const k of Object.keys(state)) if (k && Array.isArray(state[k]) && state[k].length > 0) unique.add(k);
           setViewerCount(unique.size);
         } catch { /* ignore */ }
-      }, 1500);
+      }, 600);
     };
     let tracked = false;
+    let heartbeat: number | null = null;
     channel
       .on('presence', { event: 'sync' }, recount)
+      .on('presence', { event: 'join' }, recount)
+      .on('presence', { event: 'leave' }, recount)
       .subscribe(async (status) => {
         if (status === 'SUBSCRIBED' && !tracked) {
           tracked = true;
           try { await channel.track({ at: Date.now() }); } catch { /* ignore */ }
           recount();
+          // Heartbeat: re-track every 25s so phantom presences expire & counter stays accurate
+          heartbeat = window.setInterval(() => {
+            if (document.visibilityState === 'visible') {
+              channel.track({ at: Date.now() }).catch(() => {});
+            }
+          }, 25000);
         }
       });
     return () => {
       if (pending) window.clearTimeout(pending);
+      if (heartbeat) window.clearInterval(heartbeat);
       try { void channel.untrack(); } catch { /* ignore */ }
       supabase.removeChannel(channel);
     };
@@ -466,6 +502,23 @@ export default function Live() {
                     <span className="text-[10px] font-mono text-muted-foreground">ID: {unlocked.watermark}</span>
                   )}
                 </div>
+
+                {membership && (
+                  <div className="rounded-xl border border-primary/30 bg-primary/5 p-3 text-xs sm:text-sm flex flex-wrap items-center justify-between gap-2">
+                    <div className="space-y-0.5">
+                      <div className="font-semibold text-foreground">Membership aktif</div>
+                      <div className="text-muted-foreground">
+                        {membership.expires_at ? `Berlaku s/d ${new Date(membership.expires_at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}` : 'Tanpa batas waktu'}
+                      </div>
+                      <div className="text-muted-foreground">
+                        Reset perangkat: <span className="font-mono text-foreground">{membership.resets_used}/{membership.resets_max}</span> terpakai · Sisa <span className="font-mono text-foreground">{membership.remaining}</span>
+                      </div>
+                    </div>
+                    <Button type="button" variant="outline" size="sm" onClick={handleSelfReset} disabled={membership.remaining <= 0}>
+                      Reset perangkat ini
+                    </Button>
+                  </div>
+                )}
 
                 {allSources.length > 1 && (
                   <div className="flex items-center gap-2 overflow-x-auto pb-1">

@@ -10,8 +10,9 @@ const json = (b: unknown, status = 200) =>
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   try {
-    const { mtoken, mpassword } = await req.json().catch(() => ({} as any));
+    const { mtoken, mpassword, browser_id } = await req.json().catch(() => ({} as any));
     if (!mtoken || !mpassword) return json({ ok: false, reason: "missing" });
+    if (!browser_id || browser_id.length < 6) return json({ ok: false, reason: "no_device" });
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -26,12 +27,14 @@ Deno.serve(async (req) => {
 
     const used = t.manual_resets_used || 0;
     const max = t.manual_resets_max || 3;
-    if (used >= max) return json({ ok: false, reason: "quota_exhausted", remaining: 0 });
+    if (used >= max) return json({ ok: false, reason: "quota_exhausted", used, max, remaining: 0 });
 
     await supabase.from("membership_token_devices").delete().eq("token_id", t.id);
+    // Immediately bind the requesting browser as the new active device
+    await supabase.from("membership_token_devices").insert({ token_id: t.id, browser_id });
     await supabase.from("membership_tokens").update({ manual_resets_used: used + 1, updated_at: new Date().toISOString() }).eq("id", t.id);
 
-    return json({ ok: true, remaining: max - (used + 1) });
+    return json({ ok: true, used: used + 1, max, remaining: max - (used + 1) });
   } catch {
     return json({ ok: false }, 500);
   }
