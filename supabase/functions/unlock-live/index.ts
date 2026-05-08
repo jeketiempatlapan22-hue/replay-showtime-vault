@@ -11,11 +11,43 @@ const json = (b: unknown, status = 200) =>
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   try {
-    const { token, password, browser_id } = await req.json().catch(() => ({} as any));
+    const { token, password, browser_id, show_id } = await req.json().catch(() => ({} as any));
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
+
+    // ===== Branch A: per-show live (active_shows) =====
+    if (show_id) {
+      const { data: show } = await supabase
+        .from("active_shows")
+        .select("id,title,is_live,live_auto_schedule,live_url,live_type,live_sources,live_password,live_require_password,show_date,show_time,is_active")
+        .eq("id", show_id)
+        .maybeSingle();
+      if (!show || !show.is_active) return json({ valid: false, reason: "off" });
+
+      const startMs = new Date(`${show.show_date}T${show.show_time}`).getTime();
+      const nowMs = Date.now();
+      const autoOn = show.live_auto_schedule && nowMs >= startMs && nowMs <= startMs + 8 * 3600 * 1000;
+      const enabled = !!show.is_live || !!autoOn;
+
+      if (show.live_require_password) {
+        if (!password) return json({ valid: false, reason: "password_or_token_required" });
+        if (!show.live_password || show.live_password !== password) return json({ valid: false, reason: "bad_password" });
+      }
+
+      return json({
+        valid: true,
+        enabled,
+        title: show.title,
+        type: show.live_type || "m3u8",
+        url: show.live_url || "",
+        sources: Array.isArray(show.live_sources) ? show.live_sources : [],
+        watermark: `RT-${String(show.id).slice(0, 4).toUpperCase()}`,
+      });
+    }
+
+    // ===== Branch B: legacy live_config_private =====
     const { data: cfg } = await supabase.from("live_config_private").select("*").limit(1).maybeSingle();
     if (!cfg) return json({ valid: false, reason: "off" });
 
@@ -23,7 +55,6 @@ Deno.serve(async (req) => {
 
     const enabled = !!cfg.enabled;
 
-    // Token path (device-locked) — token can be validated regardless of enabled state
     if (token) {
       const { data: t } = await supabase.from("live_tokens").select("*").eq("token", token).maybeSingle();
       if (!t || t.revoked) return json({ valid: false, reason: "revoked" });
@@ -51,7 +82,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Password path — allowed even when live is offline
     if (password) {
       if (!cfg.password || cfg.password !== password) return json({ valid: false, reason: "bad_password" });
       return json({
