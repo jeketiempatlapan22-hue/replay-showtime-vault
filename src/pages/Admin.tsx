@@ -1308,10 +1308,17 @@ export default function Admin() {
                       <Trash2 className="w-3.5 h-3.5" />
                     </Button>
                   </div>
-                  <Input className="h-8 text-xs" placeholder={s.type === 'youtube' ? 'YouTube ID atau URL' : s.type === 'cloudflare' ? 'Cloudflare UID atau URL' : 'Link .m3u8 (boleh .live)'}
-                    value={s.url}
-                    onChange={e => setForm(f => ({ ...f, sources: f.sources.map((x, i) => i === idx ? { ...x, url: e.target.value } : x) }))} />
-                </div>
+                  {s.type === 'youtube' ? (
+                    <YouTubeIdInput
+                      value={s.url}
+                      onChange={(v) => setForm(f => ({ ...f, sources: f.sources.map((x, i) => i === idx ? { ...x, url: v } : x) }))}
+                      placeholder="URL YouTube (live/watch/youtu.be) atau ID 11 karakter"
+                    />
+                  ) : (
+                    <Input className="h-8 text-xs" placeholder={s.type === 'cloudflare' ? 'Cloudflare UID atau URL' : 'Link .m3u8 (boleh .live)'}
+                      value={s.url}
+                      onChange={e => setForm(f => ({ ...f, sources: f.sources.map((x, i) => i === idx ? { ...x, url: e.target.value } : x) }))} />
+                  )}
               ))}
             </div>
 
