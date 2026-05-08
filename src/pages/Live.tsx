@@ -118,7 +118,7 @@ export default function Live() {
             return null;
           }
           const enabled = !!data.is_live;
-          const pubSources = (Array.isArray(data.live_sources) ? data.live_sources : []).map((s: any) => ({ label: s.label, type: s.type }));
+          const pubSources = toPublicSources(data.live_sources);
           let wasOff = false;
           setStatus(prev => {
             wasOff = !prev?.enabled;
@@ -137,7 +137,7 @@ export default function Live() {
             title: data.title || prev.title,
             type: (data.live_type as SrcType) || prev.type,
             url: data.live_url || '',
-            sources: (Array.isArray(data.live_sources) ? data.live_sources : []) as unknown as PrivateSource[],
+            sources: toPrivateSources(data.live_sources),
           } : prev);
           // When live just toggled on, silently re-call unlock to re-validate (token/blocked)
           if (enabled && wasOff) {
@@ -149,7 +149,7 @@ export default function Live() {
         });
     }
     return supabase.rpc('get_live_status').then(({ data }) => {
-      const row: any = Array.isArray(data) ? data[0] : data;
+      const row = Array.isArray(data) ? data[0] : data;
       setStatus(row ? {
         enabled: !!row.enabled, title: row.title || 'Live', type: row.type || 'm3u8',
         require_password: row.require_password !== false,
