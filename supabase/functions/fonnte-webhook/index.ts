@@ -19,13 +19,14 @@ function normalizePhone(raw: string) {
   return d;
 }
 
-async function sendFonnte(phone: string, message: string): Promise<{ ok: boolean; data?: unknown; error?: string }> {
+async function sendFonnte(phone: string, message: string, inboxId = ''): Promise<{ ok: boolean; data?: unknown; error?: string }> {
   const token = Deno.env.get('FONNTE_TOKEN');
   if (!token) return { ok: false, error: 'FONNTE_TOKEN not configured' };
   const form = new FormData();
   form.append('target', normalizePhone(phone));
   form.append('message', message);
   form.append('countryCode', '62');
+  if (inboxId) form.append('inboxid', inboxId);
   try {
     const res = await fetch('https://api.fonnte.com/send', {
       method: 'POST', headers: { Authorization: token }, body: form,
@@ -83,6 +84,63 @@ async function isAuthorizedTestRequest(authHeader: string, admin: ReturnType<typ
   } catch {
     return false;
   }
+}
+
+function pickWebhookPayload(input: any) {
+  if (Array.isArray(input)) return input[0] ?? {};
+  if (Array.isArray(input?.data)) return input.data[0] ?? {};
+  if (input?.data && typeof input.data === 'object') return input.data;
+  return input ?? {};
+}
+
+async function logBotEvent(
+  admin: ReturnType<typeof createClient>,
+  event: {
+    phone?: string; device?: string; message?: string; command?: string;
+    inboxId?: string; fromMe?: boolean; eventName: string; detail?: Record<string, unknown>;
+  },
+) {
+  try {
+    await admin.from('bot_inbox_events').insert({
+      phone: event.phone || null,
+      device: event.device || null,
+      message: event.message || null,
+      command: event.command || null,
+      inbox_id: event.inboxId || null,
+      from_me: event.fromMe ?? false,
+      event_name: event.eventName,
+      detail: event.detail || {},
+    });
+  } catch { /* audit logging must never block bot replies */ }
+}
+
+async function sendAndAudit(
+  admin: ReturnType<typeof createClient>,
+  opts: { phone: string; message: string; inboxId?: string; testMode?: boolean; deliverTest?: boolean; command?: string; device?: string; fromMe?: boolean },
+) {
+  const sendResult = opts.testMode && !opts.deliverTest
+    ? { ok: true, data: { skipped: true, reason: 'test_mode' } }
+    : await sendFonnte(opts.phone, opts.message, opts.inboxId || '');
+
+  await admin.from('wa_outbox').insert({
+    phone: opts.phone,
+    message: opts.message,
+    status: sendResult.ok ? 'sent' : 'failed',
+    error: sendResult.ok ? null : sendResult.error,
+    fonnte_response: sendResult.data as Record<string, unknown> | undefined,
+  });
+  await logBotEvent(admin, {
+    phone: opts.phone,
+    device: opts.device,
+    message: opts.message,
+    command: opts.command,
+    inboxId: opts.inboxId,
+    fromMe: opts.fromMe,
+    eventName: sendResult.ok ? 'reply_sent' : 'reply_failed',
+    detail: { send: sendResult.data, error: sendResult.error },
+  });
+
+  return sendResult;
 }
 
 Deno.serve(async (req) => {
