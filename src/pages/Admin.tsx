@@ -824,7 +824,7 @@ export default function Admin() {
                                 }
                                 const { error } = await supabase.from('active_shows').update({ is_live: v }).eq('id', s.id);
                                 if (error) toast({ title: 'Gagal', description: error.message, variant: 'destructive' });
-                                else { toast({ title: v ? `🔴 ${s.title} sedang LIVE` : 'Live dinonaktifkan' }); refreshShows(); }
+                                else { toast({ title: v ? `🔴 ${s.title} sedang LIVE` : 'Live dinonaktifkan' }); refreshActiveShows(); }
                               }}
                             />
                           </div>
