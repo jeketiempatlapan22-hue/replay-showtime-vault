@@ -229,11 +229,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
   const togglePlay = () => {
     if (type === 'youtube') {
       const p = ytPlayerRef.current;
-      if (useYoutubeFallback) {
-        if (iframeRef.current) iframeRef.current.src = isPlaying ? 'about:blank' : ytEmbedUrl;
-        setIsPlaying(!isPlaying);
-        return;
-      }
+      // No fallback path needed: iframe is rendered immediately, API attaches in place.
       if (!p || typeof p.pauseVideo !== 'function') return;
       try {
         const state = p.getPlayerState?.();
@@ -258,13 +254,6 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
     try { localStorage.setItem(MUTED_KEY, m ? '1' : '0'); } catch { /* ignore */ }
     if (type === 'youtube') {
       const p = ytPlayerRef.current;
-      if (useYoutubeFallback) {
-        if (iframeRef.current && ytId) {
-          iframeRef.current.src = `https://www.youtube-nocookie.com/embed/${ytId}?rel=0&modestbranding=1&playsinline=1&autoplay=1&mute=${m ? 1 : 0}&controls=0&fs=0&iv_load_policy=3&disablekb=1&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`;
-        }
-        setShowHint(false);
-        return;
-      }
       if (!p || typeof p.mute !== 'function') {
         if (iframeRef.current && ytId) {
           iframeRef.current.src = `https://www.youtube-nocookie.com/embed/${ytId}?rel=0&modestbranding=1&playsinline=1&autoplay=1&mute=${m ? 1 : 0}&controls=0&fs=0&iv_load_policy=3&disablekb=1&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`;
