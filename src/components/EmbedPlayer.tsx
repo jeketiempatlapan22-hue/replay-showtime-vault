@@ -50,6 +50,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
   const ytMountRef = useRef<HTMLDivElement>(null);
   const ytPlayerRef = useRef<YoutubePlayerApi | null>(null);
   const ytFallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const readyRef = useRef(false);
   const [ready, setReady] = useState(false);
   const [useYoutubeFallback, setUseYoutubeFallback] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -76,6 +77,11 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
   const [seeking, setSeeking] = useState(false);
   const [showControls, setShowControls] = useState(true);
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const markReady = useCallback((value: boolean) => {
+    readyRef.current = value;
+    setReady(value);
+  }, []);
 
   const resetHideTimer = useCallback(() => {
     setShowControls(true);
@@ -118,27 +124,27 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
   // karena timer pendek — fallback iframe (tanpa API) hanya dipakai bila API gagal (onError) atau setelah
   // safety timeout panjang.
   useEffect(() => {
-    setReady(false);
+    markReady(false);
     setIsPlaying(false);
     setUseYoutubeFallback(false);
     setDuration(0);
     setCurrentTime(0);
     if (ytFallbackTimerRef.current) clearTimeout(ytFallbackTimerRef.current);
     if (type !== 'youtube') {
-      const id = setTimeout(() => { setReady(true); setIsPlaying(true); }, 600);
+      const id = setTimeout(() => { markReady(true); setIsPlaying(true); }, 600);
       return () => clearTimeout(id);
     }
     if (!ytId) {
       // Invalid YouTube id — clear loading so user sees error message instead of stuck spinner
-      setReady(true);
+      markReady(true);
       return;
     }
     let cancelled = false;
     // Safety net: kalau API benar-benar gagal load (script blocked / network), pakai fallback iframe.
     ytFallbackTimerRef.current = setTimeout(() => {
-      if (cancelled || ready) return;
+      if (cancelled || readyRef.current) return;
       setUseYoutubeFallback(true);
-      setReady(true);
+      markReady(true);
       setIsPlaying(true);
       if (!mutedRef.current) {
         setMuted(true);
@@ -163,7 +169,10 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
         events: {
           onReady: () => {
             if (cancelled) return;
-            if (ytFallbackTimerRef.current) clearTimeout(ytFallbackTimerRef.current);
+            if (ytFallbackTimerRef.current) {
+              clearTimeout(ytFallbackTimerRef.current);
+              ytFallbackTimerRef.current = null;
+            }
             // Force injected iframe to fill container & block native clicks
             try {
               const ifr = ytPlayerRef.current?.getIframe?.();
@@ -173,7 +182,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
                 ifr.setAttribute('allowfullscreen', 'true');
               }
             } catch { /* ignore */ }
-            setReady(true);
+            markReady(true);
             try {
               ytPlayerRef.current.setVolume?.(Math.round(volumeRef.current * 100));
               if (mutedRef.current) ytPlayerRef.current.mute?.(); else ytPlayerRef.current.unMute?.();
@@ -197,7 +206,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
           onError: () => {
             if (cancelled) return;
             setUseYoutubeFallback(true);
-            setReady(true);
+            markReady(true);
             setIsPlaying(true);
           },
         },
@@ -225,7 +234,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
       if (ytFallbackTimerRef.current) clearTimeout(ytFallbackTimerRef.current);
       try { ytPlayerRef.current?.pauseVideo?.(); ytPlayerRef.current?.destroy?.(); } catch { /* ignore */ }
     };
-  }, [ytId, type]);
+  }, [ytId, type, markReady]);
 
   // Cloudflare via Stream SDK postMessage (basic play/pause/volume via iframe contentWindow)
   const cfPost = (event: string, value?: number) => {
