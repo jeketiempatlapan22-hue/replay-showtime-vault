@@ -236,28 +236,6 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
             </div>
           </div>
         )}
-              <div className="text-[10px] text-muted-foreground mt-2">Order: {pakasirOrderId}</div>
-              {qrUrl && (
-                <a
-                  href={qrUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-block mt-2 text-[11px] text-primary hover:underline"
-                >
-                  Buka di tab baru ↗
-                </a>
-              )}
-            </div>
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-muted-foreground">Berlaku selama</span>
-              <span className="font-mono font-semibold text-primary">{mm}:{ss}</span>
-            </div>
-            <div className="flex items-center gap-2 rounded-md bg-muted/40 p-2 text-xs text-muted-foreground">
-              <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
-              Menunggu pembayaran... status akan otomatis berubah.
-            </div>
-          </div>
-        )}
 
         {status === 'paid' && (
           <div className="space-y-3 py-2">
