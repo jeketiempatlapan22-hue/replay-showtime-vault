@@ -6,7 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { getActiveShows, type ActiveShow } from '@/lib/activeShows';
 import ActiveShowCard from '@/components/ActiveShowCard';
 import HamburgerMenu from '@/components/HamburgerMenu';
-import logoImg from '@/assets/realtime48-logo.png';
+import logoImg from '@/assets/logo.png';
 
 export default function Shows() {
   const navigate = useNavigate();
