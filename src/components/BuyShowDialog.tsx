@@ -205,19 +205,18 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
 
         {status === 'qr' && (
           <div className="space-y-3">
-            <div className="rounded-lg border border-border bg-card p-3 text-center">
-              <div className="text-xs text-muted-foreground mb-1">Scan QRIS</div>
+            <div className="rounded-lg border border-border bg-card p-2 text-center">
+              <div className="text-xs text-muted-foreground mb-1">Scan QRIS untuk Pembayaran</div>
               {qrUrl && (
-                <img
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=400x400&margin=12&data=${encodeURIComponent(qrUrl)}`}
-                  alt="QRIS Pembayaran"
-                  className="mx-auto w-56 h-56 object-contain rounded bg-white p-2"
-                  onError={(e) => {
-                    const img = e.currentTarget;
-                    img.onerror = null;
-                    img.src = `https://quickchart.io/qr?size=400&margin=2&text=${encodeURIComponent(qrUrl)}`;
-                  }}
-                />
+                <div className="relative w-full overflow-hidden rounded bg-white" style={{ height: 460 }}>
+                  <iframe
+                    src={qrUrl}
+                    title="QRIS Pembayaran"
+                    className="w-full h-full border-0"
+                    allow="payment *"
+                    sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+                  />
+                </div>
               )}
               <div className="text-[10px] text-muted-foreground mt-2">Order: {pakasirOrderId}</div>
               {qrUrl && (
@@ -227,7 +226,7 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
                   rel="noopener noreferrer"
                   className="inline-block mt-2 text-[11px] text-primary hover:underline"
                 >
-                  Atau buka halaman pembayaran ↗
+                  Buka di tab baru ↗
                 </a>
               )}
             </div>
