@@ -53,6 +53,7 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
   const [pwError, setPwError] = useState('');
   const [pwChecking, setPwChecking] = useState(false);
   const [activeSourceId, setActiveSourceId] = useState<string | null>(null);
+  const [activeToken, setActiveToken] = useState<string>('');
   const containerRef = useRef<HTMLDivElement>(null);
   
   const hlsPlayerRef = useRef<HlsPlayerHandle>(null);
