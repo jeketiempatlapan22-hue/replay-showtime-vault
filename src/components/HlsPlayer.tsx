@@ -282,6 +282,13 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
         }
       });
       hls.on(Hls.Events.ERROR, (_, data) => {
+        if (data.details === Hls.ErrorDetails.MANIFEST_LOAD_ERROR && data.response?.code && data.response.code >= 400) {
+          setError('Sumber video tidak dapat diakses. Mencoba player lain…');
+          setLoading(false);
+          setBuffering(false);
+          onFatalErrorRef.current?.();
+          return;
+        }
         // Non-fatal errors: log only, hls.js handles internal retries.
         if (!data.fatal) {
           if (data.type === Hls.ErrorTypes.MEDIA_ERROR && recoveryAttemptsRef.current < 2) {
