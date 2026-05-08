@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
+import QRCode from 'qrcode';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Loader2, CheckCircle2, Copy, Smartphone, ExternalLink, QrCode } from 'lucide-react';
+import { Loader2, CheckCircle2, Copy, Smartphone, ExternalLink } from 'lucide-react';
 import { setShowPurchase, setReplayPurchase } from '@/lib/purchases';
 
 interface Props {
@@ -29,6 +30,9 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
   const [status, setStatus] = useState<Status>('form');
   const [orderId, setOrderId] = useState<string | null>(null);
   const [qrUrl, setQrUrl] = useState<string>('');
+  const [qrString, setQrString] = useState<string>('');
+  const [qrDataUrl, setQrDataUrl] = useState<string>('');
+  const [totalPayment, setTotalPayment] = useState<number>(0);
   const [pakasirOrderId, setPakasirOrderId] = useState<string>('');
   const [accessToken, setAccessToken] = useState<string>('');
   const [createdAt, setCreatedAt] = useState<number>(0);
@@ -40,7 +44,7 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
     if (!open) {
       setStatus('form');
       setOrderId(null);
-      setQrUrl('');
+      setQrUrl(''); setQrString(''); setQrDataUrl(''); setTotalPayment(0);
       setPakasirOrderId('');
       setAccessToken('');
       setCreatedAt(0);
@@ -141,7 +145,15 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
       if (!r?.ok) throw new Error(r?.error || 'Gagal membuat order');
       setOrderId(r.order_id);
       setPakasirOrderId(r.pakasir_order_id);
-      setQrUrl(r.qr_url);
+      setQrUrl(r.qr_url || '');
+      setQrString(r.qr_string || '');
+      setTotalPayment(Number(r.total_payment || amount));
+      if (r.qr_string) {
+        try {
+          const dataUrl = await QRCode.toDataURL(r.qr_string, { width: 512, margin: 1, errorCorrectionLevel: 'M' });
+          setQrDataUrl(dataUrl);
+        } catch { /* ignore */ }
+      }
       setCreatedAt(Date.now());
       setNow(Date.now());
       setStatus('qr');
@@ -206,25 +218,31 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
         {status === 'qr' && (
           <div className="space-y-3">
             <div className="rounded-lg border border-border bg-card p-4 text-center space-y-3">
-              <div className="flex flex-col items-center gap-2">
-                <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
-                  <QrCode className="w-8 h-8 text-primary" />
+              <div className="text-xs text-muted-foreground">Scan QRIS dengan e-wallet / m-banking</div>
+              {qrDataUrl ? (
+                <div className="mx-auto bg-white p-3 rounded-md inline-block">
+                  <img src={qrDataUrl} alt="QRIS Pembayaran" width={260} height={260} className="block" />
                 </div>
-                <div className="text-sm font-semibold text-foreground">QRIS Pembayaran Siap</div>
-                <div className="text-xs text-muted-foreground px-2">
-                  Klik tombol di bawah untuk membuka halaman QRIS Pakasir. Scan QR di sana dengan aplikasi e-wallet/m-banking Anda.
+              ) : (
+                <div className="py-10 flex flex-col items-center gap-2">
+                  <Loader2 className="w-8 h-8 text-primary animate-spin" />
+                  <p className="text-xs text-muted-foreground">Membuat QR...</p>
                 </div>
+              )}
+              <div className="text-base font-bold text-primary">
+                Rp {(totalPayment || amount).toLocaleString('id-ID')}
               </div>
-              <a
-                href={qrUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center justify-center gap-2 w-full rounded-md bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-3 text-sm font-semibold transition"
-              >
-                <ExternalLink className="w-4 h-4" />
-                Buka Halaman Pembayaran QRIS
-              </a>
               <div className="text-[10px] text-muted-foreground">Order ID: {pakasirOrderId}</div>
+              {qrUrl && (
+                <a
+                  href={qrUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center justify-center gap-1 text-[11px] text-primary hover:underline"
+                >
+                  <ExternalLink className="w-3 h-3" /> Buka di halaman Pakasir
+                </a>
+              )}
             </div>
             <div className="flex items-center justify-between text-xs">
               <span className="text-muted-foreground">QRIS berlaku selama</span>

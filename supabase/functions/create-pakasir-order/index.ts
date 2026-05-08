@@ -77,6 +77,29 @@ Deno.serve(async (req) => {
 
     const orderId = genOrderId();
     const qrUrl = `https://app.pakasir.com/pay/${slug}/${orderId}?amount=${amount}&qris_only=1`;
+    const apiKey = Deno.env.get('PAKASIR_API_KEY') || '';
+
+    // Call Pakasir API to get raw QRIS string so we can render it in our own UI.
+    let qrString = '';
+    let totalPayment = amount;
+    let expiredAt = '';
+    try {
+      const pres = await fetch(`https://app.pakasir.com/api/transactioncreate/qris`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ project: slug, order_id: orderId, amount, api_key: apiKey }),
+      });
+      const pjson: any = await pres.json().catch(() => ({}));
+      const p = pjson?.payment || {};
+      qrString = String(p.payment_number || '');
+      totalPayment = Number(p.total_payment || amount);
+      expiredAt = String(p.expired_at || '');
+      if (!pres.ok || !qrString) {
+        return new Response(JSON.stringify({ error: 'pakasir_create_failed', detail: pjson }), { status: 502, headers: corsHeaders });
+      }
+    } catch (e) {
+      return new Response(JSON.stringify({ error: 'pakasir_unreachable', detail: String(e) }), { status: 502, headers: corsHeaders });
+    }
 
     const { data: order, error: orderErr } = await admin.from('orders').insert({
       user_phone: phone,
@@ -91,7 +114,8 @@ Deno.serve(async (req) => {
     if (orderErr) return new Response(JSON.stringify({ error: orderErr.message }), { status: 500, headers: corsHeaders });
 
     return new Response(JSON.stringify({
-      ok: true, order_id: order.id, pakasir_order_id: orderId, amount, qr_url: qrUrl,
+      ok: true, order_id: order.id, pakasir_order_id: orderId, amount,
+      qr_url: qrUrl, qr_string: qrString, total_payment: totalPayment, expired_at: expiredAt,
     }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   } catch (e) {
     return new Response(JSON.stringify({ error: String(e) }), { status: 500, headers: corsHeaders });
