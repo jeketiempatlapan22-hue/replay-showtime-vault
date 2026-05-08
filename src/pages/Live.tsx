@@ -38,17 +38,47 @@ export default function Live() {
     try { return Math.max(0, Number(sessionStorage.getItem(SS_SRC_KEY) || '0')); } catch { return 0; }
   });
 
-  const fetchStatus = () => supabase.rpc('get_live_status').then(({ data }) => {
-    const row: any = Array.isArray(data) ? data[0] : data;
-    setStatus(row ? {
-      enabled: !!row.enabled, title: row.title || 'Live', type: row.type || 'm3u8',
-      require_password: row.require_password !== false,
-      sources: Array.isArray(row.sources) ? row.sources : [],
-      lineup: Array.isArray(row.lineup) ? row.lineup : [],
-    } : { enabled: false, title: 'Live', type: 'm3u8', require_password: true, sources: [], lineup: [] });
-    setStatusLoading(false);
-    return row;
-  });
+  const showId = search.get('show') || '';
+
+  const fetchStatus = () => {
+    if (showId) {
+      // Active-show LIVE: read from active_shows + RPC for current live
+      return supabase.from('active_shows')
+        .select('id,title,is_live,live_auto_schedule,live_type,live_require_password,live_sources,lineup,show_date,show_time,is_active')
+        .eq('id', showId).maybeSingle()
+        .then(({ data }) => {
+          if (!data || !data.is_active) {
+            setStatus({ enabled: false, title: 'Live', type: 'm3u8', require_password: true, sources: [], lineup: [] });
+            setStatusLoading(false);
+            return null;
+          }
+          const startMs = new Date(`${data.show_date}T${data.show_time}`).getTime();
+          const nowMs = Date.now();
+          const autoOn = data.live_auto_schedule && nowMs >= startMs && nowMs <= startMs + 8 * 3600 * 1000;
+          const enabled = !!data.is_live || !!autoOn;
+          const pubSources = (Array.isArray(data.live_sources) ? data.live_sources : []).map((s: any) => ({ label: s.label, type: s.type }));
+          setStatus({
+            enabled, title: data.title || 'Live', type: data.live_type || 'm3u8',
+            require_password: data.live_require_password !== false,
+            sources: pubSources,
+            lineup: Array.isArray(data.lineup) ? data.lineup : [],
+          });
+          setStatusLoading(false);
+          return data;
+        });
+    }
+    return supabase.rpc('get_live_status').then(({ data }) => {
+      const row: any = Array.isArray(data) ? data[0] : data;
+      setStatus(row ? {
+        enabled: !!row.enabled, title: row.title || 'Live', type: row.type || 'm3u8',
+        require_password: row.require_password !== false,
+        sources: Array.isArray(row.sources) ? row.sources : [],
+        lineup: Array.isArray(row.lineup) ? row.lineup : [],
+      } : { enabled: false, title: 'Live', type: 'm3u8', require_password: true, sources: [], lineup: [] });
+      setStatusLoading(false);
+      return row;
+    });
+  };
 
   const doUnlock = async (opts: { token?: string; password?: string }, silent = false) => {
     if (!silent) { setSubmitting(true); setPwError(''); }
