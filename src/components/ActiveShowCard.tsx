@@ -31,8 +31,18 @@ function useCountdown(target: Date) {
 export default function ActiveShowCard({ show, index = 0 }: { show: ActiveShow; index?: number }) {
   const target = getShowDateTime(show);
   const cd = useCountdown(target);
+  const navigate = useNavigate();
+  const [buyOpen, setBuyOpen] = useState(false);
+  const [buyMode, setBuyMode] = useState<'show' | 'replay'>('show');
   const formattedDate = target.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
   const formattedTime = `${pad(target.getHours())}:${pad(target.getMinutes())} WIB`;
+
+  const replayMode = show.replay_enabled && !!show.replay_id;
+  const showPriced = (show.price_show || 0) > 0 && (show.pakasir_amount || 0) > 0;
+  const replayPriced = (show.price_replay || 0) > 0 && (show.pakasir_amount || 0) > 0;
+
+  const openBuy = (mode: 'show' | 'replay') => { setBuyMode(mode); setBuyOpen(true); };
+  const goReplay = () => { if (show.replay_id) navigate(`/replay/${show.replay_id}`); };
 
   return (
     <div
