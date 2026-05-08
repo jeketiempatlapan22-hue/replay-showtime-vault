@@ -46,7 +46,8 @@ export default function EmbedPlayer({ type, source, title, watermark }: Props) {
 
   // YouTube IFrame API
   useEffect(() => {
-    if (type !== 'youtube' || !ytId) return;
+    if (type !== 'youtube') { setReady(true); return; }
+    if (!ytId) return;
     let cancelled = false;
 
     const init = () => {
