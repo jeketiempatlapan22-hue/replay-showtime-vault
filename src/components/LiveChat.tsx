@@ -27,6 +27,8 @@ export default function LiveChat() {
   const [nameInput, setNameInput] = useState('');
   const [nameError, setNameError] = useState('');
   const listRef = useRef<HTMLDivElement>(null);
+  const [cooldownLeft, setCooldownLeft] = useState(0);
+  const sentTimestampsRef = useRef<number[]>([]);
 
   // Modal opens on demand when user tries to interact without a name.
   // (Username is required per browser before any chat interaction.)
