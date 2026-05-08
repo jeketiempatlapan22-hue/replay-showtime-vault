@@ -137,7 +137,11 @@ export default function ShowLiveControl({ showId, showTitle }: Props) {
         </div>
         <div className="sm:col-span-2">
           <Label className="text-xs">Live URL Utama</Label>
-          <Input value={liveUrl} onChange={e => setLiveUrl(e.target.value)} placeholder="https://...m3u8 atau ID YouTube" />
+          {liveType === 'youtube' ? (
+            <YouTubeIdInput value={liveUrl} onChange={setLiveUrl} placeholder="URL YouTube (live/watch/youtu.be) atau ID 11 karakter" />
+          ) : (
+            <Input value={liveUrl} onChange={e => setLiveUrl(e.target.value)} placeholder={liveType === 'cloudflare' ? 'Cloudflare UID atau URL' : 'https://...m3u8'} />
+          )}
         </div>
       </div>
 
