@@ -51,21 +51,29 @@ export interface ReplaySource {
 export async function getReplaySource(
   replayId: string,
   opts: { password?: string; accessToken?: string },
-): Promise<ReplaySource | null> {
+): Promise<{ data: ReplaySource | null; reason?: string }> {
   try {
     const body: Record<string, string> = { replay_id: replayId };
     if (opts.password) body.password = opts.password;
-    if (opts.accessToken) body.access_token = opts.accessToken;
+    if (opts.accessToken) {
+      body.access_token = opts.accessToken;
+      try {
+        const { getBrowserId } = await import('@/lib/browserId');
+        body.browser_id = getBrowserId();
+      } catch { /* ignore */ }
+    }
     const { data, error } = await supabase.functions.invoke('get-replay-source', { body });
-    if (error || !data?.valid) return null;
+    if (error || !data?.valid) return { data: null, reason: data?.reason };
     return {
-      youtube_id: data.youtube_id || '',
-      m3u8_url: data.m3u8_url || '',
-      source_type: data.source_type || 'youtube',
-      sources: Array.isArray(data.sources) ? data.sources : [],
+      data: {
+        youtube_id: data.youtube_id || '',
+        m3u8_url: data.m3u8_url || '',
+        source_type: data.source_type || 'youtube',
+        sources: Array.isArray(data.sources) ? data.sources : [],
+      },
     };
   } catch {
-    return null;
+    return { data: null };
   }
 }
 
