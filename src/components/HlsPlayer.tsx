@@ -318,12 +318,8 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
           onFatalErrorRef.current?.();
           return;
         }
-        // Non-fatal errors: log only, hls.js handles internal retries.
+        // Non-fatal errors: let hls.js retry internally. Avoid media recovery here because it can restart/seek unexpectedly.
         if (!data.fatal) {
-          if (data.type === Hls.ErrorTypes.MEDIA_ERROR && recoveryAttemptsRef.current < 2) {
-            recoveryAttemptsRef.current += 1;
-            try { hls?.recoverMediaError(); safePlay(); } catch { /* ignore */ }
-          }
           return;
         }
 
@@ -509,21 +505,30 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
   const togglePlay = () => {
     const video = videoRef.current;
     if (!video) return;
-    if (video.paused) { video.play().catch(() => {}); }
-    else { video.pause(); }
+    if (video.paused) {
+      video.play().catch(() => {});
+      setIsPlaying(true);
+    } else {
+      video.pause();
+      setIsPlaying(false);
+    }
     resetHideTimer();
   };
 
   const seek = (delta: number) => {
     const video = videoRef.current;
     if (!video || isLiveStream) return;
-    video.currentTime = Math.max(0, Math.min(video.duration || 0, video.currentTime + delta));
+    if (!Number.isFinite(video.duration) || video.duration <= 0) return;
+    video.currentTime = Math.max(0, Math.min(video.duration, video.currentTime + delta));
+    resetHideTimer();
   };
 
   const seekTo = (e: React.ChangeEvent<HTMLInputElement>) => {
     const video = videoRef.current;
-    if (!video || isLiveStream) return;
-    video.currentTime = Number(e.target.value);
+    if (!video || isLiveStream || !Number.isFinite(video.duration) || video.duration <= 0) return;
+    video.currentTime = Math.max(0, Math.min(video.duration, Number(e.target.value)));
+    setCurrentTime(video.currentTime);
+    resetHideTimer();
   };
 
   const changeVolume = (e: React.ChangeEvent<HTMLInputElement>) => {
