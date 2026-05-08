@@ -120,6 +120,7 @@ export default function Live() {
   const [submitting, setSubmitting] = useState(false);
   const [kickedMsg, setKickedMsg] = useState('');
   const [failedSourceKeys, setFailedSourceKeys] = useState<string[]>([]);
+  const [tokenInfo, setTokenInfo] = useState<{ kind: string; max_devices: number } | null>(null);
   const navVisible = useAutoHideOnInteraction(!!unlocked, 3000);
   const [sourceIdx, setSourceIdx] = useState<number>(() => {
     try { return Math.max(0, Number(sessionStorage.getItem(SS_SRC_KEY) || '0')); } catch { return 0; }
