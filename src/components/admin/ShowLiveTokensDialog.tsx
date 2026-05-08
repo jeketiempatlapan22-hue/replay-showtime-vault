@@ -29,6 +29,7 @@ interface Props {
 export default function ShowLiveTokensDialog({ open, onOpenChange, showId, showTitle }: Props) {
   const [tokens, setTokens] = useState<Token[]>([]);
   const [devices, setDevices] = useState<Record<string, Device[]>>({});
+  const [blocked, setBlocked] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(false);
   const [label, setLabel] = useState('');
   const [maxDevices, setMaxDevices] = useState(1);
