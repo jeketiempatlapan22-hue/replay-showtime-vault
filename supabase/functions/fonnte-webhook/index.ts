@@ -220,6 +220,7 @@ Deno.serve(async (req) => {
       .insert({ phone: phoneNorm, message_hash: hash });
     if (dupErr) {
       // Likely unique violation → already processed in last 20s
+      await logBotEvent(admin, { phone: phoneNorm, device: deviceNorm, message: text, command: commandPreview, inboxId, fromMe, eventName: 'ignored_duplicate', detail: { error: dupErr.message } });
       return new Response('ok', { headers: corsHeaders });
     }
   }
@@ -230,6 +231,7 @@ Deno.serve(async (req) => {
     const { data: rl } = await admin.from('bot_rate_limit')
       .select('last_sent_at').eq('phone', phoneNorm).maybeSingle();
     if (rl?.last_sent_at && Date.now() - new Date(rl.last_sent_at).getTime() < RL_WINDOW_MS) {
+      await logBotEvent(admin, { phone: phoneNorm, device: deviceNorm, message: text, command: commandPreview, inboxId, fromMe, eventName: 'ignored_rate_limited', detail: { last_sent_at: rl.last_sent_at } });
       return new Response('ok', { headers: corsHeaders });
     }
     await admin.from('bot_rate_limit').upsert({ phone: phoneNorm, last_sent_at: new Date().toISOString() });
@@ -251,7 +253,16 @@ Deno.serve(async (req) => {
     .maybeSingle();
 
   if (!command) {
-    await sendFonnte(phoneNorm, '❓ Command tidak dikenali. Ketik */menu* untuk daftar perintah.');
+    await sendAndAudit(admin, {
+      phone: phoneNorm,
+      message: '❓ Command tidak dikenali. Ketik */menu* untuk daftar perintah.',
+      inboxId,
+      testMode,
+      deliverTest,
+      command: cmd,
+      device: deviceNorm,
+      fromMe,
+    });
     return new Response('ok', { headers: corsHeaders });
   }
 
@@ -267,7 +278,16 @@ Deno.serve(async (req) => {
       .maybeSingle();
     isBotAdmin = !!ba;
     if (!isBotAdmin) {
-      await sendFonnte(phoneNorm, '🔒 Command ini hanya untuk admin bot. Hubungi owner untuk akses.');
+      await sendAndAudit(admin, {
+        phone: phoneNorm,
+        message: '🔒 Command ini hanya untuk admin bot. Hubungi owner untuk akses.',
+        inboxId,
+        testMode,
+        deliverTest,
+        command: cmd,
+        device: deviceNorm,
+        fromMe,
+      });
       return new Response('ok', { headers: corsHeaders });
     }
   }
