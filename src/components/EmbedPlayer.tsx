@@ -51,7 +51,6 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
   const ytFallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const readyRef = useRef(false);
   const [ready, setReady] = useState(false);
-  const [useYoutubeFallback, setUseYoutubeFallback] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   // Default unmuted: clear stale persisted mute one time per session.
   const initialMuted = (() => {

@@ -1,59 +1,53 @@
-# Rencana Perbaikan Membership, Unlock & Linter
+## Tujuan
+1. Pulihkan tombol "Tap untuk aktifkan suara" + seek bar + tombol seek (±10 dtk) + durasi pada EmbedPlayer YouTube (replay & show aktif live).
+2. Klik di mana pun pada layar memunculkan navbar dan menyembunyikannya kembali setelah 3 detik.
+3. Responsif konsisten di mobile, PC, TV, dan proyektor — tidak ada tombol/UI yang terpotong.
+4. Embed YouTube/Cloudflare tampil mulus tanpa stuck "Menghubungkan…", lag, atau loncatan posisi.
 
-## 1. Akar masalah error "membuka akses replay/live"
+Tidak ada perubahan logika backend / verifikasi password / membership / RLS / edge functions.
 
-- Edge `unlock-live` & `verify-password` mengembalikan `reason` baru (`bad_membership_password`, `expired`, `not_started`, `scope`, `device_limit`, `no_device`) yang **tidak dipetakan** di `Live.tsx` / Akses → user lihat pesan generic "Gagal membuka akses live", terlihat seperti error.
-- `unlock-live` saat membership: jika `mtoken` ada tapi `browser_id` kosong → `bind` gagal silent → user terkunci.
-- `verify-password` (replay) tidak menolak konsisten saat `browser_id` kosong (anti-spoof bocor), dan tidak menambah `last_seen` → device pertama bisa diganti dari browser lain karena tidak ada penegak unique.
-- Tabel `membership_token_devices` tidak punya `UNIQUE(token_id)` sehingga race-condition memungkinkan 2 device terikat.
+---
 
-## 2. Perubahan yang dilakukan
+## Perubahan per file
 
-### A. Database (migration)
-- Tambah `UNIQUE(token_id)` pada `membership_token_devices` (1 device per token, dijamin di DB).
-- Tambah index `(browser_id)` untuk pencarian cepat.
-- Tambah kolom `last_seen` sudah ada → pakai untuk audit.
-- Perbaiki **semua linter Supabase**:
-  - Tabel RLS-enabled tanpa policy (`login_attempts`) → tambah policy admin-only.
-  - Hapus policy `USING (true)` non-SELECT (mis. `ratings UPDATE`, `blocked_browsers INSERT`) → ganti dengan policy edge-function-only (service role) atau scoping yang aman.
-  - `SECURITY DEFINER` function publik → REVOKE EXECUTE FROM anon untuk fungsi yang tidak perlu publik (`record_login_attempt`, `check_login_lock`, `prune_*`, `update_*_timestamp`); biarkan `get_live_status`, `get_active_live`, `email_for_phone`, `phone_exists`, `has_role`, `increment_view_count` (dipakai client / RLS).
-  - Public bucket listing → tambah policy `storage.objects SELECT` di-scope hanya ke bucket dan tolak listing root (atau set bucket non-public + signed URLs jika tidak dipakai listing). Pilih opsi yang **tidak merubah** akses gambar member/card → pakai policy SELECT spesifik per `bucket_id` sehingga listing tetap diblok.
+### `src/components/EmbedPlayer.tsx` (utama)
+Player iframe sudah dirender langsung, tapi hint suara dan seek bar hilang karena state `showHint` dan `duration` baru di-set setelah API YouTube siap. Perbaikan:
 
-### B. Edge functions (anti-spoof konsisten)
-- `unlock-live` & `verify-password`:
-  - Wajib `browser_id` non-kosong saat `mtoken` dipakai → reject `no_device`.
-  - Hash `browser_id` (sha256 + salt server) sebelum disimpan/dibanding → mempersulit pemalsuan dengan menebak nilai dari client.
-  - Pakai `upsert` dengan `onConflict: token_id` untuk memenuhi unique → jika sudah ada row dengan `browser_id` lain → tolak `device_limit`.
-  - Update `last_seen` setiap unlock berhasil.
-  - Sertakan `manual_resets_used`, `manual_resets_max`, `expires_at` di response sukses.
-- `membership-self-reset`: tambahkan info `used`, `max`, `remaining` dan reject jika `browser_id` kosong.
+- **Tap untuk aktifkan suara**: set `showHint=true` segera setelah `iframe.onLoad` saat `mutedRef.current === true` (autoplay paksa mute). Sembunyikan setelah user menekan tombol unmute.
+- **Toggle mute fallback**: Saat YT API belum siap, ubah `iframe.src` (mengganti param `mute=0/1`) — sudah ada, pastikan tetap mempertahankan `currentTime` dengan param `start=`.
+- **Seek bar & durasi**:
+  - Pertahankan polling `getDuration/getCurrentTime` (sudah ada). Tampilkan seek bar segera ketika `type==='youtube'` walau `duration===0` dengan placeholder `--:--` agar UI tidak "loncat" muncul belakangan.
+  - Pastikan tombol `SkipBack`/`SkipForward` tampil untuk YouTube replay (sudah ada via `hideSeekButtons`).
+- **Hapus state mati `useYoutubeFallback`** yang tidak pernah di-set true (mengecoh logika `togglePlay`/`toggleMute`).
+- **Auto-hide kontrol player**: tetap 3 dtk; hentikan `e.stopPropagation` pada wrapper kontrol — gunakan `pointer-events` yang lebih halus agar event `pointerdown` global (capture phase) tetap terdeteksi oleh `useAutoHideOnInteraction`.
+- **Responsivitas**: tambah `landscape:` dan breakpoint `xl:` agar tombol fullscreen/volume tidak terpotong; gunakan `gap-1 xs:gap-2`; volume slider hidden di < 360px.
 
-### C. UI Live (`src/pages/Live.tsx`)
-- Petakan semua `reason` ke pesan Indonesia yang jelas.
-- Setelah unlock membership berhasil: tampilkan kartu kecil "Membership aktif sampai DD-MM-YYYY · Reset perangkat: X/Y terpakai · Sisa Z" + tombol **Reset perangkat ini**.
-- Tombol self-reset pakai `mtoken` & `mp` dari URL/sessionStorage (tanpa `prompt()`).
-- **Viewer counter**: ganti perhitungan presence — gunakan `Object.values(state).flat().length === 0 ? 0 : Object.keys(state).length` tetap, tapi tambahkan presence-key unik per tab `${bid}:${tabId}` lalu dedupe by prefix `bid` di client → mencegah hilang count saat 1 user buka 2 tab dan mencegah double-count saat reconnect. Tambah heartbeat `track({ at })` setiap 25s & `recount` pada `join`/`leave`.
+### `src/components/HlsPlayer.tsx`
+- Audit: `e.stopPropagation` pada div control dihapus dari level pembungkus — biarkan tombol-tombolnya saja yang stopPropagation supaya klik area kosong tetap memicu autohide global.
+- Pastikan seek bar VOD tetap berfungsi (tidak diubah perilakunya), hanya bersihkan sedikit styling untuk layar TV (tinggi track 3px → 4px landscape, target tap min 44×44 px).
 
-### D. Admin (`MembershipAdmin.tsx`)
-- Satu layar Tab Membership, per row aksi: **Copy link**, **Revoke**, **Reset perangkat** (delete devices), **Reset kuota perangkat** (set `manual_resets_used=0`), **Hapus**.
-- Tampilkan device terikat (browser_id terpotong + `last_seen`) ekspandable.
+### `src/hooks/useAutoHideOnInteraction.ts`
+- Tambahkan listener `click` selain `pointerdown` (capture+passive) agar perangkat TV/remote yang hanya mengirim event `click` ikut memicu navbar muncul.
+- Reset timer juga pada `touchstart` & `mousemove` (throttled 500ms).
 
-## 3. Tidak akan diubah
-- File player (`HlsPlayer.tsx`, `EmbedPlayer.tsx`), embed, autoplay, kontrol, chat, sumber, sorting replay/live.
-- Skema kolom `replays`, `active_shows`, `live_config_private`.
+### `src/pages/Live.tsx` & `src/components/YouTubePlayer.tsx`
+- Tidak ubah logika; hanya pastikan kontainer player menggunakan `max-w-screen-2xl` + `w-full` + `aspect-video` agar di TV/proyektor (≥1920px) video memenuhi tanpa terpotong, dan pada mobile sempit (<360px) padding lateral berkurang menjadi `px-1`.
+- Pada `Live.tsx`, hapus `e.stopPropagation` pada wrapper status/info card supaya klik di area mana pun tetap memunculkan navbar.
 
-## 4. Verifikasi
-- Jalankan `supabase--linter` lagi → 0 WARN/ERROR (atau hanya yang dipertahankan dengan justifikasi di security memory).
-- Manual test: unlock dengan token yang sudah terikat ke browser lain → dapat pesan "Batas perangkat tercapai", lalu self-reset → berhasil dan kuota berkurang di UI.
-- Buka 2 tab → viewer count tetap 1; buka di 2 device → 2.
+### `src/components/ActiveShowCard.tsx`
+- DialogContent inline player live: ubah ke `w-[calc(100vw-0.5rem)] sm:w-[calc(100vw-2rem)] max-w-[1600px]` + `max-h-[100dvh]` agar di TV tidak terpotong; tambah `aspect-video` pada wrapper player.
 
-## Detail teknis singkat
-```
-membership_token_devices
-  UNIQUE(token_id)                -- enforce 1 device
-  hashed browser_id (sha256+salt) -- anti-spoof
-  last_seen timestamp             -- audit
+---
 
-unlock response (sukses, mtoken):
-  { valid, ...cfg, membership: { expires_at, resets_used, resets_max, remaining } }
-```
+## Cara verifikasi
+- Buka `/live?show=…` (YouTube source) → player langsung tampil, "Tap untuk aktifkan suara" muncul, klik aktifkan suara, seek bar + tombol ±10s + durasi tampil setelah API ready (≤3 dtk).
+- Buka kartu Show Aktif yang sedang live (YouTube) di Index → player inline punya semua kontrol sama.
+- Klik area mana pun pada halaman saat menonton → navbar muncul, hilang 3 dtk kemudian.
+- Resize preview: 320, 414, 768, 1280, 1920, 2560 — tidak ada tombol terpotong.
+- Tidak ada error baru di console; status `200` untuk semua request.
+
+## Apa yang TIDAK diubah
+- Edge functions (`unlock-live`, `verify-password`, dst.)
+- Skema database / RLS
+- Logika membership, token, device-binding, atau viewer counter
+- HLS player engine (hls.js config)
