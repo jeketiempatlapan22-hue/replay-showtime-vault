@@ -145,7 +145,15 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
       if (!r?.ok) throw new Error(r?.error || 'Gagal membuat order');
       setOrderId(r.order_id);
       setPakasirOrderId(r.pakasir_order_id);
-      setQrUrl(r.qr_url);
+      setQrUrl(r.qr_url || '');
+      setQrString(r.qr_string || '');
+      setTotalPayment(Number(r.total_payment || amount));
+      if (r.qr_string) {
+        try {
+          const dataUrl = await QRCode.toDataURL(r.qr_string, { width: 512, margin: 1, errorCorrectionLevel: 'M' });
+          setQrDataUrl(dataUrl);
+        } catch { /* ignore */ }
+      }
       setCreatedAt(Date.now());
       setNow(Date.now());
       setStatus('qr');
