@@ -110,6 +110,25 @@ export default function ShowLiveTokensDialog({ open, onOpenChange, showId, showT
     load();
   };
 
+  const blockBrowser = async (browser_id: string) => {
+    if (!confirm('Blokir perangkat ini? User tidak bisa akses live (semua show) sampai dibuka admin.')) return;
+    // upsert: jika sudah ada (unblocked), set unblocked=false; jika belum, insert
+    const { data: existing } = await supabase.from('blocked_browsers').select('id').eq('browser_id', browser_id).maybeSingle();
+    if (existing) {
+      await supabase.from('blocked_browsers').update({ unblocked: false, reason: 'admin_block' }).eq('id', existing.id);
+    } else {
+      await supabase.from('blocked_browsers').insert({ browser_id, reason: 'admin_block', unblocked: false });
+    }
+    toast({ title: 'Perangkat diblokir' });
+    load();
+  };
+
+  const unblockBrowser = async (browser_id: string) => {
+    await supabase.from('blocked_browsers').update({ unblocked: true }).eq('browser_id', browser_id);
+    toast({ title: 'Blokir dibuka' });
+    load();
+  };
+
   const copyLink = async (token: string) => {
     const url = `${window.location.origin}/live?show=${showId}&t=${token}`;
     try { await navigator.clipboard.writeText(url); toast({ title: 'Link tersalin' }); } catch { /* ignore */ }
