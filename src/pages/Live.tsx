@@ -257,9 +257,30 @@ export default function Live() {
 
   useEffect(() => {
     const t = search.get('t');
-    if (!t || unlocked || statusLoading) return;
-    void doUnlock({ token: t });
+    const mt = search.get('mtoken');
+    const mp = search.get('mp') || search.get('mpassword') || '';
+    if (unlocked || statusLoading) return;
+    if (mt) void doUnlock({ mtoken: mt, mpassword: mp });
+    else if (t) void doUnlock({ token: t });
   }, [search, statusLoading]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleSelfReset = async () => {
+    const mt = search.get('mtoken') || prompt('Masukkan token membership:') || '';
+    if (!mt) return;
+    const mp = search.get('mp') || prompt('Masukkan sandi membership:') || '';
+    if (!mp) return;
+    try {
+      const { data } = await supabase.functions.invoke('membership-self-reset', { body: { mtoken: mt, mpassword: mp } });
+      if (data?.ok) {
+        setPwError('');
+        alert(`Perangkat berhasil direset. Sisa kuota reset: ${data.remaining}`);
+      } else {
+        alert(`Reset gagal: ${data?.reason || 'unknown'}`);
+      }
+    } catch {
+      alert('Gagal terhubung ke server.');
+    }
+  };
 
   const allSources = useMemo<PrivateSource[]>(() => {
     if (!unlocked) return [];
