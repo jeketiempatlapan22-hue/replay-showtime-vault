@@ -86,6 +86,33 @@ export type Database = {
         }
         Relationships: []
       }
+      bot_admins: {
+        Row: {
+          created_at: string
+          enabled: boolean
+          id: string
+          label: string
+          phone: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          label?: string
+          phone: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          label?: string
+          phone?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       bot_commands: {
         Row: {
           created_at: string

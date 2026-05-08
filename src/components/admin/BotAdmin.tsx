@@ -18,6 +18,15 @@ type BotCommand = {
   sort_order: number;
 };
 
+type BotAdminRow = { id: string; phone: string; label: string; enabled: boolean };
+
+function normalizePhone(raw: string) {
+  const d = raw.replace(/\D/g, '');
+  if (!d) return '';
+  if (d.startsWith('0')) return '62' + d.slice(1);
+  return d;
+}
+
 export default function BotAdmin() {
   const [commands, setCommands] = useState<BotCommand[]>([]);
   const [loading, setLoading] = useState(true);
@@ -25,6 +34,9 @@ export default function BotAdmin() {
   const [testMsg, setTestMsg] = useState('Halo dari ReplayTime ✨');
   const [sending, setSending] = useState(false);
   const [copiedWebhook, setCopiedWebhook] = useState(false);
+  const [admins, setAdmins] = useState<BotAdminRow[]>([]);
+  const [newPhone, setNewPhone] = useState('');
+  const [newLabel, setNewLabel] = useState('');
 
   const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
   const fonnteWebhook = `https://${projectId}.supabase.co/functions/v1/fonnte-webhook`;
@@ -32,12 +44,35 @@ export default function BotAdmin() {
 
   const load = async () => {
     setLoading(true);
-    const { data } = await supabase.from('bot_commands').select('*').order('sort_order');
-    setCommands((data ?? []) as BotCommand[]);
+    const [{ data: cmds }, { data: ads }] = await Promise.all([
+      supabase.from('bot_commands').select('*').order('sort_order'),
+      supabase.from('bot_admins').select('*').order('created_at'),
+    ]);
+    setCommands((cmds ?? []) as BotCommand[]);
+    setAdmins((ads ?? []) as BotAdminRow[]);
     setLoading(false);
   };
 
   useEffect(() => { load(); }, []);
+
+  const addAdmin = async () => {
+    const phone = normalizePhone(newPhone);
+    if (!phone) { toast({ title: 'Nomor tidak valid', variant: 'destructive' }); return; }
+    const { error } = await supabase.from('bot_admins').insert({ phone, label: newLabel || '' });
+    if (error) toast({ title: 'Gagal', description: error.message, variant: 'destructive' });
+    else { setNewPhone(''); setNewLabel(''); load(); toast({ title: 'Admin bot ditambahkan' }); }
+  };
+
+  const toggleAdmin = async (a: BotAdminRow) => {
+    await supabase.from('bot_admins').update({ enabled: !a.enabled }).eq('id', a.id);
+    load();
+  };
+
+  const removeAdmin = async (id: string) => {
+    if (!confirm('Hapus admin bot ini?')) return;
+    await supabase.from('bot_admins').delete().eq('id', id);
+    load();
+  };
 
   const save = async (c: BotCommand) => {
     const { error } = await supabase.from('bot_commands').update({
@@ -129,6 +164,38 @@ export default function BotAdmin() {
         <Button onClick={sendTest} disabled={sending} className="w-full sm:w-auto">
           <Send className="w-4 h-4 mr-2" />{sending ? 'Mengirim…' : 'Kirim Tes'}
         </Button>
+      </div>
+
+      {/* Bot Admins whitelist */}
+      <div className="bg-card border border-border rounded-xl p-4 space-y-3">
+        <h3 className="font-semibold">Admin Bot WhatsApp</h3>
+        <p className="text-xs text-muted-foreground">
+          Hanya nomor di daftar ini yang dapat menjalankan command admin seperti <code>/buattoken</code>.
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <Input placeholder="08xxxx atau 628xxxx" value={newPhone} onChange={(e) => setNewPhone(e.target.value)} />
+          <Input placeholder="Label (opsional)" value={newLabel} onChange={(e) => setNewLabel(e.target.value)} />
+          <Button onClick={addAdmin}><Plus className="w-4 h-4 mr-1" />Tambah Admin</Button>
+        </div>
+        <div className="space-y-2">
+          {admins.length === 0 ? (
+            <p className="text-xs text-muted-foreground italic">Belum ada admin bot.</p>
+          ) : admins.map((a) => (
+            <div key={a.id} className="flex items-center gap-2 border border-border rounded-lg p-2 bg-secondary/30">
+              <div className="flex-1 min-w-0">
+                <p className="font-mono text-sm">+{a.phone}</p>
+                {a.label && <p className="text-xs text-muted-foreground">{a.label}</p>}
+              </div>
+              <label className="flex items-center gap-2 text-xs">
+                <Switch checked={a.enabled} onCheckedChange={() => toggleAdmin(a)} />
+                Aktif
+              </label>
+              <Button size="icon" variant="outline" onClick={() => removeAdmin(a.id)}>
+                <Trash2 className="w-4 h-4" />
+              </Button>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Commands editor */}
