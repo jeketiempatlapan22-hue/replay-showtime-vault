@@ -44,6 +44,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
   const stallWatchdogRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastProgressRef = useRef({ time: 0, checkedAt: Date.now(), recoveries: 0 });
   const onFatalErrorRef = useRef(onFatalError);
+  const initialLiveEdgeSyncRef = useRef(false);
 
   const initialVolume = (() => { try { const v = parseFloat(localStorage.getItem('replaytime-volume') || ''); return isFinite(v) ? Math.max(0, Math.min(1, v)) : 1; } catch { return 1; } })();
   // Default unmuted; one-time per session, clear stale persisted mute so user starts with sound on.
@@ -169,6 +170,19 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
       return Number.isFinite(current) && current > 0 ? current : -1;
     };
 
+    const seekToLiveEdgeOnce = (syncPosition?: number | null) => {
+      if (initialLiveEdgeSyncRef.current) return;
+      const seekable = video.seekable;
+      const fallbackEdge = seekable.length ? seekable.end(seekable.length - 1) : NaN;
+      const edge = Number.isFinite(syncPosition || NaN) ? Number(syncPosition) : fallbackEdge;
+      if (!Number.isFinite(edge) || edge <= 0) return;
+      initialLiveEdgeSyncRef.current = true;
+      const target = Math.max(0, edge - 1.5);
+      if (Math.abs(video.currentTime - target) > 2) {
+        try { video.currentTime = target; } catch { /* ignore */ }
+      }
+    };
+
     const startStallWatchdog = () => {
       if (stallWatchdogRef.current) clearInterval(stallWatchdogRef.current);
       stallWatchdogRef.current = setInterval(() => {
@@ -246,6 +260,8 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
         maxLoadingDelay: 8,
         // Hindari buffering ulang berlebihan
         appendErrorMaxRetry: 5,
+        startPosition: -1,
+        liveDurationInfinity: true,
         liveSyncDurationCount: 4,
         liveMaxLatencyDurationCount: 12,
       });
