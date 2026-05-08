@@ -47,7 +47,6 @@ const MUTED_KEY = 'replaytime-muted';
 export default function EmbedPlayer({ type, source, title, watermark, hideSeekButtons = false }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const ytMountRef = useRef<HTMLDivElement>(null);
   const ytPlayerRef = useRef<YoutubePlayerApi | null>(null);
   const ytFallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const readyRef = useRef(false);
@@ -99,6 +98,18 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
     resetHideTimer();
   }, [resetHideTimer]);
 
+  const handleFrameLoaded = useCallback(() => {
+    markReady(true);
+    setIsPlaying(true);
+    // Browser autoplay is most reliable when embeds start muted. Show the same tap-to-unmute flow
+    // instead of reloading the iframe or leaving the user behind a loading overlay.
+    if (!mutedRef.current) {
+      mutedRef.current = true;
+      setMuted(true);
+      setShowHint(true);
+    }
+  }, [markReady]);
+
   useEffect(() => {
     resetHideTimer();
     return () => { if (hideTimerRef.current) clearTimeout(hideTimerRef.current); };
@@ -110,10 +121,8 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
   useEffect(() => { mutedRef.current = muted; }, [muted]);
   useEffect(() => { volumeRef.current = volume; }, [volume]);
 
-  // YouTube IFrame API — instantiate via div mount so YT injects an iframe sized 100% inside our container.
-  // Penting: untuk replay, seek bar/durasi mengandalkan IFrame API. Jadi kita TIDAK auto-fallback hanya
-  // karena timer pendek — fallback iframe (tanpa API) hanya dipakai bila API gagal (onError) atau setelah
-  // safety timeout panjang.
+  // YouTube: tampilkan iframe langsung agar tidak blank/stuck, lalu attach IFrame API ke iframe yang sama
+  // untuk kontrol replay (seek, durasi, play/pause, mute) saat API sudah siap.
   useEffect(() => {
     markReady(false);
     setIsPlaying(false);
@@ -122,7 +131,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
     setCurrentTime(0);
     if (ytFallbackTimerRef.current) clearTimeout(ytFallbackTimerRef.current);
     if (type !== 'youtube') {
-      const id = setTimeout(() => { markReady(true); setIsPlaying(true); }, 600);
+      const id = setTimeout(() => { markReady(true); setIsPlaying(true); }, 1200);
       return () => clearTimeout(id);
     }
     if (!ytId) {
@@ -131,28 +140,21 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
       return;
     }
     let cancelled = false;
-    // Safety net: kalau API benar-benar gagal load (script blocked / network), pakai fallback iframe.
+    let initialized = false;
+    // Safety net: jangan biarkan overlay koneksi menutup iframe bila API/onLoad lambat atau diblokir.
     ytFallbackTimerRef.current = setTimeout(() => {
       if (cancelled || readyRef.current) return;
-      setUseYoutubeFallback(true);
       markReady(true);
       setIsPlaying(true);
-    }, 15000);
+    }, 3000);
 
     const init = () => {
-      if (cancelled || !ytMountRef.current) return;
+      if (cancelled || !iframeRef.current) return;
+      if (initialized) return;
       const YT = (window as YoutubeWindow).YT;
       if (!YT?.Player) { setTimeout(init, 200); return; }
-      ytPlayerRef.current = new YT.Player(ytMountRef.current, {
-        videoId: ytId,
-        width: '100%',
-        height: '100%',
-        host: 'https://www.youtube-nocookie.com',
-        playerVars: {
-          rel: 0, modestbranding: 1, playsinline: 1, autoplay: 1,
-          controls: 0, fs: 0, iv_load_policy: 3, disablekb: 1,
-          enablejsapi: 1, origin: window.location.origin,
-        },
+      initialized = true;
+      ytPlayerRef.current = new YT.Player(iframeRef.current, {
         events: {
           onReady: () => {
             if (cancelled) return;
@@ -172,27 +174,22 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
             markReady(true);
             try {
               ytPlayerRef.current.setVolume?.(Math.round(volumeRef.current * 100));
-              if (mutedRef.current) ytPlayerRef.current.mute?.(); else ytPlayerRef.current.unMute?.();
+              // Embed dimulai muted agar autoplay stabil; user bisa aktifkan suara lewat tombol hint.
+              ytPlayerRef.current.mute?.();
+              if (!mutedRef.current) {
+                mutedRef.current = true;
+                setMuted(true);
+                setShowHint(true);
+              }
               ytPlayerRef.current.playVideo?.();
-              setTimeout(() => {
-                try {
-                  const state = ytPlayerRef.current?.getPlayerState?.();
-                  if (state !== 1 && !mutedRef.current) {
-                    ytPlayerRef.current?.mute?.();
-                    setMuted(true);
-                    ytPlayerRef.current?.playVideo?.();
-                    setShowHint(true);
-                  }
-                } catch { /* ignore */ }
-              }, 800);
             } catch { /* ignore */ }
           },
           onStateChange: (e: { data: number }) => {
-            setIsPlaying(e.data === 1);
+            if (e.data === 1 || e.data === 3) markReady(true);
+            setIsPlaying(e.data === 1 || e.data === 3);
           },
           onError: () => {
             if (cancelled) return;
-            setUseYoutubeFallback(true);
             markReady(true);
             setIsPlaying(true);
           },
@@ -219,7 +216,8 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
     return () => {
       cancelled = true;
       if (ytFallbackTimerRef.current) clearTimeout(ytFallbackTimerRef.current);
-      try { ytPlayerRef.current?.pauseVideo?.(); ytPlayerRef.current?.destroy?.(); } catch { /* ignore */ }
+      try { ytPlayerRef.current?.pauseVideo?.(); } catch { /* ignore */ }
+      ytPlayerRef.current = null;
     };
   }, [ytId, type, markReady]);
 
@@ -268,7 +266,13 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
         setShowHint(false);
         return;
       }
-      if (!p || typeof p.mute !== 'function') return;
+      if (!p || typeof p.mute !== 'function') {
+        if (iframeRef.current && ytId) {
+          iframeRef.current.src = `https://www.youtube-nocookie.com/embed/${ytId}?rel=0&modestbranding=1&playsinline=1&autoplay=1&mute=${m ? 1 : 0}&controls=0&fs=0&iv_load_policy=3&disablekb=1&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`;
+        }
+        if (!m) setShowHint(false);
+        return;
+      }
       if (m) p.mute(); else { p.unMute?.(); p.setVolume?.(Math.round(volume * 100)); p.playVideo?.(); }
     } else {
       cfPost(m ? 'mute' : 'unmute');
@@ -284,7 +288,13 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
     if (type === 'youtube') {
       const p = ytPlayerRef.current;
       if (useYoutubeFallback) return;
-      if (!p || typeof p.setVolume !== 'function') return;
+      if (!p || typeof p.setVolume !== 'function') {
+        if (v > 0 && iframeRef.current && ytId) {
+          iframeRef.current.src = `https://www.youtube-nocookie.com/embed/${ytId}?rel=0&modestbranding=1&playsinline=1&autoplay=1&mute=0&controls=0&fs=0&iv_load_policy=3&disablekb=1&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`;
+          setShowHint(false);
+        }
+        return;
+      }
       p.setVolume(Math.round(v * 100));
       if (v > 0) p.unMute();
     } else {
@@ -335,10 +345,10 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
   };
 
   const ytEmbedUrl = ytId
-    ? `https://www.youtube-nocookie.com/embed/${ytId}?rel=0&modestbranding=1&playsinline=1&autoplay=1&mute=${muted || showHint ? 1 : 0}&controls=0&fs=0&iv_load_policy=3&disablekb=1&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`
+    ? `https://www.youtube-nocookie.com/embed/${ytId}?rel=0&modestbranding=1&playsinline=1&autoplay=1&mute=1&controls=0&fs=0&iv_load_policy=3&disablekb=1&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`
     : '';
   const cfEmbedUrl = cfUid
-    ? `https://iframe.videodelivery.net/${cfUid}?autoplay=true&controls=false&preload=auto&muted=${muted}`
+    ? `https://iframe.videodelivery.net/${cfUid}?autoplay=true&controls=false&preload=auto&muted=true`
     : '';
 
   return (
@@ -352,21 +362,17 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
     >
       {type === 'youtube' ? (
         ytId ? (
-          useYoutubeFallback ? (
-            <iframe
-              ref={iframeRef}
-              src={ytEmbedUrl}
-              onLoad={() => { setReady(true); setIsPlaying(true); }}
-              className="absolute inset-0 w-full h-full pointer-events-none"
-              title={title}
-              allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
-              allowFullScreen
-              referrerPolicy="strict-origin-when-cross-origin"
-              style={{ border: 0 }}
-            />
-          ) : (
-            <div ref={ytMountRef} className="absolute inset-0 w-full h-full" />
-          )
+          <iframe
+            ref={iframeRef}
+            src={ytEmbedUrl}
+            onLoad={handleFrameLoaded}
+            className="absolute inset-0 w-full h-full pointer-events-none"
+            title={title}
+            allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+            allowFullScreen
+            referrerPolicy="strict-origin-when-cross-origin"
+            style={{ border: 0 }}
+          />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center bg-black text-white/80 text-sm px-4 text-center">
             Link YouTube tidak valid. Hubungi admin untuk memeriksa sumber.
@@ -376,7 +382,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
         <iframe
           ref={iframeRef}
           src={cfEmbedUrl}
-          onLoad={() => { setReady(true); setIsPlaying(true); }}
+          onLoad={handleFrameLoaded}
           className="absolute inset-0 w-full h-full pointer-events-none"
           title={title}
           allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
