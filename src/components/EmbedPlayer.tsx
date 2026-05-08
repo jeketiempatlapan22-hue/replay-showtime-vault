@@ -104,7 +104,7 @@ export default function EmbedPlayer({ type, source, title, watermark }: Props) {
   const togglePlay = () => {
     if (type === 'youtube') {
       const p = ytPlayerRef.current;
-      if (!p) return;
+      if (!p || typeof p.pauseVideo !== 'function') return;
       if (isPlaying) p.pauseVideo(); else p.playVideo();
     } else {
       cfPost(isPlaying ? 'pause' : 'play');
@@ -118,7 +118,7 @@ export default function EmbedPlayer({ type, source, title, watermark }: Props) {
     try { localStorage.setItem(MUTED_KEY, m ? '1' : '0'); } catch { /* ignore */ }
     if (type === 'youtube') {
       const p = ytPlayerRef.current;
-      if (!p) return;
+      if (!p || typeof p.mute !== 'function') return;
       if (m) p.mute(); else { p.unMute(); p.setVolume(Math.round(volume * 100)); }
     } else {
       cfPost(m ? 'mute' : 'unmute');
@@ -133,7 +133,7 @@ export default function EmbedPlayer({ type, source, title, watermark }: Props) {
     if (v > 0 && muted) { setMuted(false); try { localStorage.setItem(MUTED_KEY, '0'); } catch { /* ignore */ } }
     if (type === 'youtube') {
       const p = ytPlayerRef.current;
-      if (!p) return;
+      if (!p || typeof p.setVolume !== 'function') return;
       p.setVolume(Math.round(v * 100));
       if (v > 0) p.unMute();
     } else {
