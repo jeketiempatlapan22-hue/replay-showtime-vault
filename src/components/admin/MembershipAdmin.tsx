@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Loader2, Plus, Trash2, Copy, RefreshCw } from 'lucide-react';
+import { Loader2, Plus, Trash2, Copy, RefreshCw, RotateCcw, ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -23,6 +23,8 @@ interface MembershipToken {
   created_at: string;
 }
 
+interface DeviceRow { id: string; token_id: string; browser_id: string; created_at: string; last_seen: string }
+
 const randStr = (n = 10) => {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let s = '';
@@ -32,14 +34,24 @@ const randStr = (n = 10) => {
 
 export default function MembershipAdmin() {
   const [rows, setRows] = useState<MembershipToken[]>([]);
+  const [devices, setDevices] = useState<Record<string, DeviceRow[]>>({});
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState({ label: '', phone: '', duration_days: 30, includes_replays: true });
   const [creating, setCreating] = useState(false);
 
   const load = async () => {
     setLoading(true);
-    const { data } = await supabase.from('membership_tokens').select('*').order('created_at', { ascending: false });
-    setRows((data as MembershipToken[]) || []);
+    const [{ data: tokens }, { data: devs }] = await Promise.all([
+      supabase.from('membership_tokens').select('*').order('created_at', { ascending: false }),
+      supabase.from('membership_token_devices').select('*'),
+    ]);
+    setRows((tokens as MembershipToken[]) || []);
+    const map: Record<string, DeviceRow[]> = {};
+    ((devs as DeviceRow[]) || []).forEach(d => {
+      (map[d.token_id] ||= []).push(d);
+    });
+    setDevices(map);
     setLoading(false);
   };
   useEffect(() => { void load(); }, []);
@@ -64,16 +76,29 @@ export default function MembershipAdmin() {
 
   const toggleRevoke = async (r: MembershipToken) => {
     await supabase.from('membership_tokens').update({ revoked: !r.revoked }).eq('id', r.id);
+    toast.success(r.revoked ? 'Membership diaktifkan' : 'Membership dicabut');
     void load();
   };
   const remove = async (id: string) => {
-    if (!confirm('Hapus membership token ini?')) return;
+    if (!confirm('Hapus membership token ini? Tindakan tidak bisa dibatalkan.')) return;
     await supabase.from('membership_tokens').delete().eq('id', id);
+    toast.success('Membership dihapus');
     void load();
   };
   const resetDevices = async (id: string) => {
     await supabase.from('membership_token_devices').delete().eq('token_id', id);
     toast.success('Perangkat tertaut direset');
+    void load();
+  };
+  const revokeOneDevice = async (deviceId: string) => {
+    await supabase.from('membership_token_devices').delete().eq('id', deviceId);
+    toast.success('Perangkat dicabut');
+    void load();
+  };
+  const resetQuota = async (id: string) => {
+    await supabase.from('membership_tokens').update({ manual_resets_used: 0, updated_at: new Date().toISOString() }).eq('id', id);
+    toast.success('Kuota reset perangkat dikembalikan ke 0');
+    void load();
   };
   const copyLink = (r: MembershipToken) => {
     const link = `${window.location.origin}/live?mtoken=${encodeURIComponent(r.token)}&mp=${encodeURIComponent(r.password)}`;
@@ -111,19 +136,52 @@ export default function MembershipAdmin() {
             <div className="space-y-2">
               {rows.map(r => {
                 const expired = r.expires_at && new Date(r.expires_at).getTime() < Date.now();
+                const tokenDevices = devices[r.id] || [];
+                const isOpen = !!expanded[r.id];
                 return (
-                  <div key={r.id} className="border border-border rounded-lg p-3 text-sm space-y-1">
+                  <div key={r.id} className="border border-border rounded-lg p-3 text-sm space-y-2">
                     <div className="flex items-center justify-between gap-2 flex-wrap">
-                      <div className="font-medium">{r.label || '(tanpa label)'} {expired && <span className="text-xs text-destructive">[expired]</span>} {r.revoked && <span className="text-xs text-destructive">[revoked]</span>}</div>
-                      <div className="flex gap-1">
-                        <Button size="sm" variant="ghost" onClick={() => copyLink(r)} title="Salin link"><Copy className="w-3.5 h-3.5" /></Button>
-                        <Button size="sm" variant="ghost" onClick={() => resetDevices(r.id)} title="Reset perangkat"><RefreshCw className="w-3.5 h-3.5" /></Button>
-                        <Button size="sm" variant="ghost" onClick={() => toggleRevoke(r)} title={r.revoked ? 'Aktifkan' : 'Cabut'}>{r.revoked ? '✓' : '✕'}</Button>
+                      <div className="font-medium">
+                        {r.label || '(tanpa label)'} {expired && <span className="text-xs text-destructive">[expired]</span>} {r.revoked && <span className="text-xs text-destructive">[revoked]</span>}
+                      </div>
+                      <div className="flex gap-1 flex-wrap">
+                        <Button size="sm" variant="outline" onClick={() => copyLink(r)} title="Salin link"><Copy className="w-3.5 h-3.5 mr-1" />Link</Button>
+                        <Button size="sm" variant="outline" onClick={() => resetDevices(r.id)} title="Cabut semua perangkat tertaut"><RefreshCw className="w-3.5 h-3.5 mr-1" />Reset Device</Button>
+                        <Button size="sm" variant="outline" onClick={() => resetQuota(r.id)} title="Reset kuota reset manual ke 0"><RotateCcw className="w-3.5 h-3.5 mr-1" />Reset Kuota</Button>
+                        <Button size="sm" variant={r.revoked ? 'default' : 'secondary'} onClick={() => toggleRevoke(r)}>{r.revoked ? 'Aktifkan' : 'Cabut'}</Button>
                         <Button size="sm" variant="ghost" onClick={() => remove(r.id)} title="Hapus"><Trash2 className="w-3.5 h-3.5 text-destructive" /></Button>
                       </div>
                     </div>
-                    <div className="text-xs text-muted-foreground font-mono">Token: {r.token} · Sandi: {r.password}</div>
-                    <div className="text-xs text-muted-foreground">WA: {r.phone || '-'} · Kuota reset: {r.manual_resets_used}/{r.manual_resets_max} · Aktif s/d {new Date(r.expires_at).toLocaleString('id-ID')}</div>
+                    <div className="text-xs text-muted-foreground font-mono break-all">Token: {r.token} · Sandi: {r.password}</div>
+                    <div className="text-xs text-muted-foreground">
+                      WA: {r.phone || '-'} · Kuota reset: <span className="font-mono">{r.manual_resets_used}/{r.manual_resets_max}</span> · Aktif s/d {new Date(r.expires_at).toLocaleString()}
+                      {r.includes_replays ? ' · termasuk replay' : ' · live saja'}
+                    </div>
+                    <button
+                      type="button"
+                      className="text-xs text-primary inline-flex items-center gap-1"
+                      onClick={() => setExpanded(prev => ({ ...prev, [r.id]: !prev[r.id] }))}
+                    >
+                      {isOpen ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                      Perangkat tertaut ({tokenDevices.length}/1)
+                    </button>
+                    {isOpen && (
+                      <div className="rounded border border-border bg-muted/30 p-2 space-y-1">
+                        {tokenDevices.length === 0 ? (
+                          <p className="text-[11px] text-muted-foreground">Belum ada perangkat terikat.</p>
+                        ) : tokenDevices.map(d => (
+                          <div key={d.id} className="flex items-center justify-between gap-2 text-[11px]">
+                            <div className="font-mono truncate">
+                              {d.browser_id.slice(0, 12)}…{d.browser_id.slice(-4)}
+                              <span className="text-muted-foreground ml-2">last seen {new Date(d.last_seen).toLocaleString()}</span>
+                            </div>
+                            <Button size="sm" variant="ghost" className="h-6 px-2" onClick={() => revokeOneDevice(d.id)}>
+                              <Trash2 className="w-3 h-3 text-destructive" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 );
               })}
