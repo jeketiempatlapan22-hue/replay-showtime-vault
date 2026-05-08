@@ -26,7 +26,7 @@ async function sendFonnte(phone: string, message: string, inboxId = ''): Promise
   form.append('target', normalizePhone(phone));
   form.append('message', message);
   form.append('countryCode', '62');
-  if (inboxId) form.append('inboxid', inboxId);
+  if (/^\d+$/.test(inboxId)) form.append('inboxid', inboxId);
   try {
     const res = await fetch('https://api.fonnte.com/send', {
       method: 'POST', headers: { Authorization: token }, body: form,
