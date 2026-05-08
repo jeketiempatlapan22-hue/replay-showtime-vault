@@ -149,6 +149,27 @@ export type Database = {
         }
         Relationships: []
       }
+      bot_inbox_dedup: {
+        Row: {
+          id: string
+          message_hash: string
+          phone: string
+          received_at: string
+        }
+        Insert: {
+          id?: string
+          message_hash: string
+          phone: string
+          received_at?: string
+        }
+        Update: {
+          id?: string
+          message_hash?: string
+          phone?: string
+          received_at?: string
+        }
+        Relationships: []
+      }
       comments: {
         Row: {
           created_at: string
