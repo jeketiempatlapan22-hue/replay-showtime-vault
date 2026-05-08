@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, Trash2, Edit2, Key, Save, Palette, MessageCircle, LogOut, Eye, Send, List, Settings, ShieldCheck, Unlock as UnlockIcon, Link2, Copy, X, Radio, RefreshCw, Users, Upload, Search, ArrowUpDown, Sparkles, Calendar } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Edit2, Key, Save, Palette, MessageCircle, LogOut, Eye, Send, List, Settings, ShieldCheck, Unlock as UnlockIcon, Link2, Copy, X, Radio, RefreshCw, Users, Upload, Search, ArrowUpDown, Sparkles, Calendar, Bot } from 'lucide-react';
+import BotAdmin from '@/components/admin/BotAdmin';
 import { getMembers, upsertMember, deleteMember, uploadMemberPhoto, type Member } from '@/lib/members';
 import { getActiveShows, upsertActiveShow, deleteActiveShow, type ActiveShow } from '@/lib/activeShows';
 import { Switch } from '@/components/ui/switch';
