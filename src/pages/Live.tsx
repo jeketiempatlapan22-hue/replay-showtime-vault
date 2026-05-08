@@ -492,6 +492,23 @@ export default function Live() {
                   )}
                 </div>
 
+                {membership && (
+                  <div className="rounded-xl border border-primary/30 bg-primary/5 p-3 text-xs sm:text-sm flex flex-wrap items-center justify-between gap-2">
+                    <div className="space-y-0.5">
+                      <div className="font-semibold text-foreground">Membership aktif</div>
+                      <div className="text-muted-foreground">
+                        {membership.expires_at ? `Berlaku s/d ${new Date(membership.expires_at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}` : 'Tanpa batas waktu'}
+                      </div>
+                      <div className="text-muted-foreground">
+                        Reset perangkat: <span className="font-mono text-foreground">{membership.resets_used}/{membership.resets_max}</span> terpakai · Sisa <span className="font-mono text-foreground">{membership.remaining}</span>
+                      </div>
+                    </div>
+                    <Button type="button" variant="outline" size="sm" onClick={handleSelfReset} disabled={membership.remaining <= 0}>
+                      Reset perangkat ini
+                    </Button>
+                  </div>
+                )}
+
                 {allSources.length > 1 && (
                   <div className="flex items-center gap-2 overflow-x-auto pb-1">
                     {allSources.map((s, i) => (
