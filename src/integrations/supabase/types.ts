@@ -589,6 +589,7 @@ export type Database = {
       replays: {
         Row: {
           access_token: string | null
+          admin_alias: string
           created_at: string
           criteria: string
           date: string
@@ -609,6 +610,7 @@ export type Database = {
         }
         Insert: {
           access_token?: string | null
+          admin_alias?: string
           created_at?: string
           criteria?: string
           date: string
@@ -629,6 +631,7 @@ export type Database = {
         }
         Update: {
           access_token?: string | null
+          admin_alias?: string
           created_at?: string
           criteria?: string
           date?: string
