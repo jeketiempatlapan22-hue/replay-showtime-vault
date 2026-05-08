@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { isFullscreenActive, onFullscreenChange, requestFs, exitFs } from '@/lib/fullscreen';
-import { Play, Pause, Volume2, VolumeX, Maximize, Minimize } from 'lucide-react';
+import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, SkipBack, SkipForward } from 'lucide-react';
 import LiveWatermark from '@/components/LiveWatermark';
 
 interface Props {
@@ -146,6 +146,36 @@ export default function EmbedPlayer({ type, source, title, watermark }: Props) {
     return onFullscreenChange(onChange);
   }, []);
 
+  // Poll YT time/duration
+  useEffect(() => {
+    if (type !== 'youtube' || !ready) return;
+    const id = setInterval(() => {
+      const p = ytPlayerRef.current;
+      if (!p || seeking) return;
+      try {
+        const d = p.getDuration?.() || 0;
+        const t = p.getCurrentTime?.() || 0;
+        if (d && d !== duration) setDuration(d);
+        setCurrentTime(t);
+      } catch { /* ignore */ }
+    }, 500);
+    return () => clearInterval(id);
+  }, [ready, type, seeking, duration]);
+
+  const seekTo = (t: number) => {
+    const p = ytPlayerRef.current;
+    if (!p) return;
+    try { p.seekTo(Math.max(0, Math.min(duration || t, t)), true); setCurrentTime(t); } catch { /* ignore */ }
+  };
+  const skip = (delta: number) => seekTo((currentTime || 0) + delta);
+  const fmtTime = (s: number) => {
+    if (!isFinite(s) || s < 0) s = 0;
+    const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = Math.floor(s % 60);
+    const mm = String(m).padStart(h ? 2 : 1, '0');
+    const ss = String(sec).padStart(2, '0');
+    return h ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
+  };
+
   const toggleFullscreen = () => {
     if (!containerRef.current) return;
     if (!isFullscreenActive()) requestFs(containerRef.current);
@@ -193,10 +223,39 @@ export default function EmbedPlayer({ type, source, title, watermark }: Props) {
 
       {/* Controls */}
       <div className="absolute inset-x-0 bottom-0 z-10 px-3 pb-3 pt-8 bg-gradient-to-t from-black/80 to-transparent" style={{ touchAction: 'manipulation' }}>
+        {type === 'youtube' && duration > 0 && (
+          <div className="flex items-center gap-2 mb-2 text-white text-[11px] landscape:text-xs tabular-nums" onClick={(e) => e.stopPropagation()}>
+            <span>{fmtTime(currentTime)}</span>
+            <input
+              type="range"
+              min={0}
+              max={duration}
+              step={0.1}
+              value={Math.min(currentTime, duration)}
+              onChange={(e) => { setSeeking(true); setCurrentTime(Number(e.target.value)); }}
+              onMouseUp={(e) => { seekTo(Number((e.target as HTMLInputElement).value)); setSeeking(false); }}
+              onTouchEnd={(e) => { seekTo(Number((e.target as HTMLInputElement).value)); setSeeking(false); }}
+              aria-label="Seek"
+              className="flex-1 h-2 accent-primary cursor-pointer"
+              style={{ touchAction: 'manipulation' }}
+            />
+            <span>{fmtTime(duration)}</span>
+          </div>
+        )}
         <div className="flex items-center gap-2 landscape:gap-3" onClick={(e) => e.stopPropagation()}>
           <button onClick={togglePlay} aria-label={isPlaying ? 'Pause' : 'Play'} className="p-2.5 landscape:p-3 text-white hover:text-primary active:scale-95 transition-all">
             {isPlaying ? <Pause className="w-5 h-5 landscape:w-6 landscape:h-6" /> : <Play className="w-5 h-5 landscape:w-6 landscape:h-6" />}
           </button>
+          {type === 'youtube' && (
+            <>
+              <button onClick={() => skip(-10)} aria-label="Mundur 10 detik" className="p-2.5 landscape:p-3 text-white hover:text-primary active:scale-95 transition-all">
+                <SkipBack className="w-5 h-5 landscape:w-6 landscape:h-6" />
+              </button>
+              <button onClick={() => skip(10)} aria-label="Maju 10 detik" className="p-2.5 landscape:p-3 text-white hover:text-primary active:scale-95 transition-all">
+                <SkipForward className="w-5 h-5 landscape:w-6 landscape:h-6" />
+              </button>
+            </>
+          )}
           <button onClick={toggleMute} aria-label={muted ? 'Unmute' : 'Mute'} className="p-2.5 landscape:p-3 text-white hover:text-primary active:scale-95 transition-all">
             {muted || volume === 0 ? <VolumeX className="w-5 h-5 landscape:w-6 landscape:h-6" /> : <Volume2 className="w-5 h-5 landscape:w-6 landscape:h-6" />}
           </button>
