@@ -57,6 +57,8 @@ export default function EmbedPlayer({ type, source, title, watermark }: Props) {
   const initialVolume = (() => { try { const v = parseFloat(localStorage.getItem(VOL_KEY) || ''); return isFinite(v) ? Math.max(0, Math.min(1, v)) : 1; } catch { return 1; } })();
   const [muted, setMuted] = useState(initialMuted);
   const [volume, setVolume] = useState(initialVolume);
+  const mutedRef = useRef(initialMuted);
+  const volumeRef = useRef(initialVolume);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showHint, setShowHint] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -65,6 +67,9 @@ export default function EmbedPlayer({ type, source, title, watermark }: Props) {
 
   const ytId = type === 'youtube' ? extractYoutubeId(source) : '';
   const cfUid = type === 'cloudflare' ? extractCloudflareUid(source) : '';
+
+  useEffect(() => { mutedRef.current = muted; }, [muted]);
+  useEffect(() => { volumeRef.current = volume; }, [volume]);
 
   // YouTube IFrame API — instantiate via div mount so YT injects an iframe sized 100% inside our container
   useEffect(() => {
@@ -83,7 +88,7 @@ export default function EmbedPlayer({ type, source, title, watermark }: Props) {
       setUseYoutubeFallback(true);
       setReady(true);
       setIsPlaying(true);
-      if (!muted) {
+      if (!mutedRef.current) {
         setMuted(true);
         setShowHint(true);
       }
@@ -118,13 +123,13 @@ export default function EmbedPlayer({ type, source, title, watermark }: Props) {
             } catch { /* ignore */ }
             setReady(true);
             try {
-              ytPlayerRef.current.setVolume(Math.round(volume * 100));
-              if (muted) ytPlayerRef.current.mute(); else ytPlayerRef.current.unMute();
+              ytPlayerRef.current.setVolume?.(Math.round(volumeRef.current * 100));
+              if (mutedRef.current) ytPlayerRef.current.mute?.(); else ytPlayerRef.current.unMute?.();
               ytPlayerRef.current.playVideo();
               setTimeout(() => {
                 try {
                   const state = ytPlayerRef.current.getPlayerState();
-                  if (state !== 1 && !muted) {
+                  if (state !== 1 && !mutedRef.current) {
                     ytPlayerRef.current.mute();
                     setMuted(true);
                     ytPlayerRef.current.playVideo();
