@@ -1454,7 +1454,7 @@ export default function Admin() {
                 onChange={e => setForm(f => ({ ...f, adminAlias: e.target.value.replace(/\s+/g, '') }))}
               />
               <p className="text-xs text-muted-foreground mt-1">
-                Tidak ditampilkan ke pengguna. Bisa dipakai di bot: <code>/buattoken &lt;alias&gt;</code> atau <code>/tokensatuan &lt;alias&gt;</code>.
+                Tidak ditampilkan ke pengguna. Bisa dipakai di bot: <code>/buattoken &lt;alias&gt;</code> atau <code>/createtoken &lt;alias&gt;</code>.
               </p>
             </div>
             <Button className="w-full" onClick={handleSaveReplay}>
