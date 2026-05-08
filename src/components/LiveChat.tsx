@@ -108,11 +108,18 @@ export default function LiveChat() {
     return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
   };
 
+  const canChat = isAdmin || !!name.trim();
+
   return (
     <div className="rounded-2xl bg-card/80 border border-border overflow-hidden flex flex-col h-[60vh] min-h-[380px]">
       <div className="flex items-center gap-2 px-3 py-2 border-b border-border bg-secondary/40">
         <MessageCircle className="w-4 h-4 text-primary" />
         <span className="text-sm font-semibold">Live Chat</span>
+        {!isAdmin && name && (
+          <button onClick={openChangeName} className="ml-auto inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground">
+            <UserCog className="w-3 h-3" /> {name}
+          </button>
+        )}
       </div>
 
       {/* Pinned banner */}
@@ -164,23 +171,51 @@ export default function LiveChat() {
 
       {/* Input */}
       <div className="border-t border-border p-2 space-y-1.5 bg-secondary/30">
-        {!isAdmin && (
-          <Input
-            value={name} onChange={e => setName(e.target.value)} placeholder="Nama (opsional)"
-            className="h-8 text-xs bg-background"
-          />
+        {!canChat && (
+          <button
+            onClick={openChangeName}
+            className="w-full text-[11px] text-primary underline-offset-2 hover:underline text-left"
+          >
+            Masukkan nama dulu untuk mengirim pesan →
+          </button>
         )}
         <div className="flex gap-1.5">
           <Input
-            value={text} onChange={e => setText(e.target.value.slice(0, 500))}
-            onKeyDown={e => e.key === 'Enter' && send()}
-            placeholder="Ketik pesan..." className="h-9 text-sm bg-background"
+            value={text}
+            onChange={e => setText(e.target.value.slice(0, 500))}
+            onKeyDown={e => e.key === 'Enter' && canChat && send()}
+            onFocus={() => { if (!canChat) openChangeName(); }}
+            placeholder={canChat ? 'Ketik pesan...' : 'Masukkan nama untuk berinteraksi'}
+            className="h-9 text-sm bg-background"
+            disabled={!canChat}
           />
-          <Button size="icon" onClick={send} disabled={sending || !text.trim()} className="h-9 w-9 shrink-0">
+          <Button size="icon" onClick={send} disabled={sending || !text.trim() || !canChat} className="h-9 w-9 shrink-0">
             <Send className="w-4 h-4" />
           </Button>
         </div>
       </div>
+
+      {/* Name modal */}
+      <Dialog open={nameModalOpen} onOpenChange={(o) => { if (o || name.trim()) setNameModalOpen(o); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Masukkan Nama</DialogTitle>
+            <DialogDescription>Nama akan ditampilkan saat kamu berinteraksi di live chat. Wajib diisi tiap perangkat.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Input
+              autoFocus
+              value={nameInput}
+              onChange={(e) => { setNameInput(e.target.value.slice(0, 40)); setNameError(''); }}
+              onKeyDown={(e) => e.key === 'Enter' && saveName()}
+              placeholder="Nama kamu (2-40 karakter)"
+              maxLength={40}
+            />
+            {nameError && <p className="text-xs text-destructive">{nameError}</p>}
+            <Button className="w-full" onClick={saveName} disabled={nameInput.trim().length < 2}>Simpan Nama</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
