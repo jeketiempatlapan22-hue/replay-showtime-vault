@@ -288,24 +288,32 @@ export default function EmbedPlayer({ type, source, title, watermark }: Props) {
       onContextMenu={(e) => e.preventDefault()}
     >
       {type === 'youtube' ? (
-        useYoutubeFallback ? (
-          <iframe
-            ref={iframeRef}
-            src={ytEmbedUrl}
-            className="absolute inset-0 w-full h-full pointer-events-none"
-            title={title}
-            allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
-            allowFullScreen
-            referrerPolicy="strict-origin-when-cross-origin"
-            style={{ border: 0 }}
-          />
+        ytId ? (
+          useYoutubeFallback ? (
+            <iframe
+              ref={iframeRef}
+              src={ytEmbedUrl}
+              onLoad={() => { setReady(true); setIsPlaying(true); }}
+              className="absolute inset-0 w-full h-full pointer-events-none"
+              title={title}
+              allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+              allowFullScreen
+              referrerPolicy="strict-origin-when-cross-origin"
+              style={{ border: 0 }}
+            />
+          ) : (
+            <div ref={ytMountRef} className="absolute inset-0 w-full h-full" />
+          )
         ) : (
-          <div ref={ytMountRef} className="absolute inset-0 w-full h-full" />
+          <div className="absolute inset-0 flex items-center justify-center bg-black text-white/80 text-sm px-4 text-center">
+            Link YouTube tidak valid. Hubungi admin untuk memeriksa sumber.
+          </div>
         )
       ) : (
         <iframe
           ref={iframeRef}
           src={cfEmbedUrl}
+          onLoad={() => { setReady(true); setIsPlaying(true); }}
           className="absolute inset-0 w-full h-full pointer-events-none"
           title={title}
           allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
@@ -320,7 +328,7 @@ export default function EmbedPlayer({ type, source, title, watermark }: Props) {
 
       {watermark && <LiveWatermark code={watermark} />}
 
-      {!ready && (
+      {!ready && ytId !== '' && (
         <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-black/70 backdrop-blur-sm animate-fade-in pointer-events-none">
           <div className="w-12 h-12 rounded-full border-4 border-white/20 border-t-primary animate-spin" />
           <div className="text-white/90 text-xs font-medium tracking-wide">Menghubungkan ke pemutar…</div>
