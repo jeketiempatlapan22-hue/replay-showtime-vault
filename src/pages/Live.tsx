@@ -153,7 +153,7 @@ export default function Live() {
       setStatus(row ? {
         enabled: !!row.enabled, title: row.title || 'Live', type: row.type || 'm3u8',
         require_password: row.require_password !== false,
-        sources: Array.isArray(row.sources) ? row.sources : [],
+        sources: toPublicSources(row.sources),
         lineup: Array.isArray(row.lineup) ? row.lineup : [],
       } : { enabled: false, title: 'Live', type: 'm3u8', require_password: true, sources: [], lineup: [] });
       setStatusLoading(false);
