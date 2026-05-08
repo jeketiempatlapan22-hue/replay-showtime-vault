@@ -84,7 +84,7 @@ export default function Live() {
     if (!silent) { setSubmitting(true); setPwError(''); }
     try {
       const { data } = await supabase.functions.invoke('unlock-live', {
-        body: { ...opts, browser_id: getBrowserId() },
+        body: { ...opts, browser_id: getBrowserId(), show_id: showId || undefined },
       });
       if (data?.valid) {
         const cfg: UnlockedConfig = { title: data.title, type: data.type, url: data.url, sources: Array.isArray(data.sources) ? data.sources : [], watermark: data.watermark || '', enabled: !!data.enabled };
