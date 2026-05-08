@@ -8,6 +8,19 @@ const corsHeaders = {
 const json = (b: unknown, status = 200) =>
   new Response(JSON.stringify(b), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
+async function bindMembershipDevice(supabase: any, tokenId: string, browser_id: string) {
+  const { data: existing } = await supabase
+    .from("membership_token_devices").select("id,browser_id").eq("token_id", tokenId).maybeSingle();
+  if (existing) {
+    if (existing.browser_id !== browser_id) return { ok: false, reason: "device_limit" };
+    await supabase.from("membership_token_devices").update({ last_seen: new Date().toISOString() }).eq("id", existing.id);
+    return { ok: true };
+  }
+  const { error } = await supabase.from("membership_token_devices").insert({ token_id: tokenId, browser_id });
+  if (error) return { ok: false, reason: "device_limit" };
+  return { ok: true };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   try {
@@ -23,8 +36,8 @@ Deno.serve(async (req) => {
       .from("replays").select("password, date").eq("id", replay_id).single();
     if (!replay) return json({ valid: false });
 
-    // Membership token bypass (covers replays when includes_replays = true)
     if (mtoken) {
+      if (!browser_id || browser_id.length < 6) return json({ valid: false, reason: "no_device" });
       const { data: t } = await supabase
         .from("membership_tokens").select("*").eq("token", mtoken).maybeSingle();
       if (!t || t.revoked) return json({ valid: false, reason: "revoked" });
@@ -32,19 +45,18 @@ Deno.serve(async (req) => {
       if (!t.includes_replays) return json({ valid: false, reason: "scope" });
       const now = Date.now();
       if (t.expires_at && new Date(t.expires_at).getTime() < now) return json({ valid: false, reason: "expired" });
-      if (browser_id) {
-        const { data: existing } = await supabase
-          .from("membership_token_devices").select("id").eq("token_id", t.id).eq("browser_id", browser_id).maybeSingle();
-        if (existing) {
-          await supabase.from("membership_token_devices").update({ last_seen: new Date().toISOString() }).eq("id", existing.id);
-        } else {
-          const { count } = await supabase
-            .from("membership_token_devices").select("id", { count: "exact", head: true }).eq("token_id", t.id);
-          if ((count || 0) >= 1) return json({ valid: false, reason: "device_limit" });
-          await supabase.from("membership_token_devices").insert({ token_id: t.id, browser_id });
-        }
-      }
-      return json({ valid: true, via: "membership" });
+      if (t.starts_at && new Date(t.starts_at).getTime() > now) return json({ valid: false, reason: "not_started" });
+      const bind = await bindMembershipDevice(supabase, t.id, browser_id);
+      if (!bind.ok) return json({ valid: false, reason: bind.reason });
+      return json({
+        valid: true, via: "membership",
+        membership: {
+          expires_at: t.expires_at,
+          resets_used: t.manual_resets_used || 0,
+          resets_max: t.manual_resets_max || 3,
+          remaining: Math.max(0, (t.manual_resets_max || 3) - (t.manual_resets_used || 0)),
+        },
+      });
     }
 
     if (!password) return json({ valid: false });
