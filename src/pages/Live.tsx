@@ -92,9 +92,8 @@ export default function Live() {
 
   const fetchStatus = () => {
     if (showId) {
-      // Active-show LIVE: read from active_shows + RPC for current live
       return supabase.from('active_shows')
-        .select('id,title,is_live,live_auto_schedule,live_type,live_url,live_sources,live_require_password,lineup,show_date,show_time,is_active')
+        .select('id,title,is_live,live_type,live_url,live_sources,live_require_password,lineup,show_date,show_time,is_active,image_url')
         .eq('id', showId).maybeSingle()
         .then(({ data }) => {
           if (!data || !data.is_active) {
@@ -102,19 +101,20 @@ export default function Live() {
             setStatusLoading(false);
             return null;
           }
-          const startMs = new Date(`${data.show_date}T${data.show_time}`).getTime();
-          const nowMs = Date.now();
-          const autoOn = data.live_auto_schedule && nowMs >= startMs && nowMs <= startMs + 8 * 3600 * 1000;
-          const enabled = !!data.is_live || !!autoOn;
+          const enabled = !!data.is_live;
           const pubSources = (Array.isArray(data.live_sources) ? data.live_sources : []).map((s: any) => ({ label: s.label, type: s.type }));
-          setStatus({
-            enabled, title: data.title || 'Live', type: data.live_type || 'm3u8',
-            require_password: data.live_require_password !== false,
-            sources: pubSources,
-            lineup: Array.isArray(data.lineup) ? data.lineup : [],
-            show_date: data.show_date, show_time: data.show_time,
+          let wasOff = false;
+          setStatus(prev => {
+            wasOff = !prev?.enabled;
+            return {
+              enabled, title: data.title || 'Live', type: data.live_type || 'm3u8',
+              require_password: data.live_require_password !== false,
+              sources: pubSources,
+              lineup: Array.isArray(data.lineup) ? data.lineup : [],
+              show_date: data.show_date, show_time: data.show_time,
+              image_url: data.image_url || '',
+            };
           });
-          // If user is unlocked, refresh URL/sources so player shows new embed instantly
           setUnlocked(prev => prev ? {
             ...prev,
             enabled,
@@ -123,6 +123,11 @@ export default function Live() {
             url: data.live_url || '',
             sources: (Array.isArray(data.live_sources) ? data.live_sources : []) as unknown as PrivateSource[],
           } : prev);
+          // When live just toggled on, silently re-call unlock to re-validate (token/blocked)
+          if (enabled && wasOff) {
+            const t = search.get('t');
+            if (t) void doUnlock({ token: t }, true);
+          }
           setStatusLoading(false);
           return data;
         });
