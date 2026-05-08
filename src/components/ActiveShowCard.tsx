@@ -154,9 +154,15 @@ export default function ActiveShowCard({ show, index = 0 }: { show: ActiveShow; 
         {/* Action buttons */}
         <div className="pt-2 space-y-2">
           {isLiveNow && (
-            <Button className="w-full gap-2 bg-red-600 hover:bg-red-700 text-white" onClick={goLive}>
-              <Radio className="w-4 h-4" /> Tonton Live
-            </Button>
+            hasAccess ? (
+              <Button className="w-full gap-2 bg-red-600 hover:bg-red-700 text-white" onClick={goLive}>
+                <Radio className="w-4 h-4" /> Tonton Live
+              </Button>
+            ) : (
+              <Button variant="secondary" className="w-full gap-2" onClick={goLive}>
+                <Lock className="w-4 h-4" /> Masukkan Sandi
+              </Button>
+            )
           )}
           {replayMode ? (
             replayPriced ? (
