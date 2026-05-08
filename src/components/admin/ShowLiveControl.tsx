@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Plus, Trash2, Radio, Film, Save, Loader2 } from 'lucide-react';
+import { Plus, Trash2, Radio, Film, Save, Loader2, KeyRound } from 'lucide-react';
+import ShowLiveTokensDialog from './ShowLiveTokensDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -19,6 +20,7 @@ interface Props {
 export default function ShowLiveControl({ showId, showTitle }: Props) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [tokensOpen, setTokensOpen] = useState(false);
 
   const [isLive, setIsLive] = useState(false);
   const [autoSchedule, setAutoSchedule] = useState(false);
@@ -205,10 +207,16 @@ export default function ShowLiveControl({ showId, showTitle }: Props) {
         </div>
       </div>
 
-      <Button onClick={save} disabled={saving} className="w-full">
-        {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
-        Simpan Pengaturan Live & Replay
-      </Button>
+      <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2">
+        <Button onClick={save} disabled={saving} className="w-full">
+          {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+          Simpan Pengaturan Live & Replay
+        </Button>
+        <Button type="button" variant="outline" onClick={() => setTokensOpen(true)} className="w-full sm:w-auto">
+          <KeyRound className="w-4 h-4 mr-2" />Token & Riwayat Akses
+        </Button>
+      </div>
+      <ShowLiveTokensDialog open={tokensOpen} onOpenChange={setTokensOpen} showId={showId} showTitle={showTitle} />
     </div>
   );
 }

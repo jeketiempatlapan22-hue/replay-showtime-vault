@@ -92,7 +92,7 @@ export default function Live() {
     if (showId) {
       // Active-show LIVE: read from active_shows + RPC for current live
       return supabase.from('active_shows')
-        .select('id,title,is_live,live_auto_schedule,live_type,live_require_password,live_sources,lineup,show_date,show_time,is_active')
+        .select('id,title,is_live,live_auto_schedule,live_type,live_url,live_sources,live_require_password,lineup,show_date,show_time,is_active')
         .eq('id', showId).maybeSingle()
         .then(({ data }) => {
           if (!data || !data.is_active) {
@@ -112,6 +112,15 @@ export default function Live() {
             lineup: Array.isArray(data.lineup) ? data.lineup : [],
             show_date: data.show_date, show_time: data.show_time,
           });
+          // If user is unlocked, refresh URL/sources so player shows new embed instantly
+          setUnlocked(prev => prev ? {
+            ...prev,
+            enabled,
+            title: data.title || prev.title,
+            type: (data.live_type as SrcType) || prev.type,
+            url: data.live_url || '',
+            sources: (Array.isArray(data.live_sources) ? data.live_sources : []) as unknown as PrivateSource[],
+          } : prev);
           setStatusLoading(false);
           return data;
         });
@@ -174,6 +183,14 @@ export default function Live() {
         if (t) void doUnlock({ token: t }, true);
       })
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'live_token_devices' }, () => {
+        const t = search.get('t');
+        if (t) void doUnlock({ token: t }, true);
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'active_show_tokens' }, () => {
+        const t = search.get('t');
+        if (t) void doUnlock({ token: t }, true);
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'active_show_token_devices' }, () => {
         const t = search.get('t');
         if (t) void doUnlock({ token: t }, true);
       })
