@@ -370,7 +370,7 @@ export default function Live() {
               </div>
               <h2 className="text-2xl font-bold text-foreground">Akses Live Terkunci</h2>
               <p className="text-sm text-muted-foreground">
-                Masukkan <span className="font-semibold text-foreground">sandi akses</span> di bawah, atau hubungi admin untuk membeli show.
+                Masukkan <span className="font-semibold text-foreground">sandi satuan show</span> atau <span className="font-semibold text-foreground">sandi master bulanan</span>, atau hubungi admin untuk membeli show.
               </p>
             </div>
 
