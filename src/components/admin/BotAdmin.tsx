@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { toast } from '@/hooks/use-toast';
-import { Plus, Save, Trash2, Send, Copy, Check } from 'lucide-react';
+import { Plus, Save, Trash2, Send, Copy, Check, Bot } from 'lucide-react';
 
 type BotCommand = {
   id: string;
@@ -33,6 +33,10 @@ export default function BotAdmin() {
   const [testPhone, setTestPhone] = useState('');
   const [testMsg, setTestMsg] = useState('Halo dari ReplayTime ✨');
   const [sending, setSending] = useState(false);
+  const [botTestPhone, setBotTestPhone] = useState('+62 888-0904-8431');
+  const [botTestCommand, setBotTestCommand] = useState('/menu');
+  const [botTesting, setBotTesting] = useState(false);
+  const [botTestResult, setBotTestResult] = useState<{ ok?: boolean; reply?: string; reason?: string; command?: string; delivered?: boolean } | null>(null);
   const [copiedWebhook, setCopiedWebhook] = useState(false);
   const [admins, setAdmins] = useState<BotAdminRow[]>([]);
   const [newPhone, setNewPhone] = useState('');
@@ -120,6 +124,30 @@ export default function BotAdmin() {
     } finally { setSending(false); }
   };
 
+  const runBotTest = async () => {
+    const phone = normalizePhone(botTestPhone);
+    const message = botTestCommand.trim();
+    if (!phone || !message.startsWith('/')) {
+      toast({ title: 'Command uji tidak valid', description: 'Isi nomor dan command yang diawali /', variant: 'destructive' });
+      return;
+    }
+    setBotTesting(true);
+    setBotTestResult(null);
+    try {
+      const { data, error } = await supabase.functions.invoke('fonnte-webhook', {
+        headers: { 'x-bot-test': 'true' },
+        body: { sender: phone, message, test: true, deliver: true },
+      });
+      if (error) throw error;
+      setBotTestResult(data as { ok?: boolean; reply?: string; reason?: string; command?: string; delivered?: boolean });
+      toast({ title: (data as { ok?: boolean })?.ok ? 'Uji bot berhasil' : 'Uji bot selesai', description: message });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'gagal';
+      setBotTestResult({ ok: false, reason: msg });
+      toast({ title: 'Uji bot gagal', description: msg, variant: 'destructive' });
+    } finally { setBotTesting(false); }
+  };
+
   const copy = (text: string) => {
     navigator.clipboard.writeText(text);
     setCopiedWebhook(true);
@@ -164,6 +192,30 @@ export default function BotAdmin() {
         <Button onClick={sendTest} disabled={sending} className="w-full sm:w-auto">
           <Send className="w-4 h-4 mr-2" />{sending ? 'Mengirim…' : 'Kirim Tes'}
         </Button>
+      </div>
+
+      {/* Bot command test */}
+      <div className="bg-card border border-border rounded-xl p-4 space-y-3">
+        <div>
+          <h3 className="font-semibold">Uji Bot</h3>
+          <p className="text-xs text-muted-foreground">Kirim command uji ke nomor WhatsApp dan tampilkan balasan yang dibuat bot.</p>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <Input placeholder="08xxxx" value={botTestPhone} onChange={(e) => setBotTestPhone(e.target.value)} />
+          <Input placeholder="/menu" value={botTestCommand} onChange={(e) => setBotTestCommand(e.target.value)} className="font-mono sm:col-span-2" />
+        </div>
+        <Button onClick={runBotTest} disabled={botTesting} className="w-full sm:w-auto">
+          <Bot className="w-4 h-4 mr-2" />{botTesting ? 'Menguji…' : 'Uji Bot'}
+        </Button>
+        {botTestResult && (
+          <div className="border border-border rounded-lg bg-secondary/30 p-3 space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs font-semibold">Hasil balasan</p>
+              <span className="text-[11px] text-muted-foreground">{botTestResult.ok ? (botTestResult.delivered ? 'Terkirim' : 'OK') : botTestResult.reason || 'Gagal'}</span>
+            </div>
+            <pre className="whitespace-pre-wrap break-words text-xs font-mono leading-relaxed text-foreground">{botTestResult.reply || botTestResult.reason || 'Tidak ada balasan.'}</pre>
+          </div>
+        )}
       </div>
 
       {/* Bot Admins whitelist */}

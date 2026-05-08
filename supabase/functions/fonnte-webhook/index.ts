@@ -3,8 +3,14 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-bot-test',
 };
+
+const json = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
 
 function normalizePhone(raw: string) {
   const d = String(raw).replace(/\D/g, '');
@@ -13,16 +19,23 @@ function normalizePhone(raw: string) {
   return d;
 }
 
-async function sendFonnte(phone: string, message: string) {
+async function sendFonnte(phone: string, message: string): Promise<{ ok: boolean; data?: unknown; error?: string }> {
   const token = Deno.env.get('FONNTE_TOKEN');
-  if (!token) return;
+  if (!token) return { ok: false, error: 'FONNTE_TOKEN not configured' };
   const form = new FormData();
   form.append('target', normalizePhone(phone));
   form.append('message', message);
   form.append('countryCode', '62');
-  await fetch('https://api.fonnte.com/send', {
-    method: 'POST', headers: { Authorization: token }, body: form,
-  }).catch(() => null);
+  try {
+    const res = await fetch('https://api.fonnte.com/send', {
+      method: 'POST', headers: { Authorization: token }, body: form,
+    });
+    const data = await res.json().catch(() => ({}));
+    const ok = res.ok && (data as { status?: boolean })?.status !== false;
+    return { ok, data, error: ok ? undefined : JSON.stringify(data) };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : 'send_failed' };
+  }
 }
 
 function buildBaseUrl() {
@@ -52,14 +65,42 @@ async function callCreateToken(payload: Record<string, unknown>): Promise<{ ok: 
   }
 }
 
+async function isAuthorizedTestRequest(authHeader: string, admin: ReturnType<typeof createClient>) {
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+  const bearer = authHeader.replace(/^Bearer\s+/i, '');
+  if (bearer && bearer === serviceKey) return true;
+  if (!bearer) return false;
+
+  try {
+    const userClient = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const { data: claims } = await userClient.auth.getClaims(bearer);
+    const userId = claims?.claims?.sub;
+    if (!userId) return false;
+    const { data: isAdmin } = await admin.rpc('has_role', { _user_id: userId, _role: 'admin' });
+    return !!isAdmin;
+  } catch {
+    return false;
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'POST') return new Response('ok', { headers: corsHeaders });
 
   const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+  const authHeader = req.headers.get('Authorization') || '';
+  const testMode = req.headers.get('x-bot-test') === 'true';
+  const debug = (reason: string, extra: Record<string, unknown> = {}) =>
+    testMode ? json({ ok: false, reason, ...extra }) : new Response('ok', { headers: corsHeaders });
+
+  if (testMode && !(await isAuthorizedTestRequest(authHeader, admin))) {
+    return json({ ok: false, reason: 'unauthorized' }, 401);
+  }
 
   // Fonnte sends as multipart/form-data, x-www-form-urlencoded, or json
-  let phone = '', text = '', device = '', fromMe = false;
+  let phone = '', text = '', device = '', fromMe = false, deliverTest = false;
   try {
     const ct = req.headers.get('content-type') || '';
     if (ct.includes('application/json')) {
@@ -68,54 +109,60 @@ Deno.serve(async (req) => {
       device = String(j.device ?? '');
       text = String(j.message ?? j.text ?? '').trim();
       fromMe = j.fromMe === true || j.fromMe === 'true' || j.from_me === true;
+      deliverTest = j.deliver === true || j.deliver === 'true' || j.test_deliver === true;
     } else {
       const fd = await req.formData();
       phone = String(fd.get('sender') ?? fd.get('from') ?? '');
       device = String(fd.get('device') ?? '');
       text = String(fd.get('message') ?? fd.get('text') ?? '').trim();
       fromMe = String(fd.get('fromMe') ?? fd.get('from_me') ?? '') === 'true';
+      deliverTest = String(fd.get('deliver') ?? fd.get('test_deliver') ?? '') === 'true';
     }
   } catch {
-    return new Response('ok', { headers: corsHeaders });
+    return debug('bad_payload');
   }
 
-  if (!phone || !text) return new Response('ok', { headers: corsHeaders });
+  if (!phone || !text) return debug('missing_phone_or_text');
 
   const phoneNorm = normalizePhone(phone);
   const deviceNorm = normalizePhone(device);
 
-  // Anti-loop: ignore echoes of bot's own outbound messages
-  if (fromMe) return new Response('ok', { headers: corsHeaders });
-  if (deviceNorm && deviceNorm === phoneNorm) return new Response('ok', { headers: corsHeaders });
-
   // Only process commands starting with '/' — silently ignore other chatter
-  if (!text.startsWith('/')) return new Response('ok', { headers: corsHeaders });
+  if (!text.startsWith('/')) return debug('not_a_command', { phone: phoneNorm, text });
+
+  // Anti-loop: ignore echoes, but still allow slash commands from the device owner/self chat.
+  if (!testMode && fromMe && !text.startsWith('/')) return new Response('ok', { headers: corsHeaders });
+  if (!testMode && deviceNorm && deviceNorm === phoneNorm && !text.startsWith('/')) return new Response('ok', { headers: corsHeaders });
 
   // Dedup: same phone+message within ~20s = duplicate webhook delivery from Fonnte.
   // Prune FIRST so genuine repeated commands (>20s apart) are not blocked.
-  const hash = await sha1(text);
-  await admin.from('bot_inbox_dedup')
-    .delete()
-    .lt('received_at', new Date(Date.now() - 20_000).toISOString());
-  const { error: dupErr } = await admin
-    .from('bot_inbox_dedup')
-    .insert({ phone: phoneNorm, message_hash: hash });
-  if (dupErr) {
-    // Likely unique violation → already processed in last 20s
-    return new Response('ok', { headers: corsHeaders });
+  if (!testMode) {
+    const hash = await sha1(text);
+    await admin.from('bot_inbox_dedup')
+      .delete()
+      .lt('received_at', new Date(Date.now() - 20_000).toISOString());
+    const { error: dupErr } = await admin
+      .from('bot_inbox_dedup')
+      .insert({ phone: phoneNorm, message_hash: hash });
+    if (dupErr) {
+      // Likely unique violation → already processed in last 20s
+      return new Response('ok', { headers: corsHeaders });
+    }
   }
 
   // Per-phone rate limit: max 1 reply per 8 seconds
-  const RL_WINDOW_MS = 8000;
-  const { data: rl } = await admin.from('bot_rate_limit')
-    .select('last_sent_at').eq('phone', phoneNorm).maybeSingle();
-  if (rl?.last_sent_at && Date.now() - new Date(rl.last_sent_at).getTime() < RL_WINDOW_MS) {
-    return new Response('ok', { headers: corsHeaders });
+  if (!testMode) {
+    const RL_WINDOW_MS = 8000;
+    const { data: rl } = await admin.from('bot_rate_limit')
+      .select('last_sent_at').eq('phone', phoneNorm).maybeSingle();
+    if (rl?.last_sent_at && Date.now() - new Date(rl.last_sent_at).getTime() < RL_WINDOW_MS) {
+      return new Response('ok', { headers: corsHeaders });
+    }
+    await admin.from('bot_rate_limit').upsert({ phone: phoneNorm, last_sent_at: new Date().toISOString() });
+    // Janitor for rate limit (>10 min)
+    await admin.from('bot_rate_limit').delete()
+      .lt('last_sent_at', new Date(Date.now() - 10 * 60_000).toISOString());
   }
-  await admin.from('bot_rate_limit').upsert({ phone: phoneNorm, last_sent_at: new Date().toISOString() });
-  // Janitor for rate limit (>10 min)
-  await admin.from('bot_rate_limit').delete()
-    .lt('last_sent_at', new Date(Date.now() - 10 * 60_000).toISOString());
 
   const lower = text.toLowerCase();
   const [cmd, ...rest] = lower.split(/\s+/);
@@ -269,10 +316,21 @@ Deno.serve(async (req) => {
   }
 
 
-  await sendFonnte(phoneNorm, reply || '✅ OK');
+  const finalReply = reply || '✅ OK';
+  const sendResult = testMode && !deliverTest
+    ? { ok: true, data: { skipped: true, reason: 'test_mode' } }
+    : await sendFonnte(phoneNorm, finalReply);
   await admin.from('wa_outbox').insert({
-    phone: phoneNorm, message: reply, status: 'sent',
+    phone: phoneNorm,
+    message: finalReply,
+    status: sendResult.ok ? 'sent' : 'failed',
+    error: sendResult.ok ? null : sendResult.error,
+    fonnte_response: sendResult.data as Record<string, unknown> | undefined,
   });
+
+  if (testMode) {
+    return json({ ok: true, phone: phoneNorm, command: cmd, reply: finalReply, delivered: deliverTest, send: sendResult });
+  }
 
   return new Response('ok', { headers: corsHeaders });
 });
