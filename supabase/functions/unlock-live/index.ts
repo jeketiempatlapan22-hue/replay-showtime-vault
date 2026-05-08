@@ -44,7 +44,8 @@ async function verifyMembership(supabase: any, mtoken: string, mpassword: string
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   try {
-    const { token, password, browser_id, show_id, mtoken, mpassword } = await req.json().catch(() => ({} as any));
+    const { token, password, browser_id, show_id, mtoken, mpassword, silent } = await req.json().catch(() => ({} as any));
+    const isSilent = silent === true;
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
