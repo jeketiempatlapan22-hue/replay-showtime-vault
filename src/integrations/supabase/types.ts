@@ -597,7 +597,7 @@ export type Database = {
           {
             foreignKeyName: "membership_token_devices_token_id_fkey"
             columns: ["token_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "membership_tokens"
             referencedColumns: ["id"]
           },
