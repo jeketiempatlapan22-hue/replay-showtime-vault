@@ -178,7 +178,7 @@ export default function Live() {
     });
   };
 
-  const doUnlock = async (opts: { token?: string; password?: string }, silent = false) => {
+  const doUnlock = async (opts: { token?: string; password?: string; mtoken?: string; mpassword?: string }, silent = false) => {
     if (!silent) { setSubmitting(true); setPwError(''); }
     try {
       const { data } = await supabase.functions.invoke('unlock-live', {
