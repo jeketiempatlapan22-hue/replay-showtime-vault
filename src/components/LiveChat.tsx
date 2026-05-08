@@ -92,20 +92,90 @@ export default function LiveChat() {
     if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight;
   }, [messages.length]);
 
+  // Rate limit per browser (client-side, anti-spam):
+  // - Min 2 detik antar pesan
+  // - Maks 8 pesan per 60 detik
+  // - Maks 3 pesan identik berturut-turut
+  // Tidak berlaku untuk admin.
+  const RL_MIN_GAP_MS = 2000;
+  const RL_WINDOW_MS = 60_000;
+  const RL_MAX_IN_WINDOW = 8;
+  const RL_KEY = `replaytime-chat-ts-${getBrowserId()}`;
+  const RL_LAST_MSGS_KEY = `replaytime-chat-last-${getBrowserId()}`;
+
+  const checkRate = (msg: string): { ok: true } | { ok: false; reason: string; waitSec?: number } => {
+    if (isAdmin) return { ok: true };
+    let ts: number[] = sentTimestampsRef.current;
+    if (ts.length === 0) {
+      try { ts = JSON.parse(localStorage.getItem(RL_KEY) || '[]'); } catch { ts = []; }
+    }
+    const now = Date.now();
+    ts = ts.filter(t => now - t < RL_WINDOW_MS);
+    if (ts.length > 0 && now - ts[ts.length - 1] < RL_MIN_GAP_MS) {
+      return { ok: false, reason: 'Tunggu sebentar sebelum kirim pesan lagi.', waitSec: Math.ceil((RL_MIN_GAP_MS - (now - ts[ts.length - 1])) / 1000) };
+    }
+    if (ts.length >= RL_MAX_IN_WINDOW) {
+      const wait = Math.ceil((RL_WINDOW_MS - (now - ts[0])) / 1000);
+      return { ok: false, reason: `Terlalu banyak pesan. Coba lagi dalam ${wait} detik.`, waitSec: wait };
+    }
+    let lastMsgs: string[] = [];
+    try { lastMsgs = JSON.parse(localStorage.getItem(RL_LAST_MSGS_KEY) || '[]'); } catch { lastMsgs = []; }
+    if (lastMsgs.length >= 3 && lastMsgs.slice(-3).every(m => m === msg)) {
+      return { ok: false, reason: 'Hindari kirim pesan yang sama berulang kali.' };
+    }
+    return { ok: true };
+  };
+
+  const recordSent = (msg: string) => {
+    const now = Date.now();
+    const ts = [...sentTimestampsRef.current.filter(t => now - t < RL_WINDOW_MS), now];
+    sentTimestampsRef.current = ts;
+    try { localStorage.setItem(RL_KEY, JSON.stringify(ts)); } catch { /* ignore */ }
+    let lastMsgs: string[] = [];
+    try { lastMsgs = JSON.parse(localStorage.getItem(RL_LAST_MSGS_KEY) || '[]'); } catch { lastMsgs = []; }
+    lastMsgs = [...lastMsgs, msg].slice(-5);
+    try { localStorage.setItem(RL_LAST_MSGS_KEY, JSON.stringify(lastMsgs)); } catch { /* ignore */ }
+  };
+
+  const startCooldown = (sec: number) => {
+    setCooldownLeft(sec);
+    const tick = () => setCooldownLeft(prev => {
+      if (prev <= 1) return 0;
+      setTimeout(tick, 1000);
+      return prev - 1;
+    });
+    if (sec > 0) setTimeout(tick, 1000);
+  };
+
   const send = async () => {
     const msg = text.trim().slice(0, 500);
     if (!msg || sending) return;
     if (!isAdmin && !name.trim()) { openChangeName(); return; }
+    const rl = checkRate(msg);
+    if (!rl.ok) {
+      if (rl.waitSec) startCooldown(rl.waitSec);
+      // soft toast via alert-style inline; reuse nameError-like channel by injecting a transient message
+      // Use console-free UI: set sending false and show via toast import? Avoid extra deps — use window.alert as last resort.
+      // Better: surface inline by setting nameError-like state. Add toast via existing hook:
+      try {
+        const { toast } = await import('@/hooks/use-toast');
+        toast({ title: 'Pesan ditolak', description: rl.reason, variant: 'destructive' });
+      } catch { /* ignore */ }
+      return;
+    }
     setSending(true);
     const display = (name.trim() || 'Anonim').slice(0, 40);
-    await supabase.from('live_messages').insert({
+    const { error } = await supabase.from('live_messages').insert({
       browser_id: getBrowserId(),
       name: isAdmin ? (adminUsername || 'Admin') : display,
       message: msg,
       is_admin: isAdmin,
       pinned: false,
     });
-    setText('');
+    if (!error) {
+      recordSent(msg);
+      setText('');
+    }
     setSending(false);
   };
 
