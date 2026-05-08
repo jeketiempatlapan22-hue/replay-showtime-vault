@@ -194,17 +194,46 @@ export default function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWa
             </div>
           </div>
 
-          {isUnlocked ? (
+          {isPurchased ? (
+            <div className="space-y-2 mt-2">
+              <Button type="button" className="w-full" onClick={() => onWatch(replay)}>
+                <Play className="w-4 h-4 mr-2" /> Tonton Replay
+              </Button>
+              <div className="rounded-md border border-border bg-muted/30 p-2 space-y-1">
+                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Sandi akses kamu</div>
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 text-[11px] font-mono break-all text-foreground">{purchasedToken}</code>
+                  <Button type="button" size="sm" variant="outline" onClick={copyToken} className="h-7 px-2"><Copy className="w-3 h-3" /></Button>
+                </div>
+              </div>
+            </div>
+          ) : isUnlocked ? (
             <Button type="button" className="w-full mt-2" onClick={() => onWatch(replay)}>
               <Play className="w-4 h-4 mr-2" /> Tonton Sekarang
             </Button>
           ) : (
-            <Button type="button" variant="outline" className="w-full mt-2 border-primary/50 text-primary hover:bg-primary hover:text-primary-foreground" onClick={() => setShowPasswordDialog(true)}>
-              <Lock className="w-4 h-4 mr-2" /> Buka dengan Sandi
-            </Button>
+            <div className="space-y-2 mt-2">
+              <Button type="button" className="w-full gap-2" onClick={() => setBuyOpen(true)}>
+                <ShoppingCart className="w-4 h-4" /> Beli Replay · Rp {REPLAY_DEFAULT_PRICE.toLocaleString('id-ID')}
+              </Button>
+              <Button type="button" variant="outline" className="w-full border-primary/50 text-primary hover:bg-primary hover:text-primary-foreground" onClick={() => setShowPasswordDialog(true)}>
+                <Lock className="w-4 h-4 mr-2" /> Buka dengan Sandi
+              </Button>
+            </div>
           )}
         </div>
       </div>
+
+      <BuyShowDialog
+        open={buyOpen}
+        onOpenChange={setBuyOpen}
+        showId=""
+        showTitle={replay.title}
+        amount={REPLAY_DEFAULT_PRICE}
+        itemTitle={`Replay: ${replay.title}`}
+        replayId={replay.id}
+        kind="replay_only"
+      />
 
       <Dialog open={showPasswordDialog} onOpenChange={setShowPasswordDialog}>
         <DialogContent className="bg-card border-border">
