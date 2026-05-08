@@ -46,7 +46,17 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
   const onFatalErrorRef = useRef(onFatalError);
 
   const initialVolume = (() => { try { const v = parseFloat(localStorage.getItem('replaytime-volume') || ''); return isFinite(v) ? Math.max(0, Math.min(1, v)) : 1; } catch { return 1; } })();
-  const initialMuted = (() => { try { return localStorage.getItem('replaytime-muted') === '1'; } catch { return false; } })();
+  // Default unmuted; one-time per session, clear stale persisted mute so user starts with sound on.
+  const initialMuted = (() => {
+    try {
+      if (!sessionStorage.getItem('replaytime-mute-reset')) {
+        localStorage.removeItem('replaytime-muted');
+        sessionStorage.setItem('replaytime-mute-reset', '1');
+        return false;
+      }
+      return localStorage.getItem('replaytime-muted') === '1';
+    } catch { return false; }
+  })();
   const initialVolumeRef = useRef(initialVolume);
   const initialMutedRef = useRef(initialMuted);
   const savedQualityHeight = (() => { try { const v = parseInt(localStorage.getItem('replaytime-quality-height') || '', 10); return isFinite(v) ? v : null; } catch { return null; } })();
