@@ -113,6 +113,7 @@ export default function Live() {
   const [status, setStatus] = useState<LiveStatus | null>(null);
   const [statusLoading, setStatusLoading] = useState(true);
   const [unlocked, setUnlocked] = useState<UnlockedConfig | null>(null);
+  const [membership, setMembership] = useState<MembershipInfo | null>(null);
   const [pwInput, setPwInput] = useState('');
   const [pwError, setPwError] = useState('');
   const [submitting, setSubmitting] = useState(false);
