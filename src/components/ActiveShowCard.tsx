@@ -203,7 +203,7 @@ export default function ActiveShowCard({ show, index = 0 }: { show: ActiveShow; 
       {/* Inline replay player dialog */}
       {inlineReplay && (
         <Dialog open={inlinePlayerOpen} onOpenChange={setInlinePlayerOpen}>
-          <DialogContent className="max-w-4xl p-0 overflow-hidden bg-black border-border">
+          <DialogContent className="w-[calc(100vw-1rem)] max-w-screen-xl p-0 overflow-hidden bg-black border-border">
             <button onClick={() => setInlinePlayerOpen(false)} className="absolute top-2 right-2 z-50 w-8 h-8 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80">
               <X className="w-4 h-4" />
             </button>
