@@ -88,6 +88,18 @@ Deno.serve(async (req) => {
     .delete()
     .lt('received_at', new Date(Date.now() - 5 * 60_000).toISOString());
 
+  // Per-phone rate limit: max 1 reply per 8 seconds
+  const RL_WINDOW_MS = 8000;
+  const { data: rl } = await admin.from('bot_rate_limit')
+    .select('last_sent_at').eq('phone', phoneNorm).maybeSingle();
+  if (rl?.last_sent_at && Date.now() - new Date(rl.last_sent_at).getTime() < RL_WINDOW_MS) {
+    return new Response('ok', { headers: corsHeaders });
+  }
+  await admin.from('bot_rate_limit').upsert({ phone: phoneNorm, last_sent_at: new Date().toISOString() });
+  // Janitor for rate limit (>10 min)
+  await admin.from('bot_rate_limit').delete()
+    .lt('last_sent_at', new Date(Date.now() - 10 * 60_000).toISOString());
+
   const lower = text.toLowerCase();
   const [cmd, ...rest] = lower.split(/\s+/);
   const arg = rest.join(' ').trim();
