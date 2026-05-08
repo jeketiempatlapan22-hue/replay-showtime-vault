@@ -79,9 +79,9 @@ export default function LiveChat() {
   const send = async () => {
     const msg = text.trim().slice(0, 500);
     if (!msg || sending) return;
+    if (!isAdmin && !name.trim()) { openChangeName(); return; }
     setSending(true);
     const display = (name.trim() || 'Anonim').slice(0, 40);
-    localStorage.setItem('replaytime-name', display);
     await supabase.from('live_messages').insert({
       browser_id: getBrowserId(),
       name: isAdmin ? (adminUsername || 'Admin') : display,
