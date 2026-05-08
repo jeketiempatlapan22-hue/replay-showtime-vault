@@ -436,6 +436,15 @@ export default function Live() {
                 </Button>
               </a>
               <p className="text-center text-[11px] text-muted-foreground">+62 888-0904-8431</p>
+
+              <div className="pt-3 border-t border-border">
+                <Button type="button" variant="ghost" size="sm" className="w-full text-xs" onClick={handleSelfReset}>
+                  Reset perangkat membership saya
+                </Button>
+                <p className="text-[10px] text-muted-foreground text-center mt-1">
+                  Gunakan jika ingin pindah browser/device. Maks. 3x reset manual; otomatis reset tiap 00:00 WIB.
+                </p>
+              </div>
             </div>
           </div>
         ) : (
