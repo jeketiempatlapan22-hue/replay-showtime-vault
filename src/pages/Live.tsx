@@ -286,11 +286,11 @@ export default function Live() {
 
   const liveActive = !!(status?.enabled || unlocked?.enabled);
 
-  // ============ VIEWER COUNTER (presence) ============
+  // ============ VIEWER COUNTER (presence) — count unique browser_id ============
   const showKey = search.get('show') || 'global';
   const [viewerCount, setViewerCount] = useState<number>(0);
   useEffect(() => {
-    if (!liveActive || !unlocked) return;
+    if (!liveActive) return;
     const bid = getBrowserId();
     const channel = supabase.channel(`live-viewers:${showKey}`, {
       config: { presence: { key: bid } },
@@ -298,15 +298,21 @@ export default function Live() {
     const recount = () => {
       try {
         const state = channel.presenceState() as Record<string, unknown[]>;
-        setViewerCount(Object.keys(state).length);
+        // Each presence key IS a browser_id; using Set guarantees uniqueness
+        // even if duplicate join events surface the same key multiple times.
+        const unique = new Set<string>();
+        for (const k of Object.keys(state)) if (k) unique.add(k);
+        setViewerCount(unique.size);
       } catch { /* ignore */ }
     };
+    let tracked = false;
     channel
       .on('presence', { event: 'sync' }, recount)
       .on('presence', { event: 'join' }, recount)
       .on('presence', { event: 'leave' }, recount)
       .subscribe(async (status) => {
-        if (status === 'SUBSCRIBED') {
+        if (status === 'SUBSCRIBED' && !tracked) {
+          tracked = true;
           try { await channel.track({ at: Date.now() }); } catch { /* ignore */ }
           recount();
         }
@@ -317,7 +323,7 @@ export default function Live() {
       try { void channel.untrack(); } catch { /* ignore */ }
       supabase.removeChannel(channel);
     };
-  }, [liveActive, unlocked, showKey]);
+  }, [liveActive, showKey]);
 
   return (
     <div className="min-h-screen bg-background relative z-10">
