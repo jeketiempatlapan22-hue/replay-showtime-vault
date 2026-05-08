@@ -76,6 +76,11 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
   const [seeking, setSeeking] = useState(false);
   const [showControls, setShowControls] = useState(true);
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Auto-detect live for YouTube (duration === 0/Infinity sambil currentTime jalan = live).
+  // Prop `isLive` jadi initial hint; deteksi runtime bisa meng-override.
+  const [detectedLive, setDetectedLive] = useState<boolean>(!!isLive);
+  const liveActive = isLive || detectedLive;
+  const liveEndedRef = useRef(false);
 
   const markReady = useCallback((value: boolean) => {
     readyRef.current = value;
