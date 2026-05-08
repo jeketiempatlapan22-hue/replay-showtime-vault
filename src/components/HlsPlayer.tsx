@@ -318,12 +318,8 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
           onFatalErrorRef.current?.();
           return;
         }
-        // Non-fatal errors: log only, hls.js handles internal retries.
+        // Non-fatal errors: let hls.js retry internally. Avoid media recovery here because it can restart/seek unexpectedly.
         if (!data.fatal) {
-          if (data.type === Hls.ErrorTypes.MEDIA_ERROR && recoveryAttemptsRef.current < 2) {
-            recoveryAttemptsRef.current += 1;
-            try { hls?.recoverMediaError(); safePlay(); } catch { /* ignore */ }
-          }
           return;
         }
 
@@ -425,7 +421,16 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
     const onPlay = () => setIsPlaying(true);
     const onPause = () => setIsPlaying(false);
     const onTimeUpdate = () => setCurrentTime(video.currentTime);
-    const onDurationChange = () => setDuration(video.duration);
+    const onDurationChange = () => {
+      const nextDuration = video.duration;
+      if (!Number.isFinite(nextDuration) || nextDuration <= 0) {
+        setDuration(0);
+        isLiveRef.current = true;
+        setIsLiveStream(true);
+        return;
+      }
+      setDuration(nextDuration);
+    };
     const onWaiting = () => {
       // mid-play stall (not initial)
       if (!loadingRef.current) setBuffering(true);
@@ -509,21 +514,30 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
   const togglePlay = () => {
     const video = videoRef.current;
     if (!video) return;
-    if (video.paused) { video.play().catch(() => {}); }
-    else { video.pause(); }
+    if (video.paused) {
+      video.play().catch(() => {});
+      setIsPlaying(true);
+    } else {
+      video.pause();
+      setIsPlaying(false);
+    }
     resetHideTimer();
   };
 
   const seek = (delta: number) => {
     const video = videoRef.current;
     if (!video || isLiveStream) return;
-    video.currentTime = Math.max(0, Math.min(video.duration || 0, video.currentTime + delta));
+    if (!Number.isFinite(video.duration) || video.duration <= 0) return;
+    video.currentTime = Math.max(0, Math.min(video.duration, video.currentTime + delta));
+    resetHideTimer();
   };
 
   const seekTo = (e: React.ChangeEvent<HTMLInputElement>) => {
     const video = videoRef.current;
-    if (!video || isLiveStream) return;
-    video.currentTime = Number(e.target.value);
+    if (!video || isLiveStream || !Number.isFinite(video.duration) || video.duration <= 0) return;
+    video.currentTime = Math.max(0, Math.min(video.duration, Number(e.target.value)));
+    setCurrentTime(video.currentTime);
+    resetHideTimer();
   };
 
   const changeVolume = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -634,10 +648,12 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
             <input
               type="range"
               min={0}
-              max={duration || 0}
+              max={isLiveStream ? 1 : Math.max(1, duration || 1)}
               step={0.1}
               value={isLiveStream ? 0 : currentTime}
               onChange={seekTo}
+              onPointerDown={(e) => e.stopPropagation()}
+              onPointerUp={(e) => e.stopPropagation()}
               disabled={isLiveStream}
               className="flex-1 h-1.5 accent-primary cursor-pointer disabled:cursor-default disabled:opacity-70"
               style={{
@@ -654,22 +670,22 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
           </div>
 
           <div className="flex items-center gap-1 sm:gap-2">
-            <button type="button" onClick={togglePlay} className="p-2 text-white hover:text-primary transition-colors" aria-label={isPlaying ? 'Pause' : 'Play'}>
+            <button type="button" onClick={(e) => { e.stopPropagation(); togglePlay(); }} className="p-2 text-white hover:text-primary transition-colors" aria-label={isPlaying ? 'Pause' : 'Play'}>
               {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
             </button>
             {!hideSeekButtons && (
               <>
-                <button type="button" onClick={() => seek(-10)} disabled={isLiveStream} className="p-2 text-white hover:text-primary transition-colors disabled:opacity-40 disabled:hover:text-current" aria-label="Mundur 10 detik" title="Mundur 10 detik">
+                <button type="button" onClick={(e) => { e.stopPropagation(); seek(-10); }} disabled={isLiveStream} className="p-2 text-white hover:text-primary transition-colors disabled:opacity-40 disabled:hover:text-current" aria-label="Mundur 10 detik" title="Mundur 10 detik">
                   <RotateCcw className="w-5 h-5" />
                 </button>
-                <button type="button" onClick={() => seek(10)} disabled={isLiveStream} className="p-2 text-white hover:text-primary transition-colors disabled:opacity-40 disabled:hover:text-current" aria-label="Maju 10 detik" title="Maju 10 detik">
+                <button type="button" onClick={(e) => { e.stopPropagation(); seek(10); }} disabled={isLiveStream} className="p-2 text-white hover:text-primary transition-colors disabled:opacity-40 disabled:hover:text-current" aria-label="Maju 10 detik" title="Maju 10 detik">
                   <RotateCw className="w-5 h-5" />
                 </button>
               </>
             )}
 
             <div className="flex items-center gap-1 group/volume">
-              <button type="button" onClick={toggleMute} className="p-2 text-white hover:text-primary transition-colors" aria-label={muted ? 'Unmute' : 'Mute'}>
+              <button type="button" onClick={(e) => { e.stopPropagation(); toggleMute(); resetHideTimer(); }} className="p-2 text-white hover:text-primary transition-colors" aria-label={muted ? 'Unmute' : 'Mute'}>
                 {muted || volume === 0 ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
               </button>
               <input
@@ -679,6 +695,8 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
                 step={0.05}
                 value={muted ? 0 : volume}
                 onChange={changeVolume}
+                onPointerDown={(e) => e.stopPropagation()}
+                onPointerUp={(e) => e.stopPropagation()}
                 className="w-16 sm:w-20 h-1 accent-primary cursor-pointer hidden sm:block"
               />
             </div>
@@ -689,7 +707,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
               <div className="relative">
                 <button
                   type="button"
-                  onClick={() => setShowQualityMenu(v => !v)}
+                  onClick={(e) => { e.stopPropagation(); setShowQualityMenu(v => !v); resetHideTimer(); }}
                   className="p-2 text-white hover:text-primary transition-colors flex items-center gap-1"
                   aria-label="Kualitas video"
                   title="Kualitas video"
@@ -712,7 +730,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
                         <button
                           key={q.index}
                           type="button"
-                          onClick={() => selectQuality(q.index)}
+                          onClick={(e) => { e.stopPropagation(); selectQuality(q.index); resetHideTimer(); }}
                           className={`w-full flex items-center justify-between gap-2 px-3 py-2 text-xs text-left transition-colors ${
                             active ? 'bg-primary/15 text-primary font-medium' : 'text-foreground hover:bg-secondary/60'
                           }`}
@@ -732,7 +750,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
               </div>
             )}
 
-            <button type="button" onClick={toggleFullscreen} className="p-2 text-white hover:text-primary transition-colors" aria-label="Fullscreen">
+            <button type="button" onClick={(e) => { e.stopPropagation(); toggleFullscreen(); resetHideTimer(); }} className="p-2 text-white hover:text-primary transition-colors" aria-label="Fullscreen">
               {isFullscreen ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
             </button>
           </div>
