@@ -479,7 +479,9 @@ export default function Live() {
             )}
 
             {/* LIVE CHAT */}
-            <LiveChat />
+            <Suspense fallback={<ChatFallback />}>
+              <LiveChat />
+            </Suspense>
           </>
         )}
       </div>
