@@ -73,6 +73,23 @@ Deno.serve(async (req) => {
     return new Response('ok', { headers: corsHeaders });
   }
 
+  // Admin-only commands
+  const ADMIN_ONLY = new Set(['/buattoken']);
+  let isBotAdmin = false;
+  if (ADMIN_ONLY.has(cmd)) {
+    const { data: ba } = await admin
+      .from('bot_admins')
+      .select('phone')
+      .eq('phone', phoneNorm)
+      .eq('enabled', true)
+      .maybeSingle();
+    isBotAdmin = !!ba;
+    if (!isBotAdmin) {
+      await sendFonnte(phoneNorm, '🔒 Command ini hanya untuk admin bot. Hubungi owner untuk akses.');
+      return new Response('ok', { headers: corsHeaders });
+    }
+  }
+
   let reply = command.response_template ?? '';
 
   // Settings substitution
@@ -97,6 +114,42 @@ Deno.serve(async (req) => {
           const lineup = (s.lineup ?? []).join(', ');
           return `• *${s.title}*\n  📅 ${s.show_date} ${String(s.show_time).slice(0,5)}\n  🏷️ ${s.category}${lineup ? `\n  👥 ${lineup}` : ''}`;
         }).join('\n\n');
+      }
+    } else if (cmd === '/buattoken') {
+      const origin = map.get('site_origin') || '';
+      if (!arg) {
+        const { data: replays } = await admin
+          .from('replays')
+          .select('id,title,date,show_name')
+          .order('date', { ascending: false })
+          .limit(8);
+        if (!replays?.length) {
+          reply = '📭 Belum ada replay tersimpan.';
+        } else {
+          reply = '🎬 *DAFTAR REPLAY TERBARU*\n\nGunakan: */buattoken <kode>*\nKode = 8 karakter pertama ID.\n\n' +
+            replays.map((r) => `• \`${r.id.slice(0,8)}\` — ${r.title}\n  📅 ${r.date}`).join('\n\n');
+        }
+      } else {
+        const code = arg.trim().toLowerCase();
+        const { data: matches } = await admin
+          .from('replays')
+          .select('id,title,access_token')
+          .ilike('id', `${code}%`)
+          .limit(2);
+        if (!matches?.length) {
+          reply = `❌ Replay dengan kode *${code}* tidak ditemukan.`;
+        } else if (matches.length > 1) {
+          reply = `⚠️ Kode *${code}* ambigu (${matches.length} match). Gunakan kode lebih panjang.`;
+        } else {
+          const r = matches[0];
+          let token = r.access_token;
+          if (!token) {
+            token = crypto.randomUUID().replace(/-/g, '').slice(0, 24);
+            await admin.from('replays').update({ access_token: token }).eq('id', r.id);
+          }
+          const link = `${origin}/?token=${token}&replay=${r.id}`;
+          reply = `✅ *Token Replay*\n\n${r.title}\n🔗 ${link}\n\n_Bagikan link ini ke pembeli._`;
+        }
       }
     } else if (cmd === '/token') {
       if (!arg) {
