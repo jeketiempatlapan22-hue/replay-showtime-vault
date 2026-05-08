@@ -53,6 +53,7 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
   const [pwError, setPwError] = useState('');
   const [pwChecking, setPwChecking] = useState(false);
   const [activeSourceId, setActiveSourceId] = useState<string | null>(null);
+  const [activeToken, setActiveToken] = useState<string>('');
   const containerRef = useRef<HTMLDivElement>(null);
   
   const hlsPlayerRef = useRef<HlsPlayerHandle>(null);
@@ -79,6 +80,7 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
       password = sessionStorage.getItem(`replaytime-pw-${replay.id}`) || '';
       token = sessionStorage.getItem(`replaytime-tok-${replay.id}`) || '';
     } catch { /* ignore */ }
+    setActiveToken(token);
 
     if (!password && !token) {
       setSourceLoading(false);
@@ -253,21 +255,35 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
             <p className="text-destructive font-medium">Video belum tersedia. Hubungi admin.</p>
           </div>
         ) : activeSource.type === 'm3u8' && !hlsFailed ? (
-          <HlsPlayer
-            ref={hlsPlayerRef}
-            key={activeSource.id}
-            src={activeSource.url}
-            title={replay.title}
-            onFatalError={handleHlsFatalError}
-            onPipChange={setPipActive}
-          />
+          <div className="relative">
+            <HlsPlayer
+              ref={hlsPlayerRef}
+              key={activeSource.id}
+              src={activeSource.url}
+              title={replay.title}
+              onFatalError={handleHlsFatalError}
+              onPipChange={setPipActive}
+            />
+            {activeToken && (
+              <div className="pointer-events-none absolute top-2 right-2 z-10 select-none rounded-md bg-black/20 px-2 py-0.5 text-[10px] font-mono tracking-wider text-white/40 backdrop-blur-[1px] mix-blend-difference">
+                RT-{activeToken.slice(-4).toUpperCase()}
+              </div>
+            )}
+          </div>
         ) : (
-          <EmbedPlayer
-            key={activeSource.id}
-            type={activeSource.type as 'youtube' | 'cloudflare'}
-            source={activeSource.url}
-            title={replay.title}
-          />
+          <div className="relative">
+            <EmbedPlayer
+              key={activeSource.id}
+              type={activeSource.type as 'youtube' | 'cloudflare'}
+              source={activeSource.url}
+              title={replay.title}
+            />
+            {activeToken && (
+              <div className="pointer-events-none absolute top-2 right-2 z-10 select-none rounded-md bg-black/20 px-2 py-0.5 text-[10px] font-mono tracking-wider text-white/40 backdrop-blur-[1px] mix-blend-difference">
+                RT-{activeToken.slice(-4).toUpperCase()}
+              </div>
+            )}
+          </div>
         )}
 
         {/* Playlist chips */}

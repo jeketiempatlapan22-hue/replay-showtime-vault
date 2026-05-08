@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Loader2, PlayCircle, ShieldCheck, Lock, Calendar, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -49,13 +49,21 @@ export default function Akses() {
     })();
   }, [token, replayId]);
 
-  const handleOpen = () => {
+  const handleOpen = useCallback(() => {
     if (!replay) return;
     try {
       sessionStorage.setItem(`replaytime-tok-${replay.id}`, token);
     } catch { /* ignore */ }
     navigate(`/?token=${encodeURIComponent(token)}&replay=${replay.id}`);
-  };
+  }, [replay, token, navigate]);
+
+  // Auto-open replay langsung setelah token tervalidasi
+  useEffect(() => {
+    if (replay && !loading && !error) {
+      const t = setTimeout(handleOpen, 600);
+      return () => clearTimeout(t);
+    }
+  }, [replay, loading, error, handleOpen]);
 
   return (
     <div className="relative min-h-screen overflow-hidden">

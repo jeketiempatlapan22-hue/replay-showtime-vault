@@ -118,8 +118,8 @@ async function createTokenInline(
       .from('replays').select('id,title,date').eq('id', opts.replayId).maybeSingle();
     if (!replay) return { ok: false, error: 'replay_not_found' };
 
-    const origin = opts.settingsMap.get('site_origin') || '';
-    const liveUrl = origin ? `${origin}/live` : '';
+    const origin = (opts.settingsMap.get('site_origin') || 'https://replaytime.lovable.app').replace(/\/+$/, '');
+    const liveUrl = `${origin}/live`;
     const token = newToken();
     const isPersonal = opts.kind === 'personal';
 
