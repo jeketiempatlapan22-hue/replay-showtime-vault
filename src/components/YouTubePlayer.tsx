@@ -1,11 +1,12 @@
 import { ArrowLeft, Maximize, Minimize, Eye, Loader2, Lock, PictureInPicture2, ListVideo } from 'lucide-react';
-import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
+import { useState, useRef, useCallback, useEffect, useMemo, lazy, Suspense } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { type ReplayRow, getReplaySource, type ReplaySource, type PlaylistSource } from '@/lib/store';
 import { supabase } from '@/integrations/supabase/client';
 import RatingStars from '@/components/RatingStars';
-import CommentSection from '@/components/CommentSection';
+// CommentSection lazy-loaded — chunk komentar baru dimuat saat user scroll/buka.
+const CommentSection = lazy(() => import('@/components/CommentSection'));
 import HlsPlayer, { type HlsPlayerHandle } from '@/components/HlsPlayer';
 import EmbedPlayer from '@/components/EmbedPlayer';
 import { prefetchM3U8, prefetchYouTube, prefetchCloudflare } from '@/lib/prefetch';
