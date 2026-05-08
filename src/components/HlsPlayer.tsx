@@ -378,6 +378,11 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
     } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
       video.src = src;
       nativeLoadedHandler = () => {
+        const durationValue = video.duration;
+        const nativeLive = !Number.isFinite(durationValue) || durationValue === Infinity;
+        isLiveRef.current = nativeLive;
+        setIsLiveStream(nativeLive);
+        if (nativeLive) setTimeout(() => seekToLiveEdgeOnce(), 250);
         setLoading(false);
         safePlay();
       };
