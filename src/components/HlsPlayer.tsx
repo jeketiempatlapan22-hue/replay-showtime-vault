@@ -478,8 +478,25 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
     setShowControls(true);
     if (hideControlsTimerRef.current) clearTimeout(hideControlsTimerRef.current);
     hideControlsTimerRef.current = setTimeout(() => {
-      if (videoRef.current && !videoRef.current.paused) setShowControls(false);
+      const v = videoRef.current;
+      if (v && !v.paused && !v.ended) setShowControls(false);
     }, 3000);
+  }, []);
+
+  const toggleControls = useCallback(() => {
+    setShowControls(prev => {
+      const next = !prev;
+      if (next) {
+        if (hideControlsTimerRef.current) clearTimeout(hideControlsTimerRef.current);
+        hideControlsTimerRef.current = setTimeout(() => {
+          const v = videoRef.current;
+          if (v && !v.paused && !v.ended) setShowControls(false);
+        }, 3000);
+      } else if (hideControlsTimerRef.current) {
+        clearTimeout(hideControlsTimerRef.current);
+      }
+      return next;
+    });
   }, []);
 
   useEffect(() => {
@@ -492,8 +509,9 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
   const togglePlay = () => {
     const video = videoRef.current;
     if (!video) return;
-    if (video.paused) video.play().catch(() => {});
-    else video.pause();
+    if (video.paused) { video.play().catch(() => {}); }
+    else { video.pause(); }
+    resetHideTimer();
   };
 
   const seek = (delta: number) => {
