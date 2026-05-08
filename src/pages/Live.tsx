@@ -16,6 +16,7 @@ interface PublicSource { label: string; type: SrcType }
 interface PrivateSource extends PublicSource { url: string }
 interface LiveStatus { enabled: boolean; title: string; type: string; require_password: boolean; sources: PublicSource[]; lineup: string[]; show_date?: string; show_time?: string; image_url?: string }
 interface UnlockedConfig { title: string; type: SrcType; url: string; sources: PrivateSource[]; watermark: string; enabled: boolean }
+type SourceLike = Partial<Record<keyof PrivateSource, unknown>>;
 
 const SS_KEY_BASE = 'replaytime-live-unlocked';
 const SS_SRC_KEY = 'replaytime-live-source-idx';
@@ -23,6 +24,21 @@ const WA_NUMBER = '6288809048431';
 const WA_LINK = `https://wa.me/${WA_NUMBER}?text=${encodeURIComponent('Halo admin, saya ingin beli akses show live.')}`;
 
 const typeLabel = (t: string) => t === 'youtube' ? 'YouTube' : t === 'cloudflare' ? 'Cloudflare' : 'M3U8 / HLS';
+
+const isSrcType = (value: unknown): value is SrcType => value === 'm3u8' || value === 'youtube' || value === 'cloudflare';
+const asSourceLike = (value: unknown): SourceLike | null => value && typeof value === 'object' ? value as SourceLike : null;
+const toPublicSources = (value: unknown): PublicSource[] => Array.isArray(value)
+  ? value.flatMap((item) => {
+    const source = asSourceLike(item);
+    return source ? [{ label: String(source.label || ''), type: isSrcType(source.type) ? source.type : 'm3u8' }] : [];
+  })
+  : [];
+const toPrivateSources = (value: unknown): PrivateSource[] => Array.isArray(value)
+  ? value.flatMap((item) => {
+    const source = asSourceLike(item);
+    return source ? [{ label: String(source.label || ''), type: isSrcType(source.type) ? source.type : 'm3u8', url: String(source.url || '') }] : [];
+  })
+  : [];
 
 function pad(n: number) { return String(n).padStart(2, '0'); }
 
