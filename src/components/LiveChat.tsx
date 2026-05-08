@@ -60,7 +60,8 @@ export default function LiveChat() {
       supabase.from('live_messages').select('*').eq('pinned', false).order('created_at', { ascending: false }).limit(30),
     ]);
     setPinned((pins || []) as Msg[]);
-    setMessages(((list || []) as Msg[]).reverse());
+    // Newest first — user sees latest without scrolling; scroll down for older messages.
+    setMessages(((list || []) as Msg[]));
   };
 
   useEffect(() => {
