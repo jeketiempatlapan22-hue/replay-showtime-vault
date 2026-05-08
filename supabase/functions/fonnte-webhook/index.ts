@@ -528,12 +528,12 @@ Deno.serve(async (req) => {
           });
         }
       }
-    } else if (cmd === '/tokensatuan') {
+    } else if (cmd === '/createtoken') {
       const parts = arg.split(/\s+/).filter(Boolean);
       const code = (parts[0] || '').toLowerCase();
       const label = parts.slice(1).join(' ').trim();
       if (!code) {
-        reply = 'ℹ️ Format: */tokensatuan <kode|alias> [label]*\n_Kode = 8 karakter pertama ID replay, atau alias admin._\nKetik */buattoken* untuk melihat daftar replay.';
+        reply = 'ℹ️ Format: */createtoken <kode|alias> [label]*\n_Token replay personal (1 device). Kode = 8 karakter pertama ID replay, atau alias admin._\nKetik */buattoken* untuk melihat daftar replay.';
       } else {
         const { data: byAlias } = await admin
           .from('replays').select('id,title').ilike('admin_alias', code).limit(2);
