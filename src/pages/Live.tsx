@@ -409,10 +409,10 @@ export default function Live() {
                   : <EmbedPlayer key={`em-${safeIdx}-${activeSource.url}`} type={activeSource.type} source={activeSource.url} title={unlocked.title} watermark={unlocked.watermark} />}
 
                 <div className="flex items-center justify-between flex-wrap gap-2 px-1">
-                  <div className="text-xs text-muted-foreground">
-                    Sumber aktif: <span className="font-semibold text-foreground">{activeSource.label || 'Player'}</span>
-                    <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded bg-secondary text-[10px] uppercase tracking-wider">{typeLabel(activeSource.type)}</span>
-                  </div>
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-500/10 border border-red-500/30 text-red-500 text-xs font-semibold">
+                    <Eye className="w-3.5 h-3.5" />
+                    {viewerCount.toLocaleString('id-ID')} menonton
+                  </span>
                   {unlocked.watermark && (
                     <span className="text-[10px] font-mono text-muted-foreground">ID: {unlocked.watermark}</span>
                   )}
