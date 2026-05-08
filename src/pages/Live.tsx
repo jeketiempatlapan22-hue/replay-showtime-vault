@@ -338,11 +338,11 @@ export default function Live() {
 
   return (
     <div className="min-h-screen bg-background relative z-10">
-      <div className="sticky top-0 z-20 bg-card/90 backdrop-blur border-b border-border px-3 sm:px-4 py-3 flex items-center gap-3">
+      <div className="sticky top-0 z-20 bg-card/90 backdrop-blur border-b border-border px-2 sm:px-4 py-2 sm:py-3 flex items-center gap-2 sm:gap-3">
         <Button variant="ghost" size="icon" onClick={() => navigate('/')} className="shrink-0"><ArrowLeft className="w-5 h-5" /></Button>
-        <div className="flex-1 min-w-0 flex items-center gap-2">
+        <div className="flex-1 min-w-0 flex items-center gap-2 flex-wrap">
           {liveActive ? (
-            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-red-500/15 border border-red-500/40 text-red-500 text-[10px] font-bold uppercase tracking-wider">
+            <span className="shrink-0 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-red-500/15 border border-red-500/40 text-red-500 text-[10px] font-bold uppercase tracking-wider">
               <span className="relative flex h-1.5 w-1.5">
                 <span className="absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75 animate-ping" />
                 <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-red-500" />
@@ -350,12 +350,12 @@ export default function Live() {
               ON AIR
             </span>
           ) : (
-            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-muted/40 border border-border text-muted-foreground text-[10px] font-bold uppercase tracking-wider">
+            <span className="shrink-0 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-muted/40 border border-border text-muted-foreground text-[10px] font-bold uppercase tracking-wider">
               <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/60" />
               OFF AIR
             </span>
           )}
-          <h1 className="text-base sm:text-lg font-semibold truncate font-sans">{unlocked?.title || status?.title || 'Live'}</h1>
+          <h1 className="text-sm sm:text-lg font-semibold truncate font-sans min-w-0 flex-1">{unlocked?.title || status?.title || 'Live'}</h1>
         </div>
       </div>
 
