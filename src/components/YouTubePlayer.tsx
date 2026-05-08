@@ -76,18 +76,18 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
 
     let password = '';
     let token = '';
+    let wmSource = '';
     try {
       password = sessionStorage.getItem(`replaytime-pw-${replay.id}`) || '';
       token = sessionStorage.getItem(`replaytime-tok-${replay.id}`) || '';
       if (!token) {
         const url = new URL(window.location.href);
-        token = url.searchParams.get('token') || '';
+        const urlTok = url.searchParams.get('token') || '';
+        if (urlTok) token = urlTok;
       }
-      if (!token) {
-        token = localStorage.getItem('replaytime-browser-id') || '';
-      }
+      wmSource = token || localStorage.getItem('replaytime-browser-id') || '';
     } catch { /* ignore */ }
-    setActiveToken(token);
+    setActiveToken(wmSource);
 
     if (!password && !token) {
       setSourceLoading(false);
