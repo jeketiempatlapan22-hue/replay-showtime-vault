@@ -586,8 +586,7 @@ export default function Admin() {
             <nav className="p-2">
               {[
                 { v: 'replays', label: 'Replay', Icon: List },
-                { v: 'shows', label: 'Show Aktif', Icon: Sparkles },
-                { v: 'live', label: 'Live', Icon: Radio },
+                { v: 'shows', label: 'Streaming Show', Icon: Radio },
                 { v: 'members', label: 'Member', Icon: Users },
                 { v: 'bot', label: 'Bot WhatsApp', Icon: Bot },
                 { v: 'history', label: 'Riwayat Token', Icon: History },
