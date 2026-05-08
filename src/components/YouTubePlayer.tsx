@@ -10,6 +10,7 @@ const CommentSection = lazy(() => import('@/components/CommentSection'));
 import HlsPlayer, { type HlsPlayerHandle } from '@/components/HlsPlayer';
 import EmbedPlayer from '@/components/EmbedPlayer';
 import { prefetchM3U8, prefetchYouTube, prefetchCloudflare } from '@/lib/prefetch';
+import { useAutoHideOnInteraction } from '@/hooks/useAutoHideOnInteraction';
 
 interface Props {
   replay: ReplayRow;
@@ -56,6 +57,7 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
   const [activeSourceId, setActiveSourceId] = useState<string | null>(null);
   const [activeToken, setActiveToken] = useState<string>('');
   const containerRef = useRef<HTMLDivElement>(null);
+  const navVisible = useAutoHideOnInteraction(true, 3000);
   
   const hlsPlayerRef = useRef<HlsPlayerHandle>(null);
   const [pipActive, setPipActive] = useState(false);
@@ -208,7 +210,7 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
 
   return (
     <div className="min-h-screen bg-background relative z-10">
-      <div className="sticky top-0 z-20 bg-card/90 backdrop-blur border-b border-border px-3 sm:px-4 py-3 flex items-center gap-2 sm:gap-4">
+      <div className={`sticky top-0 z-20 bg-card/90 backdrop-blur border-b border-border px-2 sm:px-4 py-2 sm:py-3 flex items-center gap-2 sm:gap-4 transition-all duration-300 ${navVisible ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0 pointer-events-none'}`}>
         <Button variant="ghost" size="icon" onClick={onBack} className="shrink-0">
           <ArrowLeft className="w-5 h-5" />
         </Button>
@@ -225,7 +227,7 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
 
       <div
         ref={containerRef}
-        className="w-full max-w-5xl mx-auto px-2 sm:px-4 py-4 select-none"
+        className="w-full max-w-screen-2xl mx-auto px-2 sm:px-4 lg:px-6 py-3 sm:py-4 select-none"
         style={{ WebkitUserSelect: 'none', userSelect: 'none' }}
         onContextMenu={(e) => e.preventDefault()}
       >
