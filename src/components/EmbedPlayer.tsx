@@ -46,7 +46,8 @@ export default function EmbedPlayer({ type, source, title, watermark }: Props) {
 
   // YouTube IFrame API
   useEffect(() => {
-    if (type !== 'youtube' || !ytId) return;
+    if (type !== 'youtube') { setReady(true); return; }
+    if (!ytId) return;
     let cancelled = false;
 
     const init = () => {
@@ -104,7 +105,7 @@ export default function EmbedPlayer({ type, source, title, watermark }: Props) {
   const togglePlay = () => {
     if (type === 'youtube') {
       const p = ytPlayerRef.current;
-      if (!p) return;
+      if (!p || typeof p.pauseVideo !== 'function') return;
       if (isPlaying) p.pauseVideo(); else p.playVideo();
     } else {
       cfPost(isPlaying ? 'pause' : 'play');
@@ -118,7 +119,7 @@ export default function EmbedPlayer({ type, source, title, watermark }: Props) {
     try { localStorage.setItem(MUTED_KEY, m ? '1' : '0'); } catch { /* ignore */ }
     if (type === 'youtube') {
       const p = ytPlayerRef.current;
-      if (!p) return;
+      if (!p || typeof p.mute !== 'function') return;
       if (m) p.mute(); else { p.unMute(); p.setVolume(Math.round(volume * 100)); }
     } else {
       cfPost(m ? 'mute' : 'unmute');
@@ -133,7 +134,7 @@ export default function EmbedPlayer({ type, source, title, watermark }: Props) {
     if (v > 0 && muted) { setMuted(false); try { localStorage.setItem(MUTED_KEY, '0'); } catch { /* ignore */ } }
     if (type === 'youtube') {
       const p = ytPlayerRef.current;
-      if (!p) return;
+      if (!p || typeof p.setVolume !== 'function') return;
       p.setVolume(Math.round(v * 100));
       if (v > 0) p.unMute();
     } else {
@@ -211,6 +212,13 @@ export default function EmbedPlayer({ type, source, title, watermark }: Props) {
       <div className="absolute inset-0" onClick={(e) => e.preventDefault()} />
 
       {watermark && <LiveWatermark code={watermark} />}
+
+      {!ready && (
+        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-black/70 backdrop-blur-sm animate-fade-in pointer-events-none">
+          <div className="w-12 h-12 rounded-full border-4 border-white/20 border-t-primary animate-spin" />
+          <div className="text-white/90 text-xs font-medium tracking-wide">Menghubungkan ke pemutar…</div>
+        </div>
+      )}
 
       {showHint && (
         <button
