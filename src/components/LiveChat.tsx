@@ -92,9 +92,11 @@ export default function LiveChat() {
   useEffect(() => {
     const el = listRef.current;
     if (!el) return;
-    // Auto-scroll only if user is already near bottom; preserve position if scrolled up.
-    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
-    if (nearBottom) el.scrollTop = el.scrollHeight;
+    // Newest message is at the top. If user is near top, keep them pinned to top so
+    // the latest message is always visible. If they scrolled down to read older
+    // messages, don't disturb their position.
+    const nearTop = el.scrollTop < 40;
+    if (nearTop) el.scrollTop = 0;
   }, [messages.length]);
 
   // Rate limit per browser (client-side, anti-spam):
