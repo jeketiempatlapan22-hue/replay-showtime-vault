@@ -178,7 +178,7 @@ export default function Live() {
     });
   };
 
-  const doUnlock = async (opts: { token?: string; password?: string }, silent = false) => {
+  const doUnlock = async (opts: { token?: string; password?: string; mtoken?: string; mpassword?: string }, silent = false) => {
     if (!silent) { setSubmitting(true); setPwError(''); }
     try {
       const { data } = await supabase.functions.invoke('unlock-live', {
@@ -257,9 +257,30 @@ export default function Live() {
 
   useEffect(() => {
     const t = search.get('t');
-    if (!t || unlocked || statusLoading) return;
-    void doUnlock({ token: t });
+    const mt = search.get('mtoken');
+    const mp = search.get('mp') || search.get('mpassword') || '';
+    if (unlocked || statusLoading) return;
+    if (mt) void doUnlock({ mtoken: mt, mpassword: mp });
+    else if (t) void doUnlock({ token: t });
   }, [search, statusLoading]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleSelfReset = async () => {
+    const mt = search.get('mtoken') || prompt('Masukkan token membership:') || '';
+    if (!mt) return;
+    const mp = search.get('mp') || prompt('Masukkan sandi membership:') || '';
+    if (!mp) return;
+    try {
+      const { data } = await supabase.functions.invoke('membership-self-reset', { body: { mtoken: mt, mpassword: mp } });
+      if (data?.ok) {
+        setPwError('');
+        alert(`Perangkat berhasil direset. Sisa kuota reset: ${data.remaining}`);
+      } else {
+        alert(`Reset gagal: ${data?.reason || 'unknown'}`);
+      }
+    } catch {
+      alert('Gagal terhubung ke server.');
+    }
+  };
 
   const allSources = useMemo<PrivateSource[]>(() => {
     if (!unlocked) return [];
@@ -415,6 +436,15 @@ export default function Live() {
                 </Button>
               </a>
               <p className="text-center text-[11px] text-muted-foreground">+62 888-0904-8431</p>
+
+              <div className="pt-3 border-t border-border">
+                <Button type="button" variant="ghost" size="sm" className="w-full text-xs" onClick={handleSelfReset}>
+                  Reset perangkat membership saya
+                </Button>
+                <p className="text-[10px] text-muted-foreground text-center mt-1">
+                  Gunakan jika ingin pindah browser/device. Maks. 3x reset manual; otomatis reset tiap 00:00 WIB.
+                </p>
+              </div>
             </div>
           </div>
         ) : (

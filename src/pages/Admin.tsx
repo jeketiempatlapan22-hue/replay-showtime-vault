@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Plus, Trash2, Edit2, Key, Save, Palette, MessageCircle, LogOut, Eye, Send, List, Settings, ShieldCheck, Unlock as UnlockIcon, Link2, Copy, X, Radio, RefreshCw, Users, Upload, Search, ArrowUpDown, Sparkles, Calendar, Bot, History, Menu, Lock } from 'lucide-react';
 import BotAdmin from '@/components/admin/BotAdmin';
 import TokenHistoryAdmin from '@/components/admin/TokenHistoryAdmin';
+import MembershipAdmin from '@/components/admin/MembershipAdmin';
 import ReplayPersonalTokensDialog from '@/components/admin/ReplayPersonalTokensDialog';
 import ShowLiveControl from '@/components/admin/ShowLiveControl';
 import { getMembers, upsertMember, deleteMember, uploadMemberPhoto, type Member } from '@/lib/members';
@@ -609,6 +610,7 @@ export default function Admin() {
                 { v: 'members', label: 'Member', Icon: Users },
                 { v: 'bot', label: 'Bot WhatsApp', Icon: Bot },
                 { v: 'history', label: 'Riwayat Token', Icon: History },
+                { v: 'membership', label: 'Membership', Icon: Users },
                 { v: 'preview', label: 'Preview', Icon: Eye },
                 { v: 'comments', label: 'Komentar', Icon: MessageCircle },
                 { v: 'security', label: 'Blokir', Icon: ShieldCheck },
@@ -627,7 +629,7 @@ export default function Admin() {
           </SheetContent>
         </Sheet>
         <Button variant="ghost" size="icon" onClick={() => navigate('/')} className="shrink-0" title="Beranda"><ArrowLeft className="w-5 h-5" /></Button>
-        <h1 className="text-base sm:text-xl font-bold font-sans text-foreground flex-1 min-w-0 truncate">Admin · {({ replays: 'Replay', shows: 'Streaming Show', members: 'Member', bot: 'Bot WA', history: 'Riwayat', preview: 'Preview', comments: 'Komentar', security: 'Blokir', settings: 'Setelan' } as Record<string, string>)[activeTab]}</h1>
+        <h1 className="text-base sm:text-xl font-bold font-sans text-foreground flex-1 min-w-0 truncate">Admin · {({ replays: 'Replay', shows: 'Streaming Show', members: 'Member', bot: 'Bot WA', history: 'Riwayat', membership: 'Membership', preview: 'Preview', comments: 'Komentar', security: 'Blokir', settings: 'Setelan' } as Record<string, string>)[activeTab]}</h1>
         <div className="flex items-center gap-1 sm:gap-2 shrink-0">
           <Button size="sm" onClick={() => { resetForm(); setShowAddDialog(true); }} className="text-xs sm:text-sm">
             <Plus className="w-4 h-4 sm:mr-1" /> <span className="hidden sm:inline">Tambah</span>
@@ -639,11 +641,12 @@ export default function Admin() {
       <div className="max-w-6xl mx-auto px-2 sm:px-4 py-4">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="hidden">
-            <TabsTrigger value="replays" /><TabsTrigger value="shows" /><TabsTrigger value="members" /><TabsTrigger value="bot" /><TabsTrigger value="history" /><TabsTrigger value="preview" /><TabsTrigger value="comments" /><TabsTrigger value="security" /><TabsTrigger value="settings" />
+            <TabsTrigger value="replays" /><TabsTrigger value="shows" /><TabsTrigger value="members" /><TabsTrigger value="bot" /><TabsTrigger value="history" /><TabsTrigger value="membership" /><TabsTrigger value="preview" /><TabsTrigger value="comments" /><TabsTrigger value="security" /><TabsTrigger value="settings" />
           </TabsList>
 
           <TabsContent value="bot"><BotAdmin /></TabsContent>
           <TabsContent value="history"><TokenHistoryAdmin /></TabsContent>
+          <TabsContent value="membership"><MembershipAdmin /></TabsContent>
 
           {/* ===== REPLAYS TAB ===== */}
           <TabsContent value="replays">
