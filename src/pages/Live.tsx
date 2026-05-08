@@ -14,7 +14,7 @@ import LiveChat from '@/components/LiveChat';
 type SrcType = 'm3u8' | 'youtube' | 'cloudflare';
 interface PublicSource { label: string; type: SrcType }
 interface PrivateSource extends PublicSource { url: string }
-interface LiveStatus { enabled: boolean; title: string; type: string; require_password: boolean; sources: PublicSource[]; lineup: string[] }
+interface LiveStatus { enabled: boolean; title: string; type: string; require_password: boolean; sources: PublicSource[]; lineup: string[]; show_date?: string; show_time?: string }
 interface UnlockedConfig { title: string; type: SrcType; url: string; sources: PrivateSource[]; watermark: string; enabled: boolean }
 
 const SS_KEY_BASE = 'replaytime-live-unlocked';
@@ -62,6 +62,7 @@ export default function Live() {
             require_password: data.live_require_password !== false,
             sources: pubSources,
             lineup: Array.isArray(data.lineup) ? data.lineup : [],
+            show_date: data.show_date, show_time: data.show_time,
           });
           setStatusLoading(false);
           return data;
