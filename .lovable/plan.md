@@ -1,60 +1,89 @@
-## Tujuan
-Sederhanakan admin: gabungkan tab **Live** dan **Show Aktif** menjadi satu tab **"Streaming Show"**. Toggle LIVE ada di setiap kartu show, dapat diaktifkan kapan saja (bebas jadwal). Player Live realtime memperbarui embed + playlist saat toggle ON. Background countdown memakai gambar kartu show (transparan). Tambah opsi blokir per `browser_id` agar perangkat tidak bisa akses lagi tanpa direset admin.
+## Ringkasan
+Empat perubahan: (1) hitung viewer benar-benar unik per browser, (2) wajibkan username sebelum live chat, (3) tombol beli replay (default Rp 2.000) dengan token & sandi tersimpan di localStorage, (4) status pembelian show aktif juga persist di localStorage.
 
-## Perubahan
+---
 
-### 1. Admin Panel (`src/pages/Admin.tsx`)
-- Hapus tab **"Live"** (legacy `live_config_private`) — termasuk `liveCfg`, `liveTokens`, `handleSaveLive`, `handleCreateLiveToken`, dst. (kode masih ada di backend untuk kompatibilitas, tapi tidak diakses dari UI lagi.)
-- Rename tab `shows` menjadi **"Streaming Show"** (label & ikon `Radio`).
-- Pada list kartu show:
-  - Tambah **toggle "LIVE NOW"** langsung di header tiap kartu (tanpa harus buka dialog edit). Klik = update `is_live` instan + auto-mematikan show lain yang sedang live.
-  - Tampilkan badge merah berdenyut saat aktif.
-  - Tombol cepat: **"Buka Player"**, **"Token & Riwayat"**, **"Edit Detail"**.
-- Dialog edit show tetap memuat `ShowLiveControl` lengkap (URL, sumber, sandi, replay).
-- Hilangkan validasi "harus pada jam jadwal" — toggle bisa ON kapan pun.
+## 1. Viewer counter unik per browser (`src/pages/Live.tsx`)
 
-### 2. `ShowLiveControl.tsx`
-- Hapus toggle **"Live Otomatis Sesuai Jadwal"** (atau biarkan tersembunyi & default false) karena sekarang murni manual via toggle admin.
-- Saat menyimpan, broadcast langsung ke realtime (sudah otomatis lewat update row).
+Masalah saat ini:
+- Presence channel hanya aktif setelah `unlocked` ⇒ user yang belum unlock tidak terhitung.
+- Pakai `Object.keys(state).length`; jika ada race / multiple track call dengan key sama, hitungannya bisa bias.
 
-### 3. Player `src/pages/Live.tsx`
-- Sudah subscribe `active_shows` row spesifik. Tambahkan: ketika `is_live` berubah `false → true`, **panggil ulang `doUnlock`** (silent) bila user sudah punya token/sandi tersimpan, agar `unlocked.url` & `sources` selalu terupdate dengan embed terbaru.
-- Hapus dependency `live_auto_schedule` di logic enable — `enabled = !!data.is_live` saja.
-- **`ScheduleCountdown` baru**:
-  - Background = `image_url` show (object-cover, opacity ~30% + overlay gelap), agar judul/jadwal/countdown tetap terbaca.
-  - Tambah prop `imageUrl`, ambil dari query `active_shows`.
-- Player playlist tab (sumber tambahan) sudah otomatis re-render karena `unlocked.sources` di-refresh dari realtime row.
+Perubahan:
+- Pisahkan channel presence agar aktif setiap kali halaman live dibuka (tidak menunggu `unlocked`), kuncinya tetap `browser_id`.
+- Hitung unik dengan cara mengumpulkan `browser_id` dari `presenceState()` ke dalam `Set` lalu ambil `.size` (aman walau ada multi-entry).
+- Tambah throttle: hanya track sekali setelah subscribed, jangan re-track tiap render.
+- Channel name memakai `live-viewers:${showKey}` (sudah ada).
+- Tampilkan badge viewer hanya saat `liveActive`.
 
-### 4. Blokir per `browser_id`
-- Migration: gunakan tabel `blocked_browsers` yang sudah ada (`browser_id`, `unblocked`, `reason`).
-- Edge function `unlock-live`: sebelum cek token/password, query `blocked_browsers` untuk `browser_id` user. Jika ada baris dengan `unblocked=false` → return `{ valid: false, reason: 'blocked' }`.
-- `Live.tsx`: tampilkan pesan "Perangkat ini diblokir oleh admin" bila reason `blocked`.
-- Pada `ShowLiveTokensDialog.tsx` (panel device per token): tambah tombol **"Blokir Perangkat"** di tiap row device → insert ke `blocked_browsers` (`browser_id`, `reason='admin_block'`, `unblocked=false`). Tombol **"Buka Blokir"** bila sudah diblokir → `update unblocked=true`.
-- Reset device (hapus dari `active_show_token_devices`) tetap terpisah dari blokir.
+## 2. Wajib username untuk live chat (`src/components/LiveChat.tsx`)
 
-### 5. Migration
-Tidak ada perubahan skema (`blocked_browsers` sudah ada). Hanya update edge function & UI.
+- Saat user pertama kali masuk halaman live (atau localStorage `replaytime-name` kosong), tampilkan modal kecil "Masukkan nama untuk berinteraksi" sebelum input chat aktif.
+- Validasi: minimal 2 karakter, max 40, trim. Setelah disimpan ke `localStorage` per browser, modal tidak muncul lagi.
+- Tombol "Ganti nama" kecil di header chat agar bisa diubah.
+- Input pesan disabled selama nama belum diisi (untuk non-admin).
+- Admin tetap memakai `admin_username` (skip prompt).
 
-## Aspek Teknis Singkat
+## 3. Pembelian replay langsung dari kartu replay
 
-```text
-Admin tab "Streaming Show"
- └── Card (per show)
-      ├── Toggle LIVE (instant update is_live, exclusive)
-      ├── Badge ON AIR
-      └── Edit Detail → ShowLiveControl (URL/sumber/sandi/replay/token)
+File: `src/components/ReplayCardComponent.tsx`, `src/pages/Index.tsx` (dan/atau parent yang render kartu), `src/components/BuyShowDialog.tsx` (atau dialog baru `BuyReplayDialog.tsx`), edge function `create-pakasir-order` & `pakasir-webhook`.
 
-Live page
- ├── subscribe active_shows row → re-fetch + silent re-unlock
- ├── ScheduleCountdown (bg = show.image_url + overlay)
- └── Player + playlist refresh dari unlocked.sources realtime
+Perubahan UI kartu replay:
+- Tambah tombol "Beli Replay · Rp {harga}" dengan harga default `2000` jika replay belum punya harga.
+- Setelah pembayaran terkonfirmasi (status `paid`), kartu menampilkan:
+  - Tombol "Tonton Replay" (membuka player seperti sekarang).
+  - Sandi replay (dari kolom `replays.password` atau access_token) yang bisa di-copy.
+- State persist di `localStorage`:
+  - Key: `replaytime-replay-purchased` (object: `{ [replayId]: { token, password, paidAt } }`).
+  - Saat mount, kartu cek key ini; bila ada ⇒ langsung tampilkan tombol Tonton + sandi tanpa perlu beli ulang.
 
-unlock-live edge fn
- ├── 1. cek blocked_browsers(browser_id) → reason='blocked'
- ├── 2. lanjut token / password seperti biasa
+Edge function:
+- Perluas `create-pakasir-order` agar menerima `kind: 'replay'` tanpa `show_id` (cukup `replay_id`). Validasi harga: pakai `replays`-level harga; jika kosong, fallback `2000`.
+- `pakasir-webhook` saat order paid untuk `kind: 'replay'`: generate token (sudah ada untuk show), set `access_token` di order. Tetap kirim WhatsApp.
+
+Klien polling/realtime (mirip BuyShowDialog) — saat `paid`, simpan `{ token, password }` ke localStorage lalu refresh tampilan kartu.
+
+> Catatan harga: harga replay disimpan di mana? Lihat poin pertanyaan klarifikasi di bawah.
+
+## 4. Persist pembelian show aktif
+
+File: `src/components/ActiveShowCard.tsx`, `BuyShowDialog.tsx`.
+
+- Setelah status `paid` di `BuyShowDialog`, simpan ke localStorage:
+  - Key `replaytime-show-purchased` (object: `{ [showId]: { token, paidAt, kind: 'show'|'replay' } }`).
+- `ActiveShowCard` cek localStorage saat mount:
+  - Bila sudah dibeli show ⇒ tombol "Tonton Live" langsung aktif (auto-isi token saat klik, navigate `/live?show={id}&t={token}`).
+  - Bila sudah dibeli replay ⇒ tombol "Tonton Replay" aktif tanpa harus beli ulang.
+- Listener `storage` + `focus` (sudah ada untuk sessionStorage) ditambah cek localStorage.
+
+## Pertanyaan klarifikasi (akan ditanyakan terpisah jika perlu)
+
+1. Harga replay default Rp 2.000: berlaku ke semua replay? Atau hanya replay yang belum punya harga sendiri di tabel?
+2. Sandi yang ditampilkan setelah beli replay: pakai `replays.password` (sandi master/satuan) atau `access_token` (one-time)?
+3. Apakah pembelian replay perlu reset otomatis setelah waktu tertentu (mis. 24 jam) atau permanen di localStorage?
+
+---
+
+## Detail teknis singkat
+
+```ts
+// Viewer unique
+const ids = new Set<string>();
+const state = channel.presenceState() as Record<string, Array<{at:number}>>;
+Object.keys(state).forEach(k => ids.add(k)); // key = browser_id
+setViewerCount(ids.size);
 ```
 
-## Yang TIDAK Berubah
-- Replay & semua halaman publik lain.
-- Tabel `live_config_private`, `live_tokens` (legacy, disembunyikan saja).
-- Schema database (tidak ada migration baru).
+```ts
+// Replay purchase storage shape
+type ReplayPurchase = { token: string; password?: string; paidAt: number };
+const KEY = 'replaytime-replay-purchased';
+```
+
+```ts
+// Active show purchase storage shape
+type ShowPurchase = { token: string; kind: 'show'|'replay'; paidAt: number };
+const KEY = 'replaytime-show-purchased';
+```
+
+Tidak ada perubahan skema database; hanya perluasan logic edge function `create-pakasir-order` (menerima `kind=replay` tanpa show) dan `pakasir-webhook` (token untuk replay-only).
