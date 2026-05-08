@@ -30,7 +30,9 @@ export default function EmbedPlayer({ type, source, title, watermark }: Props) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const ytMountRef = useRef<HTMLDivElement>(null);
   const ytPlayerRef = useRef<any>(null);
+  const ytFallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [ready, setReady] = useState(false);
+  const [useYoutubeFallback, setUseYoutubeFallback] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const initialMuted = (() => { try { return localStorage.getItem(MUTED_KEY) === '1'; } catch { return false; } })();
   const initialVolume = (() => { try { const v = parseFloat(localStorage.getItem(VOL_KEY) || ''); return isFinite(v) ? Math.max(0, Math.min(1, v)) : 1; } catch { return 1; } })();
@@ -47,9 +49,26 @@ export default function EmbedPlayer({ type, source, title, watermark }: Props) {
 
   // YouTube IFrame API — instantiate via div mount so YT injects an iframe sized 100% inside our container
   useEffect(() => {
-    if (type !== 'youtube') { setReady(true); return; }
+    setReady(false);
+    setIsPlaying(false);
+    setUseYoutubeFallback(false);
+    if (ytFallbackTimerRef.current) clearTimeout(ytFallbackTimerRef.current);
+    if (type !== 'youtube') {
+      const id = setTimeout(() => { setReady(true); setIsPlaying(true); }, 900);
+      return () => clearTimeout(id);
+    }
     if (!ytId) return;
     let cancelled = false;
+    ytFallbackTimerRef.current = setTimeout(() => {
+      if (cancelled) return;
+      setUseYoutubeFallback(true);
+      setReady(true);
+      setIsPlaying(true);
+      if (!muted) {
+        setMuted(true);
+        setShowHint(true);
+      }
+    }, 3500);
 
     const init = () => {
       if (cancelled || !ytMountRef.current) return;
@@ -68,6 +87,7 @@ export default function EmbedPlayer({ type, source, title, watermark }: Props) {
         events: {
           onReady: () => {
             if (cancelled) return;
+            if (ytFallbackTimerRef.current) clearTimeout(ytFallbackTimerRef.current);
             // Force injected iframe to fill container & block native clicks
             try {
               const ifr = ytPlayerRef.current?.getIframe?.();
@@ -98,7 +118,12 @@ export default function EmbedPlayer({ type, source, title, watermark }: Props) {
           onStateChange: (e: any) => {
             setIsPlaying(e.data === 1);
           },
-          onError: () => { /* swallow to avoid blank */ },
+          onError: () => {
+            if (cancelled) return;
+            setUseYoutubeFallback(true);
+            setReady(true);
+            setIsPlaying(true);
+          },
         },
       });
     };
@@ -118,7 +143,11 @@ export default function EmbedPlayer({ type, source, title, watermark }: Props) {
     } else {
       init();
     }
-    return () => { cancelled = true; try { ytPlayerRef.current?.destroy(); } catch { /* ignore */ } };
+    return () => {
+      cancelled = true;
+      if (ytFallbackTimerRef.current) clearTimeout(ytFallbackTimerRef.current);
+      try { ytPlayerRef.current?.pauseVideo?.(); ytPlayerRef.current?.destroy?.(); } catch { /* ignore */ }
+    };
   }, [ytId, type]);
 
   // Cloudflare via Stream SDK postMessage (basic play/pause/volume via iframe contentWindow)
