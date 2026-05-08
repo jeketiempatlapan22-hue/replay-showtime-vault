@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react';
-import { Calendar, Clock, Tag, Users, Radio, ShoppingCart, PlayCircle } from 'lucide-react';
+import { Calendar, Clock, Tag, Users, Radio, ShoppingCart, PlayCircle, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 import MemberAvatar from '@/components/MemberAvatar';
 import BuyShowDialog from '@/components/BuyShowDialog';
+import HlsPlayer from '@/components/HlsPlayer';
+import EmbedPlayer from '@/components/EmbedPlayer';
 import { type ActiveShow, getShowDateTime } from '@/lib/activeShows';
 import { useNavigate } from 'react-router-dom';
 
