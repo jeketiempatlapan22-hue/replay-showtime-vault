@@ -44,6 +44,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
   const stallWatchdogRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastProgressRef = useRef({ time: 0, checkedAt: Date.now(), recoveries: 0 });
   const onFatalErrorRef = useRef(onFatalError);
+  const initialLiveEdgeSyncRef = useRef(false);
 
   const initialVolume = (() => { try { const v = parseFloat(localStorage.getItem('replaytime-volume') || ''); return isFinite(v) ? Math.max(0, Math.min(1, v)) : 1; } catch { return 1; } })();
   // Default unmuted; one-time per session, clear stale persisted mute so user starts with sound on.
@@ -135,6 +136,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
     setIsLiveStream(false);
     recoveryAttemptsRef.current = 0;
     isLiveRef.current = false;
+    initialLiveEdgeSyncRef.current = false;
     lastProgressRef.current = { time: 0, checkedAt: Date.now(), recoveries: 0 };
     if (stallWatchdogRef.current) clearInterval(stallWatchdogRef.current);
     let hls: Hls | null = null;
@@ -167,6 +169,19 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
     const resumePosition = () => {
       const current = video.currentTime;
       return Number.isFinite(current) && current > 0 ? current : -1;
+    };
+
+    const seekToLiveEdgeOnce = (syncPosition?: number | null) => {
+      if (initialLiveEdgeSyncRef.current) return;
+      const seekable = video.seekable;
+      const fallbackEdge = seekable.length ? seekable.end(seekable.length - 1) : NaN;
+      const edge = Number.isFinite(syncPosition || NaN) ? Number(syncPosition) : fallbackEdge;
+      if (!Number.isFinite(edge) || edge <= 0) return;
+      initialLiveEdgeSyncRef.current = true;
+      const target = Math.max(0, edge - 1.5);
+      if (Math.abs(video.currentTime - target) > 2) {
+        try { video.currentTime = target; } catch { /* ignore */ }
+      }
     };
 
     const startStallWatchdog = () => {
@@ -246,6 +261,8 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
         maxLoadingDelay: 8,
         // Hindari buffering ulang berlebihan
         appendErrorMaxRetry: 5,
+        startPosition: -1,
+        liveDurationInfinity: true,
         liveSyncDurationCount: 4,
         liveMaxLatencyDurationCount: 12,
       });
@@ -289,6 +306,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
         const live = !!data.details?.live;
         isLiveRef.current = live;
         setIsLiveStream(live);
+        if (live) seekToLiveEdgeOnce(data.details?.edge);
         if (!live) {
           const vodDuration = typeof data.details?.totalduration === 'number' ? data.details.totalduration : video.duration;
           if (Number.isFinite(vodDuration) && vodDuration > 0) setDuration(vodDuration);
@@ -330,8 +348,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
 
           if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
             try {
-              // Resume from current position; for live, -1 jumps to live edge (not start)
-              hls?.startLoad(-1);
+              hls?.startLoad(isLiveRef.current ? -1 : resumePosition());
               if (wasPlaying) video.play().catch(() => {});
               return;
             } catch { /* ignore */ }
@@ -361,6 +378,11 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
     } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
       video.src = src;
       nativeLoadedHandler = () => {
+        const durationValue = video.duration;
+        const nativeLive = !Number.isFinite(durationValue) || durationValue === Infinity;
+        isLiveRef.current = nativeLive;
+        setIsLiveStream(nativeLive);
+        if (nativeLive) setTimeout(() => seekToLiveEdgeOnce(), 250);
         setLoading(false);
         safePlay();
       };
