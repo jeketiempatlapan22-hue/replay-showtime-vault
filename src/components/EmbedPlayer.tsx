@@ -330,9 +330,11 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
   return (
     <div
       ref={containerRef}
-      className="relative w-full overflow-hidden rounded-xl bg-black select-none"
+      className={`relative w-full overflow-hidden rounded-xl bg-black select-none ${showControls || !isPlaying ? '' : 'cursor-none'}`}
       style={{ paddingBottom: isFullscreen ? '0' : '56.25%', height: isFullscreen ? '100%' : undefined }}
       onContextMenu={(e) => e.preventDefault()}
+      onMouseMove={resetHideTimer}
+      onTouchStart={resetHideTimer}
     >
       {type === 'youtube' ? (
         ytId ? (
@@ -370,8 +372,11 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
         />
       )}
 
-      {/* Anti-click overlay - covers entire iframe to block YouTube logo / Watch on YT button. Click does NOT toggle play. */}
-      <div className="absolute inset-0" onClick={(e) => e.preventDefault()} />
+      {/* Click-shield over iframe — single tap toggles controls visibility instead of clicking through to YouTube logo. */}
+      <div
+        className="absolute inset-0 z-[5]"
+        onClick={(e) => { e.preventDefault(); toggleControls(); }}
+      />
 
       {watermark && <LiveWatermark code={watermark} />}
 
@@ -384,7 +389,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
 
       {showHint && (
         <button
-          onClick={toggleMute}
+          onClick={(e) => { e.stopPropagation(); toggleMute(); }}
           className="absolute top-3 left-1/2 -translate-x-1/2 z-20 px-4 py-2 rounded-full bg-primary text-primary-foreground text-xs font-semibold shadow-lg animate-fade-in"
         >
           🔊 Tap untuk aktifkan suara
@@ -392,7 +397,13 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
       )}
 
       {/* Controls */}
-      <div className="absolute inset-x-0 bottom-0 z-10 px-3 pb-3 pt-8 bg-gradient-to-t from-black/80 to-transparent" style={{ touchAction: 'manipulation' }}>
+      <div
+        className={`absolute inset-x-0 bottom-0 z-10 px-3 pb-3 pt-8 bg-gradient-to-t from-black/80 to-transparent transition-opacity duration-300 ${
+          showControls || !isPlaying ? 'opacity-100' : 'opacity-0 pointer-events-none'
+        }`}
+        style={{ touchAction: 'manipulation' }}
+        onClick={(e) => e.stopPropagation()}
+      >
         {type === 'youtube' && duration > 0 && (
           <div className="flex items-center gap-2 mb-2 text-white text-[11px] landscape:text-xs tabular-nums" onClick={(e) => e.stopPropagation()}>
             <span>{fmtTime(currentTime)}</span>
@@ -413,20 +424,20 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
           </div>
         )}
         <div className="flex items-center gap-2 landscape:gap-3" onClick={(e) => e.stopPropagation()}>
-          <button onClick={togglePlay} aria-label={isPlaying ? 'Pause' : 'Play'} className="p-2.5 landscape:p-3 text-white hover:text-primary active:scale-95 transition-all">
+          <button onClick={(e) => { e.stopPropagation(); togglePlay(); resetHideTimer(); }} aria-label={isPlaying ? 'Pause' : 'Play'} className="p-2.5 landscape:p-3 text-white hover:text-primary active:scale-95 transition-all">
             {isPlaying ? <Pause className="w-5 h-5 landscape:w-6 landscape:h-6" /> : <Play className="w-5 h-5 landscape:w-6 landscape:h-6" />}
           </button>
           {type === 'youtube' && !hideSeekButtons && (
             <>
-              <button onClick={() => skip(-10)} aria-label="Mundur 10 detik" className="p-2.5 landscape:p-3 text-white hover:text-primary active:scale-95 transition-all">
+              <button onClick={(e) => { e.stopPropagation(); skip(-10); resetHideTimer(); }} aria-label="Mundur 10 detik" className="p-2.5 landscape:p-3 text-white hover:text-primary active:scale-95 transition-all">
                 <SkipBack className="w-5 h-5 landscape:w-6 landscape:h-6" />
               </button>
-              <button onClick={() => skip(10)} aria-label="Maju 10 detik" className="p-2.5 landscape:p-3 text-white hover:text-primary active:scale-95 transition-all">
+              <button onClick={(e) => { e.stopPropagation(); skip(10); resetHideTimer(); }} aria-label="Maju 10 detik" className="p-2.5 landscape:p-3 text-white hover:text-primary active:scale-95 transition-all">
                 <SkipForward className="w-5 h-5 landscape:w-6 landscape:h-6" />
               </button>
             </>
           )}
-          <button onClick={toggleMute} aria-label={muted ? 'Unmute' : 'Mute'} className="p-2.5 landscape:p-3 text-white hover:text-primary active:scale-95 transition-all">
+          <button onClick={(e) => { e.stopPropagation(); toggleMute(); resetHideTimer(); }} aria-label={muted ? 'Unmute' : 'Mute'} className="p-2.5 landscape:p-3 text-white hover:text-primary active:scale-95 transition-all">
             {muted || volume === 0 ? <VolumeX className="w-5 h-5 landscape:w-6 landscape:h-6" /> : <Volume2 className="w-5 h-5 landscape:w-6 landscape:h-6" />}
           </button>
           <input
@@ -438,7 +449,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
             style={{ touchAction: 'manipulation' }}
           />
           <div className="flex-1" />
-          <button onClick={toggleFullscreen} aria-label="Fullscreen" className="p-2.5 landscape:p-3 text-white hover:text-primary active:scale-95 transition-all">
+          <button onClick={(e) => { e.stopPropagation(); toggleFullscreen(); }} aria-label="Fullscreen" className="p-2.5 landscape:p-3 text-white hover:text-primary active:scale-95 transition-all">
             {isFullscreen ? <Minimize className="w-5 h-5 landscape:w-6 landscape:h-6" /> : <Maximize className="w-5 h-5 landscape:w-6 landscape:h-6" />}
           </button>
         </div>
