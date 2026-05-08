@@ -213,7 +213,7 @@ export default function Live() {
     if (!silent) { setSubmitting(true); setPwError(''); }
     try {
       const { data } = await supabase.functions.invoke('unlock-live', {
-        body: { ...opts, browser_id: getBrowserId(), show_id: showId || undefined },
+        body: { ...opts, browser_id: getBrowserId(), show_id: showId || undefined, silent },
       });
       if (data?.valid) {
         const cfg: UnlockedConfig = {
@@ -224,15 +224,29 @@ export default function Live() {
           watermark: data.watermark || '',
           enabled: !!data.enabled,
         };
-        setUnlocked(cfg);
+        // For silent revalidation with `soft:true` (multi-device token, slot full),
+        // do NOT overwrite existing player URL/sources to avoid remount; just keep alive.
+        if (silent && data.soft) {
+          // no-op on unlocked; keep current session
+        } else {
+          setUnlocked(cfg);
+          try { sessionStorage.setItem(`${SS_KEY_BASE}${showId?'-'+showId:''}`, JSON.stringify(cfg)); } catch { /* ignore */ }
+        }
         if (data.membership) setMembership(data.membership as MembershipInfo);
+        if (data.token_kind || data.max_devices) {
+          setTokenInfo({ kind: String(data.token_kind || 'personal'), max_devices: Number(data.max_devices || 1) });
+        }
         setKickedMsg('');
-        try { sessionStorage.setItem(`${SS_KEY_BASE}${showId?'-'+showId:''}`, JSON.stringify(cfg)); } catch { /* ignore */ }
       } else if (silent) {
-        setUnlocked(null);
-        setMembership(null);
-        try { sessionStorage.removeItem(`${SS_KEY_BASE}${showId?'-'+showId:''}`); } catch { /* ignore */ }
-        setKickedMsg('Akses Anda telah dicabut oleh admin.');
+        // Only kick on hard security reasons. Other transient/server errors must NOT log user out.
+        const reason = data?.reason;
+        if (reason === 'revoked' || reason === 'blocked') {
+          setUnlocked(null);
+          setMembership(null);
+          try { sessionStorage.removeItem(`${SS_KEY_BASE}${showId?'-'+showId:''}`); } catch { /* ignore */ }
+          setKickedMsg(reasonMessage(reason));
+        }
+        // device_limit / off / network: ignore silently — keep user inside.
       } else {
         setPwError(reasonMessage(data?.reason));
       }
