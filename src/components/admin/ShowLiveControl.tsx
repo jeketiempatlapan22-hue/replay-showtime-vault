@@ -8,6 +8,8 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import YouTubeIdInput from '@/components/admin/YouTubeIdInput';
+import { parseYouTubeId } from '@/lib/youtube';
 
 type SrcType = 'm3u8' | 'youtube' | 'cloudflare';
 interface LiveSource { label: string; type: SrcType; url: string }
@@ -62,13 +64,46 @@ export default function ShowLiveControl({ showId, showTitle }: Props) {
 
   const addSource = () => {
     if (!newLabel.trim() || !newUrl.trim()) return;
-    setLiveSources(prev => [...prev, { label: newLabel.trim().slice(0, 80), type: newType, url: newUrl.trim() }]);
+    if (newType === 'youtube' && !parseYouTubeId(newUrl)) {
+      toast({ title: 'YouTube tidak valid', description: 'Format YouTube tidak dikenali. Periksa link/ID.', variant: 'destructive' });
+      return;
+    }
+    const url = newType === 'youtube' ? (parseYouTubeId(newUrl) || '') : newUrl.trim();
+    setLiveSources(prev => [...prev, { label: newLabel.trim().slice(0, 80), type: newType, url }]);
     setNewLabel(''); setNewUrl(''); setNewType('m3u8');
   };
 
   const removeSource = (i: number) => setLiveSources(prev => prev.filter((_, idx) => idx !== i));
 
   const save = async () => {
+    // Normalisasi YouTube ke ID 11 karakter & validasi
+    let normalizedLiveUrl = liveUrl.trim();
+    if (liveType === 'youtube' && normalizedLiveUrl) {
+      const id = parseYouTubeId(normalizedLiveUrl);
+      if (!id) {
+        toast({ title: 'YouTube tidak valid', description: 'Live URL Utama: format YouTube tidak dikenali.', variant: 'destructive' });
+        return;
+      }
+      normalizedLiveUrl = id;
+    }
+    let normalizedReplayYt = replayYt.trim();
+    if (normalizedReplayYt) {
+      const id = parseYouTubeId(normalizedReplayYt);
+      if (!id) {
+        toast({ title: 'YouTube tidak valid', description: 'Replay YouTube: format tidak dikenali.', variant: 'destructive' });
+        return;
+      }
+      normalizedReplayYt = id;
+    }
+    const normalizedSources = liveSources.map(s => s.type === 'youtube'
+      ? { ...s, url: parseYouTubeId(s.url) || s.url }
+      : s);
+    const invalidYt = liveSources.find(s => s.type === 'youtube' && s.url && !parseYouTubeId(s.url));
+    if (invalidYt) {
+      toast({ title: 'YouTube tidak valid', description: `Sumber "${invalidYt.label}" memiliki YouTube tidak dikenali.`, variant: 'destructive' });
+      return;
+    }
+
     setSaving(true);
     try {
       // Pastikan hanya satu show yang is_live = true
@@ -78,16 +113,19 @@ export default function ShowLiveControl({ showId, showTitle }: Props) {
       const { error } = await supabase.from('active_shows').update({
         is_live: isLive,
         live_auto_schedule: autoSchedule,
-        live_url: liveUrl.trim(),
+        live_url: normalizedLiveUrl,
         live_type: liveType,
-        live_sources: liveSources,
+        live_sources: normalizedSources,
         live_password: livePassword,
         live_require_password: requirePw,
         replay_mode: replayMode,
         replay_m3u8_url: replayM3u8.trim(),
-        replay_youtube_url: replayYt.trim(),
+        replay_youtube_url: normalizedReplayYt,
       } as any).eq('id', showId);
       if (error) throw error;
+      setLiveUrl(normalizedLiveUrl);
+      setReplayYt(normalizedReplayYt);
+      setLiveSources(normalizedSources);
       toast({ title: 'Pengaturan Live & Replay tersimpan' });
     } catch (e: any) {
       toast({ title: 'Gagal menyimpan', description: e.message, variant: 'destructive' });
@@ -135,7 +173,11 @@ export default function ShowLiveControl({ showId, showTitle }: Props) {
         </div>
         <div className="sm:col-span-2">
           <Label className="text-xs">Live URL Utama</Label>
-          <Input value={liveUrl} onChange={e => setLiveUrl(e.target.value)} placeholder="https://...m3u8 atau ID YouTube" />
+          {liveType === 'youtube' ? (
+            <YouTubeIdInput value={liveUrl} onChange={setLiveUrl} placeholder="URL YouTube (live/watch/youtu.be) atau ID 11 karakter" />
+          ) : (
+            <Input value={liveUrl} onChange={e => setLiveUrl(e.target.value)} placeholder={liveType === 'cloudflare' ? 'Cloudflare UID atau URL' : 'https://...m3u8'} />
+          )}
         </div>
       </div>
 
@@ -150,7 +192,11 @@ export default function ShowLiveControl({ showId, showTitle }: Props) {
             <option value="youtube">YouTube</option>
             <option value="cloudflare">Cloudflare</option>
           </select>
-          <Input placeholder="URL atau ID video" value={newUrl} onChange={e => setNewUrl(e.target.value)} />
+          {newType === 'youtube' ? (
+            <YouTubeIdInput value={newUrl} onChange={setNewUrl} placeholder="URL YouTube atau ID 11 karakter" />
+          ) : (
+            <Input placeholder={newType === 'cloudflare' ? 'Cloudflare UID atau URL' : 'https://...m3u8'} value={newUrl} onChange={e => setNewUrl(e.target.value)} />
+          )}
           <Button type="button" onClick={addSource} size="sm"><Plus className="w-4 h-4 mr-1" />Tambah</Button>
         </div>
         {liveSources.length > 0 && (
@@ -203,7 +249,7 @@ export default function ShowLiveControl({ showId, showTitle }: Props) {
         </div>
         <div>
           <Label className="text-xs">Link YouTube (URL atau ID)</Label>
-          <Input value={replayYt} onChange={e => setReplayYt(e.target.value)} placeholder="https://youtu.be/... atau ID 11 karakter" />
+          <YouTubeIdInput value={replayYt} onChange={setReplayYt} placeholder="URL YouTube (live/watch/youtu.be) atau ID 11 karakter" />
         </div>
       </div>
 

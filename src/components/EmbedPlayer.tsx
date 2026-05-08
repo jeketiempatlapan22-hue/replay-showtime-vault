@@ -29,11 +29,10 @@ interface YoutubeWindow extends Window {
   onYouTubeIframeAPIReady?: () => void;
 }
 
+import { parseYouTubeId } from '@/lib/youtube';
+
 function extractYoutubeId(raw: string): string {
-  const r = (raw || '').trim();
-  const matched = r.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/|v\/))([A-Za-z0-9_-]{11})/)?.[1];
-  const fallback = r.match(/([A-Za-z0-9_-]{11})/)?.[1];
-  return (matched || fallback || '').slice(0, 11);
+  return parseYouTubeId(raw) || '';
 }
 function extractCloudflareUid(raw: string): string {
   const r = (raw || '').trim();
