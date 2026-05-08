@@ -292,8 +292,13 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
         safePlay();
       });
       hls.on(Hls.Events.LEVEL_LOADED, (_, data) => {
-        isLiveRef.current = !!data.details?.live;
-        setIsLiveStream(!!data.details?.live);
+        const live = !!data.details?.live;
+        isLiveRef.current = live;
+        setIsLiveStream(live);
+        if (!live) {
+          const vodDuration = typeof data.details?.totalduration === 'number' ? data.details.totalduration : video.duration;
+          if (Number.isFinite(vodDuration) && vodDuration > 0) setDuration(vodDuration);
+        }
       });
       hls.on(Hls.Events.LEVEL_SWITCHED, (_, data) => {
         if (hls && hls.autoLevelEnabled) {
@@ -425,11 +430,12 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
       const nextDuration = video.duration;
       if (!Number.isFinite(nextDuration) || nextDuration <= 0) {
         setDuration(0);
-        isLiveRef.current = true;
-        setIsLiveStream(true);
+        if (isLiveRef.current) setIsLiveStream(true);
         return;
       }
       setDuration(nextDuration);
+      isLiveRef.current = false;
+      setIsLiveStream(false);
     };
     const onWaiting = () => {
       // mid-play stall (not initial)
@@ -441,7 +447,8 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
       // Reset recovery counter on successful playback so future hiccups can recover too
       recoveryAttemptsRef.current = 0;
     };
-    const onCanPlay = () => setBuffering(false);
+    const onCanPlay = () => { setLoading(false); setBuffering(false); };
+    const onLoadedMetadata = () => onDurationChange();
     const onProgress = () => {
       lastProgressRef.current = { time: video.currentTime, checkedAt: Date.now(), recoveries: 0 };
     };
@@ -454,6 +461,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
     video.addEventListener('pause', onPause);
     video.addEventListener('timeupdate', onTimeUpdate);
     video.addEventListener('durationchange', onDurationChange);
+    video.addEventListener('loadedmetadata', onLoadedMetadata);
     video.addEventListener('waiting', onWaiting);
     video.addEventListener('playing', onPlaying);
     video.addEventListener('canplay', onCanPlay);
@@ -465,6 +473,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
       video.removeEventListener('pause', onPause);
       video.removeEventListener('timeupdate', onTimeUpdate);
       video.removeEventListener('durationchange', onDurationChange);
+      video.removeEventListener('loadedmetadata', onLoadedMetadata);
       video.removeEventListener('waiting', onWaiting);
       video.removeEventListener('playing', onPlaying);
       video.removeEventListener('canplay', onCanPlay);
