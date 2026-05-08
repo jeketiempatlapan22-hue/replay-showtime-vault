@@ -142,6 +142,8 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
     setIsPlaying(false);
     autoMuteAppliedRef.current = false;
     userUnmutedRef.current = false;
+    liveEndedRef.current = false;
+    setDetectedLive(!!isLive);
 
     setDuration(0);
     setCurrentTime(0);
