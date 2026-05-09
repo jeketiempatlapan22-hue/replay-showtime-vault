@@ -65,12 +65,31 @@ Deno.serve(async (req) => {
     }
 
     // ===== Branch A: per-show live (active_shows) =====
-    if (show_id) {
+    // If no show_id provided, auto-resolve to the currently-live active show
+    // so master/per-show passwords still work from the generic /kunci page.
+    let resolvedShowId = show_id as string | undefined;
+    if (!resolvedShowId) {
+      const { data: liveShow } = await supabase
+        .from("active_shows")
+        .select("id")
+        .eq("is_active", true)
+        .eq("is_live", true)
+        .order("show_date", { ascending: false })
+        .order("show_time", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (liveShow?.id) resolvedShowId = liveShow.id;
+    }
+
+    if (resolvedShowId) {
       const { data: show } = await supabase
         .from("active_shows")
         .select("id,title,is_live,live_auto_schedule,live_url,live_type,live_sources,live_password,live_require_password,show_date,show_time,is_active")
-        .eq("id", show_id).maybeSingle();
-      if (!show || !show.is_active) return json({ valid: false, reason: "off" });
+        .eq("id", resolvedShowId).maybeSingle();
+      if (!show || !show.is_active) {
+        if (show_id) return json({ valid: false, reason: "off" });
+        // fall through to legacy branch
+      } else {
 
       const enabled = !!show.is_live;
       const okPayload = {
@@ -90,7 +109,7 @@ Deno.serve(async (req) => {
 
       if (token) {
         const { data: t } = await supabase
-          .from("active_show_tokens").select("*").eq("token", token).eq("show_id", show_id).maybeSingle();
+          .from("active_show_tokens").select("*").eq("token", token).eq("show_id", resolvedShowId).maybeSingle();
         if (!t || t.revoked) return json({ valid: false, reason: "revoked" });
         if (!browser_id) return json({ valid: false, reason: "no_device" });
         const { data: existing } = await supabase
@@ -113,7 +132,7 @@ Deno.serve(async (req) => {
 
       if (show.live_require_password) {
         if (!password) return json({ valid: false, reason: "password_or_token_required" });
-        const lockId = `livepw:${show_id}:${browser_id || 'anon'}`;
+        const lockId = `livepw:${resolvedShowId}:${browser_id || 'anon'}`;
         const { data: lock } = await supabase.rpc('check_login_lock', { _identifier: lockId });
         const lockRow = Array.isArray(lock) ? lock[0] : lock;
         if (lockRow?.locked) return json({ valid: false, reason: 'rate_limited', seconds_remaining: lockRow.seconds_remaining });
@@ -129,6 +148,7 @@ Deno.serve(async (req) => {
         if (!valid) return json({ valid: false, reason: "bad_password" });
       }
       return json(okPayload);
+      }
     }
 
     // ===== Branch B: legacy live_config_private =====
