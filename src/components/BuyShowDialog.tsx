@@ -300,6 +300,10 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
                 </span>
               )}
             </div>
+            <a href={adminWaUrl} target="_blank" rel="noopener noreferrer"
+              className="flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground hover:text-primary hover:underline">
+              <MessageCircle className="w-3 h-3" /> Pembayaran bermasalah? Hubungi admin
+            </a>
           </div>
         )}
 
