@@ -270,6 +270,20 @@ Deno.serve(async (req) => {
     return json({ ok: false, reason: 'unauthorized' }, 401);
   }
 
+  // Optional shared-secret for production webhook calls. When FONNTE_WEBHOOK_SECRET
+  // is set, Fonnte must be configured to send it as the X-Webhook-Secret header.
+  // Falls back to "open" when secret unset (with a 7s rate limit per phone) for
+  // backward compatibility with existing Fonnte deployments.
+  if (!testMode) {
+    const expectedSecret = Deno.env.get('FONNTE_WEBHOOK_SECRET') || '';
+    if (expectedSecret) {
+      const provided = req.headers.get('x-webhook-secret') || req.headers.get('X-Webhook-Secret') || '';
+      if (provided !== expectedSecret) {
+        return new Response('ok', { headers: corsHeaders });
+      }
+    }
+  }
+
   // Fonnte sends as multipart/form-data, x-www-form-urlencoded, or json
   let phone = '', text = '', device = '', inboxId = '', fromMe = false, deliverTest = false;
   try {
