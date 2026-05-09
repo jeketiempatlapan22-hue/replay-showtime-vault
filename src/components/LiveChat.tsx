@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import { Send, Pin, PinOff, Trash2, MessageCircle, ShieldCheck, UserCog } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Send, Pin, PinOff, Trash2, MessageCircle, ShieldCheck, UserCog, Reply, X, Ban, CheckCircle2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -13,7 +13,26 @@ interface Msg {
   is_admin: boolean;
   pinned: boolean;
   created_at: string;
+  browser_id?: string;
+  reply_to_id?: string | null;
 }
+
+// Palet warna nama (gaya YouTube/TikTok). Pakai token semantik.
+const NAME_COLORS = [
+  'text-sky-400',
+  'text-emerald-400',
+  'text-fuchsia-400',
+  'text-amber-400',
+  'text-rose-400',
+  'text-violet-400',
+  'text-teal-400',
+  'text-orange-400',
+];
+const colorForName = (name: string) => {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+  return NAME_COLORS[h % NAME_COLORS.length];
+};
 
 export default function LiveChat() {
   const [messages, setMessages] = useState<Msg[]>([]);
@@ -26,10 +45,16 @@ export default function LiveChat() {
   const [nameModalOpen, setNameModalOpen] = useState(false);
   const [nameInput, setNameInput] = useState('');
   const [nameError, setNameError] = useState('');
+  const [replyTo, setReplyTo] = useState<Msg | null>(null);
+  const [blockedSet, setBlockedSet] = useState<Set<string>>(new Set());
+  const [highlightId, setHighlightId] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const stickToBottomRef = useRef(true);
   const [cooldownLeft, setCooldownLeft] = useState(0);
   const sentTimestampsRef = useRef<number[]>([]);
+
+  const myBrowserId = getBrowserId();
+  const iAmBlocked = blockedSet.has(myBrowserId) && !isAdmin;
 
   const saveName = () => {
     const v = nameInput.trim();
@@ -53,15 +78,14 @@ export default function LiveChat() {
   }, []);
 
   const refresh = async () => {
-    const [{ data: pins }, { data: list }] = await Promise.all([
+    const [{ data: pins }, { data: list }, { data: blocks }] = await Promise.all([
       supabase.from('live_messages').select('*').eq('pinned', true).order('created_at', { ascending: false }),
-      // Ambil 30 terbaru, lalu balik agar terbaru tampil di bawah (gaya YouTube).
-      supabase.from('live_messages').select('*').eq('pinned', false).order('created_at', { ascending: false }).limit(30),
+      supabase.from('live_messages').select('*').eq('pinned', false).order('created_at', { ascending: false }).limit(50),
+      supabase.from('chat_blocks').select('browser_id'),
     ]);
     setPinned((pins || []) as Msg[]);
-    const newest30 = ((list || []) as Msg[]).slice().reverse();
-    setMessages(newest30);
-    // Setelah load awal, scroll ke bawah supaya pesan terbaru terlihat.
+    setMessages(((list || []) as Msg[]).slice().reverse());
+    setBlockedSet(new Set(((blocks || []) as { browser_id: string }[]).map(b => b.browser_id)));
     stickToBottomRef.current = true;
   };
 
@@ -70,15 +94,11 @@ export default function LiveChat() {
     const ch = supabase.channel('live-chat-realtime')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'live_messages' }, (payload) => {
         const m = payload.new as Msg;
-        if (m.pinned) {
-          setPinned(prev => [m, ...prev.filter(x => x.id !== m.id)]);
-        } else {
-          // Append ke akhir (terbaru di bawah) lalu cap 30.
-          setMessages(prev => {
-            const next = [...prev.filter(x => x.id !== m.id), m];
-            return next.length > 30 ? next.slice(next.length - 30) : next;
-          });
-        }
+        if (m.pinned) setPinned(prev => [m, ...prev.filter(x => x.id !== m.id)]);
+        else setMessages(prev => {
+          const next = [...prev.filter(x => x.id !== m.id), m];
+          return next.length > 50 ? next.slice(next.length - 50) : next;
+        });
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'live_messages' }, (payload) => {
         const m = payload.new as Msg;
@@ -88,7 +108,7 @@ export default function LiveChat() {
           const exists = prev.some(x => x.id === m.id);
           if (exists) return prev.map(x => x.id === m.id ? m : x);
           const next = [...prev, m];
-          return next.length > 30 ? next.slice(next.length - 30) : next;
+          return next.length > 50 ? next.slice(next.length - 50) : next;
         });
       })
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'live_messages' }, (payload) => {
@@ -97,11 +117,14 @@ export default function LiveChat() {
         setMessages(prev => prev.filter(x => x.id !== id));
         setPinned(prev => prev.filter(x => x.id !== id));
       })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_blocks' }, async () => {
+        const { data } = await supabase.from('chat_blocks').select('browser_id');
+        setBlockedSet(new Set(((data || []) as { browser_id: string }[]).map(b => b.browser_id)));
+      })
       .subscribe();
     return () => { supabase.removeChannel(ch); };
   }, []);
 
-  // Track apakah user "near bottom" agar auto-scroll tidak menggangu saat baca pesan lama.
   const handleScroll = () => {
     const el = listRef.current;
     if (!el) return;
@@ -109,22 +132,33 @@ export default function LiveChat() {
     stickToBottomRef.current = distFromBottom < 60;
   };
 
-  // Setiap pesan berubah, jika user di dekat bawah → scroll ke bawah.
   useEffect(() => {
     const el = listRef.current;
     if (!el) return;
-    if (stickToBottomRef.current) {
-      // Tunggu DOM update.
-      requestAnimationFrame(() => { el.scrollTop = el.scrollHeight; });
-    }
+    if (stickToBottomRef.current) requestAnimationFrame(() => { el.scrollTop = el.scrollHeight; });
   }, [messages.length]);
 
-  // Rate limit per browser (client-side, anti-spam):
+  // Lookup pesan asli untuk reply preview
+  const messageMap = useMemo(() => {
+    const map = new Map<string, Msg>();
+    [...messages, ...pinned].forEach(m => map.set(m.id, m));
+    return map;
+  }, [messages, pinned]);
+
+  const scrollToMessage = (id: string) => {
+    const el = document.getElementById(`chatmsg-${id}`);
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setHighlightId(id);
+    setTimeout(() => setHighlightId(null), 1500);
+  };
+
+  // Rate limit
   const RL_MIN_GAP_MS = 2000;
   const RL_WINDOW_MS = 60_000;
   const RL_MAX_IN_WINDOW = 8;
-  const RL_KEY = `replaytime-chat-ts-${getBrowserId()}`;
-  const RL_LAST_MSGS_KEY = `replaytime-chat-last-${getBrowserId()}`;
+  const RL_KEY = `replaytime-chat-ts-${myBrowserId}`;
+  const RL_LAST_MSGS_KEY = `replaytime-chat-last-${myBrowserId}`;
 
   const checkRate = (msg: string): { ok: true } | { ok: false; reason: string; waitSec?: number } => {
     if (isAdmin) return { ok: true };
@@ -173,6 +207,7 @@ export default function LiveChat() {
   const send = async () => {
     const msg = text.trim().slice(0, 500);
     if (!msg || sending) return;
+    if (iAmBlocked) return;
     if (!isAdmin && !name.trim()) { openChangeName(); return; }
     const rl = checkRate(msg);
     if (rl.ok === false) {
@@ -187,30 +222,33 @@ export default function LiveChat() {
     }
     setSending(true);
     const display = (name.trim() || 'Anonim').slice(0, 40);
-    // Ketika user mengirim, pasti ingin lihat pesannya — pin ke bawah.
     stickToBottomRef.current = true;
     const { error } = await supabase.from('live_messages').insert({
-      browser_id: getBrowserId(),
+      browser_id: myBrowserId,
       name: isAdmin ? (adminUsername || 'Admin') : display,
       message: msg,
       is_admin: isAdmin,
       pinned: false,
+      reply_to_id: replyTo?.id ?? null,
     });
     if (!error) {
       recordSent(msg);
       setText('');
+      setReplyTo(null);
     }
     setSending(false);
   };
 
-  const togglePin = async (m: Msg) => {
-    if (!isAdmin) return;
-    await supabase.from('live_messages').update({ pinned: !m.pinned }).eq('id', m.id);
-  };
+  const togglePin = async (m: Msg) => { if (isAdmin) await supabase.from('live_messages').update({ pinned: !m.pinned }).eq('id', m.id); };
+  const remove = async (m: Msg) => { if (isAdmin) await supabase.from('live_messages').delete().eq('id', m.id); };
 
-  const remove = async (m: Msg) => {
-    if (!isAdmin) return;
-    await supabase.from('live_messages').delete().eq('id', m.id);
+  const blockUser = async (m: Msg) => {
+    if (!isAdmin || !m.browser_id) return;
+    await supabase.from('chat_blocks').insert({ browser_id: m.browser_id, last_name: m.name });
+  };
+  const unblockUser = async (m: Msg) => {
+    if (!isAdmin || !m.browser_id) return;
+    await supabase.from('chat_blocks').delete().eq('browser_id', m.browser_id);
   };
 
   const time = (s: string) => {
@@ -218,7 +256,7 @@ export default function LiveChat() {
     return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
   };
 
-  const canChat = isAdmin || !!name.trim();
+  const canChat = (isAdmin || !!name.trim()) && !iAmBlocked;
 
   return (
     <div className="rounded-2xl bg-card/80 border border-border overflow-hidden flex flex-col h-[60vh] min-h-[380px]">
@@ -254,34 +292,76 @@ export default function LiveChat() {
         </div>
       )}
 
-      {/* Messages — terbaru di bawah (gaya YouTube) */}
-      <div ref={listRef} onScroll={handleScroll} className="flex-1 overflow-y-auto px-3 py-2 space-y-2">
+      {/* Messages — gaya YouTube/TikTok/IG, tanpa avatar, terbaru di bawah */}
+      <div ref={listRef} onScroll={handleScroll} className="flex-1 overflow-y-auto py-2 space-y-0.5">
         {messages.length === 0 && <p className="text-xs text-muted-foreground text-center py-6">Belum ada pesan.</p>}
-        {messages.map(m => (
-          <div key={m.id} className="text-xs group">
-            <div className="flex items-baseline gap-1.5 flex-wrap">
-              <span className={`font-semibold ${m.is_admin ? 'text-yellow-400' : 'text-foreground'}`}>{m.name}</span>
-              {m.is_admin && (
-                <span className="inline-flex items-center gap-0.5 text-[8px] uppercase bg-red-500/80 text-white px-1 py-0.5 rounded">
-                  <ShieldCheck className="w-2.5 h-2.5" />Admin
-                </span>
+        {messages.map(m => {
+          const isUserBlocked = !!m.browser_id && blockedSet.has(m.browser_id);
+          const replied = m.reply_to_id ? messageMap.get(m.reply_to_id) : null;
+          const nameColor = m.is_admin ? 'text-yellow-400' : colorForName(m.name);
+          return (
+            <div
+              id={`chatmsg-${m.id}`}
+              key={m.id}
+              className={`group px-3 py-1 transition-colors ${highlightId === m.id ? 'bg-primary/20' : 'hover:bg-secondary/40'} rounded-md mx-1`}
+            >
+              {replied && (
+                <button
+                  onClick={() => scrollToMessage(replied.id)}
+                  className="block w-full text-left mb-0.5 pl-2 border-l-2 border-primary/60 text-[10px] text-muted-foreground truncate hover:text-foreground"
+                >
+                  ↪ <span className="font-medium">@{replied.name}</span>: {replied.message}
+                </button>
               )}
-              <span className="text-[10px] text-muted-foreground">{time(m.created_at)}</span>
-              {isAdmin && (
-                <span className="ml-auto opacity-0 group-hover:opacity-100 flex gap-1">
-                  <button onClick={() => togglePin(m)} className="text-muted-foreground hover:text-primary"><Pin className="w-3 h-3" /></button>
-                  <button onClick={() => remove(m)} className="text-destructive"><Trash2 className="w-3 h-3" /></button>
-                </span>
+              {m.reply_to_id && !replied && (
+                <div className="mb-0.5 pl-2 border-l-2 border-muted text-[10px] text-muted-foreground/70 italic">↪ Pesan tidak tersedia</div>
               )}
+              <div className="flex items-baseline gap-1.5 flex-wrap text-sm leading-snug">
+                <span className={`font-semibold ${nameColor}`}>{m.name}</span>
+                {m.is_admin && (
+                  <span className="inline-flex items-center gap-0.5 text-[9px] uppercase bg-red-500/80 text-white px-1 py-0.5 rounded">
+                    <ShieldCheck className="w-2.5 h-2.5" />Admin
+                  </span>
+                )}
+                {isUserBlocked && !m.is_admin && (
+                  <span className="text-[9px] uppercase bg-destructive/80 text-destructive-foreground px-1 py-0.5 rounded">Diblokir</span>
+                )}
+                <span className="text-foreground/95 break-words">{m.message}</span>
+                <span className="text-[10px] text-muted-foreground/60 ml-1">{time(m.created_at)}</span>
+                <span className="ml-auto opacity-0 group-hover:opacity-100 flex gap-1.5 items-center">
+                  {!m.is_admin && !iAmBlocked && (
+                    <button title="Balas" onClick={() => { setReplyTo(m); }} className="text-muted-foreground hover:text-primary">
+                      <Reply className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                  {isAdmin && (
+                    <>
+                      <button title="Pin" onClick={() => togglePin(m)} className="text-muted-foreground hover:text-primary"><Pin className="w-3.5 h-3.5" /></button>
+                      {!m.is_admin && m.browser_id && (
+                        isUserBlocked ? (
+                          <button title="Buka blokir" onClick={() => unblockUser(m)} className="text-emerald-500 hover:text-emerald-400"><CheckCircle2 className="w-3.5 h-3.5" /></button>
+                        ) : (
+                          <button title="Blokir user" onClick={() => blockUser(m)} className="text-orange-500 hover:text-orange-400"><Ban className="w-3.5 h-3.5" /></button>
+                        )
+                      )}
+                      <button title="Hapus" onClick={() => remove(m)} className="text-destructive hover:opacity-80"><Trash2 className="w-3.5 h-3.5" /></button>
+                    </>
+                  )}
+                </span>
+              </div>
             </div>
-            <p className="text-foreground/90 break-words">{m.message}</p>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Input */}
       <div className="border-t border-border p-2 space-y-1.5 bg-secondary/30">
-        {!canChat && (
+        {iAmBlocked && (
+          <div className="text-[11px] bg-destructive/15 text-destructive border border-destructive/40 rounded px-2 py-1.5">
+            Kamu diblokir oleh admin dari live chat.
+          </div>
+        )}
+        {!iAmBlocked && !canChat && (
           <button
             onClick={openChangeName}
             className="w-full text-[11px] text-primary underline-offset-2 hover:underline text-left"
@@ -289,13 +369,22 @@ export default function LiveChat() {
             Masukkan nama dulu untuk mengirim pesan →
           </button>
         )}
+        {replyTo && (
+          <div className="flex items-center gap-2 pl-2 pr-1 py-1 bg-primary/10 border-l-2 border-primary rounded text-[11px]">
+            <Reply className="w-3 h-3 text-primary shrink-0" />
+            <div className="flex-1 min-w-0 truncate">
+              Membalas <span className="font-semibold text-primary">@{replyTo.name}</span>: <span className="text-muted-foreground">{replyTo.message.slice(0, 60)}</span>
+            </div>
+            <button onClick={() => setReplyTo(null)} className="text-muted-foreground hover:text-foreground shrink-0"><X className="w-3 h-3" /></button>
+          </div>
+        )}
         <div className="flex gap-1.5">
           <Input
             value={text}
             onChange={e => setText(e.target.value.slice(0, 500))}
             onKeyDown={e => e.key === 'Enter' && canChat && cooldownLeft === 0 && send()}
-            onFocus={() => { if (!canChat) openChangeName(); }}
-            placeholder={cooldownLeft > 0 ? `Tunggu ${cooldownLeft} detik…` : (canChat ? 'Ketik pesan...' : 'Masukkan nama untuk berinteraksi')}
+            onFocus={() => { if (!iAmBlocked && !canChat) openChangeName(); }}
+            placeholder={iAmBlocked ? 'Diblokir admin' : (cooldownLeft > 0 ? `Tunggu ${cooldownLeft} detik…` : (canChat ? (replyTo ? `Balas @${replyTo.name}…` : 'Ketik pesan...') : 'Masukkan nama untuk berinteraksi'))}
             className="h-9 text-sm bg-background"
             disabled={!canChat || cooldownLeft > 0}
           />
