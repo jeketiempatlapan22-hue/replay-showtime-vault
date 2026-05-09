@@ -131,7 +131,7 @@ export default function Live() {
   const fetchStatus = () => {
     if (showId) {
       return supabase.from('active_shows')
-        .select('id,title,is_live,live_type,live_url,live_sources,live_require_password,lineup,show_date,show_time,is_active,image_url')
+        .select('id,title,is_live,live_type,live_require_password,lineup,show_date,show_time,is_active,image_url')
         .eq('id', showId).maybeSingle()
         .then(({ data }) => {
           if (!data || !data.is_active) {
@@ -140,40 +140,30 @@ export default function Live() {
             return null;
           }
           const enabled = !!data.is_live;
-          const pubSources = toPublicSources(data.live_sources);
           let wasOff = false;
           setStatus(prev => {
             wasOff = !prev?.enabled;
             return {
               enabled, title: data.title || 'Live', type: data.live_type || 'm3u8',
               require_password: data.live_require_password !== false,
-              sources: pubSources,
+              sources: [],
               lineup: Array.isArray(data.lineup) ? data.lineup : [],
               show_date: data.show_date, show_time: data.show_time,
               image_url: data.image_url || '',
             };
           });
-          // JANGAN PERNAH menimpa URL yang sudah aktif — itu akan me-remount player dan
-          // memutar video live dari awal. URL hanya diisi saat player belum punya URL sama
-          // sekali (mis. saat live baru saja diaktifkan dan unlocked belum membawa URL).
-          const pubMain = (data.live_url || '').trim();
-          const pubPrivSources = toPrivateSources(data.live_sources);
+          // Stream URLs are no longer readable from the public table — only the
+          // unlock-live edge function returns them. When live just toggled on,
+          // silently re-call unlock to refresh url/sources.
           setUnlocked(prev => {
             if (!prev) return prev;
-            const hasNoUrl = !prev.url && (prev.sources || []).length === 0;
-            // Saat live baru aktif (OFF→ON) dan unlocked belum punya URL,
-            // langsung isi dari URL publik admin agar player auto-mount realtime.
-            const shouldFill = enabled && (wasOff || hasNoUrl);
             return {
               ...prev,
               enabled,
               title: data.title || prev.title,
               type: (data.live_type as SrcType) || prev.type,
-              url: shouldFill && !prev.url && pubMain ? pubMain : prev.url,
-              sources: shouldFill && (prev.sources || []).length === 0 && pubPrivSources.length ? pubPrivSources : prev.sources,
             };
           });
-          // When live just toggled on, silently re-call unlock to re-validate (token/blocked)
           if (enabled && wasOff) {
             const t = search.get('t');
             if (t) void doUnlock({ token: t }, true);
