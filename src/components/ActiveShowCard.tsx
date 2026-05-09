@@ -185,7 +185,7 @@ export default function ActiveShowCard({ show, index = 0 }: { show: ActiveShow; 
             replayPriced ? (
               <Button className="w-full gap-2" onClick={() => openBuy('replay')}>
                 <PlayCircle className="w-4 h-4" />
-                Tonton Replay · Rp {show.price_replay.toLocaleString('id-ID')}
+                Tonton Replay · Rp {replayAmount.toLocaleString('id-ID')}
               </Button>
             ) : (
               <Button className="w-full gap-2" variant="secondary" onClick={goReplay}>
@@ -196,7 +196,7 @@ export default function ActiveShowCard({ show, index = 0 }: { show: ActiveShow; 
           ) : showPriced ? (
             <Button className="w-full gap-2" onClick={() => openBuy('show')}>
               <ShoppingCart className="w-4 h-4" />
-              Beli Show · Rp {show.price_show.toLocaleString('id-ID')}
+              Beli Show · Rp {showAmount.toLocaleString('id-ID')}
             </Button>
           ) : null}
         </div>
