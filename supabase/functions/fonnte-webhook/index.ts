@@ -382,12 +382,17 @@ Deno.serve(async (req) => {
     }
   }
 
-  // Per-phone rate limit: max 1 reply per 8 seconds
+  const lower = text.toLowerCase();
+  const [cmd, ...rest] = lower.split(/\s+/);
+  const arg = rest.join(' ').trim();
+  const ADMIN_ONLY = new Set(['/buattoken', '/createtoken', '/createtokenrep', '/createlink', '/createpub']);
+
+  // Per-phone rate limit: max 1 reply per 2 seconds, but never throttle admin token commands.
   if (!testMode) {
-    const RL_WINDOW_MS = 8000;
+    const RL_WINDOW_MS = ADMIN_ONLY.has(cmd) ? 0 : 2000;
     const { data: rl } = await admin.from('bot_rate_limit')
       .select('last_sent_at').eq('phone', phoneNorm).maybeSingle();
-    if (rl?.last_sent_at && Date.now() - new Date(rl.last_sent_at).getTime() < RL_WINDOW_MS) {
+    if (RL_WINDOW_MS > 0 && rl?.last_sent_at && Date.now() - new Date(rl.last_sent_at).getTime() < RL_WINDOW_MS) {
       await logBotEvent(admin, { phone: phoneNorm, device: deviceNorm, message: text, command: commandPreview, inboxId, fromMe, eventName: 'ignored_rate_limited', detail: { last_sent_at: rl.last_sent_at } });
       return new Response('ok', { headers: corsHeaders });
     }
@@ -396,10 +401,6 @@ Deno.serve(async (req) => {
     await admin.from('bot_rate_limit').delete()
       .lt('last_sent_at', new Date(Date.now() - 10 * 60_000).toISOString());
   }
-
-  const lower = text.toLowerCase();
-  const [cmd, ...rest] = lower.split(/\s+/);
-  const arg = rest.join(' ').trim();
 
   // Lookup command template
   const { data: command } = await admin
@@ -424,7 +425,6 @@ Deno.serve(async (req) => {
   }
 
   // Admin-only commands
-  const ADMIN_ONLY = new Set(['/buattoken', '/createtoken', '/createtokenrep', '/createlink', '/createpub']);
   let isBotAdmin = false;
   if (ADMIN_ONLY.has(cmd)) {
     const candidatePhones = uniquePhones([phoneNorm, participantNorm, deviceNorm]);
