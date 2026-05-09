@@ -148,6 +148,7 @@ Deno.serve(async (req) => {
         if (!valid) return json({ valid: false, reason: "bad_password" });
       }
       return json(okPayload);
+      }
     }
 
     // ===== Branch B: legacy live_config_private =====
