@@ -67,11 +67,12 @@ export default function MembershipAdmin() {
       token, password, label: form.label, phone: form.phone,
       duration_days: form.duration_days, starts_at, expires_at,
       includes_replays: form.includes_replays,
+      max_devices: Math.max(1, Math.min(10000, Number(form.max_devices) || 1)),
     });
     setCreating(false);
     if (error) { toast.error(error.message); return; }
     toast.success('Membership token dibuat');
-    setForm({ label: '', phone: '', duration_days: 30, includes_replays: true });
+    setForm({ label: '', phone: '', duration_days: 30, includes_replays: true, max_devices: 1 });
     void load();
   };
 
