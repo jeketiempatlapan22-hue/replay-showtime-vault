@@ -45,8 +45,10 @@ export default function ActiveShowCard({ show, index = 0 }: { show: ActiveShow; 
   // Replay routing: prefer inline replay_mode (m3u8/youtube), else legacy replay_id route
   const inlineReplay = !!show.replay_mode && (!!show.replay_m3u8_url || !!show.replay_youtube_url);
   const replayMode = inlineReplay || (show.replay_enabled && !!show.replay_id);
-  const showPriced = (show.price_show || 0) > 0 && (show.pakasir_amount || 0) > 0;
-  const replayPriced = (show.price_replay || 0) > 0 && (show.pakasir_amount || 0) > 0;
+  const showAmount = (show.price_show || show.pakasir_amount || 0);
+  const replayAmount = (show.price_replay || show.pakasir_amount || 0);
+  const showPriced = showAmount >= 100;
+  const replayPriced = replayAmount >= 100;
 
   // LIVE detection
   const startMs = target.getTime();
@@ -183,7 +185,7 @@ export default function ActiveShowCard({ show, index = 0 }: { show: ActiveShow; 
             replayPriced ? (
               <Button className="w-full gap-2" onClick={() => openBuy('replay')}>
                 <PlayCircle className="w-4 h-4" />
-                Tonton Replay · Rp {show.price_replay.toLocaleString('id-ID')}
+                Tonton Replay · Rp {replayAmount.toLocaleString('id-ID')}
               </Button>
             ) : (
               <Button className="w-full gap-2" variant="secondary" onClick={goReplay}>
@@ -194,7 +196,7 @@ export default function ActiveShowCard({ show, index = 0 }: { show: ActiveShow; 
           ) : showPriced ? (
             <Button className="w-full gap-2" onClick={() => openBuy('show')}>
               <ShoppingCart className="w-4 h-4" />
-              Beli Show · Rp {show.price_show.toLocaleString('id-ID')}
+              Beli Show · Rp {showAmount.toLocaleString('id-ID')}
             </Button>
           ) : null}
         </div>
@@ -221,7 +223,7 @@ export default function ActiveShowCard({ show, index = 0 }: { show: ActiveShow; 
         onOpenChange={setBuyOpen}
         showId={show.id}
         showTitle={show.title}
-        amount={show.pakasir_amount}
+        amount={buyMode === 'replay' ? replayAmount : showAmount}
         itemTitle={buyMode === 'replay' ? `Replay: ${show.title}` : `Show: ${show.title}`}
         replayId={buyMode === 'replay' ? show.replay_id : null}
         kind={buyMode === 'replay' ? 'replay' : 'show'}

@@ -66,7 +66,8 @@ Deno.serve(async (req) => {
         const a = Number(show.price_replay || show.pakasir_amount || 0);
         amount = a >= 100 ? a : 2000; // default Rp 2.000 for replay if admin not set
       } else {
-        amount = Number(show.price_show || show.pakasir_amount || 0);
+        const a = Number(show.price_show || show.pakasir_amount || 0);
+        amount = a >= 100 ? a : 0;
       }
       itemTitle = `${kind === 'replay' ? 'Replay' : 'Show'} • ${show.title}`;
       resolvedShowId = show.id;

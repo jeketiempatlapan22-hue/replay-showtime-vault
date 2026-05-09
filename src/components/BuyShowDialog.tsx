@@ -37,6 +37,7 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
   const [accessToken, setAccessToken] = useState<string>('');
   const [createdAt, setCreatedAt] = useState<number>(0);
   const [now, setNow] = useState(Date.now());
+  const [lastChecked, setLastChecked] = useState<number>(0);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   // Reset on close
@@ -92,16 +93,17 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
       })
       .subscribe();
     channelRef.current = ch;
-    // Also poll every 8s as fallback
+    // Also poll every 3s as fallback
     const poll = setInterval(async () => {
       const { data } = await supabase.from('orders').select('status, access_token').eq('id', orderId).maybeSingle();
+      setLastChecked(Date.now());
       if (data?.status === 'paid') {
         const tok = (data as any).access_token || '';
         setAccessToken(tok);
         persistPaid(tok);
         setStatus('paid');
       }
-    }, 8000);
+    }, 3000);
     return () => {
       try { supabase.removeChannel(ch); } catch { /* ignore */ }
       clearInterval(poll);
@@ -250,7 +252,12 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
             </div>
             <div className="flex items-center gap-2 rounded-md bg-muted/40 p-2 text-xs text-muted-foreground">
               <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
-              Menunggu pembayaran... halaman ini akan otomatis berubah saat lunas.
+              <span className="flex-1">Mengecek status pembayaran… otomatis berubah saat lunas.</span>
+              {lastChecked > 0 && (
+                <span className="font-mono text-[10px] opacity-70">
+                  {new Date(lastChecked).toLocaleTimeString('id-ID', { hour12: false })}
+                </span>
+              )}
             </div>
           </div>
         )}

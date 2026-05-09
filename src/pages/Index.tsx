@@ -440,8 +440,7 @@ export default function Index() {
         </header>
 
         <main className="max-w-7xl mx-auto px-4 pb-20">
-          {/* Active Shows */}
-          <ActiveShowsSection />
+          {/* Active Shows moved to /show page */}
 
           {/* Stats */}
           {!loading && allReplays.length > 0 && <StatsBar replays={allReplays} />}

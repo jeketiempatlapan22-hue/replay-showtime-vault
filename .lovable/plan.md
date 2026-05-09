@@ -1,49 +1,72 @@
 ## Tujuan
 
-1. Untuk user yang membuka link dengan token publik atau token multi-device (`max_devices > 1`):
-   - Tidak menampilkan tombol "Reset perangkat" di halaman Live.
-   - Tidak pernah otomatis logout (kicked) saat polling revalidasi token tiap 60 detik, walau baris device-nya dihapus admin atau saat ada race condition.
-2. Live Chat: pesan terbaru selalu terlihat tanpa user perlu scroll. Untuk melihat chat lama, user scroll ke bawah secara manual.
+Lima penyesuaian terfokus pada pembelian show aktif, polling status, halaman show, dan pesan bot WhatsApp. Tidak menyentuh sistem lain (replay, live, auth, admin lainnya).
 
-## Perubahan
+---
 
-### A. Edge function — jangan kick token multi-device saat revalidasi senyap
+## 1. Polling status pembayaran real-time di dialog QRIS
 
-**`supabase/functions/unlock-live/index.ts`**
-- Tambahkan parameter opsional `silent: boolean` di body request.
-- Pada cabang `active_show_tokens` (≈ baris 83–97) dan `live_tokens` (≈ baris 132–154):
-  - Jika `t.max_devices > 1` dan device belum terdaftar:
-    - Coba `insert` device baru.
-    - Bila kuota penuh DAN `silent === true` → kembalikan `valid: true` dengan flag `soft: true` (tidak meng-kick user yang sudah terhubung).
-    - Bila kuota penuh dan bukan silent (akses pertama) → tetap `device_limit` seperti sekarang.
-  - Token personal (`max_devices = 1`) tidak berubah.
-- Token revoked / blocked tetap menyebabkan logout (security tetap dijaga).
+File: `src/components/BuyShowDialog.tsx`
 
-### B. Halaman Live — sembunyikan tombol reset & jangan tampilkan kicked
+- Saat status `qr` aktif dan `orderId` ada, jalankan polling `supabase.from('orders').select('status, access_token').eq('id', orderId)` setiap **3 detik** (dipersingkat dari 8 dtk) **selain** subscription realtime yang sudah ada — supaya status tetap berubah ke `paid` walau realtime channel terlambat.
+- Tambah indikator visual kecil di bawah QR: "Mengecek status pembayaran… (auto-refresh)" + `last checked` waktu, agar user tahu sistem aktif memantau.
+- Saat `status === 'paid'`, hentikan polling, tampilkan token dan ringkasan order — sudah ada, tinggal pastikan polling dibersihkan.
 
-**`src/pages/Live.tsx`**
-- Tambahkan state `tokenInfo` (kind, max_devices) yang diisi dari respons `unlock-live` (nilai baru `kind`, `max_devices` ikut dikirim balik dari edge function — non-sensitif).
-- Tombol "Reset perangkat membership saya" (≈ baris 488) dan "Reset perangkat ini" (≈ baris 528):
-  - Sembunyikan jika user mengakses lewat `?t=` (token link), bukan membership.
-  - Tetap tampil hanya saat `mtoken` membership aktif dan `max_devices = 1`.
-- `doUnlock(..., silent=true)` ikut mengirim flag `silent: true` ke edge function.
-- Pada hasil silent dengan `valid: false` namun `reason !== 'revoked'` dan `reason !== 'blocked'`: jangan set `kickedMsg`, jangan hapus `unlocked` — user tetap di dalam.
+## 2. Pisahkan kartu Show Aktif dari kartu Replay
 
-### C. Live Chat — pesan terbaru di atas, scroll bawah untuk history
+- `src/pages/Index.tsx`: hapus `<ActiveShowsSection />` dari halaman utama (line 444). Halaman utama hanya menampilkan kartu replay.
+- `src/App.tsx`: tambah alias route `/show` → komponen `Shows` (selain `/shows` yang sudah ada) supaya URL yang diminta user bekerja.
+- `src/pages/Shows.tsx`: tetap apa adanya — sudah render `ActiveShowCard`. Tambahkan judul / SEO ringkas: H1 "Show Aktif", meta description.
+- (Opsional) Tambah link menu di `HamburgerMenu.tsx` ke `/show` jika belum ada.
 
-**`src/components/LiveChat.tsx`**
-- Pada `refresh()`: hilangkan `.reverse()` agar `messages` urut dari paling baru ke paling lama.
-- Realtime `INSERT`: prepend pesan baru → `[m, ...prev].slice(0, 30)`.
-- Pinned banner tetap di paling atas.
-- Daftar pesan menggunakan order normal (atas = terbaru). Container tetap scrollable; user scroll ke bawah untuk membaca chat lama.
-- Hapus efek auto-scroll ke bawah (tidak diperlukan lagi). Tambah efek ringan: bila scrollTop user ≤ 40px (sedang di atas), pastikan `scrollTop = 0` saat ada pesan baru, sehingga pesan terbaru selalu terlihat tanpa mengganggu user yang sedang membaca history.
+## 3. Harga show ditetapkan admin & terhubung Pakasir
 
-## Catatan
+Saat ini admin mengisi 3 angka (`price_show`, `price_replay`, `pakasir_amount`). Sederhanakan agar admin cukup isi **satu angka** dan otomatis dipakai Pakasir.
 
-- Tidak ada perubahan skema database.
-- Field `kind` & `max_devices` token bukan rahasia; aman dikirim balik dari edge function untuk dipakai UI.
-- Verifikasi setelah implementasi:
-  1. Buka link token publik (`max_devices > 1`) di 2 device → tombol reset tidak muncul, kedua sesi tetap stabil >2 menit.
-  2. Admin hapus baris device dari token publik → user tidak terpental.
-  3. Live chat: kirim pesan dari device lain → muncul di atas tanpa harus scroll.
-  4. Scroll ke bawah di live chat → riwayat lama terlihat, posisi tidak terganggu saat ada pesan baru.
+- `supabase/functions/create-pakasir-order/index.ts`: untuk `kind === 'show'`, prioritas amount = `price_show > 0 ? price_show : pakasir_amount`. Untuk `kind === 'replay'`: `price_replay > 0 ? price_replay : (pakasir_amount || 2000)` (default Rp 2.000 sudah ada). Validasi minimal Rp 100 tetap.
+- `src/components/ActiveShowCard.tsx`:
+  - `showPriced = (show.price_show || show.pakasir_amount) > 0`
+  - `replayPriced = (show.price_replay || show.pakasir_amount) > 0`
+  - `amount` yang dikirim ke `BuyShowDialog` = nilai harga sesuai kind (bukan `pakasir_amount` saja). Tambahkan prop `amount` yang dihitung di tombol klik agar selalu match dengan label tombol.
+- `src/pages/Admin.tsx`: tambahkan keterangan kecil di field harga: "Nominal ini akan ditagihkan via QRIS Pakasir." `pakasir_amount` tetap ada sebagai fallback opsional. Tidak ada perubahan skema DB.
+
+## 4. Deteksi nomor WA fleksibel (`6288…`, `+62 822-…`, `088…`)
+
+Normalisasi disamakan di tiga tempat dan toleran terhadap spasi, tanda hubung, dan tanda `+`.
+
+Aturan:
+1. Strip semua non-digit.
+2. Jika diawali `0` → ganti jadi `62`.
+3. Jika diawali `8` (tanpa 0/62) → tambah prefix `62`.
+4. Jika sudah diawali `62` → biarkan.
+5. Validasi akhir regex: `/^62\d{8,13}$/`.
+
+File yang diupdate (logic sama persis):
+- `src/components/BuyShowDialog.tsx` (`normalizePhone`) — sudah benar, tinggal pastikan urutan branch.
+- `supabase/functions/create-pakasir-order/index.ts` — sudah benar, dipertahankan.
+- `supabase/functions/pakasir-webhook/index.ts` — **tambah branch `startsWith('8')` → `'62' + d`** (sekarang belum ada). Ini memastikan `target` Fonnte selalu valid.
+- (Cek juga `supabase/functions/fonnte-webhook/index.ts` jika ada `normalizePhone` serupa — samakan.)
+
+## 5. Pesan WhatsApp menyertakan sandi satuan show
+
+File: `supabase/functions/pakasir-webhook/index.ts`
+
+- Setelah `order` ditemukan dan `status` paid, jika `order.show_id` ada **dan** `order.replay_id` null (artinya pembelian show aktif, bukan replay), query: `select live_password, title, live_require_password from active_shows where id = order.show_id`.
+- Jika `live_password` non-empty, sisipkan blok di pesan WA:
+
+  ```
+  🔐 Sandi tonton LIVE:
+  <password>
+  Masukkan sandi ini di halaman Live untuk masuk.
+  ```
+
+- Untuk pembelian replay (kind replay / replay_only) pesan tidak berubah (tetap kirim link `/akses?token=...`).
+- Tambahkan link tonton live: `${origin}/live?show=${order.show_id}&t=${accessToken}` agar user tinggal klik.
+
+---
+
+## Catatan teknis
+
+- Tidak ada migrasi DB — semua kolom yang dipakai (`price_show`, `price_replay`, `pakasir_amount`, `live_password`) sudah ada.
+- Edge function `create-pakasir-order` & `pakasir-webhook` akan otomatis ter-deploy setelah perubahan disetujui.
+- Tidak menyentuh: HlsPlayer, fallback VOD, sistem auth, admin panel selain teks bantuan harga, replay flow.
