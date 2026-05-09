@@ -46,14 +46,14 @@ async function sendFonnte(phone: string, message: string, inboxId = ''): Promise
   };
   try {
     let res = await fetch('https://api.fonnte.com/send', {
-      method: 'POST', headers: { Authorization: token }, body: buildForm(true),
+      method: 'POST', headers: { Authorization: token }, body: buildForm(true), signal: AbortSignal.timeout(7000),
     });
     let data = await res.json().catch(() => ({}));
     let ok = res.ok && (data as { status?: boolean })?.status !== false;
     const reason = String((data as { reason?: string })?.reason || '').toLowerCase();
     if (!ok && inboxId && (reason.includes('inbox') || reason.includes('body'))) {
       res = await fetch('https://api.fonnte.com/send', {
-        method: 'POST', headers: { Authorization: token }, body: buildForm(false),
+        method: 'POST', headers: { Authorization: token }, body: buildForm(false), signal: AbortSignal.timeout(7000),
       });
       data = await res.json().catch(() => ({}));
       ok = res.ok && (data as { status?: boolean })?.status !== false;
