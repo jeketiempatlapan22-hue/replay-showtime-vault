@@ -116,6 +116,7 @@ export default function MembershipAdmin() {
           <div><Label className="text-xs">Label</Label><Input value={form.label} onChange={e => setForm({ ...form, label: e.target.value })} placeholder="cth: Member Premium A" /></div>
           <div><Label className="text-xs">Nomor WA</Label><Input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} placeholder="62xxx" /></div>
           <div><Label className="text-xs">Durasi (hari)</Label><Input type="number" value={form.duration_days} onChange={e => setForm({ ...form, duration_days: Number(e.target.value) || 30 })} /></div>
+          <div><Label className="text-xs">Max Device</Label><Input type="number" min={1} value={form.max_devices} onChange={e => setForm({ ...form, max_devices: Number(e.target.value) || 1 })} placeholder="cth: 300" /></div>
           <div className="flex items-end gap-2">
             <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={form.includes_replays} onChange={e => setForm({ ...form, includes_replays: e.target.checked })} /> Termasuk replay</label>
           </div>
