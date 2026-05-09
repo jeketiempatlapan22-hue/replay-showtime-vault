@@ -1049,6 +1049,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_clear_live_messages: { Args: never; Returns: number }
       check_login_lock: {
         Args: { _identifier: string }
         Returns: {
@@ -1057,6 +1058,7 @@ export type Database = {
           seconds_remaining: number
         }[]
       }
+      cron_clear_live_messages: { Args: never; Returns: undefined }
       email_for_phone: { Args: { _phone: string }; Returns: string }
       get_active_live: {
         Args: never
