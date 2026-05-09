@@ -194,10 +194,17 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
       setNow(Date.now());
       setStatus('qr');
     } catch (e: any) {
-      toast.error(e?.message || 'Gagal membuat order. Coba lagi.');
-      setStatus('form');
+      const msg = e?.message || 'Gagal membuat order';
+      toast.error(`${msg}. Menampilkan QRIS statis sebagai alternatif.`);
+      setStatus('static_qris');
     }
   };
+
+  const adminWaUrl = (() => {
+    const num = (ownerWa || '6288809048431').replace(/\D/g, '');
+    const desc = `Halo Admin, saya ingin konfirmasi pembayaran:%0A%0A• Item: ${encodeURIComponent(itemTitle)}%0A• Show: ${encodeURIComponent(showTitle)}%0A• Nominal: Rp ${amount.toLocaleString('id-ID')}%0A• Nomor saya: ${normalizePhone(phone) || '-'}${pakasirOrderId ? `%0A• Order ID: ${pakasirOrderId}` : ''}%0A%0AMohon dikirimkan token akses setelah pembayaran terkonfirmasi. Terima kasih 🙏`;
+    return `https://wa.me/${num}?text=${desc}`;
+  })();
 
   const remaining = Math.max(0, EXPIRY_MS - (now - createdAt));
   const mm = String(Math.floor(remaining / 60000)).padStart(2, '0');
