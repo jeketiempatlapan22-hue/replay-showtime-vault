@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState, lazy, Suspense } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Lock, Loader2, ShoppingBag, MessageCircle, Users, Eye } from 'lucide-react';
+import { ArrowLeft, Loader2, Users, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 
 import { supabase } from '@/integrations/supabase/client';
 import { getBrowserId } from '@/lib/browserId';
