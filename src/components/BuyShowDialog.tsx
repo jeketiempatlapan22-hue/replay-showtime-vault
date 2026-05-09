@@ -93,16 +93,17 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
       })
       .subscribe();
     channelRef.current = ch;
-    // Also poll every 8s as fallback
+    // Also poll every 3s as fallback
     const poll = setInterval(async () => {
       const { data } = await supabase.from('orders').select('status, access_token').eq('id', orderId).maybeSingle();
+      setLastChecked(Date.now());
       if (data?.status === 'paid') {
         const tok = (data as any).access_token || '';
         setAccessToken(tok);
         persistPaid(tok);
         setStatus('paid');
       }
-    }, 8000);
+    }, 3000);
     return () => {
       try { supabase.removeChannel(ch); } catch { /* ignore */ }
       clearInterval(poll);
