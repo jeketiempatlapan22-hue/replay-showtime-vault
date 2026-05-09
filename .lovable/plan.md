@@ -1,56 +1,62 @@
-## 1. Player Live: countdown saat OFF, embed realtime saat ON
+## 1. Sandi master bulanan untuk Live & Replay
 
-File: `src/pages/Live.tsx` (frontend only, tanpa menyentuh komponen lain).
+**Replay** — sudah didukung (`verify-password` & `get-replay-source` mengecek `master_passwords` berdasarkan bulan dari `replay.date`). Tidak diubah.
 
-**Masalah saat ini:**
-- Sebelum user unlock (belum input sandi/token), area player menampilkan form sandi — bukan countdown + jadwal seperti yang diminta.
-- Saat admin men-toggle `is_live` dari OFF → ON, `fetchStatus` hanya mengisi `unlocked.url` jika `hasNoUrl` true. Akibatnya kalau user ter-unlock saat OFF (URL kosong dari server), kadang URL tetap kosong dan player tidak tampil meski toggle sudah ON.
+**Live per-show (`active_shows`)** — sudah didukung di `unlock-live` Branch A (cek `master_passwords` berdasarkan `show.show_date`). Tidak diubah.
 
-**Perbaikan:**
+**Live legacy (`live_config_private`)** — saat ini hanya cocokkan `cfg.password`. Tambahkan fallback master:
+- File: `supabase/functions/unlock-live/index.ts`, blok `if (password)` di Branch B.
+- Hitung bulan `YYYY-MM` dari `now()`, query `master_passwords`, valid bila `paused !== true` dan password cocok.
 
-a. **Selalu tampilkan countdown saat live OFF** — pindahkan blok `ScheduleCountdown` agar dirender ketika `status?.enabled === false`, terlepas dari `unlocked` state. Form sandi/CTA beli show ditampilkan DI BAWAH countdown (atau tetap di bagian akses) tetapi tidak menggantikan area player. Saat OFF, judul + tanggal + jam tampil persis seperti komponen `ScheduleCountdown` saat ini.
+## 2. Membership multi-device (sesuai input admin, mis. 300)
 
-b. **Realtime switch OFF → ON** — pada `fetchStatus`, ubah logika update `unlocked` agar saat toggle baru aktif (`enabled && wasOff`):
-   - Jika `unlocked` ada tapi `url`/`sources` kosong, isi dari `data.live_url` + `toPrivateSources(data.live_sources)` (pakai URL publik yang baru di-set admin), supaya player langsung mount tanpa menunggu re-unlock.
-   - Tetap pertahankan guard "jangan timpa URL yang sudah aktif" agar stream yang sedang berjalan tidak di-remount.
-   - Tambahkan path: jika `unlocked` masih null tapi user punya `t` param, tetap panggil `doUnlock({ token: t }, true)` (sudah ada).
+**Migrasi DB** — tambah kolom `max_devices` di `membership_tokens`:
+```sql
+ALTER TABLE public.membership_tokens
+  ADD COLUMN max_devices integer NOT NULL DEFAULT 1;
+```
 
-c. **Realtime switch ON → OFF** — saat `enabled` berubah jadi false, biarkan `unlocked` tetap, tapi karena `liveActive` jadi false, kondisi render otomatis switch ke `ScheduleCountdown` (sudah ada di branch `liveActive && activeSource`). Cukup pastikan tidak ada early-return yang menyembunyikannya.
+**Edge function `unlock-live`** (`bindMembershipDevice`):
+- Ganti `maybeSingle()` menjadi cek per `(token_id, browser_id)`. Jika ada → update `last_seen`.
+- Jika tidak ada → hitung total device untuk token (`count`). Jika `count >= tokenRow.max_devices` → `device_limit`. Jika belum penuh → insert.
 
-Tidak menyentuh: `HlsPlayer`, `EmbedPlayer`, `LiveChat`, `unlock-live` edge function, RLS, schema.
+**Edge function `verify-password`** — terapkan logika `bindMembershipDevice` yang sama (perlu menerima `tokenRow` agar tahu `max_devices`).
 
-## 2. Pesan bot WhatsApp: sertakan sandi & domain replaytime.lovable.app
+**Admin UI `MembershipAdmin.tsx`**:
+- Tambah field `max_devices` di form pembuatan (input number, default 1, min 1, max 1000) — admin bebas isi 300, dst.
+- Saat insert, sertakan `max_devices`.
+- Tampilkan rasio "Perangkat tertaut (n/{max_devices})".
+- Tambah tombol kecil "Ubah max device" via prompt → update kolom.
 
-File: `supabase/functions/create-token/index.ts` (edge function bot saja).
+## 3. Daftar command otomatis (bot `/menu` & website)
 
-**Perbaikan:**
+**Bot `/menu`** — jadikan dinamis:
+- Update row `bot_commands` `/menu` → `is_dynamic = true`.
+- Di `supabase/functions/fonnte-webhook/index.ts` blok `command.is_dynamic`, tambah handler:
+  ```ts
+  if (cmd === '/menu') {
+    const { data: cmds } = await admin.from('bot_commands')
+      .select('trigger,description').eq('enabled', true).order('sort_order');
+    reply = '📋 *DAFTAR COMMAND*\n\n' +
+      (cmds || []).map(c => `• *${c.trigger}* — ${c.description || '-'}`).join('\n') +
+      '\n\nKetik salah satu untuk mencoba.';
+  }
+  ```
 
-a. **Selalu pakai domain `https://replaytime.lovable.app` sebagai fallback** kalau `site_settings.site_origin` kosong. Variabel `origin` diganti:
-   ```ts
-   const origin = (settingsMap.get('site_origin') as string) || 'https://replaytime.lovable.app';
-   ```
-   Sehingga `link` dan `liveUrl` selalu valid.
+**Website** — buat komponen baru `src/components/BotCommandsPublic.tsx`:
+- Fetch `bot_commands` (RLS publik untuk SELECT sudah aktif).
+- Render daftar trigger + description.
+- Sisipkan section di bagian bawah `src/pages/Index.tsx` ("Daftar Perintah Bot").
 
-b. **Sertakan sandi replay & sandi live** di pesan WA. Query `replays` ditambah kolom `password`, dan ambil sandi live aktif dari `active_shows` yang `is_active = true AND replay_id = :replayId` (kolom `live_password`). Jika tidak ditemukan, fallback ambil dari `live_config_private.password`.
+## 4. File yang diubah
 
-c. Update `buildAttractiveMessage`:
-   - Tambahkan parameter `replayPassword?: string` dan `livePassword?: string`.
-   - Sisipkan blok baru di atas baris bonus live:
-     ```
-     🔑 Sandi Replay: <replayPassword>
-     🔑 Sandi Live: <livePassword>
-     ```
-   - Tampilkan baris hanya jika nilainya ada (filter falsy).
+1. Migrasi DB — `ALTER TABLE membership_tokens ADD COLUMN max_devices` + `UPDATE bot_commands SET is_dynamic = true WHERE trigger = '/menu'`.
+2. `supabase/functions/unlock-live/index.ts` — fallback master di Branch B + `bindMembershipDevice` multi-device.
+3. `supabase/functions/verify-password/index.ts` — `bindMembershipDevice` multi-device.
+4. `supabase/functions/fonnte-webhook/index.ts` — handler dinamis `/menu`.
+5. `src/components/admin/MembershipAdmin.tsx` — input & tampilan `max_devices`.
+6. `src/components/BotCommandsPublic.tsx` (baru) + sisipkan ke `src/pages/Index.tsx`.
 
-d. **Tidak mengubah** auth, rate limit, struktur `token_deliveries`, RLS, atau pesan dynamic command lain di `bot_commands`.
+## 5. Tidak disentuh
 
-## 3. Files yang diubah
-
-1. `src/pages/Live.tsx` — restrukturisasi render branch (countdown selalu tampil saat OFF; auto-fill URL pada OFF→ON).
-2. `supabase/functions/create-token/index.ts` — fallback origin, fetch sandi, format pesan.
-
-## 4. Tidak disentuh
-
-- Komponen player (`HlsPlayer`, `EmbedPlayer`, `YouTubePlayer`).
-- `LiveChat`, `MemberAvatar`, sistem token/RLS, edge functions lain (`unlock-live`, `manage-live`, `fonnte-webhook`, dll).
-- Schema database.
+- `Live.tsx`, `Akses.tsx`, `LiveChat`, player components, RLS lain, sistem token replay/live yang sudah ada, kolom membership lain (kuota reset, dll).

@@ -641,6 +641,7 @@ export type Database = {
           label: string
           manual_resets_max: number
           manual_resets_used: number
+          max_devices: number
           password: string
           phone: string
           revoked: boolean
@@ -658,6 +659,7 @@ export type Database = {
           label?: string
           manual_resets_max?: number
           manual_resets_used?: number
+          max_devices?: number
           password?: string
           phone?: string
           revoked?: boolean
@@ -675,6 +677,7 @@ export type Database = {
           label?: string
           manual_resets_max?: number
           manual_resets_used?: number
+          max_devices?: number
           password?: string
           phone?: string
           revoked?: boolean
