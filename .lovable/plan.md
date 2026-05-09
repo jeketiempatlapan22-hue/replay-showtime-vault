@@ -1,72 +1,57 @@
-## Tujuan
+## Perubahan pada halaman /live dan komponen LiveChat
 
-Lima penyesuaian terfokus pada pembelian show aktif, polling status, halaman show, dan pesan bot WhatsApp. Tidak menyentuh sistem lain (replay, live, auth, admin lainnya).
-
----
-
-## 1. Polling status pembayaran real-time di dialog QRIS
-
-File: `src/components/BuyShowDialog.tsx`
-
-- Saat status `qr` aktif dan `orderId` ada, jalankan polling `supabase.from('orders').select('status, access_token').eq('id', orderId)` setiap **3 detik** (dipersingkat dari 8 dtk) **selain** subscription realtime yang sudah ada — supaya status tetap berubah ke `paid` walau realtime channel terlambat.
-- Tambah indikator visual kecil di bawah QR: "Mengecek status pembayaran… (auto-refresh)" + `last checked` waktu, agar user tahu sistem aktif memantau.
-- Saat `status === 'paid'`, hentikan polling, tampilkan token dan ringkasan order — sudah ada, tinggal pastikan polling dibersihkan.
-
-## 2. Pisahkan kartu Show Aktif dari kartu Replay
-
-- `src/pages/Index.tsx`: hapus `<ActiveShowsSection />` dari halaman utama (line 444). Halaman utama hanya menampilkan kartu replay.
-- `src/App.tsx`: tambah alias route `/show` → komponen `Shows` (selain `/shows` yang sudah ada) supaya URL yang diminta user bekerja.
-- `src/pages/Shows.tsx`: tetap apa adanya — sudah render `ActiveShowCard`. Tambahkan judul / SEO ringkas: H1 "Show Aktif", meta description.
-- (Opsional) Tambah link menu di `HamburgerMenu.tsx` ke `/show` jika belum ada.
-
-## 3. Harga show ditetapkan admin & terhubung Pakasir
-
-Saat ini admin mengisi 3 angka (`price_show`, `price_replay`, `pakasir_amount`). Sederhanakan agar admin cukup isi **satu angka** dan otomatis dipakai Pakasir.
-
-- `supabase/functions/create-pakasir-order/index.ts`: untuk `kind === 'show'`, prioritas amount = `price_show > 0 ? price_show : pakasir_amount`. Untuk `kind === 'replay'`: `price_replay > 0 ? price_replay : (pakasir_amount || 2000)` (default Rp 2.000 sudah ada). Validasi minimal Rp 100 tetap.
-- `src/components/ActiveShowCard.tsx`:
-  - `showPriced = (show.price_show || show.pakasir_amount) > 0`
-  - `replayPriced = (show.price_replay || show.pakasir_amount) > 0`
-  - `amount` yang dikirim ke `BuyShowDialog` = nilai harga sesuai kind (bukan `pakasir_amount` saja). Tambahkan prop `amount` yang dihitung di tombol klik agar selalu match dengan label tombol.
-- `src/pages/Admin.tsx`: tambahkan keterangan kecil di field harga: "Nominal ini akan ditagihkan via QRIS Pakasir." `pakasir_amount` tetap ada sebagai fallback opsional. Tidak ada perubahan skema DB.
-
-## 4. Deteksi nomor WA fleksibel (`6288…`, `+62 822-…`, `088…`)
-
-Normalisasi disamakan di tiga tempat dan toleran terhadap spasi, tanda hubung, dan tanda `+`.
-
-Aturan:
-1. Strip semua non-digit.
-2. Jika diawali `0` → ganti jadi `62`.
-3. Jika diawali `8` (tanpa 0/62) → tambah prefix `62`.
-4. Jika sudah diawali `62` → biarkan.
-5. Validasi akhir regex: `/^62\d{8,13}$/`.
-
-File yang diupdate (logic sama persis):
-- `src/components/BuyShowDialog.tsx` (`normalizePhone`) — sudah benar, tinggal pastikan urutan branch.
-- `supabase/functions/create-pakasir-order/index.ts` — sudah benar, dipertahankan.
-- `supabase/functions/pakasir-webhook/index.ts` — **tambah branch `startsWith('8')` → `'62' + d`** (sekarang belum ada). Ini memastikan `target` Fonnte selalu valid.
-- (Cek juga `supabase/functions/fonnte-webhook/index.ts` jika ada `normalizePhone` serupa — samakan.)
-
-## 5. Pesan WhatsApp menyertakan sandi satuan show
-
-File: `supabase/functions/pakasir-webhook/index.ts`
-
-- Setelah `order` ditemukan dan `status` paid, jika `order.show_id` ada **dan** `order.replay_id` null (artinya pembelian show aktif, bukan replay), query: `select live_password, title, live_require_password from active_shows where id = order.show_id`.
-- Jika `live_password` non-empty, sisipkan blok di pesan WA:
-
-  ```
-  🔐 Sandi tonton LIVE:
-  <password>
-  Masukkan sandi ini di halaman Live untuk masuk.
-  ```
-
-- Untuk pembelian replay (kind replay / replay_only) pesan tidak berubah (tetap kirim link `/akses?token=...`).
-- Tambahkan link tonton live: `${origin}/live?show=${order.show_id}&t=${accessToken}` agar user tinggal klik.
+Tiga perbaikan terfokus, tanpa menyentuh sistem lain (player, token, edge function inti, sumber video, watermark, viewer counter, membership, dsb).
 
 ---
 
-## Catatan teknis
+### 1. Verifikasi sandi LIVE di /live diperketat
 
-- Tidak ada migrasi DB — semua kolom yang dipakai (`price_show`, `price_replay`, `pakasir_amount`, `live_password`) sudah ada.
-- Edge function `create-pakasir-order` & `pakasir-webhook` akan otomatis ter-deploy setelah perubahan disetujui.
-- Tidak menyentuh: HlsPlayer, fallback VOD, sistem auth, admin panel selain teks bantuan harga, replay flow.
+Pada `src/pages/Live.tsx`:
+
+- Pastikan form sandi tetap menjadi gate utama: selama `unlocked` masih `null`, halaman hanya menampilkan form input sandi — tidak ada akses ke player atau countdown.
+- Tambahkan validasi client-side ringan: jika field kosong, langsung tampilkan pesan "Sandi wajib diisi" tanpa memanggil server.
+- Jelaskan pesan error pada `pwError` dengan lebih spesifik untuk `bad_password` dan `bad_membership_password` (keduanya sudah ditangani di `unlock-live`, hanya perlu copy yang lebih ramah: "Sandi yang dimasukkan salah. Coba lagi.").
+- Setelah verifikasi sukses (`data.valid === true`), navigasikan user ke tampilan player (yang sudah ada di blok `unlocked` saat `liveActive && activeSource`) — tidak ada perubahan rute, hanya transisi state seperti sekarang.
+- Tidak ada perubahan pada `supabase/functions/unlock-live/index.ts` (sandi sudah divalidasi server-side di sana).
+
+### 2. Live Chat bergaya YouTube (terbaru di bawah, auto-scroll)
+
+Pada `src/components/LiveChat.tsx`:
+
+- Balik urutan tampilan: query tetap `order('created_at', { ascending: false }).limit(30)` agar tetap mengambil 30 terbaru, lalu render dengan `messages.slice().reverse()` sehingga **pesan terbaru muncul di bawah**.
+- Ubah penanganan realtime INSERT/UPDATE agar pesan baru ditambahkan di akhir array (logika append + cap 30, bukan prepend).
+- Ubah auto-scroll: deteksi apakah user "near bottom" (mis. `scrollHeight - scrollTop - clientHeight < 60`) sebelum pesan baru masuk; jika ya, setelah update DOM, set `scrollTop = scrollHeight` agar pesan terbaru selalu terlihat tanpa scroll manual. Jika user sengaja scroll ke atas membaca pesan lama, jangan ganggu posisinya.
+- Saat komponen mount pertama kali, scroll otomatis ke bawah agar pesan terbaru langsung tampil.
+- Tidak mengubah rate-limit, modal nama, pin, hapus, atau styling dasar.
+
+### 3. Status LIVE hanya saat admin mengaktifkan toggle
+
+Pada `src/pages/Live.tsx`:
+
+- `liveActive` saat ini sudah bergantung pada `status?.enabled || unlocked?.enabled`, dan keduanya berasal dari kolom `is_live` (manual). Pastikan tidak ada efek samping `live_auto_schedule` yang membuat status ON AIR aktif otomatis di halaman ini — jika ditemukan, hapus pengaruh `live_auto_schedule` dari penghitungan `liveActive` agar status hanya bergantung pada `is_live`.
+- Saat `is_live = false` (admin belum menyalakan), pengguna yang sudah `unlocked` akan tetap melihat komponen `ScheduleCountdown` (sudah ada). Pastikan badge "OFF AIR" tampil dan badge "ON AIR" tidak muncul sama sekali sampai admin mengaktifkan toggle.
+- Saat admin menekan toggle live di admin panel, realtime channel `live-cfg:${showId}` (sudah ada) akan memicu `fetchStatus()` sehingga countdown otomatis berganti ke player tanpa reload.
+- Tidak ada perubahan pada admin panel atau pada edge function.
+
+---
+
+### Detail teknis
+
+**File yang akan diubah:**
+
+- `src/pages/Live.tsx`
+  - Pesan error lebih ramah untuk sandi salah.
+  - Validasi client-side ringan untuk field kosong.
+  - Pastikan `liveActive` hanya dari `is_live` (cek dan hapus pengaruh `live_auto_schedule` jika ada).
+- `src/components/LiveChat.tsx`
+  - Render pesan dengan `.slice().reverse()` (terbaru di bawah).
+  - Append pesan baru dari realtime ke akhir (bukan prepend).
+  - Logika auto-scroll-to-bottom saat user dekat bawah; scroll-to-bottom on mount.
+
+**Tidak diubah:**
+
+- `supabase/functions/unlock-live/index.ts`
+- Player (`HlsPlayer`, `EmbedPlayer`), watermark, viewer counter, presence
+- Sistem token, membership, master password
+- Admin panel, `ShowLiveControl`, struktur DB, RLS
+- `BuyShowDialog`, webhook Pakasir/Fonnte, sorting, kartu replay, halaman lain

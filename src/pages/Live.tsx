@@ -197,8 +197,8 @@ export default function Live() {
       case 'blocked': return 'Perangkat ini telah diblokir oleh admin.';
       case 'device_limit': return 'Token ini sudah terikat ke perangkat lain. Klik "Reset perangkat membership saya" jika ingin pindah perangkat.';
       case 'no_device': return 'ID perangkat tidak terdeteksi. Aktifkan penyimpanan browser lalu muat ulang halaman.';
-      case 'bad_password': return 'Sandi salah.';
-      case 'bad_membership_password': return 'Sandi membership salah.';
+      case 'bad_password': return 'Sandi yang dimasukkan salah. Coba lagi.';
+      case 'bad_membership_password': return 'Sandi membership salah. Periksa kembali sandi Anda.';
       case 'revoked': return 'Token tidak valid atau telah dicabut.';
       case 'expired': return 'Membership Anda telah berakhir. Silakan perpanjang ke admin.';
       case 'not_started': return 'Membership belum aktif (belum mencapai waktu mulai).';
@@ -363,10 +363,16 @@ export default function Live() {
 
   const submitPassword = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!pwInput.trim()) return;
+    if (!pwInput.trim()) {
+      setPwError('Sandi wajib diisi.');
+      return;
+    }
+    setPwError('');
     void doUnlock({ password: pwInput.trim() });
   };
 
+  // ON AIR hanya saat admin manual mengaktifkan toggle is_live di admin panel.
+  // status.enabled & unlocked.enabled keduanya bersumber dari kolom is_live.
   const liveActive = !!(status?.enabled || unlocked?.enabled);
 
   // ============ VIEWER COUNTER (presence) — count unique browser_id ============
