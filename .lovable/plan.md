@@ -1,62 +1,45 @@
-## 1. Sandi master bulanan untuk Live & Replay
+## Pisahkan halaman live & sandi
 
-**Replay** — sudah didukung (`verify-password` & `get-replay-source` mengecek `master_passwords` berdasarkan bulan dari `replay.date`). Tidak diubah.
+### Masalah
+Saat ini `/live` menampilkan satu halaman serbaguna: jika user belum unlock, area player tetap menampilkan kartu "JADWAL LIVE / Menunggu admin memulai siaran" (ScheduleCountdown) lalu form sandi di bawahnya, bahkan Live Chat juga muncul. Akibatnya area player terlihat seakan sudah aktif padahal user belum memasukkan sandi.
 
-**Live per-show (`active_shows`)** — sudah didukung di `unlock-live` Branch A (cek `master_passwords` berdasarkan `show.show_date`). Tidak diubah.
+### Tujuan
+- `/kunci` — halaman khusus form sandi.
+- `/live` — halaman khusus tonton (player + chat + lineup). Hanya bisa diakses jika sudah unlock.
+- Token link (`/live?t=TOKEN` atau `?mtoken=...`) tetap langsung membuka `/live` (bypass `/kunci`).
+- Sandi benar di `/kunci` → simpan unlock ke `sessionStorage` → redirect ke `/live` (preserve `?show=...`).
 
-**Live legacy (`live_config_private`)** — saat ini hanya cocokkan `cfg.password`. Tambahkan fallback master:
-- File: `supabase/functions/unlock-live/index.ts`, blok `if (password)` di Branch B.
-- Hitung bulan `YYYY-MM` dari `now()`, query `master_passwords`, valid bila `paused !== true` dan password cocok.
+### Perubahan
 
-## 2. Membership multi-device (sesuai input admin, mis. 300)
+1. **Buat halaman baru `src/pages/Kunci.tsx`**
+   - Pindahkan UI form sandi dari `Live.tsx` (kartu "Akses Live Terkunci", tombol Beli via WhatsApp, tombol "Reset perangkat membership").
+   - Tampilkan juga `ScheduleCountdown` di atas form (judul + jadwal + countdown), supaya user tetap tahu kapan live mulai.
+   - Logika: panggil `unlock-live` edge function dengan password.
+   - Sukses → simpan ke `sessionStorage` (`replaytime-live-unlocked[-${showId}]`) → `navigate('/live?show=...')`.
+   - Tetap baca `?show=...` dari URL agar terikat per-show.
 
-**Migrasi DB** — tambah kolom `max_devices` di `membership_tokens`:
-```sql
-ALTER TABLE public.membership_tokens
-  ADD COLUMN max_devices integer NOT NULL DEFAULT 1;
-```
+2. **Tambah route di `src/App.tsx`**
+   - `<Route path="/kunci" element={<Kunci />} />`
 
-**Edge function `unlock-live`** (`bindMembershipDevice`):
-- Ganti `maybeSingle()` menjadi cek per `(token_id, browser_id)`. Jika ada → update `last_seen`.
-- Jika tidak ada → hitung total device untuk token (`count`). Jika `count >= tokenRow.max_devices` → `device_limit`. Jika belum penuh → insert.
+3. **Sederhanakan `src/pages/Live.tsx`**
+   - Hapus blok form sandi & ScheduleCountdown di cabang `!unlocked`.
+   - Saat mount: cek `?t=` / `?mtoken=` → tetap auto-unlock seperti sekarang.
+   - Jika TIDAK ada token URL DAN tidak ada cache `sessionStorage` unlock → `navigate('/kunci?show=...', { replace: true })`.
+   - Saat unlock dicabut/diblokir di runtime (silent revalidation menemukan `revoked`/`blocked`) → redirect ke `/kunci` dengan pesan via query param atau state.
+   - Cabang `unlocked` tetap apa adanya (player, chat, lineup, ScheduleCountdown saat off-air).
 
-**Edge function `verify-password`** — terapkan logika `bindMembershipDevice` yang sama (perlu menerima `tokenRow` agar tahu `max_devices`).
+4. **Tidak diubah**
+   - Edge function `unlock-live`, `verify-password`, `get-replay-source`.
+   - Skema database, RLS, security memory.
+   - Logika token link, membership, multi-device, brute-force protection, dsb.
 
-**Admin UI `MembershipAdmin.tsx`**:
-- Tambah field `max_devices` di form pembuatan (input number, default 1, min 1, max 1000) — admin bebas isi 300, dst.
-- Saat insert, sertakan `max_devices`.
-- Tampilkan rasio "Perangkat tertaut (n/{max_devices})".
-- Tambah tombol kecil "Ubah max device" via prompt → update kolom.
-
-## 3. Daftar command otomatis (bot `/menu` & website)
-
-**Bot `/menu`** — jadikan dinamis:
-- Update row `bot_commands` `/menu` → `is_dynamic = true`.
-- Di `supabase/functions/fonnte-webhook/index.ts` blok `command.is_dynamic`, tambah handler:
-  ```ts
-  if (cmd === '/menu') {
-    const { data: cmds } = await admin.from('bot_commands')
-      .select('trigger,description').eq('enabled', true).order('sort_order');
-    reply = '📋 *DAFTAR COMMAND*\n\n' +
-      (cmds || []).map(c => `• *${c.trigger}* — ${c.description || '-'}`).join('\n') +
-      '\n\nKetik salah satu untuk mencoba.';
-  }
+### Detail teknis
+- Cache key `sessionStorage`: `replaytime-live-unlocked` (global) atau `replaytime-live-unlocked-${showId}` (per-show) — sama persis dengan yang sekarang dipakai `Live.tsx`, agar kompatibel.
+- `/kunci` memanggil `unlock-live` dengan body `{ password, browser_id, show_id }`. Kalau `data.valid` → tulis cache → `navigate(`/live?show=${showId}`)`.
+- `/live` deteksi unlock:
+  ```text
+  hasToken   = !!(search.get('t') || search.get('mtoken'))
+  hasCached  = !!sessionStorage.getItem(SS_KEY)
+  if (!hasToken && !hasCached) navigate('/kunci?show=' + showId, { replace: true })
   ```
-
-**Website** — buat komponen baru `src/components/BotCommandsPublic.tsx`:
-- Fetch `bot_commands` (RLS publik untuk SELECT sudah aktif).
-- Render daftar trigger + description.
-- Sisipkan section di bagian bawah `src/pages/Index.tsx` ("Daftar Perintah Bot").
-
-## 4. File yang diubah
-
-1. Migrasi DB — `ALTER TABLE membership_tokens ADD COLUMN max_devices` + `UPDATE bot_commands SET is_dynamic = true WHERE trigger = '/menu'`.
-2. `supabase/functions/unlock-live/index.ts` — fallback master di Branch B + `bindMembershipDevice` multi-device.
-3. `supabase/functions/verify-password/index.ts` — `bindMembershipDevice` multi-device.
-4. `supabase/functions/fonnte-webhook/index.ts` — handler dinamis `/menu`.
-5. `src/components/admin/MembershipAdmin.tsx` — input & tampilan `max_devices`.
-6. `src/components/BotCommandsPublic.tsx` (baru) + sisipkan ke `src/pages/Index.tsx`.
-
-## 5. Tidak disentuh
-
-- `Live.tsx`, `Akses.tsx`, `LiveChat`, player components, RLS lain, sistem token replay/live yang sudah ada, kolom membership lain (kuota reset, dll).
+- `/kunci` link "Beli Show via WhatsApp" + "Reset perangkat membership" sama persis dengan yang ada di `Live.tsx` saat ini.
