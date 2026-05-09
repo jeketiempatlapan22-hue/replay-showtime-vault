@@ -385,7 +385,7 @@ Deno.serve(async (req) => {
   const lower = text.toLowerCase();
   const [cmd, ...rest] = lower.split(/\s+/);
   const arg = rest.join(' ').trim();
-  const ADMIN_ONLY = new Set(['/buattoken', '/createtoken', '/createtokenrep', '/createlink', '/createpub']);
+  const ADMIN_ONLY = new Set(['/test', '/buattoken', '/createtoken', '/createtokenrep', '/createlink', '/createpub']);
 
   // Per-phone rate limit: max 1 reply per 2 seconds, but never throttle admin token commands.
   if (!testMode) {
@@ -695,9 +695,25 @@ Deno.serve(async (req) => {
             ].filter((l) => l !== '' || true).join('\n');
           }
         }
-      }
+      } else if (cmd === '/test') {
+      const fromGroup = !!participantNorm && participantNorm !== phoneNorm;
+      const testLines = [
+        '🧪 *MODE TEST — WEBHOOK OK*',
+        '',
+        `📱 Nomor: +${phoneNorm}`,
+        fromGroup ? `👥 Grup: +${participantNorm}` : '',
+        `🔧 Device: ${deviceNorm || '-'}`,
+        `📨 Command: *${text}*`,
+        `⏰ Waktu: ${new Date().toLocaleString('id-ID')}`,
+        '',
+        '✅ Webhook path aktif',
+        '✅ Payload diterima & diparse',
+        `✅ Admin: ${isBotAdmin ? 'terverifikasi' : 'tidak'}`,
+        '',
+        '_Tidak ada token/link yang dikirim — ini hanya simulasi._',
+      ].filter(Boolean);
+      reply = testLines.join('\n');
     }
-  }
 
 
   const finalReply = reply || '✅ OK';
