@@ -27,11 +27,9 @@ export default function LiveChat() {
   const [nameInput, setNameInput] = useState('');
   const [nameError, setNameError] = useState('');
   const listRef = useRef<HTMLDivElement>(null);
+  const stickToBottomRef = useRef(true);
   const [cooldownLeft, setCooldownLeft] = useState(0);
   const sentTimestampsRef = useRef<number[]>([]);
-
-  // Modal opens on demand when user tries to interact without a name.
-  // (Username is required per browser before any chat interaction.)
 
   const saveName = () => {
     const v = nameInput.trim();
@@ -57,27 +55,41 @@ export default function LiveChat() {
   const refresh = async () => {
     const [{ data: pins }, { data: list }] = await Promise.all([
       supabase.from('live_messages').select('*').eq('pinned', true).order('created_at', { ascending: false }),
+      // Ambil 30 terbaru, lalu balik agar terbaru tampil di bawah (gaya YouTube).
       supabase.from('live_messages').select('*').eq('pinned', false).order('created_at', { ascending: false }).limit(30),
     ]);
     setPinned((pins || []) as Msg[]);
-    // Newest first — user sees latest without scrolling; scroll down for older messages.
-    setMessages(((list || []) as Msg[]));
+    const newest30 = ((list || []) as Msg[]).slice().reverse();
+    setMessages(newest30);
+    // Setelah load awal, scroll ke bawah supaya pesan terbaru terlihat.
+    stickToBottomRef.current = true;
   };
 
   useEffect(() => {
     refresh();
-    // Incrementally apply realtime payloads instead of refetching for each event.
-    // With many concurrent viewers this reduces DB load by orders of magnitude.
     const ch = supabase.channel('live-chat-realtime')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'live_messages' }, (payload) => {
         const m = payload.new as Msg;
-        if (m.pinned) setPinned(prev => [m, ...prev.filter(x => x.id !== m.id)]);
-        else setMessages(prev => [m, ...prev.filter(x => x.id !== m.id)].slice(0, 30));
+        if (m.pinned) {
+          setPinned(prev => [m, ...prev.filter(x => x.id !== m.id)]);
+        } else {
+          // Append ke akhir (terbaru di bawah) lalu cap 30.
+          setMessages(prev => {
+            const next = [...prev.filter(x => x.id !== m.id), m];
+            return next.length > 30 ? next.slice(next.length - 30) : next;
+          });
+        }
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'live_messages' }, (payload) => {
         const m = payload.new as Msg;
         setPinned(prev => m.pinned ? [m, ...prev.filter(x => x.id !== m.id)] : prev.filter(x => x.id !== m.id));
-        setMessages(prev => m.pinned ? prev.filter(x => x.id !== m.id) : prev.map(x => x.id === m.id ? m : x));
+        setMessages(prev => {
+          if (m.pinned) return prev.filter(x => x.id !== m.id);
+          const exists = prev.some(x => x.id === m.id);
+          if (exists) return prev.map(x => x.id === m.id ? m : x);
+          const next = [...prev, m];
+          return next.length > 30 ? next.slice(next.length - 30) : next;
+        });
       })
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'live_messages' }, (payload) => {
         const id = (payload.old as { id?: string })?.id;
@@ -89,21 +101,25 @@ export default function LiveChat() {
     return () => { supabase.removeChannel(ch); };
   }, []);
 
+  // Track apakah user "near bottom" agar auto-scroll tidak menggangu saat baca pesan lama.
+  const handleScroll = () => {
+    const el = listRef.current;
+    if (!el) return;
+    const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    stickToBottomRef.current = distFromBottom < 60;
+  };
+
+  // Setiap pesan berubah, jika user di dekat bawah → scroll ke bawah.
   useEffect(() => {
     const el = listRef.current;
     if (!el) return;
-    // Newest message is at the top. If user is near top, keep them pinned to top so
-    // the latest message is always visible. If they scrolled down to read older
-    // messages, don't disturb their position.
-    const nearTop = el.scrollTop < 40;
-    if (nearTop) el.scrollTop = 0;
+    if (stickToBottomRef.current) {
+      // Tunggu DOM update.
+      requestAnimationFrame(() => { el.scrollTop = el.scrollHeight; });
+    }
   }, [messages.length]);
 
   // Rate limit per browser (client-side, anti-spam):
-  // - Min 2 detik antar pesan
-  // - Maks 8 pesan per 60 detik
-  // - Maks 3 pesan identik berturut-turut
-  // Tidak berlaku untuk admin.
   const RL_MIN_GAP_MS = 2000;
   const RL_WINDOW_MS = 60_000;
   const RL_MAX_IN_WINDOW = 8;
@@ -171,6 +187,8 @@ export default function LiveChat() {
     }
     setSending(true);
     const display = (name.trim() || 'Anonim').slice(0, 40);
+    // Ketika user mengirim, pasti ingin lihat pesannya — pin ke bawah.
+    stickToBottomRef.current = true;
     const { error } = await supabase.from('live_messages').insert({
       browser_id: getBrowserId(),
       name: isAdmin ? (adminUsername || 'Admin') : display,
@@ -236,8 +254,8 @@ export default function LiveChat() {
         </div>
       )}
 
-      {/* Messages */}
-      <div ref={listRef} className="flex-1 overflow-y-auto px-3 py-2 space-y-2">
+      {/* Messages — terbaru di bawah (gaya YouTube) */}
+      <div ref={listRef} onScroll={handleScroll} className="flex-1 overflow-y-auto px-3 py-2 space-y-2">
         {messages.length === 0 && <p className="text-xs text-muted-foreground text-center py-6">Belum ada pesan.</p>}
         {messages.map(m => (
           <div key={m.id} className="text-xs group">
