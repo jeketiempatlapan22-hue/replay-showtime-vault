@@ -696,7 +696,6 @@ Deno.serve(async (req) => {
           }
         }
       }
-    }
     } else if (cmd === '/test') {
       const fromGroup = !!participantNorm && participantNorm !== phoneNorm;
       const testLines = [
