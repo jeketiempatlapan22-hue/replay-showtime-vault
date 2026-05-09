@@ -20,3 +20,6 @@ verify_jwt = false
 
 [functions.verify-password]
 verify_jwt = false
+
+[functions.check-pakasir-status]
+verify_jwt = false

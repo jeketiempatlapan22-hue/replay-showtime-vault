@@ -72,6 +72,8 @@ export default function Admin() {
   const [currentTheme, setCurrentTheme] = useState<ThemeType>('ramadhan');
   const [waNumber, setWaNumber] = useState('');
   const [waLink, setWaLink] = useState('');
+  const [ownerWaNumber, setOwnerWaNumber] = useState('');
+  const [staticQrisUrl, setStaticQrisUrl] = useState('');
   const [adminUsername, setAdminUsername] = useState('');
 
   // Comments state
@@ -211,6 +213,8 @@ export default function Admin() {
       setWaLink(settings.whatsapp_link || '');
       setLiveChatEnabled((settings.live_chat_enabled ?? 'true') !== 'false');
       setAdminUsername(settings.admin_username || 'Admin');
+      setOwnerWaNumber(settings.owner_wa_number || '6288809048431');
+      setStaticQrisUrl(settings.static_qris_url || '');
       const { data: comments } = await supabase.from('comments').select('*').order('created_at', { ascending: false });
       if (comments) setAllComments(comments);
       const { data: blocks } = await supabase.from('blocked_browsers').select('*').order('created_at', { ascending: false });
@@ -468,6 +472,18 @@ export default function Admin() {
       toast({ title: 'Berhasil', description: 'Info WhatsApp berhasil disimpan!' });
     } catch {
       toast({ title: 'Error', description: 'Gagal menyimpan info WhatsApp.', variant: 'destructive' });
+    }
+  };
+
+  const handleSavePakasirFallback = async () => {
+    try {
+      await Promise.all([
+        setSetting('owner_wa_number', ownerWaNumber.replace(/\D/g, '') || '6288809048431'),
+        setSetting('static_qris_url', staticQrisUrl),
+      ]);
+      toast({ title: 'Berhasil', description: 'Pengaturan QRIS statis & nomor admin tersimpan.' });
+    } catch {
+      toast({ title: 'Error', description: 'Gagal menyimpan pengaturan.', variant: 'destructive' });
     }
   };
 
@@ -1159,6 +1175,24 @@ export default function Admin() {
                 <div><Label>Nomor HP</Label><Input placeholder="628123456789" value={waNumber} onChange={e => setWaNumber(e.target.value)} /></div>
                 <div><Label>Link Saluran</Label><Input placeholder="https://whatsapp.com/channel/..." value={waLink} onChange={e => setWaLink(e.target.value)} /></div>
                 <Button onClick={handleSaveWhatsApp} size="sm"><Save className="w-4 h-4 mr-2" />Simpan</Button>
+              </CardContent>
+            </Card>
+
+            {/* QRIS Statis Fallback + Nomor Admin */}
+            <Card>
+              <CardHeader><CardTitle className="font-sans text-base sm:text-lg flex items-center gap-2"><MessageCircle className="w-5 h-5 text-primary" />QRIS Statis & Nomor Admin</CardTitle></CardHeader>
+              <CardContent className="space-y-3">
+                <div>
+                  <Label>Nomor WhatsApp Admin (untuk konfirmasi pembayaran)</Label>
+                  <Input placeholder="6288809048431" value={ownerWaNumber} onChange={e => setOwnerWaNumber(e.target.value)} />
+                  <p className="text-[11px] text-muted-foreground mt-1">Tombol "Hubungi Admin" pada dialog pembayaran akan membuka chat ke nomor ini.</p>
+                </div>
+                <div>
+                  <Label>QRIS Statis (alternatif jika QRIS dinamis gagal)</Label>
+                  <ImagePicker value={staticQrisUrl} onChange={url => setStaticQrisUrl(url)} />
+                  <p className="text-[11px] text-muted-foreground mt-1">Upload gambar QRIS statis. Akan ditampilkan otomatis jika QRIS dinamis gagal dibuat.</p>
+                </div>
+                <Button onClick={handleSavePakasirFallback} size="sm"><Save className="w-4 h-4 mr-2" />Simpan</Button>
               </CardContent>
             </Card>
 

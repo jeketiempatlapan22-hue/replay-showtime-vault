@@ -1,35 +1,69 @@
-## Goals
+## Masalah & Penyebab
 
-1. Bersihkan halaman `/kunci`: hilangkan kartu "JADWAL LIVE / Live / Menunggu admin memulai siaran" di atas. Hanya tampilkan kolom sandi + deskripsi + tombol beli + tombol reset perangkat.
-2. Perbaiki countdown di player `/live` yang terpotong (overflow di mobile).
-3. Pastikan toggle live admin → hasil embed langsung tampil di player tanpa restart, lag, atau loop ulang.
+### 1. Galeri foto kosong
+Bucket `card-images` & `member-photos` **tidak punya RLS policy SELECT** di `storage.objects`. Akibatnya `supabase.storage.list(...)` mengembalikan array kosong meski file masih ada (11 foto masih utuh di storage). File tetap bisa diakses lewat URL publik, tetapi tidak bisa dilist.
 
-## Changes
+### 2. User tidak menerima token setelah bayar
+- Tidak ada satupun log webhook `pakasir-webhook` masuk → callback Pakasir tidak pernah memanggil server kita (kemungkinan URL webhook belum/blm benar di dashboard Pakasir, atau callback gagal di tengah jalan).
+- Semua 10 order terakhir berstatus `pending`, tidak ada `paid_at`.
+- Setting `site_origin` juga kosong → meski webhook jalan, link akses jadi `?token=...` tanpa domain.
+- Tidak ada mekanisme fallback (polling status ke Pakasir) jika webhook gagal.
 
-### 1. `src/pages/Kunci.tsx` — sederhanakan
-- Hapus komponen `ScheduleCountdown` dan pemanggilannya.
-- Hapus state `status` + fetch `active_shows` / `get_live_status` (tidak dipakai lagi setelah card dihilangkan).
-- Layout final hanya berisi:
-  - Sticky header "Kunci Akses Live"
-  - Kartu pusat (`max-w-md`) dengan ikon gembok, judul "Akses Live Terkunci", deskripsi, form sandi, tombol "Beli Show via WhatsApp", dan tombol "Reset perangkat membership saya".
-- Tetap pertahankan: redirect ke `/live` jika sudah ada cache di sessionStorage, parsing `?reason=`, integrasi `unlock-live`, `membership-self-reset`.
+### 3. Belum ada alternatif QRIS statis & tombol kontak admin
 
-### 2. `src/pages/Live.tsx` — perbaiki countdown player
-- Pada `ScheduleCountdown` (lines 74–115) ganti `aspect-video` jadi tinggi adaptif (`min-h-[260px] sm:aspect-video`) supaya konten tidak terpotong di layar sempit.
-- Kecilkan padding (`py-4 sm:py-6`), gap (`gap-2 sm:gap-3`), dan ukuran angka countdown di mobile (`text-xl sm:text-4xl`) agar grid 4 kolom muat di lebar 360–500px tanpa overflow.
-- Pastikan teks judul + tanggal ber-`break-words`/`flex-wrap` (sudah ada) tetap aman.
+---
 
-### 3. `src/pages/Live.tsx` — embed seamless saat toggle live ON
-- Logic silent-unlock (lines 231–245) sudah ada — pertahankan: tidak overwrite `url`/`sources` jika sudah ada (mencegah React key player berubah → remount).
-- Tambahkan jaminan: ketika `enabled` berubah dari false→true tetapi player sebelumnya menampilkan `ScheduleCountdown` (karena `!unlocked.enabled`), gunakan key player yang stabil berbasis `unlocked.url` + `activeSource.url` saja, bukan `enabled`. Verifikasi block render player (di luar window yg sudah dilihat) tidak menambah `enabled` ke key. Jika ditemukan, hapus `enabled` dari key.
-- Tidak ada perubahan ke edge function / DB.
+## Rencana Perbaikan
 
-## Out of scope
+### A. Galeri foto — RLS storage
+Migration menambah policy SELECT publik untuk dua bucket:
+- `Anyone can view card-images` (SELECT, bucket_id='card-images')
+- `Anyone can view member-photos` (SELECT, bucket_id='member-photos')
 
-- Tidak mengubah `unlock-live`, `verify-password`, RLS, atau skema DB.
-- Tidak mengubah token link flow, membership flow, atau halaman lain.
+Setelah ini, galeri akan kembali menampilkan semua foto.
 
-## Technical notes
+### B. Pengiriman token QRIS dinamis — fallback polling
+Tambahkan edge function baru **`check-pakasir-status`** yang:
+1. Menerima `order_id` (UUID order kita).
+2. Memanggil endpoint Pakasir `transactiondetail` (atau `status`) memakai `PAKASIR_API_KEY` + `PAKASIR_PROJECT_SLUG` + `pakasir_order_id`.
+3. Jika status = `completed/paid/success` dan order belum dibayar:
+   - Update order: `status='paid'`, generate `access_token`, `paid_at`.
+   - Kirim WhatsApp via Fonnte dengan format yang sama persis seperti webhook (link akses + sandi live untuk show).
+   - Tulis ke `token_deliveries` & `wa_outbox`.
 
-- Penyebab countdown terpotong: `aspect-video` memaksa rasio 16:9. Pada lebar 497px → tinggi ~280px, padahal konten (judul + tanggal + 4 angka besar) butuh lebih dari itu sehingga grid teroverflow. Solusi: tinggi minimum + aspect-video hanya pada `sm` ke atas.
-- Penyebab embed restart: jika React key elemen player berubah saat status update, iframe/HLS akan di-remount dari awal. Silent-unlock saat ini sudah aman; perlu memastikan blok render (lines >371) juga tidak memasukkan `enabled` atau timestamp ke key.
+`BuyShowDialog.tsx` polling 3 detik diubah: selain cek tabel `orders`, juga panggil `check-pakasir-status` setiap 5 detik. Jadi token tetap terkirim walau webhook Pakasir gagal.
+
+Webhook `pakasir-webhook` tetap dipertahankan (jalur cepat). Logika kirim WA dipindah ke helper internal supaya dipakai bersama oleh webhook + status checker (DRY, mencegah double-send dengan check `token_sent_at`).
+
+### C. Set `site_origin` otomatis
+Migration insert `site_origin = 'https://replaytime.lovable.app'` ke `site_settings` agar link WhatsApp lengkap.
+
+### D. Notifikasi sesuai show yang dibeli
+Format pesan WA (sudah ada per show di webhook) dipindah ke helper bersama. Memastikan: untuk pembelian show aktif, pesan menyertakan **sandi tonton LIVE** dari kolom `active_shows.live_password` + link `/live?show=<id>&t=<token>`. Untuk replay: link `/akses?token=...&replay=<id>`. Sama persis seperti format pesan bot admin sekarang.
+
+### E. Fallback QRIS statis + tombol Hubungi Admin
+- Tambah dua kolom setting baru: `static_qris_url` (URL gambar QRIS statis, diupload admin) dan opsional `owner_wa_number` (default `6288809048431`).
+- UI Admin: tambah field upload QRIS statis & input nomor admin (Settings panel).
+- `BuyShowDialog.tsx`:
+  - Jika `create-pakasir-order` gagal (status `creating` → error), tampilkan blok "QRIS Dinamis gagal — gunakan QRIS statis":
+    - Tampilkan gambar QRIS statis dari setting.
+    - Catatan nominal yang harus ditransfer.
+    - Tombol **Hubungi Admin** → `https://wa.me/6288809048431?text=...` (auto-isi: order id sementara, nominal, judul show/replay, nomor user).
+  - Tombol "Hubungi Admin" juga selalu ditampilkan kecil di footer dialog QRIS dinamis (sebagai jaring pengaman).
+
+---
+
+## Detail Teknis
+
+**Files baru/ubah:**
+- `supabase/migrations/<ts>_gallery_rls_and_settings.sql` — policy SELECT card-images & member-photos, insert `site_origin`, `owner_wa_number`, `static_qris_url`.
+- `supabase/functions/check-pakasir-status/index.ts` — polling status + kirim token (dipanggil dari client).
+- `supabase/functions/pakasir-webhook/index.ts` — refactor untuk pakai shared helper (atau duplikasi minor; tetap idempotent via `token_sent_at`).
+- `supabase/config.toml` — `[functions.check-pakasir-status] verify_jwt = false`.
+- `src/components/BuyShowDialog.tsx` — tambah polling status function, blok fallback QRIS statis, tombol Hubungi Admin.
+- `src/pages/Admin.tsx` — input upload QRIS statis & nomor owner.
+
+**Catatan untuk user (penting):** Pastikan di dashboard Pakasir, **Webhook URL** disetel ke:
+`https://zkuxrztgotfenywmopjn.supabase.co/functions/v1/pakasir-webhook`
+
+Polling client tetap menjadi safety net jika dashboard belum disetel.

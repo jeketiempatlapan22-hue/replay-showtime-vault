@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Loader2, CheckCircle2, Copy, Smartphone, ExternalLink } from 'lucide-react';
+import { Loader2, CheckCircle2, Copy, Smartphone, ExternalLink, MessageCircle, AlertTriangle } from 'lucide-react';
 import { setShowPurchase, setReplayPurchase } from '@/lib/purchases';
 
 interface Props {
@@ -21,7 +21,7 @@ interface Props {
   kind?: 'show' | 'replay' | 'replay_only';
 }
 
-type Status = 'form' | 'creating' | 'qr' | 'paid' | 'expired';
+type Status = 'form' | 'creating' | 'qr' | 'paid' | 'expired' | 'static_qris';
 
 const EXPIRY_MS = 30 * 60 * 1000;
 
@@ -38,7 +38,26 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
   const [createdAt, setCreatedAt] = useState<number>(0);
   const [now, setNow] = useState(Date.now());
   const [lastChecked, setLastChecked] = useState<number>(0);
+  const [staticQrisUrl, setStaticQrisUrl] = useState<string>('');
+  const [ownerWa, setOwnerWa] = useState<string>('6288809048431');
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+
+  // Load admin contact + static QRIS settings when dialog opens
+  useEffect(() => {
+    if (!open) return;
+    (async () => {
+      try {
+        const { data } = await supabase
+          .from('site_settings')
+          .select('key,value')
+          .in('key', ['static_qris_url', 'owner_wa_number']);
+        for (const row of data || []) {
+          if (row.key === 'static_qris_url') setStaticQrisUrl(String(row.value || ''));
+          if (row.key === 'owner_wa_number') setOwnerWa(String(row.value || '6288809048431'));
+        }
+      } catch { /* ignore */ }
+    })();
+  }, [open]);
 
   // Reset on close
   useEffect(() => {
@@ -93,8 +112,10 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
       })
       .subscribe();
     channelRef.current = ch;
-    // Also poll every 3s as fallback
+    // Also poll every 3s as fallback (DB) + every 5s ask edge fn to query Pakasir directly
+    let tick = 0;
     const poll = setInterval(async () => {
+      tick++;
       const { data } = await supabase.from('orders').select('status, access_token').eq('id', orderId).maybeSingle();
       setLastChecked(Date.now());
       if (data?.status === 'paid') {
@@ -102,6 +123,19 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
         setAccessToken(tok);
         persistPaid(tok);
         setStatus('paid');
+        return;
+      }
+      // Every other tick (~6s), call edge function to poll Pakasir directly.
+      if (tick % 2 === 0) {
+        try {
+          const { data: chk } = await supabase.functions.invoke('check-pakasir-status', { body: { order_id: orderId } });
+          const c = chk as any;
+          if (c?.status === 'paid' && c?.access_token) {
+            setAccessToken(c.access_token);
+            persistPaid(c.access_token);
+            setStatus('paid');
+          }
+        } catch { /* ignore */ }
       }
     }, 3000);
     return () => {
@@ -160,10 +194,17 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
       setNow(Date.now());
       setStatus('qr');
     } catch (e: any) {
-      toast.error(e?.message || 'Gagal membuat order. Coba lagi.');
-      setStatus('form');
+      const msg = e?.message || 'Gagal membuat order';
+      toast.error(`${msg}. Menampilkan QRIS statis sebagai alternatif.`);
+      setStatus('static_qris');
     }
   };
+
+  const adminWaUrl = (() => {
+    const num = (ownerWa || '6288809048431').replace(/\D/g, '');
+    const desc = `Halo Admin, saya ingin konfirmasi pembayaran:%0A%0A• Item: ${encodeURIComponent(itemTitle)}%0A• Show: ${encodeURIComponent(showTitle)}%0A• Nominal: Rp ${amount.toLocaleString('id-ID')}%0A• Nomor saya: ${normalizePhone(phone) || '-'}${pakasirOrderId ? `%0A• Order ID: ${pakasirOrderId}` : ''}%0A%0AMohon dikirimkan token akses setelah pembayaran terkonfirmasi. Terima kasih 🙏`;
+    return `https://wa.me/${num}?text=${desc}`;
+  })();
 
   const remaining = Math.max(0, EXPIRY_MS - (now - createdAt));
   const mm = String(Math.floor(remaining / 60000)).padStart(2, '0');
@@ -259,6 +300,10 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
                 </span>
               )}
             </div>
+            <a href={adminWaUrl} target="_blank" rel="noopener noreferrer"
+              className="flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground hover:text-primary hover:underline">
+              <MessageCircle className="w-3 h-3" /> Pembayaran bermasalah? Hubungi admin
+            </a>
           </div>
         )}
 
@@ -286,6 +331,43 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
           <div className="space-y-3 py-2 text-center">
             <p className="text-sm text-foreground">QRIS kadaluarsa. Silakan ulangi.</p>
             <Button className="w-full" onClick={() => setStatus('form')}>Buat Ulang</Button>
+          </div>
+        )}
+
+        {status === 'static_qris' && (
+          <div className="space-y-3">
+            <div className="flex items-start gap-2 rounded-md border border-yellow-500/30 bg-yellow-500/10 p-3 text-xs text-foreground">
+              <AlertTriangle className="w-4 h-4 text-yellow-500 shrink-0 mt-0.5" />
+              <div>
+                <div className="font-semibold mb-0.5">QRIS dinamis sedang gangguan.</div>
+                <div className="text-muted-foreground">Silakan bayar lewat QRIS statis di bawah, lalu hubungi admin untuk konfirmasi & menerima token akses.</div>
+              </div>
+            </div>
+
+            {staticQrisUrl ? (
+              <div className="rounded-lg border border-border bg-card p-4 text-center space-y-3">
+                <div className="text-xs text-muted-foreground">Scan QRIS statis</div>
+                <div className="mx-auto bg-white p-3 rounded-md inline-block">
+                  <img src={staticQrisUrl} alt="QRIS Statis" className="max-w-[260px] max-h-[260px] block" />
+                </div>
+                <div className="text-xs text-muted-foreground">Nominal yang harus dibayar</div>
+                <div className="text-xl font-bold text-primary">Rp {amount.toLocaleString('id-ID')}</div>
+              </div>
+            ) : (
+              <div className="rounded-lg border border-border bg-card p-4 text-center text-sm text-muted-foreground">
+                QRIS statis belum diatur admin. Silakan langsung hubungi admin.
+              </div>
+            )}
+
+            <Button asChild className="w-full" size="lg">
+              <a href={adminWaUrl} target="_blank" rel="noopener noreferrer">
+                <MessageCircle className="w-4 h-4 mr-2" /> Hubungi Admin
+              </a>
+            </Button>
+
+            <Button variant="outline" className="w-full" onClick={() => setStatus('form')}>
+              Coba QRIS dinamis lagi
+            </Button>
           </div>
         )}
       </DialogContent>
