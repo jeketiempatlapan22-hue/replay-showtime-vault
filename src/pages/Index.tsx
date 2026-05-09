@@ -109,15 +109,40 @@ export default function Index() {
   }, []);
 
   useEffect(() => {
-    Promise.all([getReplaysByMonth(), getReplays(), getSettings()]).then(([data, replays, settings]) => {
-      setAllGrouped(data);
-      setAllReplays(replays);
-      prevReplayCountRef.current = replays.length;
+    let cancelled = false;
+    // Safety net: jangan biarkan halaman selamanya menampilkan skeleton.
+    const safetyTimer = setTimeout(() => {
+      if (!cancelled) setLoading(false);
+    }, 8000);
+
+    // Muat tiap bagian secara independen agar satu kegagalan tidak memblokir UI.
+    (async () => {
+      try {
+        const replays = await getReplays();
+        if (cancelled) return;
+        const grouped: Record<string, ReplayRow[]> = {};
+        for (const r of replays) {
+          const d = new Date(r.date);
+          const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+          if (!grouped[key]) grouped[key] = [];
+          grouped[key].push(r);
+        }
+        setAllGrouped(grouped);
+        setAllReplays(replays);
+        prevReplayCountRef.current = replays.length;
+      } catch (e) {
+        console.warn('[Index] getReplays failed:', e);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+
+    getSettings().then((settings) => {
+      if (cancelled) return;
       setTheme((settings.theme as ThemeType) || 'ramadhan');
       setWaNumber(settings.whatsapp_number || '');
       setWaLink(settings.whatsapp_link || '');
-      setLoading(false);
-    });
+    }).catch((e) => console.warn('[Index] getSettings failed:', e));
 
     const replayChannel = supabase
       .channel('replays-realtime')
@@ -150,6 +175,8 @@ export default function Index() {
       .subscribe();
 
     return () => {
+      cancelled = true;
+      clearTimeout(safetyTimer);
       supabase.removeChannel(replayChannel);
       supabase.removeChannel(settingsChannel);
     };
