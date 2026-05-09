@@ -9,6 +9,7 @@ import ReplayCardComponent from '@/components/ReplayCardComponent';
 import ReplayCardSkeleton from '@/components/ReplayCardSkeleton';
 import StatsBar from '@/components/StatsBar';
 import ActiveShowsSection from '@/components/ActiveShowsSection';
+import BotCommandsPublic from '@/components/BotCommandsPublic';
 // Lazy-load player + komentar — chunk berat hanya dimuat saat user membuka replay.
 const YouTubePlayer = lazy(() => import('@/components/YouTubePlayer'));
 import { getReplaysByMonth, getReplays, getSettings } from '@/lib/store';
