@@ -65,12 +65,31 @@ Deno.serve(async (req) => {
     }
 
     // ===== Branch A: per-show live (active_shows) =====
-    if (show_id) {
+    // If no show_id provided, auto-resolve to the currently-live active show
+    // so master/per-show passwords still work from the generic /kunci page.
+    let resolvedShowId = show_id as string | undefined;
+    if (!resolvedShowId) {
+      const { data: liveShow } = await supabase
+        .from("active_shows")
+        .select("id")
+        .eq("is_active", true)
+        .eq("is_live", true)
+        .order("show_date", { ascending: false })
+        .order("show_time", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (liveShow?.id) resolvedShowId = liveShow.id;
+    }
+
+    if (resolvedShowId) {
       const { data: show } = await supabase
         .from("active_shows")
         .select("id,title,is_live,live_auto_schedule,live_url,live_type,live_sources,live_password,live_require_password,show_date,show_time,is_active")
-        .eq("id", show_id).maybeSingle();
-      if (!show || !show.is_active) return json({ valid: false, reason: "off" });
+        .eq("id", resolvedShowId).maybeSingle();
+      if (!show || !show.is_active) {
+        if (show_id) return json({ valid: false, reason: "off" });
+        // fall through to legacy branch
+      } else {
 
       const enabled = !!show.is_live;
       const okPayload = {
