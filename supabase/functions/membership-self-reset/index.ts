@@ -23,6 +23,7 @@ Deno.serve(async (req) => {
       .from("membership_tokens").select("*").eq("token", mtoken).maybeSingle();
     if (!t || t.revoked) return json({ ok: false, reason: "revoked" });
     if (t.password !== mpassword) return json({ ok: false, reason: "bad_password" });
+    if ((t.max_devices || 1) > 1) return json({ ok: false, reason: "multi_device_no_reset" });
     if (t.expires_at && new Date(t.expires_at).getTime() < Date.now()) return json({ ok: false, reason: "expired" });
 
     const used = t.manual_resets_used || 0;
