@@ -76,7 +76,10 @@ Deno.serve(async (req) => {
 
     if (!password) return json({ valid: false });
 
-    if (replay.password === password) return json({ valid: true });
+    if (replay.password === password) {
+      await supabase.rpc('record_login_attempt', { _identifier: lockId, _success: true });
+      return json({ valid: true });
+    }
 
     const d = new Date(replay.date);
     const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
@@ -84,6 +87,7 @@ Deno.serve(async (req) => {
       .from("master_passwords").select("password, paused").eq("month", monthKey).maybeSingle();
 
     const valid = !!master && master.paused !== true && master.password === password;
+    await supabase.rpc('record_login_attempt', { _identifier: lockId, _success: valid });
     return json({ valid });
   } catch {
     return json({ valid: false }, 500);
