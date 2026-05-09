@@ -697,7 +697,25 @@ Deno.serve(async (req) => {
         }
       }
     }
-  }
+    } else if (cmd === '/test') {
+      const fromGroup = !!participantNorm && participantNorm !== phoneNorm;
+      const testLines = [
+        '🧪 *MODE TEST — WEBHOOK OK*',
+        '',
+        `📱 Nomor: +${phoneNorm}`,
+        fromGroup ? `👥 Grup: +${participantNorm}` : '',
+        `🔧 Device: ${deviceNorm || '-'}`,
+        `📨 Command: *${text}*`,
+        `⏰ Waktu: ${new Date().toLocaleString('id-ID')}`,
+        '',
+        '✅ Webhook path aktif',
+        '✅ Payload diterima & diparse',
+        `✅ Admin: ${isBotAdmin ? 'terverifikasi' : 'tidak'}`,
+        '',
+        '_Tidak ada token/link yang dikirim — ini hanya simulasi._',
+      ].filter(Boolean);
+      reply = testLines.join('\n');
+    }
 
 
   const finalReply = reply || '✅ OK';
