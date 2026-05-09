@@ -498,11 +498,16 @@ export default function Live() {
                       <div className="text-muted-foreground">
                         {membership.expires_at ? `Berlaku s/d ${new Date(membership.expires_at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}` : 'Tanpa batas waktu'}
                       </div>
-                      <div className="text-muted-foreground">
-                        Reset perangkat: <span className="font-mono text-foreground">{membership.resets_used}/{membership.resets_max}</span> terpakai · Sisa <span className="font-mono text-foreground">{membership.remaining}</span>
-                      </div>
+                      {(membership.max_devices || 1) <= 1 && (
+                        <div className="text-muted-foreground">
+                          Reset perangkat: <span className="font-mono text-foreground">{membership.resets_used}/{membership.resets_max}</span> terpakai · Sisa <span className="font-mono text-foreground">{membership.remaining}</span>
+                        </div>
+                      )}
+                      {(membership.max_devices || 1) > 1 && (
+                        <div className="text-muted-foreground">Membership multi-device · {membership.max_devices} perangkat</div>
+                      )}
                     </div>
-                    {(!tokenInfo || (tokenInfo.kind !== 'public' && tokenInfo.max_devices <= 1)) && (
+                    {(membership.max_devices || 1) <= 1 && (!tokenInfo || (tokenInfo.kind !== 'public' && tokenInfo.max_devices <= 1)) && (
                       <Button type="button" variant="outline" size="sm" onClick={handleSelfReset} disabled={membership.remaining <= 0}>
                         Reset perangkat ini
                       </Button>
