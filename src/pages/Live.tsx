@@ -357,15 +357,6 @@ export default function Live() {
     if (next >= 0) selectSource(next);
   };
 
-  const submitPassword = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!pwInput.trim()) {
-      setPwError('Sandi wajib diisi.');
-      return;
-    }
-    setPwError('');
-    void doUnlock({ password: pwInput.trim() });
-  };
 
   // ON AIR hanya saat admin manual mengaktifkan toggle is_live di admin panel.
   // status.enabled & unlocked.enabled keduanya bersumber dari kolom is_live.
