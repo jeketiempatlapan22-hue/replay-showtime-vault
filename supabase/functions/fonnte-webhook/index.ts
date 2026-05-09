@@ -427,7 +427,15 @@ Deno.serve(async (req) => {
 
   // Dynamic handlers
   if (command.is_dynamic) {
-    if (cmd === '/show') {
+    if (cmd === '/menu') {
+      const { data: cmds } = await admin
+        .from('bot_commands')
+        .select('trigger,description')
+        .eq('enabled', true)
+        .order('sort_order', { ascending: true });
+      const list = (cmds ?? []).map((c: any) => `• *${c.trigger}*${c.description ? ` — ${c.description}` : ''}`).join('\n');
+      reply = `📋 *DAFTAR COMMAND*\n\n${list}\n\nKetik salah satu untuk mencoba.`;
+    } else if (cmd === '/show') {
       const { data: shows } = await admin
         .from('active_shows')
         .select('title,show_date,show_time,category,lineup')
