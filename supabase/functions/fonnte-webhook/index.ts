@@ -695,8 +695,7 @@ Deno.serve(async (req) => {
             ].filter((l) => l !== '' || true).join('\n');
           }
         }
-      }
-    } else if (cmd === '/test') {
+      } else if (cmd === '/test') {
       const fromGroup = !!participantNorm && participantNorm !== phoneNorm;
       const testLines = [
         '🧪 *MODE TEST — WEBHOOK OK*',
