@@ -237,7 +237,7 @@ export default function Live() {
           setUnlocked(null);
           setMembership(null);
           try { sessionStorage.removeItem(`${SS_KEY_BASE}${showId?'-'+showId:''}`); } catch { /* ignore */ }
-          setKickedMsg(reasonMessage(reason));
+          navigate(`/kunci?reason=${reason}${showId ? `&show=${showId}` : ''}`, { replace: true });
         }
         // device_limit / off / network: ignore silently — keep user inside.
       } else {
