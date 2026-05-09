@@ -86,12 +86,33 @@ Deno.serve(async (req) => {
   const replayPart = order.replay_id ? `&replay=${order.replay_id}` : '';
   const link = `${origin}/akses?token=${accessToken}${replayPart}`;
 
+  // If this is an active-show purchase (not standalone replay), include per-show live password + live link.
+  let showExtras = '';
+  if (order.show_id && !order.replay_id) {
+    const { data: showRow } = await admin
+      .from('active_shows')
+      .select('live_password, live_require_password')
+      .eq('id', order.show_id)
+      .maybeSingle();
+    const liveLink = `${origin}/live?show=${order.show_id}&t=${accessToken}`;
+    const pwd = String(showRow?.live_password || '').trim();
+    if (pwd) {
+      showExtras =
+        `\n\n🔐 *Sandi tonton LIVE:*\n${pwd}\n` +
+        `_Masukkan sandi ini di halaman Live untuk masuk._` +
+        `\n\n▶️ Link tonton Live:\n${liveLink}`;
+    } else {
+      showExtras = `\n\n▶️ Link tonton Live:\n${liveLink}`;
+    }
+  }
+
   const message =
     `✅ *Pembayaran Berhasil*\n\n` +
     `${order.item_title}\n` +
     `Order: ${orderId}\n\n` +
-    `🔗 Link akses Anda:\n${link}\n\n` +
-    `_Klik link di atas untuk membuka. Jangan bagikan ke orang lain._`;
+    `🔗 Link akses Anda:\n${link}` +
+    showExtras +
+    `\n\n_Klik link di atas untuk membuka. Jangan bagikan ke orang lain._`;
 
   const sent = await sendFonnte(order.user_phone, message);
 
