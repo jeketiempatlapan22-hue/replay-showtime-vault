@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState, lazy, Suspense } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Lock, Loader2, ShoppingBag, MessageCircle, Users, Eye } from 'lucide-react';
+import { ArrowLeft, Loader2, Users, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 
 import { supabase } from '@/integrations/supabase/client';
 import { getBrowserId } from '@/lib/browserId';
@@ -35,8 +34,6 @@ type SourceLike = Partial<Record<keyof PrivateSource, unknown>>;
 
 const SS_KEY_BASE = 'replaytime-live-unlocked';
 const SS_SRC_KEY = 'replaytime-live-source-idx';
-const WA_NUMBER = '6288809048431';
-const WA_LINK = `https://wa.me/${WA_NUMBER}?text=${encodeURIComponent('Halo admin, saya ingin beli akses show live.')}`;
 
 const typeLabel = (t: string) => t === 'youtube' ? 'YouTube' : t === 'cloudflare' ? 'Cloudflare' : 'M3U8 / HLS';
 
@@ -115,10 +112,8 @@ export default function Live() {
   const [statusLoading, setStatusLoading] = useState(true);
   const [unlocked, setUnlocked] = useState<UnlockedConfig | null>(null);
   const [membership, setMembership] = useState<MembershipInfo | null>(null);
-  const [pwInput, setPwInput] = useState('');
-  const [pwError, setPwError] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [kickedMsg, setKickedMsg] = useState('');
+  const [, setPwError] = useState('');
+  const [, setSubmitting] = useState(false);
   const [failedSourceKeys, setFailedSourceKeys] = useState<string[]>([]);
   const [tokenInfo, setTokenInfo] = useState<{ kind: string; max_devices: number } | null>(null);
   const navVisible = useAutoHideOnInteraction(!!unlocked, 3000);
@@ -229,7 +224,7 @@ export default function Live() {
         if (data.token_kind || data.max_devices) {
           setTokenInfo({ kind: String(data.token_kind || 'personal'), max_devices: Number(data.max_devices || 1) });
         }
-        setKickedMsg('');
+        
       } else if (silent) {
         // Only kick on hard security reasons. Other transient/server errors must NOT log user out.
         const reason = data?.reason;
@@ -237,7 +232,7 @@ export default function Live() {
           setUnlocked(null);
           setMembership(null);
           try { sessionStorage.removeItem(`${SS_KEY_BASE}${showId?'-'+showId:''}`); } catch { /* ignore */ }
-          setKickedMsg(reasonMessage(reason));
+          navigate(`/kunci?reason=${reason}${showId ? `&show=${showId}` : ''}`, { replace: true });
         }
         // device_limit / off / network: ignore silently — keep user inside.
       } else {
@@ -251,13 +246,21 @@ export default function Live() {
 
   useEffect(() => {
     fetchStatus();
+    const tParam = search.get('t');
+    const mtParam = search.get('mtoken');
+    let cached: string | null = null;
     try {
-      const cached = sessionStorage.getItem(`${SS_KEY_BASE}${showId?'-'+showId:''}`);
+      cached = sessionStorage.getItem(`${SS_KEY_BASE}${showId?'-'+showId:''}`);
       if (cached) setUnlocked(JSON.parse(cached));
     } catch { /* ignore */ }
 
+    // Gate: if no token URL and no cached unlock, send user to the dedicated /kunci page.
+    if (!tParam && !mtParam && !cached) {
+      navigate(`/kunci${showId ? `?show=${showId}` : ''}`, { replace: true });
+      return;
+    }
+
     // Scope realtime subscriptions narrowly to reduce server load with many concurrent users.
-    const tParam = search.get('t');
     const bid = getBrowserId();
     const cfgChannel = showId
       ? supabase.channel(`live-cfg:${showId}`)
@@ -273,7 +276,7 @@ export default function Live() {
         else if (unlocked) {
           setUnlocked(null);
           try { sessionStorage.removeItem(`${SS_KEY_BASE}${showId?'-'+showId:''}`); } catch { /* ignore */ }
-          setKickedMsg('Perangkat ini telah diblokir oleh admin.');
+          navigate(`/kunci?reason=blocked${showId ? `&show=${showId}` : ''}`, { replace: true });
         }
       })
       .subscribe();
@@ -354,15 +357,6 @@ export default function Live() {
     if (next >= 0) selectSource(next);
   };
 
-  const submitPassword = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!pwInput.trim()) {
-      setPwError('Sandi wajib diisi.');
-      return;
-    }
-    setPwError('');
-    void doUnlock({ password: pwInput.trim() });
-  };
 
   // ON AIR hanya saat admin manual mengaktifkan toggle is_live di admin panel.
   // status.enabled & unlocked.enabled keduanya bersumber dari kolom is_live.
@@ -445,84 +439,8 @@ export default function Live() {
         {statusLoading ? (
           <div className="flex items-center justify-center py-20"><Loader2 className="w-10 h-10 text-primary animate-spin" /></div>
         ) : !unlocked ? (
-          <>
-            {/* Saat live OFF (toggle admin mati) tampilkan countdown + judul + jadwal show, sesuai permintaan. */}
-            {!status?.enabled && (
-              <ScheduleCountdown
-                title={status?.title || 'Live'}
-                showDate={status?.show_date}
-                showTime={status?.show_time}
-                imageUrl={status?.image_url}
-              />
-            )}
-            <div className="rounded-2xl bg-card/80 border border-border p-6 max-w-md mx-auto space-y-5">
-              <div className="text-center space-y-3">
-                <div className="mx-auto w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center">
-                  <Lock className="w-7 h-7 text-primary" />
-                </div>
-                <h2 className="text-2xl font-bold text-foreground">Akses Live Terkunci</h2>
-                <p className="text-sm text-muted-foreground">
-                  Masukkan <span className="font-semibold text-foreground">sandi satuan show</span> atau <span className="font-semibold text-foreground">sandi master bulanan</span>, atau hubungi admin untuk membeli show.
-                </p>
-              </div>
-
-              <form onSubmit={submitPassword} className="space-y-2">
-                <label className="flex items-center gap-2 text-xs font-medium text-foreground">
-                  <Lock className="w-3.5 h-3.5" />
-                  Sandi Akses Live
-                </label>
-                <div className="flex gap-2">
-                  <Input
-                    type="password"
-                    placeholder="Masukkan sandi"
-                    value={pwInput}
-                    onChange={(e) => setPwInput(e.target.value)}
-                    disabled={submitting}
-                    autoFocus
-                  />
-                  <Button type="submit" disabled={submitting || !pwInput.trim()}>
-                    {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Buka'}
-                  </Button>
-                </div>
-                {pwError && <p className="text-xs text-destructive">{pwError}</p>}
-                <p className="text-[11px] text-muted-foreground">
-                  Punya link token? Buka langsung lewat <code className="px-1 rounded bg-secondary text-[10px]">/live?t=TOKEN</code>
-                </p>
-              </form>
-
-              {kickedMsg && <p className="text-xs text-destructive text-center">{kickedMsg}</p>}
-
-              <div className="pt-4 border-t border-border space-y-3">
-                <div className="text-center space-y-1">
-                  <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-foreground">
-                    <ShoppingBag className="w-3.5 h-3.5" />
-                    Belum punya akses?
-                  </div>
-                  <p className="text-xs text-muted-foreground">Hubungi admin untuk pembelian show.</p>
-                </div>
-                <a href={WA_LINK} target="_blank" rel="noopener noreferrer" className="block">
-                  <Button className="w-full bg-green-600 hover:bg-green-700 text-white gap-2">
-                    <MessageCircle className="w-4 h-4" />
-                    Beli Show via WhatsApp
-                  </Button>
-                </a>
-                <p className="text-center text-[11px] text-muted-foreground">+62 888-0904-8431</p>
-
-                <div className="pt-3 border-t border-border">
-                  {(!tokenInfo || (tokenInfo.kind !== 'public' && tokenInfo.max_devices <= 1)) && (
-                    <>
-                      <Button type="button" variant="ghost" size="sm" className="w-full text-xs" onClick={handleSelfReset}>
-                        Reset perangkat membership saya
-                      </Button>
-                      <p className="text-[10px] text-muted-foreground text-center mt-1">
-                        Gunakan jika ingin pindah browser/device. Maks. 3x reset manual; otomatis reset tiap 00:00 WIB.
-                      </p>
-                    </>
-                  )}
-                </div>
-              </div>
-            </div>
-          </>
+          // No cached unlock + no token URL → redirect to /kunci is in flight (or token unlock in progress).
+          <div className="flex items-center justify-center py-20"><Loader2 className="w-10 h-10 text-primary animate-spin" /></div>
         ) : (
           <>
             {liveActive && activeSource ? (

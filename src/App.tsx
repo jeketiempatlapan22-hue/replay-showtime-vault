@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import Index from "./pages/Index";
 import Admin from "./pages/Admin";
 import Live from "./pages/Live";
+import Kunci from "./pages/Kunci";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import Akses from "./pages/Akses";
@@ -62,6 +63,7 @@ const App = () => (
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/live" element={<Live />} />
+              <Route path="/kunci" element={<Kunci />} />
               <Route path="/auth" element={<Auth />} />
               <Route path="/akses" element={<Akses />} />
               <Route path="/shows" element={<Shows />} />
