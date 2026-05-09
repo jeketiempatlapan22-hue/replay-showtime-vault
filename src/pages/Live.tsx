@@ -208,6 +208,8 @@ export default function Live() {
       case 'scope': return 'Membership ini tidak mencakup akses replay.';
       case 'off': return 'Live belum aktif.';
       case 'password_or_token_required': return 'Masukkan sandi atau gunakan link token.';
+      case 'multi_device_no_reset': return 'Membership multi-device/publik tidak dapat direset manual.';
+      case 'quota_exhausted': return 'Kuota reset manual sudah habis.';
       default: return 'Gagal membuka akses live.';
     }
   };
