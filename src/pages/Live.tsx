@@ -229,7 +229,16 @@ export default function Live() {
         // For silent revalidation, NEVER overwrite the existing player URL/sources.
         // Doing so would change the React key on the player and remount it, restarting the live stream from the beginning.
         if (silent) {
-          // Keep current unlocked URL/sources intact; only refresh non-stream metadata below.
+          // Refresh metadata + flip enabled, and adopt new URL/sources only when current is empty
+          // (avoid remounting the player mid-stream).
+          setUnlocked(prev => {
+            if (!prev) return cfg;
+            const next = { ...prev, enabled: cfg.enabled, title: cfg.title, type: cfg.type };
+            if (!prev.url && cfg.url) next.url = cfg.url;
+            if ((!prev.sources || prev.sources.length === 0) && cfg.sources?.length) next.sources = cfg.sources;
+            try { sessionStorage.setItem(`${SS_KEY_BASE}${showId?'-'+showId:''}`, JSON.stringify(next)); } catch { /* ignore */ }
+            return next;
+          });
         } else {
           setUnlocked(cfg);
           try { sessionStorage.setItem(`${SS_KEY_BASE}${showId?'-'+showId:''}`, JSON.stringify(cfg)); } catch { /* ignore */ }
