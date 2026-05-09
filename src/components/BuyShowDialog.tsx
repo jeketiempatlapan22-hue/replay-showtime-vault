@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Loader2, CheckCircle2, Copy, Smartphone, ExternalLink } from 'lucide-react';
+import { Loader2, CheckCircle2, Copy, Smartphone, ExternalLink, MessageCircle, AlertTriangle } from 'lucide-react';
 import { setShowPurchase, setReplayPurchase } from '@/lib/purchases';
 
 interface Props {
