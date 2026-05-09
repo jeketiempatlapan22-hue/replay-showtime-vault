@@ -575,11 +575,11 @@ Deno.serve(async (req) => {
           (lines.length ? `🎤 *DAFTAR SHOW AKTIF*\n\n${lines.join('\n\n')}` : '📭 Belum ada show aktif.');
       } else {
         const { data: byAlias } = await admin
-          .from('active_shows').select('id,title,show_date,show_time').ilike('admin_alias', code).limit(2);
+          .from('active_shows').select('id,title,show_date,show_time,live_password').ilike('admin_alias', code).limit(2);
         let matches = byAlias ?? [];
         if (!matches.length) {
           const { data: byId } = await admin
-            .from('active_shows').select('id,title,show_date,show_time').ilike('id', `${code}%`).limit(2);
+            .from('active_shows').select('id,title,show_date,show_time,live_password').ilike('id', `${code}%`).limit(2);
           matches = byId ?? [];
         }
         if (!matches.length) reply = `❌ Show dengan kode/alias *${code}* tidak ditemukan.`;
@@ -599,14 +599,27 @@ Deno.serve(async (req) => {
             const link = `${origin}/live?show=${s.id}&t=${token}`;
             const header = isPublic ? '🎁 *TOKEN LIVE PUBLIK*' : '🔐 *TOKEN LIVE SATUAN*';
             const access = isPublic ? `🔓 Bisa dibuka di ${maxDevices} perangkat.` : '👤 Hanya untuk *1 perangkat pertama*.';
+            const livePwd = s.live_password ? String(s.live_password) : '';
             reply = [
-              header, '━━━━━━━━━━━━━━━━━━━━', '',
+              header,
+              '━━━━━━━━━━━━━━━━━━━━',
+              '',
               `🎤  *${s.title}*`,
-              `📅  ${s.show_date} ${String(s.show_time).slice(0,5)}`, '',
-              '🔗  *Link Akses Live:*', link, '',
-              access, '', '━━━━━━━━━━━━━━━━━━━━',
-              '— ReplayTime 💖',
-            ].join('\n');
+              '',
+              `📅  ${s.show_date} ${String(s.show_time).slice(0,5)}`,
+              '',
+              '🔗  *Link Akses Live:*',
+              '',
+              link,
+              '',
+              '🎬Link Replay : replaytime.lovable.app',
+              '',
+              livePwd ? `🗝️Sandi : ${livePwd}` : '',
+              '',
+              access,
+              '',
+              '━━━━━━━━━━━━━━━━━━━━',
+            ].filter((l) => l !== '' || true).join('\n');
           }
         }
       }
