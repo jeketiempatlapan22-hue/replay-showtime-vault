@@ -297,22 +297,24 @@ Deno.serve(async (req) => {
   }
 
   // Fonnte sends as multipart/form-data, x-www-form-urlencoded, or json
-  let phone = '', text = '', device = '', inboxId = '', fromMe = false, deliverTest = false;
+  let phone = '', text = '', device = '', inboxId = '', fromMe = false, deliverTest = false, participant = '';
   try {
     const ct = req.headers.get('content-type') || '';
     if (ct.includes('application/json')) {
       const j = pickWebhookPayload(await req.json());
-      phone = String(j.sender ?? j.from ?? j.phone ?? j.target ?? '');
+      phone = pickFirstText(j.sender, j.from, j.phone, j.target, j.number, j.remoteJid, j.chat, j.group_id);
+      participant = pickFirstText(j.participant, j.member, j.author, j.pushname_number, j.sender_number);
       device = String(j.device ?? j.device_number ?? '');
-      text = String(j.message ?? j.text ?? j.body ?? j.caption ?? '').trim();
+      text = pickFirstText(j.message, j.text, j.body, j.caption, j.content, j.msg, j.conversation);
       inboxId = String(j.inboxid ?? j.inbox_id ?? j.id ?? '');
       fromMe = j.fromMe === true || j.fromMe === 'true' || j.from_me === true;
       deliverTest = j.deliver === true || j.deliver === 'true' || j.test_deliver === true;
     } else if (ct.includes('multipart/form-data') || ct.includes('application/x-www-form-urlencoded')) {
       const fd = await req.formData();
-      phone = String(fd.get('sender') ?? fd.get('from') ?? fd.get('phone') ?? fd.get('target') ?? '');
+      phone = pickFirstText(fd.get('sender'), fd.get('from'), fd.get('phone'), fd.get('target'), fd.get('number'), fd.get('remoteJid'), fd.get('chat'), fd.get('group_id'));
+      participant = pickFirstText(fd.get('participant'), fd.get('member'), fd.get('author'), fd.get('pushname_number'), fd.get('sender_number'));
       device = String(fd.get('device') ?? fd.get('device_number') ?? '');
-      text = String(fd.get('message') ?? fd.get('text') ?? fd.get('body') ?? fd.get('caption') ?? '').trim();
+      text = pickFirstText(fd.get('message'), fd.get('text'), fd.get('body'), fd.get('caption'), fd.get('content'), fd.get('msg'), fd.get('conversation'));
       inboxId = String(fd.get('inboxid') ?? fd.get('inbox_id') ?? fd.get('id') ?? '');
       fromMe = String(fd.get('fromMe') ?? fd.get('from_me') ?? '') === 'true';
       deliverTest = String(fd.get('deliver') ?? fd.get('test_deliver') ?? '') === 'true';
@@ -320,9 +322,10 @@ Deno.serve(async (req) => {
       const raw = (await req.text()).trim();
       try {
         const j = pickWebhookPayload(JSON.parse(raw));
-        phone = String(j.sender ?? j.from ?? j.phone ?? j.target ?? '');
+        phone = pickFirstText(j.sender, j.from, j.phone, j.target, j.number, j.remoteJid, j.chat, j.group_id);
+        participant = pickFirstText(j.participant, j.member, j.author, j.pushname_number, j.sender_number);
         device = String(j.device ?? j.device_number ?? '');
-        text = String(j.message ?? j.text ?? j.body ?? j.caption ?? '').trim();
+        text = pickFirstText(j.message, j.text, j.body, j.caption, j.content, j.msg, j.conversation);
         inboxId = String(j.inboxid ?? j.inbox_id ?? j.id ?? '');
         fromMe = j.fromMe === true || j.fromMe === 'true' || j.from_me === true;
         deliverTest = j.deliver === true || j.deliver === 'true' || j.test_deliver === true;
