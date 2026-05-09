@@ -24,21 +24,30 @@ function buildAttractiveMessage(opts: {
   link: string;
   liveUrl: string;
   showDate?: string;
+  replayPassword?: string;
+  livePassword?: string;
 }) {
-  const dateLine = opts.showDate ? `📅 ${opts.showDate}\n` : '';
+  const dateLine = opts.showDate ? `📅 ${opts.showDate}` : '';
+  const pwLines = [
+    opts.replayPassword ? `🔑 Sandi Replay: *${opts.replayPassword}*` : '',
+    opts.livePassword ? `🔑 Sandi Live: *${opts.livePassword}*` : '',
+  ].filter(Boolean);
+  const pwBlock = pwLines.length ? ['', ...pwLines] : [];
   if (opts.kind === 'master') {
     return [
       '✨🎬 *TOKEN AKSES REPLAYTIME* 🎬✨',
       '',
       `🎤 *${opts.title}*`,
-      dateLine.trim(),
+      dateLine,
       '',
       '🔓 *Token Master* — bisa dibuka di banyak perangkat.',
       `🔗 ${opts.link}`,
+      ...pwBlock,
       '',
       '🎥 *Bonus:* link yang sama juga dapat dipakai untuk menonton *Live* di',
       `📺 ${opts.liveUrl}`,
       '',
+      '🌐 Situs: https://replaytime.lovable.app',
       '💖 Selamat menikmati pertunjukan, jangan lupa bagikan keseruan ini!',
     ].filter(Boolean).join('\n');
   }
@@ -46,14 +55,16 @@ function buildAttractiveMessage(opts: {
     '✨🔐 *TOKEN SATUAN REPLAYTIME* 🔐✨',
     '',
     `🎤 *${opts.title}*`,
-    dateLine.trim(),
+    dateLine,
     '',
     '👤 *Token Pribadi* — terkunci untuk *1 perangkat pertama* yang membuka.',
     `🔗 ${opts.link}`,
+    ...pwBlock,
     '',
     '🎥 *Bonus:* link ini juga jadi tiket Anda untuk menonton *Live*:',
     `📺 ${opts.liveUrl}`,
     '',
+    '🌐 Situs: https://replaytime.lovable.app',
     '⚠️ Jangan dibagikan ke orang lain — perangkat lain tidak akan bisa membuka.',
     '💖 Selamat menonton!',
   ].filter(Boolean).join('\n');
