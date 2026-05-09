@@ -333,6 +333,43 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
             <Button className="w-full" onClick={() => setStatus('form')}>Buat Ulang</Button>
           </div>
         )}
+
+        {status === 'static_qris' && (
+          <div className="space-y-3">
+            <div className="flex items-start gap-2 rounded-md border border-yellow-500/30 bg-yellow-500/10 p-3 text-xs text-foreground">
+              <AlertTriangle className="w-4 h-4 text-yellow-500 shrink-0 mt-0.5" />
+              <div>
+                <div className="font-semibold mb-0.5">QRIS dinamis sedang gangguan.</div>
+                <div className="text-muted-foreground">Silakan bayar lewat QRIS statis di bawah, lalu hubungi admin untuk konfirmasi & menerima token akses.</div>
+              </div>
+            </div>
+
+            {staticQrisUrl ? (
+              <div className="rounded-lg border border-border bg-card p-4 text-center space-y-3">
+                <div className="text-xs text-muted-foreground">Scan QRIS statis</div>
+                <div className="mx-auto bg-white p-3 rounded-md inline-block">
+                  <img src={staticQrisUrl} alt="QRIS Statis" className="max-w-[260px] max-h-[260px] block" />
+                </div>
+                <div className="text-xs text-muted-foreground">Nominal yang harus dibayar</div>
+                <div className="text-xl font-bold text-primary">Rp {amount.toLocaleString('id-ID')}</div>
+              </div>
+            ) : (
+              <div className="rounded-lg border border-border bg-card p-4 text-center text-sm text-muted-foreground">
+                QRIS statis belum diatur admin. Silakan langsung hubungi admin.
+              </div>
+            )}
+
+            <Button asChild className="w-full" size="lg">
+              <a href={adminWaUrl} target="_blank" rel="noopener noreferrer">
+                <MessageCircle className="w-4 h-4 mr-2" /> Hubungi Admin
+              </a>
+            </Button>
+
+            <Button variant="outline" className="w-full" onClick={() => setStatus('form')}>
+              Coba QRIS dinamis lagi
+            </Button>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );
