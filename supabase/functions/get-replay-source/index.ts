@@ -88,7 +88,15 @@ Deno.serve(async (req) => {
       }
     }
 
-    if (!valid) return json({ valid: false }, 403);
+    if (!valid) {
+      if (password && !access_token) {
+        await supabase.rpc('record_login_attempt', { _identifier: lockId, _success: false });
+      }
+      return json({ valid: false }, 403);
+    }
+    if (password && !access_token) {
+      await supabase.rpc('record_login_attempt', { _identifier: lockId, _success: true });
+    }
 
     return json({
       valid: true,
