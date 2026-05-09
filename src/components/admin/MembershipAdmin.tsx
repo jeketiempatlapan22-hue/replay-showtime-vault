@@ -20,6 +20,7 @@ interface MembershipToken {
   manual_resets_used: number;
   manual_resets_max: number;
   includes_replays: boolean;
+  max_devices: number;
   created_at: string;
 }
 
