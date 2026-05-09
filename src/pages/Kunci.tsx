@@ -22,6 +22,8 @@ const reasonMessage = (reason?: string): string => {
     case 'not_started': return 'Membership belum aktif.';
     case 'rate_limited': return 'Terlalu banyak percobaan. Tunggu beberapa menit lalu coba lagi.';
     case 'off': return 'Live belum aktif.';
+    case 'multi_device_no_reset': return 'Membership multi-device/publik tidak dapat direset manual.';
+    case 'quota_exhausted': return 'Kuota reset manual sudah habis.';
     default: return 'Gagal membuka akses live.';
   }
 };
