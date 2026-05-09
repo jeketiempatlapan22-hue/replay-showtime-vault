@@ -28,7 +28,7 @@ const ChatFallback = () => (
 type SrcType = 'm3u8' | 'youtube' | 'cloudflare';
 interface PublicSource { label: string; type: SrcType }
 interface PrivateSource extends PublicSource { url: string }
-interface MembershipInfo { expires_at?: string; resets_used: number; resets_max: number; remaining: number; includes_replays?: boolean }
+interface MembershipInfo { expires_at?: string; resets_used: number; resets_max: number; remaining: number; includes_replays?: boolean; max_devices?: number }
 interface LiveStatus { enabled: boolean; title: string; type: string; require_password: boolean; sources: PublicSource[]; lineup: string[]; show_date?: string; show_time?: string; image_url?: string }
 interface UnlockedConfig { title: string; type: SrcType; url: string; sources: PrivateSource[]; watermark: string; enabled: boolean }
 type SourceLike = Partial<Record<keyof PrivateSource, unknown>>;
@@ -208,6 +208,8 @@ export default function Live() {
       case 'scope': return 'Membership ini tidak mencakup akses replay.';
       case 'off': return 'Live belum aktif.';
       case 'password_or_token_required': return 'Masukkan sandi atau gunakan link token.';
+      case 'multi_device_no_reset': return 'Membership multi-device/publik tidak dapat direset manual.';
+      case 'quota_exhausted': return 'Kuota reset manual sudah habis.';
       default: return 'Gagal membuka akses live.';
     }
   };
@@ -498,11 +500,16 @@ export default function Live() {
                       <div className="text-muted-foreground">
                         {membership.expires_at ? `Berlaku s/d ${new Date(membership.expires_at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}` : 'Tanpa batas waktu'}
                       </div>
-                      <div className="text-muted-foreground">
-                        Reset perangkat: <span className="font-mono text-foreground">{membership.resets_used}/{membership.resets_max}</span> terpakai · Sisa <span className="font-mono text-foreground">{membership.remaining}</span>
-                      </div>
+                      {(membership.max_devices || 1) <= 1 && (
+                        <div className="text-muted-foreground">
+                          Reset perangkat: <span className="font-mono text-foreground">{membership.resets_used}/{membership.resets_max}</span> terpakai · Sisa <span className="font-mono text-foreground">{membership.remaining}</span>
+                        </div>
+                      )}
+                      {(membership.max_devices || 1) > 1 && (
+                        <div className="text-muted-foreground">Membership multi-device · {membership.max_devices} perangkat</div>
+                      )}
                     </div>
-                    {(!tokenInfo || (tokenInfo.kind !== 'public' && tokenInfo.max_devices <= 1)) && (
+                    {(membership.max_devices || 1) <= 1 && (!tokenInfo || (tokenInfo.kind !== 'public' && tokenInfo.max_devices <= 1)) && (
                       <Button type="button" variant="outline" size="sm" onClick={handleSelfReset} disabled={membership.remaining <= 0}>
                         Reset perangkat ini
                       </Button>
