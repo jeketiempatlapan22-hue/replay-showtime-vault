@@ -72,7 +72,7 @@ function ScheduleCountdown({ title, showDate, showTime, imageUrl }: { title: str
   const timeLabel = target ? `${pad(target.getHours())}:${pad(target.getMinutes())} WIB` : '';
 
   return (
-    <div className="relative aspect-video w-full rounded-2xl overflow-hidden border border-primary/30 bg-black">
+    <div className="relative w-full rounded-2xl overflow-hidden border border-primary/30 bg-black min-h-[320px] sm:aspect-video sm:min-h-0">
       {imageUrl && (
         <div
           className="absolute inset-0 bg-center bg-cover scale-110 blur-sm"
@@ -81,30 +81,30 @@ function ScheduleCountdown({ title, showDate, showTime, imageUrl }: { title: str
         />
       )}
       <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-primary/20 to-black/80" aria-hidden />
-      <div className="relative h-full w-full flex flex-col items-center justify-center text-center px-4 sm:px-6 py-6 gap-3 sm:gap-4">
-        <h3 className="text-lg sm:text-2xl font-bold text-white drop-shadow">
+      <div className="relative h-full w-full flex flex-col items-center justify-center text-center px-3 sm:px-6 py-4 sm:py-6 gap-2 sm:gap-4">
+        <h3 className="text-base sm:text-2xl font-bold text-white drop-shadow">
           {past ? 'Menunggu Siaran' : 'Show Belum Dimulai'}
         </h3>
-        <div className="text-xl sm:text-3xl font-bold text-primary drop-shadow flex items-center justify-center gap-2 flex-wrap">
+        <div className="text-lg sm:text-3xl font-bold text-primary drop-shadow flex items-center justify-center gap-2 flex-wrap">
           <span aria-hidden>🥷</span>
           <span>{title}</span>
         </div>
         {target && (
-          <p className="text-sm sm:text-base text-white/90 drop-shadow flex items-center justify-center gap-2 flex-wrap">
+          <p className="text-xs sm:text-base text-white/90 drop-shadow flex items-center justify-center gap-1.5 flex-wrap">
             <span aria-hidden>📅</span><span>{dateLabel}</span>
             <span className="text-white/50">•</span>
             <span aria-hidden>🕐</span><span>{timeLabel}</span>
           </p>
         )}
         {past ? (
-          <p className="text-sm sm:text-base font-semibold text-white drop-shadow">⏳ Menunggu admin memulai siaran…</p>
+          <p className="text-xs sm:text-base font-semibold text-white drop-shadow">⏳ Menunggu admin memulai siaran…</p>
         ) : (
-          <div className="rounded-2xl bg-black/40 backdrop-blur border border-white/15 px-4 sm:px-6 py-3 sm:py-4 max-w-lg w-full">
+          <div className="rounded-2xl bg-black/40 backdrop-blur border border-white/15 px-2 sm:px-6 py-2 sm:py-4 max-w-lg w-full">
             <div className="grid grid-cols-4 gap-1 sm:gap-3 items-center">
               {[{v:d,l:'Hari'},{v:h,l:'Jam'},{v:m,l:'Menit'},{v:s,l:'Detik'}].map((u,i)=>(
                 <div key={i} className="text-center">
-                  <div className="text-2xl sm:text-4xl font-bold text-primary tabular-nums drop-shadow tracking-wider">{pad(u.v)}</div>
-                  <div className="text-[10px] sm:text-xs text-white/70 uppercase tracking-widest mt-1">{u.l}</div>
+                  <div className="text-xl sm:text-4xl font-bold text-primary tabular-nums drop-shadow tracking-wider">{pad(u.v)}</div>
+                  <div className="text-[9px] sm:text-xs text-white/70 uppercase tracking-widest mt-0.5 sm:mt-1">{u.l}</div>
                 </div>
               ))}
             </div>
