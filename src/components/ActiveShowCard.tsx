@@ -10,6 +10,7 @@ import EmbedPlayer from '@/components/EmbedPlayer';
 import { type ActiveShow, getShowDateTime } from '@/lib/activeShows';
 import { useNavigate } from 'react-router-dom';
 import { getShowPurchase } from '@/lib/purchases';
+import { MEMBERSHIP_UPDATED_EVENT, readMembershipCredentials } from '@/lib/membershipAccess';
 
 const CATEGORY_LABELS: Record<string, string> = {
   reguler: 'Reguler', sts: 'STS', last_show: 'Last Show', aniv: 'Anniversary', special: 'Show Spesial',
@@ -59,23 +60,30 @@ export default function ActiveShowCard({ show, index = 0 }: { show: ActiveShow; 
   // Per-show unlock check (sessionStorage live unlock OR localStorage purchase)
   const [hasAccess, setHasAccess] = useState(false);
   const [purchasedToken, setPurchasedToken] = useState<string>('');
+  const [membershipToken, setMembershipToken] = useState<string>('');
+  const [membershipPassword, setMembershipPassword] = useState<string>('');
   useEffect(() => {
     const refresh = () => {
       try {
         const sess = !!sessionStorage.getItem(`replaytime-live-unlocked-${show.id}`);
         const purchase = getShowPurchase(show.id);
+        const membership = readMembershipCredentials();
         setPurchasedToken(purchase?.token || '');
-        setHasAccess(sess || !!purchase?.token);
+        setMembershipToken(membership?.token || '');
+        setMembershipPassword(membership?.password || '');
+        setHasAccess(sess || !!purchase?.token || !!membership?.token);
       } catch { /* ignore */ }
     };
     refresh();
     window.addEventListener('storage', refresh);
     window.addEventListener('focus', refresh);
     window.addEventListener('replaytime-purchases-updated', refresh);
+    window.addEventListener(MEMBERSHIP_UPDATED_EVENT, refresh);
     return () => {
       window.removeEventListener('storage', refresh);
       window.removeEventListener('focus', refresh);
       window.removeEventListener('replaytime-purchases-updated', refresh);
+      window.removeEventListener(MEMBERSHIP_UPDATED_EVENT, refresh);
     };
   }, [show.id]);
 
@@ -85,7 +93,8 @@ export default function ActiveShowCard({ show, index = 0 }: { show: ActiveShow; 
     if (show.replay_id) navigate(`/replay/${show.replay_id}`);
   };
   const goLive = () => {
-    if (purchasedToken) navigate(`/live?show=${show.id}&t=${purchasedToken}`);
+    if (membershipToken) navigate(`/live?show=${show.id}&mtoken=${encodeURIComponent(membershipToken)}&mp=${encodeURIComponent(membershipPassword)}`);
+    else if (purchasedToken) navigate(`/live?show=${show.id}&t=${purchasedToken}`);
     else navigate(`/live?show=${show.id}`);
   };
 
