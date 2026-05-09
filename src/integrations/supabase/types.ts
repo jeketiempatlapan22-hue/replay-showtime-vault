@@ -1096,6 +1096,10 @@ export type Database = {
       }
       increment_view_count: { Args: { _replay_id: string }; Returns: number }
       phone_exists: { Args: { _phone: string }; Returns: boolean }
+      rate_replay: {
+        Args: { _browser_id: string; _rating: number; _replay_id: string }
+        Returns: undefined
+      }
       record_login_attempt: {
         Args: { _identifier: string; _success: boolean }
         Returns: undefined

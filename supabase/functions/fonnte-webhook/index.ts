@@ -3,7 +3,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-bot-test',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-bot-test, x-webhook-secret',
 };
 
 const json = (body: unknown, status = 200) =>
@@ -268,6 +268,20 @@ Deno.serve(async (req) => {
 
   if (testMode && !(await isAuthorizedTestRequest(authHeader, admin))) {
     return json({ ok: false, reason: 'unauthorized' }, 401);
+  }
+
+  // Optional shared-secret for production webhook calls. When FONNTE_WEBHOOK_SECRET
+  // is set, Fonnte must be configured to send it as the X-Webhook-Secret header.
+  // Falls back to "open" when secret unset (with a 7s rate limit per phone) for
+  // backward compatibility with existing Fonnte deployments.
+  if (!testMode) {
+    const expectedSecret = Deno.env.get('FONNTE_WEBHOOK_SECRET') || '';
+    if (expectedSecret) {
+      const provided = req.headers.get('x-webhook-secret') || req.headers.get('X-Webhook-Secret') || '';
+      if (provided !== expectedSecret) {
+        return new Response('ok', { headers: corsHeaders });
+      }
+    }
   }
 
   // Fonnte sends as multipart/form-data, x-www-form-urlencoded, or json

@@ -39,6 +39,14 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
+    // Brute-force lockout (per replay+device)
+    const lockId = `replaypw:${replay_id}:${browser_id || 'anon'}`;
+    if (password) {
+      const { data: lock } = await supabase.rpc('check_login_lock', { _identifier: lockId });
+      const row = Array.isArray(lock) ? lock[0] : lock;
+      if (row?.locked) return json({ valid: false, reason: 'rate_limited', seconds_remaining: row.seconds_remaining }, 429);
+    }
+
     const { data: replay } = await supabase
       .from("replays").select("password, date").eq("id", replay_id).single();
     if (!replay) return json({ valid: false });
@@ -68,7 +76,10 @@ Deno.serve(async (req) => {
 
     if (!password) return json({ valid: false });
 
-    if (replay.password === password) return json({ valid: true });
+    if (replay.password === password) {
+      await supabase.rpc('record_login_attempt', { _identifier: lockId, _success: true });
+      return json({ valid: true });
+    }
 
     const d = new Date(replay.date);
     const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
@@ -76,6 +87,7 @@ Deno.serve(async (req) => {
       .from("master_passwords").select("password, paused").eq("month", monthKey).maybeSingle();
 
     const valid = !!master && master.paused !== true && master.password === password;
+    await supabase.rpc('record_login_attempt', { _identifier: lockId, _success: valid });
     return json({ valid });
   } catch {
     return json({ valid: false }, 500);

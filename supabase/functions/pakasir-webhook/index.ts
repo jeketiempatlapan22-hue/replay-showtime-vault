@@ -39,13 +39,19 @@ Deno.serve(async (req) => {
   const expectedKey = Deno.env.get('PAKASIR_API_KEY');
   const expectedSlug = Deno.env.get('PAKASIR_PROJECT_SLUG');
 
+  // Fail closed: webhook MUST be authenticated. If the API key secret isn't configured,
+  // refuse all requests rather than accepting unauthenticated payment confirmations.
+  if (!expectedKey) {
+    return new Response(JSON.stringify({ error: 'webhook not configured' }), { status: 503, headers: corsHeaders });
+  }
+
   let body: Record<string, unknown> = {};
   try { body = await req.json(); } catch { /* ignore */ }
 
   // Pakasir typically sends: order_id, amount, status, project, api_key, payment_method, completed_at
   const apiKey = String(body.api_key ?? req.headers.get('x-api-key') ?? '');
   const project = String(body.project ?? '');
-  if (expectedKey && apiKey !== expectedKey) {
+  if (apiKey !== expectedKey) {
     return new Response(JSON.stringify({ error: 'invalid api key' }), { status: 401, headers: corsHeaders });
   }
   if (expectedSlug && project && project !== expectedSlug) {

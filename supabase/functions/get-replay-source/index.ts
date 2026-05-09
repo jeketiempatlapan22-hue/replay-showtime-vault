@@ -23,6 +23,14 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
+    // Brute-force lockout for password attempts (per replay+device)
+    const lockId = `replaysrc:${replay_id}:${browser_id || 'anon'}`;
+    if (password && !access_token) {
+      const { data: lock } = await supabase.rpc('check_login_lock', { _identifier: lockId });
+      const row = Array.isArray(lock) ? lock[0] : lock;
+      if (row?.locked) return json({ valid: false, reason: 'rate_limited', seconds_remaining: row.seconds_remaining }, 429);
+    }
+
     const { data: replay } = await supabase
       .from("replays")
       .select("password, date, youtube_id, m3u8_url, source_type, sources, access_token")
@@ -80,7 +88,15 @@ Deno.serve(async (req) => {
       }
     }
 
-    if (!valid) return json({ valid: false }, 403);
+    if (!valid) {
+      if (password && !access_token) {
+        await supabase.rpc('record_login_attempt', { _identifier: lockId, _success: false });
+      }
+      return json({ valid: false }, 403);
+    }
+    if (password && !access_token) {
+      await supabase.rpc('record_login_attempt', { _identifier: lockId, _success: true });
+    }
 
     return json({
       valid: true,
