@@ -112,10 +112,8 @@ export default function Live() {
   const [statusLoading, setStatusLoading] = useState(true);
   const [unlocked, setUnlocked] = useState<UnlockedConfig | null>(null);
   const [membership, setMembership] = useState<MembershipInfo | null>(null);
-  const [pwInput, setPwInput] = useState('');
-  const [pwError, setPwError] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [kickedMsg, setKickedMsg] = useState('');
+  const [, setPwError] = useState('');
+  const [, setSubmitting] = useState(false);
   const [failedSourceKeys, setFailedSourceKeys] = useState<string[]>([]);
   const [tokenInfo, setTokenInfo] = useState<{ kind: string; max_devices: number } | null>(null);
   const navVisible = useAutoHideOnInteraction(!!unlocked, 3000);
