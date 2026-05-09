@@ -38,7 +38,26 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
   const [createdAt, setCreatedAt] = useState<number>(0);
   const [now, setNow] = useState(Date.now());
   const [lastChecked, setLastChecked] = useState<number>(0);
+  const [staticQrisUrl, setStaticQrisUrl] = useState<string>('');
+  const [ownerWa, setOwnerWa] = useState<string>('6288809048431');
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+
+  // Load admin contact + static QRIS settings when dialog opens
+  useEffect(() => {
+    if (!open) return;
+    (async () => {
+      try {
+        const { data } = await supabase
+          .from('site_settings')
+          .select('key,value')
+          .in('key', ['static_qris_url', 'owner_wa_number']);
+        for (const row of data || []) {
+          if (row.key === 'static_qris_url') setStaticQrisUrl(String(row.value || ''));
+          if (row.key === 'owner_wa_number') setOwnerWa(String(row.value || '6288809048431'));
+        }
+      } catch { /* ignore */ }
+    })();
+  }, [open]);
 
   // Reset on close
   useEffect(() => {
