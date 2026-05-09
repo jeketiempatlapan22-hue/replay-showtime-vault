@@ -251,13 +251,21 @@ export default function Live() {
 
   useEffect(() => {
     fetchStatus();
+    const tParam = search.get('t');
+    const mtParam = search.get('mtoken');
+    let cached: string | null = null;
     try {
-      const cached = sessionStorage.getItem(`${SS_KEY_BASE}${showId?'-'+showId:''}`);
+      cached = sessionStorage.getItem(`${SS_KEY_BASE}${showId?'-'+showId:''}`);
       if (cached) setUnlocked(JSON.parse(cached));
     } catch { /* ignore */ }
 
+    // Gate: if no token URL and no cached unlock, send user to the dedicated /kunci page.
+    if (!tParam && !mtParam && !cached) {
+      navigate(`/kunci${showId ? `?show=${showId}` : ''}`, { replace: true });
+      return;
+    }
+
     // Scope realtime subscriptions narrowly to reduce server load with many concurrent users.
-    const tParam = search.get('t');
     const bid = getBrowserId();
     const cfgChannel = showId
       ? supabase.channel(`live-cfg:${showId}`)
@@ -273,7 +281,7 @@ export default function Live() {
         else if (unlocked) {
           setUnlocked(null);
           try { sessionStorage.removeItem(`${SS_KEY_BASE}${showId?'-'+showId:''}`); } catch { /* ignore */ }
-          setKickedMsg('Perangkat ini telah diblokir oleh admin.');
+          navigate(`/kunci?reason=blocked${showId ? `&show=${showId}` : ''}`, { replace: true });
         }
       })
       .subscribe();
