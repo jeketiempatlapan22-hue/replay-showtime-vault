@@ -184,6 +184,10 @@ Deno.serve(async (req) => {
     }
 
     if (password) {
+      const lockId = `livepwlegacy:${browser_id || 'anon'}`;
+      const { data: lock } = await supabase.rpc('check_login_lock', { _identifier: lockId });
+      const lockRow = Array.isArray(lock) ? lock[0] : lock;
+      if (lockRow?.locked) return json({ valid: false, reason: 'rate_limited', seconds_remaining: lockRow.seconds_remaining });
       let valid = !!cfg.password && cfg.password === password;
       if (!valid) {
         const now = new Date();
@@ -192,6 +196,7 @@ Deno.serve(async (req) => {
           .from("master_passwords").select("password,paused").eq("month", monthKey).maybeSingle();
         valid = !!master && master.paused !== true && master.password === password;
       }
+      await supabase.rpc('record_login_attempt', { _identifier: lockId, _success: valid });
       if (!valid) return json({ valid: false, reason: "bad_password" });
       return json({
         valid: true, enabled, title: cfg.title, type: cfg.type, url: cfg.url,
