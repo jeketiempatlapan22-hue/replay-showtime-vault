@@ -1178,6 +1178,24 @@ export default function Admin() {
               </CardContent>
             </Card>
 
+            {/* QRIS Statis Fallback + Nomor Admin */}
+            <Card>
+              <CardHeader><CardTitle className="font-sans text-base sm:text-lg flex items-center gap-2"><MessageCircle className="w-5 h-5 text-primary" />QRIS Statis & Nomor Admin</CardTitle></CardHeader>
+              <CardContent className="space-y-3">
+                <div>
+                  <Label>Nomor WhatsApp Admin (untuk konfirmasi pembayaran)</Label>
+                  <Input placeholder="6288809048431" value={ownerWaNumber} onChange={e => setOwnerWaNumber(e.target.value)} />
+                  <p className="text-[11px] text-muted-foreground mt-1">Tombol "Hubungi Admin" pada dialog pembayaran akan membuka chat ke nomor ini.</p>
+                </div>
+                <div>
+                  <Label>QRIS Statis (alternatif jika QRIS dinamis gagal)</Label>
+                  <ImagePicker value={staticQrisUrl} onChange={url => setStaticQrisUrl(url)} />
+                  <p className="text-[11px] text-muted-foreground mt-1">Upload gambar QRIS statis. Akan ditampilkan otomatis jika QRIS dinamis gagal dibuat.</p>
+                </div>
+                <Button onClick={handleSavePakasirFallback} size="sm"><Save className="w-4 h-4 mr-2" />Simpan</Button>
+              </CardContent>
+            </Card>
+
             {/* Master Passwords */}
             <Card>
               <CardHeader><CardTitle className="font-sans text-base sm:text-lg flex items-center gap-2"><Key className="w-5 h-5 text-primary" />Sandi Master</CardTitle></CardHeader>
