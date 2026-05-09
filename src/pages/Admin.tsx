@@ -769,16 +769,18 @@ export default function Admin() {
                   <div>
                     <Label>Harga Show (Rp)</Label>
                     <Input type="number" min={0} value={showForm.price_show} onChange={e => setShowForm({ ...showForm, price_show: Number(e.target.value) })} placeholder="0" />
+                    <p className="text-[11px] text-muted-foreground mt-1">Nominal QRIS Pakasir saat user beli show.</p>
                   </div>
                   <div>
                     <Label>Harga Replay (Rp)</Label>
                     <Input type="number" min={0} value={showForm.price_replay} onChange={e => setShowForm({ ...showForm, price_replay: Number(e.target.value) })} placeholder="0" />
+                    <p className="text-[11px] text-muted-foreground mt-1">Default Rp 2.000 jika kosong.</p>
                   </div>
                 </div>
                 <div>
-                  <Label>Pakasir Amount (Rp) — nominal QRIS dinamis</Label>
-                  <Input type="number" min={0} value={showForm.pakasir_amount} onChange={e => setShowForm({ ...showForm, pakasir_amount: Number(e.target.value) })} placeholder="Misal: 25000" />
-                  <p className="text-[11px] text-muted-foreground mt-1">Kosongkan/0 untuk pakai harga di atas. Nominal aktual yang ditagihkan ke user.</p>
+                  <Label>Pakasir Amount (Rp) — fallback opsional</Label>
+                  <Input type="number" min={0} value={showForm.pakasir_amount} onChange={e => setShowForm({ ...showForm, pakasir_amount: Number(e.target.value) })} placeholder="Kosongkan jika tidak perlu" />
+                  <p className="text-[11px] text-muted-foreground mt-1">Hanya dipakai bila Harga Show / Harga Replay di atas kosong.</p>
                 </div>
                 <div>
                   <Label>Replay Terkait</Label>
