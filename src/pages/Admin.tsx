@@ -486,6 +486,8 @@ export default function Admin() {
       toast({ title: 'Error', description: 'Gagal menyimpan pengaturan.', variant: 'destructive' });
     }
   };
+
+  const handleToggleLiveChat = async (enabled: boolean) => {
     setLiveChatEnabled(enabled);
     try {
       await setSetting('live_chat_enabled', enabled ? 'true' : 'false');
