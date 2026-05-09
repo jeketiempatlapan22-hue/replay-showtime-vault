@@ -21,7 +21,7 @@ interface Props {
   kind?: 'show' | 'replay' | 'replay_only';
 }
 
-type Status = 'form' | 'creating' | 'qr' | 'paid' | 'expired';
+type Status = 'form' | 'creating' | 'qr' | 'paid' | 'expired' | 'static_qris';
 
 const EXPIRY_MS = 30 * 60 * 1000;
 
