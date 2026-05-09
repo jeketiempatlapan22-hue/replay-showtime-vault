@@ -223,7 +223,7 @@ export default function ActiveShowCard({ show, index = 0 }: { show: ActiveShow; 
         onOpenChange={setBuyOpen}
         showId={show.id}
         showTitle={show.title}
-        amount={show.pakasir_amount}
+        amount={buyMode === 'replay' ? replayAmount : showAmount}
         itemTitle={buyMode === 'replay' ? `Replay: ${show.title}` : `Show: ${show.title}`}
         replayId={buyMode === 'replay' ? show.replay_id : null}
         kind={buyMode === 'replay' ? 'replay' : 'show'}
