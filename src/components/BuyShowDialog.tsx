@@ -37,6 +37,7 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
   const [accessToken, setAccessToken] = useState<string>('');
   const [createdAt, setCreatedAt] = useState<number>(0);
   const [now, setNow] = useState(Date.now());
+  const [lastChecked, setLastChecked] = useState<number>(0);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   // Reset on close
