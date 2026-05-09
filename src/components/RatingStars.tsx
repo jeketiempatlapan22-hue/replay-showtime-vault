@@ -44,12 +44,11 @@ export default function RatingStars({ replayId }: RatingProps) {
 
   const handleRate = async (rating: number) => {
     setUserRating(rating);
-    const { error } = await supabase
-      .from('ratings')
-      .upsert(
-        { replay_id: replayId, browser_id: browserId, rating },
-        { onConflict: 'replay_id,browser_id' }
-      );
+    const { error } = await supabase.rpc('rate_replay', {
+      _replay_id: replayId,
+      _browser_id: browserId,
+      _rating: rating,
+    });
     if (!error) {
       // Refresh avg
       const { data: all } = await supabase
