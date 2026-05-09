@@ -110,9 +110,9 @@ Deno.serve(async (req) => {
 
       // Membership bypass
       if (mtoken) {
-        const r = await verifyMembership(supabase, mtoken, mpassword || "", browser_id || "");
+        const r = await verifyMembership(supabase, mtoken, mpassword || "", browser_id || "", isSilent);
         if (!r.ok) return json({ valid: false, reason: r.reason });
-        return json({ ...okPayload, watermark: `MB-${String(mtoken).slice(-4).toUpperCase()}`, membership: membershipInfo(r.token) });
+        return json({ ...okPayload, watermark: `MB-${String(mtoken).slice(-4).toUpperCase()}`, membership: membershipInfo(r.token), soft: r.soft });
       }
 
       if (token) {
