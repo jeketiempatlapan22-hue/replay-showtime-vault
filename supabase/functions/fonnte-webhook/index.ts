@@ -340,6 +340,7 @@ Deno.serve(async (req) => {
   if (!phone || !text) return debug('missing_phone_or_text');
 
   const phoneNorm = normalizePhone(phone);
+  const participantNorm = normalizePhone(participant);
   const deviceNorm = normalizePhone(device);
   const commandPreview = text.toLowerCase().split(/\s+/)[0] || '';
 
@@ -351,6 +352,7 @@ Deno.serve(async (req) => {
     inboxId,
     fromMe,
     eventName: 'received',
+    detail: participantNorm ? { participant: participantNorm } : {},
   });
 
   // Only process commands starting with '/' — silently ignore other chatter
@@ -425,13 +427,14 @@ Deno.serve(async (req) => {
   const ADMIN_ONLY = new Set(['/buattoken', '/createtoken', '/createtokenrep', '/createlink', '/createpub']);
   let isBotAdmin = false;
   if (ADMIN_ONLY.has(cmd)) {
-    const { data: ba } = await admin
+    const candidatePhones = uniquePhones([phoneNorm, participantNorm, deviceNorm]);
+    const { data: admins } = await admin
       .from('bot_admins')
       .select('phone')
-      .eq('phone', phoneNorm)
+      .in('phone', candidatePhones.length ? candidatePhones : [phoneNorm])
       .eq('enabled', true)
-      .maybeSingle();
-    isBotAdmin = !!ba;
+    const adminPhones = new Set((admins ?? []).map((a: any) => normalizePhone(a.phone)));
+    isBotAdmin = candidatePhones.some((p) => adminPhones.has(p));
     if (!isBotAdmin) {
       await sendAndAudit(admin, {
         phone: phoneNorm,
