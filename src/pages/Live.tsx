@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 
 import { supabase } from '@/integrations/supabase/client';
 import { getBrowserId } from '@/lib/browserId';
+import { clearMembershipCredentials, saveMembershipCredentials } from '@/lib/membershipAccess';
 import MemberAvatar from '@/components/MemberAvatar';
 import { useAutoHideOnInteraction } from '@/hooks/useAutoHideOnInteraction';
 
@@ -243,7 +244,10 @@ export default function Live() {
           setUnlocked(cfg);
           try { sessionStorage.setItem(`${SS_KEY_BASE}${showId?'-'+showId:''}`, JSON.stringify(cfg)); } catch { /* ignore */ }
         }
-        if (data.membership) setMembership(data.membership as MembershipInfo);
+        if (data.membership) {
+          setMembership(data.membership as MembershipInfo);
+          if (opts.mtoken) saveMembershipCredentials(opts.mtoken, opts.mpassword || '');
+        }
         if (data.token_kind || data.max_devices) {
           setTokenInfo({ kind: String(data.token_kind || 'personal'), max_devices: Number(data.max_devices || 1) });
         }
@@ -254,6 +258,7 @@ export default function Live() {
         if (reason === 'revoked' || reason === 'blocked') {
           setUnlocked(null);
           setMembership(null);
+          if (reason === 'revoked') clearMembershipCredentials();
           try { sessionStorage.removeItem(`${SS_KEY_BASE}${showId?'-'+showId:''}`); } catch { /* ignore */ }
           navigate(`/kunci?reason=${reason}${showId ? `&show=${showId}` : ''}`, { replace: true });
         }
@@ -306,7 +311,9 @@ export default function Live() {
 
     // Lightweight token revalidation: poll every 60s instead of subscribing to entire token tables.
     const revalidate = window.setInterval(() => {
-      if (tParam && document.visibilityState === 'visible') void doUnlock({ token: tParam }, true);
+      if (document.visibilityState !== 'visible') return;
+      if (tParam) void doUnlock({ token: tParam }, true);
+      else if (mtParam) void doUnlock({ mtoken: mtParam, mpassword: search.get('mp') || search.get('mpassword') || '' }, true);
     }, 60000);
 
     return () => {
