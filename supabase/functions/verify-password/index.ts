@@ -39,6 +39,14 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
+    // Brute-force lockout (per replay+device)
+    const lockId = `replaypw:${replay_id}:${browser_id || 'anon'}`;
+    if (password) {
+      const { data: lock } = await supabase.rpc('check_login_lock', { _identifier: lockId });
+      const row = Array.isArray(lock) ? lock[0] : lock;
+      if (row?.locked) return json({ valid: false, reason: 'rate_limited', seconds_remaining: row.seconds_remaining }, 429);
+    }
+
     const { data: replay } = await supabase
       .from("replays").select("password, date").eq("id", replay_id).single();
     if (!replay) return json({ valid: false });
