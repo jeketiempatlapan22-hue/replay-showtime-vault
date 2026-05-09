@@ -38,7 +38,7 @@ export default function MembershipAdmin() {
   const [devices, setDevices] = useState<Record<string, DeviceRow[]>>({});
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
-  const [form, setForm] = useState({ label: '', phone: '', duration_days: 30, includes_replays: true });
+  const [form, setForm] = useState({ label: '', phone: '', duration_days: 30, includes_replays: true, max_devices: 1 });
   const [creating, setCreating] = useState(false);
 
   const load = async () => {
