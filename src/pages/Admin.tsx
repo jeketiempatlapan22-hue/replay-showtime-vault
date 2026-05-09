@@ -1115,6 +1115,24 @@ export default function Admin() {
                 </div>
                 <Switch checked={liveChatEnabled} onCheckedChange={handleToggleLiveChat} />
               </CardContent>
+              <CardContent className="pt-0 space-y-2">
+                <p className="text-xs text-muted-foreground">Live chat akan otomatis direset setiap hari pukul 00:00 WIB. Anda juga dapat mereset manual sekarang.</p>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={async () => {
+                    if (!confirm('Hapus seluruh pesan live chat sekarang?')) return;
+                    const { data, error } = await supabase.rpc('admin_clear_live_messages' as never);
+                    if (error) {
+                      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+                    } else {
+                      toast({ title: 'Berhasil', description: `Live chat direset (${data ?? 0} pesan dihapus).` });
+                    }
+                  }}
+                >
+                  Reset Live Chat Sekarang
+                </Button>
+              </CardContent>
             </Card>
 
             {/* Admin Username */}
