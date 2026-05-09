@@ -20,6 +20,7 @@ interface MembershipToken {
   manual_resets_used: number;
   manual_resets_max: number;
   includes_replays: boolean;
+  max_devices: number;
   created_at: string;
 }
 
@@ -37,7 +38,7 @@ export default function MembershipAdmin() {
   const [devices, setDevices] = useState<Record<string, DeviceRow[]>>({});
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
-  const [form, setForm] = useState({ label: '', phone: '', duration_days: 30, includes_replays: true });
+  const [form, setForm] = useState({ label: '', phone: '', duration_days: 30, includes_replays: true, max_devices: 1 });
   const [creating, setCreating] = useState(false);
 
   const load = async () => {
@@ -66,11 +67,12 @@ export default function MembershipAdmin() {
       token, password, label: form.label, phone: form.phone,
       duration_days: form.duration_days, starts_at, expires_at,
       includes_replays: form.includes_replays,
+      max_devices: Math.max(1, Math.min(10000, Number(form.max_devices) || 1)),
     });
     setCreating(false);
     if (error) { toast.error(error.message); return; }
     toast.success('Membership token dibuat');
-    setForm({ label: '', phone: '', duration_days: 30, includes_replays: true });
+    setForm({ label: '', phone: '', duration_days: 30, includes_replays: true, max_devices: 1 });
     void load();
   };
 
@@ -100,6 +102,14 @@ export default function MembershipAdmin() {
     toast.success('Kuota reset perangkat dikembalikan ke 0');
     void load();
   };
+  const editMaxDevices = async (r: MembershipToken) => {
+    const v = prompt('Atur Max Device baru', String(r.max_devices ?? 1));
+    if (v == null) return;
+    const n = Math.max(1, Math.min(10000, Number(v) || 1));
+    await supabase.from('membership_tokens').update({ max_devices: n, updated_at: new Date().toISOString() }).eq('id', r.id);
+    toast.success(`Max device diubah ke ${n}`);
+    void load();
+  };
   const copyLink = (r: MembershipToken) => {
     const link = `${window.location.origin}/live?mtoken=${encodeURIComponent(r.token)}&mp=${encodeURIComponent(r.password)}`;
     navigator.clipboard.writeText(link);
@@ -114,6 +124,7 @@ export default function MembershipAdmin() {
           <div><Label className="text-xs">Label</Label><Input value={form.label} onChange={e => setForm({ ...form, label: e.target.value })} placeholder="cth: Member Premium A" /></div>
           <div><Label className="text-xs">Nomor WA</Label><Input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} placeholder="62xxx" /></div>
           <div><Label className="text-xs">Durasi (hari)</Label><Input type="number" value={form.duration_days} onChange={e => setForm({ ...form, duration_days: Number(e.target.value) || 30 })} /></div>
+          <div><Label className="text-xs">Max Device</Label><Input type="number" min={1} value={form.max_devices} onChange={e => setForm({ ...form, max_devices: Number(e.target.value) || 1 })} placeholder="cth: 300" /></div>
           <div className="flex items-end gap-2">
             <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={form.includes_replays} onChange={e => setForm({ ...form, includes_replays: e.target.checked })} /> Termasuk replay</label>
           </div>
@@ -146,6 +157,7 @@ export default function MembershipAdmin() {
                       </div>
                       <div className="flex gap-1 flex-wrap">
                         <Button size="sm" variant="outline" onClick={() => copyLink(r)} title="Salin link"><Copy className="w-3.5 h-3.5 mr-1" />Link</Button>
+                        <Button size="sm" variant="outline" onClick={() => editMaxDevices(r)} title="Ubah max device">Max: {r.max_devices ?? 1}</Button>
                         <Button size="sm" variant="outline" onClick={() => resetDevices(r.id)} title="Cabut semua perangkat tertaut"><RefreshCw className="w-3.5 h-3.5 mr-1" />Reset Device</Button>
                         <Button size="sm" variant="outline" onClick={() => resetQuota(r.id)} title="Reset kuota reset manual ke 0"><RotateCcw className="w-3.5 h-3.5 mr-1" />Reset Kuota</Button>
                         <Button size="sm" variant={r.revoked ? 'default' : 'secondary'} onClick={() => toggleRevoke(r)}>{r.revoked ? 'Aktifkan' : 'Cabut'}</Button>
@@ -163,7 +175,7 @@ export default function MembershipAdmin() {
                       onClick={() => setExpanded(prev => ({ ...prev, [r.id]: !prev[r.id] }))}
                     >
                       {isOpen ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                      Perangkat tertaut ({tokenDevices.length}/1)
+                      Perangkat tertaut ({tokenDevices.length}/{r.max_devices ?? 1})
                     </button>
                     {isOpen && (
                       <div className="rounded border border-border bg-muted/30 p-2 space-y-1">
