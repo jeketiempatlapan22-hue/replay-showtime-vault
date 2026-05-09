@@ -8,9 +8,10 @@ const corsHeaders = {
 const json = (b: unknown, status = 200) =>
   new Response(JSON.stringify(b), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
-async function bindMembershipDevice(supabase: any, tokenRow: any, browser_id: string) {
+async function bindMembershipDevice(supabase: any, tokenRow: any, browser_id: string, isSilent = false) {
   if (!browser_id || browser_id.length < 6) return { ok: false, reason: "no_device" };
   const max = Math.max(1, Number(tokenRow.max_devices) || 1);
+  const isMulti = max > 1;
   const { data: existing } = await supabase
     .from("membership_token_devices").select("id").eq("token_id", tokenRow.id).eq("browser_id", browser_id).maybeSingle();
   if (existing) {
@@ -19,12 +20,19 @@ async function bindMembershipDevice(supabase: any, tokenRow: any, browser_id: st
   }
   const { count } = await supabase
     .from("membership_token_devices").select("id", { count: "exact", head: true }).eq("token_id", tokenRow.id);
-  if ((count || 0) >= max) return { ok: false, reason: "device_limit" };
+  if ((count || 0) >= max) {
+    // Multi-device membership: don't kick during silent revalidation; let existing sessions continue.
+    if (isMulti && isSilent) return { ok: true, soft: true };
+    return { ok: false, reason: "device_limit" };
+  }
   const { error } = await supabase.from("membership_token_devices").insert({ token_id: tokenRow.id, browser_id });
   if (error) {
     const { data: re } = await supabase
       .from("membership_token_devices").select("id").eq("token_id", tokenRow.id).eq("browser_id", browser_id).maybeSingle();
-    if (!re) return { ok: false, reason: "device_limit" };
+    if (!re) {
+      if (isMulti && isSilent) return { ok: true, soft: true };
+      return { ok: false, reason: "device_limit" };
+    }
   }
   return { ok: true };
 }
