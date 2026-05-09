@@ -40,7 +40,7 @@ async function bindMembershipDevice(supabase: any, tokenRow: any, browser_id: st
 function membershipInfo(t: any) {
   const max = t.manual_resets_max || 3;
   const used = t.manual_resets_used || 0;
-  return { expires_at: t.expires_at, resets_used: used, resets_max: max, remaining: Math.max(0, max - used), includes_replays: !!t.includes_replays };
+  return { expires_at: t.expires_at, resets_used: used, resets_max: max, remaining: Math.max(0, max - used), includes_replays: !!t.includes_replays, max_devices: t.max_devices || 1 };
 }
 
 async function verifyMembership(supabase: any, mtoken: string, mpassword: string, browser_id: string, isSilent = false) {
