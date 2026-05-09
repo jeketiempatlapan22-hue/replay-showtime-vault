@@ -175,6 +175,8 @@ export default function Index() {
       .subscribe();
 
     return () => {
+      cancelled = true;
+      clearTimeout(safetyTimer);
       supabase.removeChannel(replayChannel);
       supabase.removeChannel(settingsChannel);
     };
