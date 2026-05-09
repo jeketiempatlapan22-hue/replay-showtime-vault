@@ -465,6 +465,38 @@ Deno.serve(async (req) => {
           return `• *${s.title}*\n  📅 ${s.show_date} ${String(s.show_time).slice(0,5)}\n  🏷️ ${s.category}${lineup ? `\n  👥 ${lineup}` : ''}`;
         }).join('\n\n');
       }
+    } else if (cmd === '/cek') {
+      // Recheck the user's most recent pending order via Pakasir poller.
+      const { data: lastOrder } = await admin
+        .from('orders')
+        .select('id,status,token_sent_at,access_token,replay_id,show_id,item_title,pakasir_order_id')
+        .eq('user_phone', phoneNorm)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (!lastOrder) {
+        reply = '📭 Belum ada order atas nomor ini. Silakan beli show dari aplikasi terlebih dahulu.';
+      } else if (lastOrder.status === 'paid' && lastOrder.token_sent_at) {
+        const origin = (map.get('site_origin') || 'https://replaytime.lovable.app').replace(/\/+$/, '');
+        const link = `${origin}/akses?token=${lastOrder.access_token}${lastOrder.replay_id ? `&replay=${lastOrder.replay_id}` : ''}`;
+        reply = `✅ Order Anda sudah lunas.\n\n${lastOrder.item_title}\n🔗 ${link}`;
+      } else {
+        try {
+          const pollRes = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/check-pakasir-status`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}` },
+            body: JSON.stringify({ order_id: lastOrder.id }),
+          });
+          const pollJson: any = await pollRes.json().catch(() => ({}));
+          if (pollJson?.status === 'paid') {
+            reply = `✅ Pembayaran terkonfirmasi! Token & link sudah dikirim ke nomor ini. Cek pesan terbaru ya 💖`;
+          } else {
+            reply = `⏳ Pembayaran *${lastOrder.pakasir_order_id || lastOrder.id.slice(0,8)}* masih *${pollJson?.status || 'pending'}*.\nSelesaikan pembayaran QRIS, lalu coba */cek* lagi 1-2 menit kemudian.`;
+          }
+        } catch {
+          reply = `⚠️ Tidak dapat menghubungi server pembayaran. Coba */cek* lagi sebentar.`;
+        }
+      }
     } else if (cmd === '/buattoken') {
       if (!arg) {
         const { data: replays } = await admin
