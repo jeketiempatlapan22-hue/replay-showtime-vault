@@ -157,6 +157,7 @@ export default function MembershipAdmin() {
                       </div>
                       <div className="flex gap-1 flex-wrap">
                         <Button size="sm" variant="outline" onClick={() => copyLink(r)} title="Salin link"><Copy className="w-3.5 h-3.5 mr-1" />Link</Button>
+                        <Button size="sm" variant="outline" onClick={() => editMaxDevices(r)} title="Ubah max device">Max: {r.max_devices ?? 1}</Button>
                         <Button size="sm" variant="outline" onClick={() => resetDevices(r.id)} title="Cabut semua perangkat tertaut"><RefreshCw className="w-3.5 h-3.5 mr-1" />Reset Device</Button>
                         <Button size="sm" variant="outline" onClick={() => resetQuota(r.id)} title="Reset kuota reset manual ke 0"><RotateCcw className="w-3.5 h-3.5 mr-1" />Reset Kuota</Button>
                         <Button size="sm" variant={r.revoked ? 'default' : 'secondary'} onClick={() => toggleRevoke(r)}>{r.revoked ? 'Aktifkan' : 'Cabut'}</Button>
@@ -174,7 +175,7 @@ export default function MembershipAdmin() {
                       onClick={() => setExpanded(prev => ({ ...prev, [r.id]: !prev[r.id] }))}
                     >
                       {isOpen ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                      Perangkat tertaut ({tokenDevices.length}/1)
+                      Perangkat tertaut ({tokenDevices.length}/{r.max_devices ?? 1})
                     </button>
                     {isOpen && (
                       <div className="rounded border border-border bg-muted/30 p-2 space-y-1">
