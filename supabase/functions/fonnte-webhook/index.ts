@@ -21,6 +21,18 @@ function normalizePhone(raw: string) {
   return d;
 }
 
+function pickFirstText(...values: unknown[]) {
+  for (const value of values) {
+    const text = String(value ?? '').trim();
+    if (text) return text;
+  }
+  return '';
+}
+
+function uniquePhones(values: string[]) {
+  return Array.from(new Set(values.map(normalizePhone).filter(Boolean)));
+}
+
 async function sendFonnte(phone: string, message: string, inboxId = ''): Promise<{ ok: boolean; data?: unknown; error?: string }> {
   const token = Deno.env.get('FONNTE_TOKEN');
   if (!token) return { ok: false, error: 'FONNTE_TOKEN not configured' };
