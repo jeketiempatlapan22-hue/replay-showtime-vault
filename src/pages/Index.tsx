@@ -198,28 +198,9 @@ export default function Index() {
       }
     } catch { /* ignore */ }
 
-    try {
-      const activeReplayId = sessionStorage.getItem(ACTIVE_REPLAY_STORAGE_KEY);
-      if (!activeReplayId) return;
-
-      const matchedReplay = allReplays.find((replay) => replay.id === activeReplayId);
-      if (!matchedReplay) {
-        sessionStorage.removeItem(ACTIVE_REPLAY_STORAGE_KEY);
-        return;
-      }
-
-      setUnlockedIds((prev) => {
-        if (prev.has(activeReplayId)) return prev;
-        const next = new Set(prev);
-        next.add(activeReplayId);
-        return next;
-      });
-      setDisplayedReplay(matchedReplay);
-      setWatchingReplay(matchedReplay);
-      requestAnimationFrame(() => requestAnimationFrame(() => setPlayerVisible(true)));
-    } catch {
-      // ignore storage failures
-    }
+    // Bersihkan sisa state player lama agar halaman / tidak pernah blank
+    // karena overlay player ter-restore dalam keadaan kosong/gagal.
+    try { sessionStorage.removeItem(ACTIVE_REPLAY_STORAGE_KEY); } catch { /* ignore */ }
   }, [allReplays, displayedReplay, loading]);
 
   // Scroll-to-top visibility
