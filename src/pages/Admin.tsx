@@ -74,6 +74,7 @@ export default function Admin() {
   const [waLink, setWaLink] = useState('');
   const [ownerWaNumber, setOwnerWaNumber] = useState('');
   const [staticQrisUrl, setStaticQrisUrl] = useState('');
+  const [useStaticQris, setUseStaticQris] = useState(false);
   const [adminUsername, setAdminUsername] = useState('');
 
   // Comments state
@@ -215,6 +216,7 @@ export default function Admin() {
       setAdminUsername(settings.admin_username || 'Admin');
       setOwnerWaNumber(settings.owner_wa_number || '6288809048431');
       setStaticQrisUrl(settings.static_qris_url || '');
+      setUseStaticQris((settings.use_static_qris || 'false') === 'true');
       const { data: comments } = await supabase.from('comments').select('*').order('created_at', { ascending: false });
       if (comments) setAllComments(comments);
       const { data: blocks } = await supabase.from('blocked_browsers').select('*').order('created_at', { ascending: false });
@@ -480,6 +482,7 @@ export default function Admin() {
       await Promise.all([
         setSetting('owner_wa_number', ownerWaNumber.replace(/\D/g, '') || '6288809048431'),
         setSetting('static_qris_url', staticQrisUrl),
+        setSetting('use_static_qris', useStaticQris ? 'true' : 'false'),
       ]);
       toast({ title: 'Berhasil', description: 'Pengaturan QRIS statis & nomor admin tersimpan.' });
     } catch {
@@ -1191,6 +1194,13 @@ export default function Admin() {
                   <Label>QRIS Statis (alternatif jika QRIS dinamis gagal)</Label>
                   <ImagePicker value={staticQrisUrl} onChange={url => setStaticQrisUrl(url)} />
                   <p className="text-[11px] text-muted-foreground mt-1">Upload gambar QRIS statis. Akan ditampilkan otomatis jika QRIS dinamis gagal dibuat.</p>
+                </div>
+                <div className="flex items-center justify-between rounded-md border border-border p-3">
+                  <div className="pr-3">
+                    <Label className="block">Paksa pakai QRIS Statis</Label>
+                    <p className="text-[11px] text-muted-foreground mt-1">Jika aktif, semua pembelian show langsung menampilkan QRIS statis + tombol Hubungi Admin (tanpa membuat QRIS dinamis Pakasir).</p>
+                  </div>
+                  <Switch checked={useStaticQris} onCheckedChange={setUseStaticQris} />
                 </div>
                 <Button onClick={handleSavePakasirFallback} size="sm"><Save className="w-4 h-4 mr-2" />Simpan</Button>
               </CardContent>
