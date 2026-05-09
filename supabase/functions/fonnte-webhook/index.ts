@@ -21,6 +21,18 @@ function normalizePhone(raw: string) {
   return d;
 }
 
+function pickFirstText(...values: unknown[]) {
+  for (const value of values) {
+    const text = String(value ?? '').trim();
+    if (text) return text;
+  }
+  return '';
+}
+
+function uniquePhones(values: string[]) {
+  return Array.from(new Set(values.map(normalizePhone).filter(Boolean)));
+}
+
 async function sendFonnte(phone: string, message: string, inboxId = ''): Promise<{ ok: boolean; data?: unknown; error?: string }> {
   const token = Deno.env.get('FONNTE_TOKEN');
   if (!token) return { ok: false, error: 'FONNTE_TOKEN not configured' };
@@ -34,14 +46,14 @@ async function sendFonnte(phone: string, message: string, inboxId = ''): Promise
   };
   try {
     let res = await fetch('https://api.fonnte.com/send', {
-      method: 'POST', headers: { Authorization: token }, body: buildForm(true),
+      method: 'POST', headers: { Authorization: token }, body: buildForm(true), signal: AbortSignal.timeout(7000),
     });
     let data = await res.json().catch(() => ({}));
     let ok = res.ok && (data as { status?: boolean })?.status !== false;
     const reason = String((data as { reason?: string })?.reason || '').toLowerCase();
     if (!ok && inboxId && (reason.includes('inbox') || reason.includes('body'))) {
       res = await fetch('https://api.fonnte.com/send', {
-        method: 'POST', headers: { Authorization: token }, body: buildForm(false),
+        method: 'POST', headers: { Authorization: token }, body: buildForm(false), signal: AbortSignal.timeout(7000),
       });
       data = await res.json().catch(() => ({}));
       ok = res.ok && (data as { status?: boolean })?.status !== false;
@@ -285,22 +297,24 @@ Deno.serve(async (req) => {
   }
 
   // Fonnte sends as multipart/form-data, x-www-form-urlencoded, or json
-  let phone = '', text = '', device = '', inboxId = '', fromMe = false, deliverTest = false;
+  let phone = '', text = '', device = '', inboxId = '', fromMe = false, deliverTest = false, participant = '';
   try {
     const ct = req.headers.get('content-type') || '';
     if (ct.includes('application/json')) {
       const j = pickWebhookPayload(await req.json());
-      phone = String(j.sender ?? j.from ?? j.phone ?? j.target ?? '');
+      phone = pickFirstText(j.sender, j.from, j.phone, j.target, j.number, j.remoteJid, j.chat, j.group_id);
+      participant = pickFirstText(j.participant, j.member, j.author, j.pushname_number, j.sender_number);
       device = String(j.device ?? j.device_number ?? '');
-      text = String(j.message ?? j.text ?? j.body ?? j.caption ?? '').trim();
+      text = pickFirstText(j.message, j.text, j.body, j.caption, j.content, j.msg, j.conversation);
       inboxId = String(j.inboxid ?? j.inbox_id ?? j.id ?? '');
       fromMe = j.fromMe === true || j.fromMe === 'true' || j.from_me === true;
       deliverTest = j.deliver === true || j.deliver === 'true' || j.test_deliver === true;
     } else if (ct.includes('multipart/form-data') || ct.includes('application/x-www-form-urlencoded')) {
       const fd = await req.formData();
-      phone = String(fd.get('sender') ?? fd.get('from') ?? fd.get('phone') ?? fd.get('target') ?? '');
+      phone = pickFirstText(fd.get('sender'), fd.get('from'), fd.get('phone'), fd.get('target'), fd.get('number'), fd.get('remoteJid'), fd.get('chat'), fd.get('group_id'));
+      participant = pickFirstText(fd.get('participant'), fd.get('member'), fd.get('author'), fd.get('pushname_number'), fd.get('sender_number'));
       device = String(fd.get('device') ?? fd.get('device_number') ?? '');
-      text = String(fd.get('message') ?? fd.get('text') ?? fd.get('body') ?? fd.get('caption') ?? '').trim();
+      text = pickFirstText(fd.get('message'), fd.get('text'), fd.get('body'), fd.get('caption'), fd.get('content'), fd.get('msg'), fd.get('conversation'));
       inboxId = String(fd.get('inboxid') ?? fd.get('inbox_id') ?? fd.get('id') ?? '');
       fromMe = String(fd.get('fromMe') ?? fd.get('from_me') ?? '') === 'true';
       deliverTest = String(fd.get('deliver') ?? fd.get('test_deliver') ?? '') === 'true';
@@ -308,9 +322,10 @@ Deno.serve(async (req) => {
       const raw = (await req.text()).trim();
       try {
         const j = pickWebhookPayload(JSON.parse(raw));
-        phone = String(j.sender ?? j.from ?? j.phone ?? j.target ?? '');
+        phone = pickFirstText(j.sender, j.from, j.phone, j.target, j.number, j.remoteJid, j.chat, j.group_id);
+        participant = pickFirstText(j.participant, j.member, j.author, j.pushname_number, j.sender_number);
         device = String(j.device ?? j.device_number ?? '');
-        text = String(j.message ?? j.text ?? j.body ?? j.caption ?? '').trim();
+        text = pickFirstText(j.message, j.text, j.body, j.caption, j.content, j.msg, j.conversation);
         inboxId = String(j.inboxid ?? j.inbox_id ?? j.id ?? '');
         fromMe = j.fromMe === true || j.fromMe === 'true' || j.from_me === true;
         deliverTest = j.deliver === true || j.deliver === 'true' || j.test_deliver === true;
@@ -325,6 +340,7 @@ Deno.serve(async (req) => {
   if (!phone || !text) return debug('missing_phone_or_text');
 
   const phoneNorm = normalizePhone(phone);
+  const participantNorm = normalizePhone(participant);
   const deviceNorm = normalizePhone(device);
   const commandPreview = text.toLowerCase().split(/\s+/)[0] || '';
 
@@ -336,6 +352,7 @@ Deno.serve(async (req) => {
     inboxId,
     fromMe,
     eventName: 'received',
+    detail: participantNorm ? { participant: participantNorm } : {},
   });
 
   // Only process commands starting with '/' — silently ignore other chatter
@@ -365,12 +382,17 @@ Deno.serve(async (req) => {
     }
   }
 
-  // Per-phone rate limit: max 1 reply per 8 seconds
+  const lower = text.toLowerCase();
+  const [cmd, ...rest] = lower.split(/\s+/);
+  const arg = rest.join(' ').trim();
+  const ADMIN_ONLY = new Set(['/buattoken', '/createtoken', '/createtokenrep', '/createlink', '/createpub']);
+
+  // Per-phone rate limit: max 1 reply per 2 seconds, but never throttle admin token commands.
   if (!testMode) {
-    const RL_WINDOW_MS = 8000;
+    const RL_WINDOW_MS = ADMIN_ONLY.has(cmd) ? 0 : 2000;
     const { data: rl } = await admin.from('bot_rate_limit')
       .select('last_sent_at').eq('phone', phoneNorm).maybeSingle();
-    if (rl?.last_sent_at && Date.now() - new Date(rl.last_sent_at).getTime() < RL_WINDOW_MS) {
+    if (RL_WINDOW_MS > 0 && rl?.last_sent_at && Date.now() - new Date(rl.last_sent_at).getTime() < RL_WINDOW_MS) {
       await logBotEvent(admin, { phone: phoneNorm, device: deviceNorm, message: text, command: commandPreview, inboxId, fromMe, eventName: 'ignored_rate_limited', detail: { last_sent_at: rl.last_sent_at } });
       return new Response('ok', { headers: corsHeaders });
     }
@@ -379,10 +401,6 @@ Deno.serve(async (req) => {
     await admin.from('bot_rate_limit').delete()
       .lt('last_sent_at', new Date(Date.now() - 10 * 60_000).toISOString());
   }
-
-  const lower = text.toLowerCase();
-  const [cmd, ...rest] = lower.split(/\s+/);
-  const arg = rest.join(' ').trim();
 
   // Lookup command template
   const { data: command } = await admin
@@ -407,16 +425,16 @@ Deno.serve(async (req) => {
   }
 
   // Admin-only commands
-  const ADMIN_ONLY = new Set(['/buattoken', '/createtoken', '/createtokenrep', '/createlink', '/createpub']);
   let isBotAdmin = false;
   if (ADMIN_ONLY.has(cmd)) {
-    const { data: ba } = await admin
+    const candidatePhones = uniquePhones([phoneNorm, participantNorm, fromMe ? deviceNorm : '']);
+    const { data: admins } = await admin
       .from('bot_admins')
       .select('phone')
-      .eq('phone', phoneNorm)
+      .in('phone', candidatePhones.length ? candidatePhones : [phoneNorm])
       .eq('enabled', true)
-      .maybeSingle();
-    isBotAdmin = !!ba;
+    const adminPhones = new Set((admins ?? []).map((a: any) => normalizePhone(a.phone)));
+    isBotAdmin = candidatePhones.some((p) => adminPhones.has(p));
     if (!isBotAdmin) {
       await sendAndAudit(admin, {
         phone: phoneNorm,
