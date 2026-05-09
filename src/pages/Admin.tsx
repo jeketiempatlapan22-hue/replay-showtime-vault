@@ -475,7 +475,17 @@ export default function Admin() {
     }
   };
 
-  const handleToggleLiveChat = async (enabled: boolean) => {
+  const handleSavePakasirFallback = async () => {
+    try {
+      await Promise.all([
+        setSetting('owner_wa_number', ownerWaNumber.replace(/\D/g, '') || '6288809048431'),
+        setSetting('static_qris_url', staticQrisUrl),
+      ]);
+      toast({ title: 'Berhasil', description: 'Pengaturan QRIS statis & nomor admin tersimpan.' });
+    } catch {
+      toast({ title: 'Error', description: 'Gagal menyimpan pengaturan.', variant: 'destructive' });
+    }
+  };
     setLiveChatEnabled(enabled);
     try {
       await setSetting('live_chat_enabled', enabled ? 'true' : 'false');
