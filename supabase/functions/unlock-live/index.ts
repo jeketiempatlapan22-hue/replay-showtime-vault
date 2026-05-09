@@ -8,9 +8,10 @@ const corsHeaders = {
 const json = (b: unknown, status = 200) =>
   new Response(JSON.stringify(b), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
-async function bindMembershipDevice(supabase: any, tokenRow: any, browser_id: string) {
+async function bindMembershipDevice(supabase: any, tokenRow: any, browser_id: string, isSilent = false) {
   if (!browser_id || browser_id.length < 6) return { ok: false, reason: "no_device" };
   const max = Math.max(1, Number(tokenRow.max_devices) || 1);
+  const isMulti = max > 1;
   const { data: existing } = await supabase
     .from("membership_token_devices").select("id").eq("token_id", tokenRow.id).eq("browser_id", browser_id).maybeSingle();
   if (existing) {
@@ -19,12 +20,19 @@ async function bindMembershipDevice(supabase: any, tokenRow: any, browser_id: st
   }
   const { count } = await supabase
     .from("membership_token_devices").select("id", { count: "exact", head: true }).eq("token_id", tokenRow.id);
-  if ((count || 0) >= max) return { ok: false, reason: "device_limit" };
+  if ((count || 0) >= max) {
+    // Multi-device membership: don't kick during silent revalidation; let existing sessions continue.
+    if (isMulti && isSilent) return { ok: true, soft: true };
+    return { ok: false, reason: "device_limit" };
+  }
   const { error } = await supabase.from("membership_token_devices").insert({ token_id: tokenRow.id, browser_id });
   if (error) {
     const { data: re } = await supabase
       .from("membership_token_devices").select("id").eq("token_id", tokenRow.id).eq("browser_id", browser_id).maybeSingle();
-    if (!re) return { ok: false, reason: "device_limit" };
+    if (!re) {
+      if (isMulti && isSilent) return { ok: true, soft: true };
+      return { ok: false, reason: "device_limit" };
+    }
   }
   return { ok: true };
 }
@@ -35,7 +43,7 @@ function membershipInfo(t: any) {
   return { expires_at: t.expires_at, resets_used: used, resets_max: max, remaining: Math.max(0, max - used), includes_replays: !!t.includes_replays };
 }
 
-async function verifyMembership(supabase: any, mtoken: string, mpassword: string, browser_id: string) {
+async function verifyMembership(supabase: any, mtoken: string, mpassword: string, browser_id: string, isSilent = false) {
   const { data: t } = await supabase
     .from("membership_tokens").select("*").eq("token", mtoken).maybeSingle();
   if (!t || t.revoked) return { ok: false, reason: "revoked" };
@@ -43,9 +51,9 @@ async function verifyMembership(supabase: any, mtoken: string, mpassword: string
   const now = Date.now();
   if (t.expires_at && new Date(t.expires_at).getTime() < now) return { ok: false, reason: "expired" };
   if (t.starts_at && new Date(t.starts_at).getTime() > now) return { ok: false, reason: "not_started" };
-  const bind = await bindMembershipDevice(supabase, t, browser_id);
+  const bind = await bindMembershipDevice(supabase, t, browser_id, isSilent);
   if (!bind.ok) return bind;
-  return { ok: true, token: t };
+  return { ok: true, token: t, soft: !!bind.soft };
 }
 
 Deno.serve(async (req) => {
@@ -102,9 +110,9 @@ Deno.serve(async (req) => {
 
       // Membership bypass
       if (mtoken) {
-        const r = await verifyMembership(supabase, mtoken, mpassword || "", browser_id || "");
+        const r = await verifyMembership(supabase, mtoken, mpassword || "", browser_id || "", isSilent);
         if (!r.ok) return json({ valid: false, reason: r.reason });
-        return json({ ...okPayload, watermark: `MB-${String(mtoken).slice(-4).toUpperCase()}`, membership: membershipInfo(r.token) });
+        return json({ ...okPayload, watermark: `MB-${String(mtoken).slice(-4).toUpperCase()}`, membership: membershipInfo(r.token), soft: r.soft });
       }
 
       if (token) {
@@ -157,13 +165,14 @@ Deno.serve(async (req) => {
     const enabled = !!cfg.enabled;
 
     if (mtoken) {
-      const r = await verifyMembership(supabase, mtoken, mpassword || "", browser_id || "");
+      const r = await verifyMembership(supabase, mtoken, mpassword || "", browser_id || "", isSilent);
       if (!r.ok) return json({ valid: false, reason: r.reason });
       return json({
         valid: true, enabled, title: cfg.title, type: cfg.type, url: cfg.url,
         sources: Array.isArray(cfg.sources) ? cfg.sources : [],
         watermark: `MB-${String(mtoken).slice(-4).toUpperCase()}`,
         membership: membershipInfo(r.token),
+        soft: r.soft,
       });
     }
 
