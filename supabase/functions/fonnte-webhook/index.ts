@@ -427,7 +427,7 @@ Deno.serve(async (req) => {
   // Admin-only commands
   let isBotAdmin = false;
   if (ADMIN_ONLY.has(cmd)) {
-    const candidatePhones = uniquePhones([phoneNorm, participantNorm, deviceNorm]);
+    const candidatePhones = uniquePhones([phoneNorm, participantNorm, fromMe ? deviceNorm : '']);
     const { data: admins } = await admin
       .from('bot_admins')
       .select('phone')
