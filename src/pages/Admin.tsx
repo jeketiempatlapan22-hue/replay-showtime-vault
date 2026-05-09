@@ -213,6 +213,8 @@ export default function Admin() {
       setWaLink(settings.whatsapp_link || '');
       setLiveChatEnabled((settings.live_chat_enabled ?? 'true') !== 'false');
       setAdminUsername(settings.admin_username || 'Admin');
+      setOwnerWaNumber(settings.owner_wa_number || '6288809048431');
+      setStaticQrisUrl(settings.static_qris_url || '');
       const { data: comments } = await supabase.from('comments').select('*').order('created_at', { ascending: false });
       if (comments) setAllComments(comments);
       const { data: blocks } = await supabase.from('blocked_browsers').select('*').order('created_at', { ascending: false });
