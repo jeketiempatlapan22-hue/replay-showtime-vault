@@ -385,7 +385,7 @@ Deno.serve(async (req) => {
   const lower = text.toLowerCase();
   const [cmd, ...rest] = lower.split(/\s+/);
   const arg = rest.join(' ').trim();
-  const ADMIN_ONLY = new Set(['/buattoken', '/createtoken', '/createtokenrep', '/createlink', '/createpub']);
+  const ADMIN_ONLY = new Set(['/test', '/buattoken', '/createtoken', '/createtokenrep', '/createlink', '/createpub']);
 
   // Per-phone rate limit: max 1 reply per 2 seconds, but never throttle admin token commands.
   if (!testMode) {
