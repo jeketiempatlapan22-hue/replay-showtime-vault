@@ -112,8 +112,10 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
       })
       .subscribe();
     channelRef.current = ch;
-    // Also poll every 3s as fallback
+    // Also poll every 3s as fallback (DB) + every 5s ask edge fn to query Pakasir directly
+    let tick = 0;
     const poll = setInterval(async () => {
+      tick++;
       const { data } = await supabase.from('orders').select('status, access_token').eq('id', orderId).maybeSingle();
       setLastChecked(Date.now());
       if (data?.status === 'paid') {
@@ -121,6 +123,19 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
         setAccessToken(tok);
         persistPaid(tok);
         setStatus('paid');
+        return;
+      }
+      // Every other tick (~6s), call edge function to poll Pakasir directly.
+      if (tick % 2 === 0) {
+        try {
+          const { data: chk } = await supabase.functions.invoke('check-pakasir-status', { body: { order_id: orderId } });
+          const c = chk as any;
+          if (c?.status === 'paid' && c?.access_token) {
+            setAccessToken(c.access_token);
+            persistPaid(c.access_token);
+            setStatus('paid');
+          }
+        } catch { /* ignore */ }
       }
     }, 3000);
     return () => {
