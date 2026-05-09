@@ -109,7 +109,7 @@ Deno.serve(async (req) => {
 
       if (token) {
         const { data: t } = await supabase
-          .from("active_show_tokens").select("*").eq("token", token).eq("show_id", show_id).maybeSingle();
+          .from("active_show_tokens").select("*").eq("token", token).eq("show_id", resolvedShowId).maybeSingle();
         if (!t || t.revoked) return json({ valid: false, reason: "revoked" });
         if (!browser_id) return json({ valid: false, reason: "no_device" });
         const { data: existing } = await supabase
@@ -132,7 +132,7 @@ Deno.serve(async (req) => {
 
       if (show.live_require_password) {
         if (!password) return json({ valid: false, reason: "password_or_token_required" });
-        const lockId = `livepw:${show_id}:${browser_id || 'anon'}`;
+        const lockId = `livepw:${resolvedShowId}:${browser_id || 'anon'}`;
         const { data: lock } = await supabase.rpc('check_login_lock', { _identifier: lockId });
         const lockRow = Array.isArray(lock) ? lock[0] : lock;
         if (lockRow?.locked) return json({ valid: false, reason: 'rate_limited', seconds_remaining: lockRow.seconds_remaining });
