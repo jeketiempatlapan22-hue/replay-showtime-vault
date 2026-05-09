@@ -224,7 +224,7 @@ export default function Live() {
         if (data.token_kind || data.max_devices) {
           setTokenInfo({ kind: String(data.token_kind || 'personal'), max_devices: Number(data.max_devices || 1) });
         }
-        setKickedMsg('');
+        
       } else if (silent) {
         // Only kick on hard security reasons. Other transient/server errors must NOT log user out.
         const reason = data?.reason;
