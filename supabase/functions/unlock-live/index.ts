@@ -165,13 +165,14 @@ Deno.serve(async (req) => {
     const enabled = !!cfg.enabled;
 
     if (mtoken) {
-      const r = await verifyMembership(supabase, mtoken, mpassword || "", browser_id || "");
+      const r = await verifyMembership(supabase, mtoken, mpassword || "", browser_id || "", isSilent);
       if (!r.ok) return json({ valid: false, reason: r.reason });
       return json({
         valid: true, enabled, title: cfg.title, type: cfg.type, url: cfg.url,
         sources: Array.isArray(cfg.sources) ? cfg.sources : [],
         watermark: `MB-${String(mtoken).slice(-4).toUpperCase()}`,
         membership: membershipInfo(r.token),
+        soft: r.soft,
       });
     }
 
