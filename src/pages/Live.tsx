@@ -171,7 +171,11 @@ export default function Live() {
           });
           if (enabled && wasOff) {
             const t = search.get('t');
+            const mt = search.get('mtoken');
+            const mp = search.get('mp') || search.get('mpassword') || '';
             if (t) void doUnlock({ token: t }, true);
+            else if (mt) void doUnlock({ mtoken: mt, mpassword: mp }, true);
+            // For password-cached users, URL/sources were fetched at initial unlock.
           }
           setStatusLoading(false);
           return data;
