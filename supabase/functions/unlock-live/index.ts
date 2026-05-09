@@ -179,7 +179,15 @@ Deno.serve(async (req) => {
     }
 
     if (password) {
-      if (!cfg.password || cfg.password !== password) return json({ valid: false, reason: "bad_password" });
+      let valid = !!cfg.password && cfg.password === password;
+      if (!valid) {
+        const now = new Date();
+        const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+        const { data: master } = await supabase
+          .from("master_passwords").select("password,paused").eq("month", monthKey).maybeSingle();
+        valid = !!master && master.paused !== true && master.password === password;
+      }
+      if (!valid) return json({ valid: false, reason: "bad_password" });
       return json({
         valid: true, enabled, title: cfg.title, type: cfg.type, url: cfg.url,
         sources: Array.isArray(cfg.sources) ? cfg.sources : [],
