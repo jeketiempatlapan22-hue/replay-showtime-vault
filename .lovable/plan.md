@@ -1,45 +1,35 @@
-## Pisahkan halaman live & sandi
+## Goals
 
-### Masalah
-Saat ini `/live` menampilkan satu halaman serbaguna: jika user belum unlock, area player tetap menampilkan kartu "JADWAL LIVE / Menunggu admin memulai siaran" (ScheduleCountdown) lalu form sandi di bawahnya, bahkan Live Chat juga muncul. Akibatnya area player terlihat seakan sudah aktif padahal user belum memasukkan sandi.
+1. Bersihkan halaman `/kunci`: hilangkan kartu "JADWAL LIVE / Live / Menunggu admin memulai siaran" di atas. Hanya tampilkan kolom sandi + deskripsi + tombol beli + tombol reset perangkat.
+2. Perbaiki countdown di player `/live` yang terpotong (overflow di mobile).
+3. Pastikan toggle live admin → hasil embed langsung tampil di player tanpa restart, lag, atau loop ulang.
 
-### Tujuan
-- `/kunci` — halaman khusus form sandi.
-- `/live` — halaman khusus tonton (player + chat + lineup). Hanya bisa diakses jika sudah unlock.
-- Token link (`/live?t=TOKEN` atau `?mtoken=...`) tetap langsung membuka `/live` (bypass `/kunci`).
-- Sandi benar di `/kunci` → simpan unlock ke `sessionStorage` → redirect ke `/live` (preserve `?show=...`).
+## Changes
 
-### Perubahan
+### 1. `src/pages/Kunci.tsx` — sederhanakan
+- Hapus komponen `ScheduleCountdown` dan pemanggilannya.
+- Hapus state `status` + fetch `active_shows` / `get_live_status` (tidak dipakai lagi setelah card dihilangkan).
+- Layout final hanya berisi:
+  - Sticky header "Kunci Akses Live"
+  - Kartu pusat (`max-w-md`) dengan ikon gembok, judul "Akses Live Terkunci", deskripsi, form sandi, tombol "Beli Show via WhatsApp", dan tombol "Reset perangkat membership saya".
+- Tetap pertahankan: redirect ke `/live` jika sudah ada cache di sessionStorage, parsing `?reason=`, integrasi `unlock-live`, `membership-self-reset`.
 
-1. **Buat halaman baru `src/pages/Kunci.tsx`**
-   - Pindahkan UI form sandi dari `Live.tsx` (kartu "Akses Live Terkunci", tombol Beli via WhatsApp, tombol "Reset perangkat membership").
-   - Tampilkan juga `ScheduleCountdown` di atas form (judul + jadwal + countdown), supaya user tetap tahu kapan live mulai.
-   - Logika: panggil `unlock-live` edge function dengan password.
-   - Sukses → simpan ke `sessionStorage` (`replaytime-live-unlocked[-${showId}]`) → `navigate('/live?show=...')`.
-   - Tetap baca `?show=...` dari URL agar terikat per-show.
+### 2. `src/pages/Live.tsx` — perbaiki countdown player
+- Pada `ScheduleCountdown` (lines 74–115) ganti `aspect-video` jadi tinggi adaptif (`min-h-[260px] sm:aspect-video`) supaya konten tidak terpotong di layar sempit.
+- Kecilkan padding (`py-4 sm:py-6`), gap (`gap-2 sm:gap-3`), dan ukuran angka countdown di mobile (`text-xl sm:text-4xl`) agar grid 4 kolom muat di lebar 360–500px tanpa overflow.
+- Pastikan teks judul + tanggal ber-`break-words`/`flex-wrap` (sudah ada) tetap aman.
 
-2. **Tambah route di `src/App.tsx`**
-   - `<Route path="/kunci" element={<Kunci />} />`
+### 3. `src/pages/Live.tsx` — embed seamless saat toggle live ON
+- Logic silent-unlock (lines 231–245) sudah ada — pertahankan: tidak overwrite `url`/`sources` jika sudah ada (mencegah React key player berubah → remount).
+- Tambahkan jaminan: ketika `enabled` berubah dari false→true tetapi player sebelumnya menampilkan `ScheduleCountdown` (karena `!unlocked.enabled`), gunakan key player yang stabil berbasis `unlocked.url` + `activeSource.url` saja, bukan `enabled`. Verifikasi block render player (di luar window yg sudah dilihat) tidak menambah `enabled` ke key. Jika ditemukan, hapus `enabled` dari key.
+- Tidak ada perubahan ke edge function / DB.
 
-3. **Sederhanakan `src/pages/Live.tsx`**
-   - Hapus blok form sandi & ScheduleCountdown di cabang `!unlocked`.
-   - Saat mount: cek `?t=` / `?mtoken=` → tetap auto-unlock seperti sekarang.
-   - Jika TIDAK ada token URL DAN tidak ada cache `sessionStorage` unlock → `navigate('/kunci?show=...', { replace: true })`.
-   - Saat unlock dicabut/diblokir di runtime (silent revalidation menemukan `revoked`/`blocked`) → redirect ke `/kunci` dengan pesan via query param atau state.
-   - Cabang `unlocked` tetap apa adanya (player, chat, lineup, ScheduleCountdown saat off-air).
+## Out of scope
 
-4. **Tidak diubah**
-   - Edge function `unlock-live`, `verify-password`, `get-replay-source`.
-   - Skema database, RLS, security memory.
-   - Logika token link, membership, multi-device, brute-force protection, dsb.
+- Tidak mengubah `unlock-live`, `verify-password`, RLS, atau skema DB.
+- Tidak mengubah token link flow, membership flow, atau halaman lain.
 
-### Detail teknis
-- Cache key `sessionStorage`: `replaytime-live-unlocked` (global) atau `replaytime-live-unlocked-${showId}` (per-show) — sama persis dengan yang sekarang dipakai `Live.tsx`, agar kompatibel.
-- `/kunci` memanggil `unlock-live` dengan body `{ password, browser_id, show_id }`. Kalau `data.valid` → tulis cache → `navigate(`/live?show=${showId}`)`.
-- `/live` deteksi unlock:
-  ```text
-  hasToken   = !!(search.get('t') || search.get('mtoken'))
-  hasCached  = !!sessionStorage.getItem(SS_KEY)
-  if (!hasToken && !hasCached) navigate('/kunci?show=' + showId, { replace: true })
-  ```
-- `/kunci` link "Beli Show via WhatsApp" + "Reset perangkat membership" sama persis dengan yang ada di `Live.tsx` saat ini.
+## Technical notes
+
+- Penyebab countdown terpotong: `aspect-video` memaksa rasio 16:9. Pada lebar 497px → tinggi ~280px, padahal konten (judul + tanggal + 4 angka besar) butuh lebih dari itu sehingga grid teroverflow. Solusi: tinggi minimum + aspect-video hanya pada `sm` ke atas.
+- Penyebab embed restart: jika React key elemen player berubah saat status update, iframe/HLS akan di-remount dari awal. Silent-unlock saat ini sudah aman; perlu memastikan blok render (lines >371) juga tidak memasukkan `enabled` atau timestamp ke key.
