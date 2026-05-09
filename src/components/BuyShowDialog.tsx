@@ -252,7 +252,12 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
             </div>
             <div className="flex items-center gap-2 rounded-md bg-muted/40 p-2 text-xs text-muted-foreground">
               <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
-              Menunggu pembayaran... halaman ini akan otomatis berubah saat lunas.
+              <span className="flex-1">Mengecek status pembayaran… otomatis berubah saat lunas.</span>
+              {lastChecked > 0 && (
+                <span className="font-mono text-[10px] opacity-70">
+                  {new Date(lastChecked).toLocaleTimeString('id-ID', { hour12: false })}
+                </span>
+              )}
             </div>
           </div>
         )}
