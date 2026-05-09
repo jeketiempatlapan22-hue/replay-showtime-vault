@@ -102,6 +102,14 @@ export default function MembershipAdmin() {
     toast.success('Kuota reset perangkat dikembalikan ke 0');
     void load();
   };
+  const editMaxDevices = async (r: MembershipToken) => {
+    const v = prompt('Atur Max Device baru', String(r.max_devices ?? 1));
+    if (v == null) return;
+    const n = Math.max(1, Math.min(10000, Number(v) || 1));
+    await supabase.from('membership_tokens').update({ max_devices: n, updated_at: new Date().toISOString() }).eq('id', r.id);
+    toast.success(`Max device diubah ke ${n}`);
+    void load();
+  };
   const copyLink = (r: MembershipToken) => {
     const link = `${window.location.origin}/live?mtoken=${encodeURIComponent(r.token)}&mp=${encodeURIComponent(r.password)}`;
     navigator.clipboard.writeText(link);
