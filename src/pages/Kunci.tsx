@@ -10,59 +10,6 @@ const SS_KEY_BASE = 'replaytime-live-unlocked';
 const WA_NUMBER = '6288809048431';
 const WA_LINK = `https://wa.me/${WA_NUMBER}?text=${encodeURIComponent('Halo admin, saya ingin beli akses show live.')}`;
 
-interface PublicStatus {
-  title: string;
-  show_date?: string;
-  show_time?: string;
-  image_url?: string;
-}
-
-function pad(n: number) { return String(n).padStart(2, '0'); }
-
-function ScheduleCountdown({ title, showDate, showTime, imageUrl }: { title: string; showDate?: string; showTime?: string; imageUrl?: string }) {
-  const target = showDate && showTime ? new Date(`${showDate}T${showTime}`) : null;
-  const [now, setNow] = useState(Date.now());
-  useEffect(() => {
-    const t = setInterval(() => { if (document.visibilityState === 'visible') setNow(Date.now()); }, 1000);
-    return () => clearInterval(t);
-  }, []);
-
-  const diff = target ? target.getTime() - now : 0;
-  const past = !target || diff <= 0;
-  const d = Math.max(0, Math.floor(diff / 86400000));
-  const h = Math.max(0, Math.floor((diff % 86400000) / 3600000));
-  const m = Math.max(0, Math.floor((diff % 3600000) / 60000));
-  const s = Math.max(0, Math.floor((diff % 60000) / 1000));
-  const dateLabel = target ? target.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : '';
-  const timeLabel = target ? `${pad(target.getHours())}:${pad(target.getMinutes())} WIB` : '';
-
-  return (
-    <div className="relative rounded-2xl overflow-hidden border border-primary/30 min-h-[260px]">
-      {imageUrl && (
-        <div className="absolute inset-0 bg-center bg-cover" style={{ backgroundImage: `url(${imageUrl})`, opacity: 0.35 }} aria-hidden />
-      )}
-      <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/40 to-black/80" aria-hidden />
-      <div className="relative p-6 sm:p-8 text-center space-y-4">
-        <p className="text-[10px] font-bold tracking-widest text-primary uppercase">Jadwal Live</p>
-        <h3 className="text-xl sm:text-3xl font-bold text-white drop-shadow">{title}</h3>
-        {target && <p className="text-sm sm:text-base text-white/90 drop-shadow">{dateLabel} • {timeLabel}</p>}
-        {past ? (
-          <p className="text-sm sm:text-base font-semibold text-white drop-shadow">⏳ Menunggu admin memulai siaran…</p>
-        ) : (
-          <div className="grid grid-cols-4 gap-2 max-w-md mx-auto">
-            {[{v:d,l:'Hari'},{v:h,l:'Jam'},{v:m,l:'Menit'},{v:s,l:'Detik'}].map((u,i)=>(
-              <div key={i} className="rounded-lg bg-white/10 backdrop-blur border border-white/30 py-3">
-                <div className="text-2xl sm:text-3xl font-bold text-white tabular-nums drop-shadow">{pad(u.v)}</div>
-                <div className="text-[10px] text-white/80 uppercase tracking-wider">{u.l}</div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
 const reasonMessage = (reason?: string): string => {
   switch (reason) {
     case 'blocked': return 'Perangkat ini telah diblokir oleh admin.';
@@ -85,7 +32,6 @@ export default function Kunci() {
   const showId = search.get('show') || '';
   const ssKey = `${SS_KEY_BASE}${showId ? '-' + showId : ''}`;
 
-  const [status, setStatus] = useState<PublicStatus | null>(null);
   const [pwInput, setPwInput] = useState('');
   const [pwError, setPwError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -103,24 +49,6 @@ export default function Kunci() {
 
     const reason = search.get('reason');
     if (reason) setNotice(reasonMessage(reason));
-
-    if (showId) {
-      supabase.from('active_shows')
-        .select('title,show_date,show_time,image_url,is_active')
-        .eq('id', showId).maybeSingle()
-        .then(({ data }) => {
-          if (data && data.is_active) {
-            setStatus({ title: data.title || 'Live', show_date: data.show_date, show_time: data.show_time, image_url: data.image_url || '' });
-          } else {
-            setStatus({ title: 'Live' });
-          }
-        });
-    } else {
-      supabase.rpc('get_live_status').then(({ data }) => {
-        const row = Array.isArray(data) ? data[0] : data;
-        setStatus({ title: row?.title || 'Live' });
-      });
-    }
   }, [showId, ssKey, navigate, search]);
 
   const submitPassword = async (e: React.FormEvent) => {
@@ -178,14 +106,7 @@ export default function Kunci() {
         <h1 className="text-sm sm:text-lg font-semibold truncate font-sans min-w-0 flex-1">Kunci Akses Live</h1>
       </div>
 
-      <div className="w-full max-w-screen-md mx-auto px-2 sm:px-4 lg:px-6 py-3 sm:py-4 space-y-3">
-        <ScheduleCountdown
-          title={status?.title || 'Live'}
-          showDate={status?.show_date}
-          showTime={status?.show_time}
-          imageUrl={status?.image_url}
-        />
-
+      <div className="w-full max-w-screen-md mx-auto px-2 sm:px-4 lg:px-6 py-6 sm:py-10">
         <div className="rounded-2xl bg-card/80 border border-border p-6 max-w-md mx-auto space-y-5">
           <div className="text-center space-y-3">
             <div className="mx-auto w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center">
