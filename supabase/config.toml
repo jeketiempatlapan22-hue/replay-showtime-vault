@@ -23,3 +23,6 @@ verify_jwt = false
 
 [functions.check-pakasir-status]
 verify_jwt = false
+
+[functions.poll-pending-orders]
+verify_jwt = false
