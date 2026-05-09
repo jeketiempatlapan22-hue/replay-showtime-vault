@@ -450,6 +450,7 @@ Deno.serve(async (req) => {
     }
   }
 
+  const processAndSendReply = async () => {
   let reply = command.response_template ?? '';
 
   // Settings substitution
@@ -710,6 +711,53 @@ Deno.serve(async (req) => {
     device: deviceNorm,
     fromMe,
   });
+
+  return { finalReply, sendResult };
+  };
+
+  if (!testMode && ADMIN_ONLY.has(cmd) && isBotAdmin) {
+    const displayCommand = [cmd, arg].filter(Boolean).join(' ');
+    const instantReply = [
+      '⚡ *Command diterima*',
+      '',
+      `Perintah: *${displayCommand}*`,
+      'Bot sedang memproses dan akan mengirim hasilnya sebentar lagi.',
+    ].join('\n');
+
+    const background = (async () => {
+      await sendAndAudit(admin, {
+        phone: phoneNorm,
+        message: instantReply,
+        inboxId,
+        testMode,
+        deliverTest,
+        command: cmd,
+        device: deviceNorm,
+        fromMe,
+      });
+      await processAndSendReply();
+    })().catch(async (e) => {
+      const errorMsg = e instanceof Error ? e.message : 'unknown_error';
+      await sendAndAudit(admin, {
+        phone: phoneNorm,
+        message: `⚠️ Command *${displayCommand}* gagal diproses. ${errorMsg}`,
+        inboxId,
+        testMode,
+        deliverTest,
+        command: cmd,
+        device: deviceNorm,
+        fromMe,
+      });
+    });
+
+    const runtime = (globalThis as unknown as { EdgeRuntime?: { waitUntil?: (promise: Promise<unknown>) => void } }).EdgeRuntime;
+    if (runtime?.waitUntil) runtime.waitUntil(background);
+    else await background;
+
+    return new Response('accepted', { status: 202, headers: corsHeaders });
+  }
+
+  const { finalReply, sendResult } = await processAndSendReply();
 
   if (testMode) {
     return json({ ok: true, phone: phoneNorm, command: cmd, reply: finalReply, delivered: deliverTest, send: sendResult });
