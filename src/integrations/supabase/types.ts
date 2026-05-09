@@ -342,6 +342,30 @@ export type Database = {
         }
         Relationships: []
       }
+      chat_blocks: {
+        Row: {
+          browser_id: string
+          created_at: string
+          id: string
+          last_name: string
+          reason: string
+        }
+        Insert: {
+          browser_id: string
+          created_at?: string
+          id?: string
+          last_name?: string
+          reason?: string
+        }
+        Update: {
+          browser_id?: string
+          created_at?: string
+          id?: string
+          last_name?: string
+          reason?: string
+        }
+        Relationships: []
+      }
       comments: {
         Row: {
           created_at: string
@@ -422,6 +446,7 @@ export type Database = {
           message: string
           name: string
           pinned: boolean
+          reply_to_id: string | null
         }
         Insert: {
           browser_id?: string
@@ -431,6 +456,7 @@ export type Database = {
           message: string
           name?: string
           pinned?: boolean
+          reply_to_id?: string | null
         }
         Update: {
           browser_id?: string
@@ -440,6 +466,7 @@ export type Database = {
           message?: string
           name?: string
           pinned?: boolean
+          reply_to_id?: string | null
         }
         Relationships: []
       }
