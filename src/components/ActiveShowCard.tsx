@@ -45,8 +45,10 @@ export default function ActiveShowCard({ show, index = 0 }: { show: ActiveShow; 
   // Replay routing: prefer inline replay_mode (m3u8/youtube), else legacy replay_id route
   const inlineReplay = !!show.replay_mode && (!!show.replay_m3u8_url || !!show.replay_youtube_url);
   const replayMode = inlineReplay || (show.replay_enabled && !!show.replay_id);
-  const showPriced = (show.price_show || 0) > 0 && (show.pakasir_amount || 0) > 0;
-  const replayPriced = (show.price_replay || 0) > 0 && (show.pakasir_amount || 0) > 0;
+  const showAmount = (show.price_show || show.pakasir_amount || 0);
+  const replayAmount = (show.price_replay || show.pakasir_amount || 0);
+  const showPriced = showAmount >= 100;
+  const replayPriced = replayAmount >= 100;
 
   // LIVE detection
   const startMs = target.getTime();
