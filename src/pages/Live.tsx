@@ -311,7 +311,9 @@ export default function Live() {
 
     // Lightweight token revalidation: poll every 60s instead of subscribing to entire token tables.
     const revalidate = window.setInterval(() => {
-      if (tParam && document.visibilityState === 'visible') void doUnlock({ token: tParam }, true);
+      if (document.visibilityState !== 'visible') return;
+      if (tParam) void doUnlock({ token: tParam }, true);
+      else if (mtParam) void doUnlock({ mtoken: mtParam, mpassword: search.get('mp') || search.get('mpassword') || '' }, true);
     }, 60000);
 
     return () => {
