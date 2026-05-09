@@ -43,6 +43,21 @@ Deno.serve(async (req) => {
     const slug = Deno.env.get('PAKASIR_PROJECT_SLUG');
     if (!slug) return new Response(JSON.stringify({ error: 'pakasir not configured' }), { status: 500, headers: corsHeaders });
 
+    // Rate limit: max 5 pending orders per phone in last 10 minutes
+    try {
+      const since = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+      const { count } = await admin
+        .from('orders')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_phone', phone)
+        .eq('status', 'pending')
+        .gte('created_at', since);
+      if ((count || 0) >= 5) {
+        return new Response(JSON.stringify({ error: 'rate_limited', message: 'Too many pending orders. Try again in a few minutes.' }), { status: 429, headers: corsHeaders });
+      }
+    } catch (_) { /* ignore rate-limit check errors */ }
+
+
     let amount = 0;
     let itemTitle = '';
     let resolvedShowId: string | null = null;
