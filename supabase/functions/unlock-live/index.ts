@@ -43,7 +43,7 @@ function membershipInfo(t: any) {
   return { expires_at: t.expires_at, resets_used: used, resets_max: max, remaining: Math.max(0, max - used), includes_replays: !!t.includes_replays };
 }
 
-async function verifyMembership(supabase: any, mtoken: string, mpassword: string, browser_id: string) {
+async function verifyMembership(supabase: any, mtoken: string, mpassword: string, browser_id: string, isSilent = false) {
   const { data: t } = await supabase
     .from("membership_tokens").select("*").eq("token", mtoken).maybeSingle();
   if (!t || t.revoked) return { ok: false, reason: "revoked" };
@@ -51,9 +51,9 @@ async function verifyMembership(supabase: any, mtoken: string, mpassword: string
   const now = Date.now();
   if (t.expires_at && new Date(t.expires_at).getTime() < now) return { ok: false, reason: "expired" };
   if (t.starts_at && new Date(t.starts_at).getTime() > now) return { ok: false, reason: "not_started" };
-  const bind = await bindMembershipDevice(supabase, t, browser_id);
+  const bind = await bindMembershipDevice(supabase, t, browser_id, isSilent);
   if (!bind.ok) return bind;
-  return { ok: true, token: t };
+  return { ok: true, token: t, soft: !!bind.soft };
 }
 
 Deno.serve(async (req) => {
