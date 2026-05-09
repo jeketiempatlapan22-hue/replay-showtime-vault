@@ -161,13 +161,16 @@ export default function Live() {
           setUnlocked(prev => {
             if (!prev) return prev;
             const hasNoUrl = !prev.url && (prev.sources || []).length === 0;
+            // Saat live baru aktif (OFF→ON) dan unlocked belum punya URL,
+            // langsung isi dari URL publik admin agar player auto-mount realtime.
+            const shouldFill = enabled && (wasOff || hasNoUrl);
             return {
               ...prev,
               enabled,
               title: data.title || prev.title,
               type: (data.live_type as SrcType) || prev.type,
-              url: hasNoUrl && pubMain ? pubMain : prev.url,
-              sources: hasNoUrl && pubPrivSources.length ? pubPrivSources : prev.sources,
+              url: shouldFill && !prev.url && pubMain ? pubMain : prev.url,
+              sources: shouldFill && (prev.sources || []).length === 0 && pubPrivSources.length ? pubPrivSources : prev.sources,
             };
           });
           // When live just toggled on, silently re-call unlock to re-validate (token/blocked)
