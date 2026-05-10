@@ -539,20 +539,25 @@ export default function Live() {
               />
             )}
 
-            {/* LINEUP */}
-            {status?.lineup && status.lineup.length > 0 && (
-              <div className="rounded-2xl bg-card/80 border border-border p-3 sm:p-4 space-y-2">
-                <div className="flex items-center gap-2">
-                  <Users className="w-4 h-4 text-primary" />
-                  <span className="text-xs font-bold uppercase tracking-wider text-foreground">Lineup</span>
+            {/* SHOW TITLE + LINEUP */}
+            <div className="rounded-2xl bg-card/80 border border-border p-3 sm:p-4 space-y-3">
+              <h2 className="text-base sm:text-lg font-bold text-foreground font-sans leading-tight">
+                {unlocked?.title || status?.title || 'Live'}
+              </h2>
+              {status?.lineup && status.lineup.length > 0 && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Users className="w-4 h-4 text-primary" />
+                    <span className="text-xs font-bold uppercase tracking-wider text-foreground">Lineup</span>
+                  </div>
+                  <div className="flex gap-3 overflow-x-auto pb-1">
+                    {status.lineup.map((m, i) => (
+                      <MemberAvatar key={i} name={m} size={56} />
+                    ))}
+                  </div>
                 </div>
-                <div className="flex gap-3 overflow-x-auto pb-1">
-                  {status.lineup.map((m, i) => (
-                    <MemberAvatar key={i} name={m} size={56} />
-                  ))}
-                </div>
-              </div>
-            )}
+              )}
+            </div>
 
             {/* LIVE CHAT */}
             <Suspense fallback={<ChatFallback />}>
