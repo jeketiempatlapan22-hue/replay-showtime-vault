@@ -20,14 +20,11 @@ async function bindMembershipDevice(supabase: any, tokenRow: any, browser_id: st
   }
   const { count } = await supabase
     .from("membership_token_devices").select("id", { count: "exact", head: true }).eq("token_id", tokenRow.id);
-  console.log("[bindMembershipDevice]", { token_id: tokenRow.id, browser_id, max, count, isMulti, isSilent });
   if ((count || 0) >= max) {
-    // Multi-device membership: don't kick during silent revalidation; let existing sessions continue.
     if (isMulti && isSilent) return { ok: true, soft: true };
     return { ok: false, reason: "device_limit" };
   }
   const { error } = await supabase.from("membership_token_devices").insert({ token_id: tokenRow.id, browser_id });
-  console.log("[bindMembershipDevice insert]", { token_id: tokenRow.id, browser_id, error });
   if (error) {
     const { data: re } = await supabase
       .from("membership_token_devices").select("id").eq("token_id", tokenRow.id).eq("browser_id", browser_id).maybeSingle();
