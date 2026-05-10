@@ -164,7 +164,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
       if (cancelled || readyRef.current) return;
       markReady(true);
       setIsPlaying(true);
-    }, 3000);
+    }, 1500);
 
     const init = () => {
       if (cancelled || !iframeRef.current) return;
@@ -403,6 +403,14 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
     ? `https://iframe.videodelivery.net/${cfUid}?autoplay=true&controls=false&preload=auto&muted=true`
     : '';
 
+  // Stable iframe id required so YT.Player can reliably attach to the existing iframe.
+  const ytIframeId = ytId ? `yt-embed-${ytId}` : 'yt-embed';
+
+  const showSpinner = !ready && (
+    (type === 'youtube' && !!ytId) ||
+    (type === 'cloudflare' && !!cfUid)
+  );
+
   return (
     <div
       ref={containerRef}
@@ -416,12 +424,14 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
         ytId ? (
           <iframe
             ref={iframeRef}
+            id={ytIframeId}
             src={ytEmbedUrl}
             onLoad={handleFrameLoaded}
             className="absolute inset-0 w-full h-full pointer-events-none"
             title={title}
-            allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+            allow="autoplay; encrypted-media; picture-in-picture; fullscreen; accelerometer; gyroscope"
             allowFullScreen
+            loading="eager"
             referrerPolicy="strict-origin-when-cross-origin"
             style={{ border: 0 }}
           />
@@ -431,17 +441,24 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
           </div>
         )
       ) : (
-        <iframe
-          ref={iframeRef}
-          src={cfEmbedUrl}
-          onLoad={handleFrameLoaded}
-          className="absolute inset-0 w-full h-full pointer-events-none"
-          title={title}
-          allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
-          allowFullScreen
-          referrerPolicy="strict-origin-when-cross-origin"
-          style={{ border: 0 }}
-        />
+        cfUid ? (
+          <iframe
+            ref={iframeRef}
+            src={cfEmbedUrl}
+            onLoad={handleFrameLoaded}
+            className="absolute inset-0 w-full h-full pointer-events-none"
+            title={title}
+            allow="autoplay; encrypted-media; picture-in-picture; fullscreen; accelerometer; gyroscope"
+            allowFullScreen
+            loading="eager"
+            referrerPolicy="strict-origin-when-cross-origin"
+            style={{ border: 0 }}
+          />
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center bg-black text-white/80 text-sm px-4 text-center">
+            Sumber Cloudflare tidak valid. Hubungi admin untuk memeriksa sumber.
+          </div>
+        )
       )}
 
       {/* Click-shield over iframe — single tap toggles controls visibility instead of clicking through to YouTube logo. */}
@@ -452,7 +469,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
 
       {watermark && <LiveWatermark code={watermark} />}
 
-      {!ready && ytId !== '' && (
+      {showSpinner && (
         <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-black/70 backdrop-blur-sm animate-fade-in pointer-events-none">
           <div className="w-12 h-12 rounded-full border-4 border-white/20 border-t-primary animate-spin" />
           <div className="text-white/90 text-xs font-medium tracking-wide">Menghubungkan ke pemutar…</div>
