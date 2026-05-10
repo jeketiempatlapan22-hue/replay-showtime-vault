@@ -164,7 +164,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
       if (cancelled || readyRef.current) return;
       markReady(true);
       setIsPlaying(true);
-    }, 3000);
+    }, 1500);
 
     const init = () => {
       if (cancelled || !iframeRef.current) return;
