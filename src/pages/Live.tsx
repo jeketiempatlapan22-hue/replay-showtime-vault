@@ -284,6 +284,25 @@ export default function Live() {
       if (cached) setUnlocked(JSON.parse(cached));
     } catch { /* ignore */ }
 
+    // If a token (membership or personal) is provided without a specific show,
+    // try to redirect to the currently live active show automatically.
+    if (!showId && (tParam || mtParam)) {
+      void supabase.from('active_shows')
+        .select('id,is_live,live_auto_schedule,show_date,show_time')
+        .eq('is_active', true)
+        .eq('is_live', true)
+        .order('show_date', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+        .then(({ data }) => {
+          if (data?.id) {
+            const params = new URLSearchParams(search);
+            params.set('show', data.id);
+            navigate(`/live?${params.toString()}`, { replace: true });
+          }
+        });
+    }
+
     // Gate: if no token URL and no cached unlock, send user to the dedicated /kunci page.
     if (!tParam && !mtParam && !cached) {
       navigate(`/kunci${showId ? `?show=${showId}` : ''}`, { replace: true });
@@ -463,7 +482,6 @@ export default function Live() {
               OFF AIR
             </span>
           )}
-          <h1 className="text-sm sm:text-lg font-semibold truncate font-sans min-w-0 flex-1">{unlocked?.title || status?.title || 'Live'}</h1>
         </div>
       </div>
 
@@ -505,9 +523,6 @@ export default function Live() {
                           Reset perangkat: <span className="font-mono text-foreground">{membership.resets_used}/{membership.resets_max}</span> terpakai · Sisa <span className="font-mono text-foreground">{membership.remaining}</span>
                         </div>
                       )}
-                      {(membership.max_devices || 1) > 1 && (
-                        <div className="text-muted-foreground">Membership multi-device · {membership.max_devices} perangkat</div>
-                      )}
                     </div>
                     {(membership.max_devices || 1) <= 1 && (!tokenInfo || (tokenInfo.kind !== 'public' && tokenInfo.max_devices <= 1)) && (
                       <Button type="button" variant="outline" size="sm" onClick={handleSelfReset} disabled={membership.remaining <= 0}>
@@ -543,20 +558,25 @@ export default function Live() {
               />
             )}
 
-            {/* LINEUP */}
-            {status?.lineup && status.lineup.length > 0 && (
-              <div className="rounded-2xl bg-card/80 border border-border p-3 sm:p-4 space-y-2">
-                <div className="flex items-center gap-2">
-                  <Users className="w-4 h-4 text-primary" />
-                  <span className="text-xs font-bold uppercase tracking-wider text-foreground">Lineup</span>
+            {/* SHOW TITLE + LINEUP */}
+            <div className="rounded-2xl bg-card/80 border border-border p-3 sm:p-4 space-y-3">
+              <h2 className="text-base sm:text-lg font-bold text-foreground font-sans leading-tight">
+                {unlocked?.title || status?.title || 'Live'}
+              </h2>
+              {status?.lineup && status.lineup.length > 0 && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Users className="w-4 h-4 text-primary" />
+                    <span className="text-xs font-bold uppercase tracking-wider text-foreground">Lineup</span>
+                  </div>
+                  <div className="flex gap-3 overflow-x-auto pb-1">
+                    {status.lineup.map((m, i) => (
+                      <MemberAvatar key={i} name={m} size={56} />
+                    ))}
+                  </div>
                 </div>
-                <div className="flex gap-3 overflow-x-auto pb-1">
-                  {status.lineup.map((m, i) => (
-                    <MemberAvatar key={i} name={m} size={56} />
-                  ))}
-                </div>
-              </div>
-            )}
+              )}
+            </div>
 
             {/* LIVE CHAT */}
             <Suspense fallback={<ChatFallback />}>
