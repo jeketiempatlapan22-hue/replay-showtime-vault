@@ -27,6 +27,7 @@ async function bindMembershipDevice(supabase: any, tokenRow: any, browser_id: st
     return { ok: false, reason: "device_limit" };
   }
   const { error } = await supabase.from("membership_token_devices").insert({ token_id: tokenRow.id, browser_id });
+  console.log("[bindMembershipDevice insert]", { token_id: tokenRow.id, browser_id, error });
   if (error) {
     const { data: re } = await supabase
       .from("membership_token_devices").select("id").eq("token_id", tokenRow.id).eq("browser_id", browser_id).maybeSingle();
