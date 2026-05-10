@@ -504,9 +504,6 @@ export default function Live() {
                           Reset perangkat: <span className="font-mono text-foreground">{membership.resets_used}/{membership.resets_max}</span> terpakai · Sisa <span className="font-mono text-foreground">{membership.remaining}</span>
                         </div>
                       )}
-                      {(membership.max_devices || 1) > 1 && (
-                        <div className="text-muted-foreground">Membership multi-device · {membership.max_devices} perangkat</div>
-                      )}
                     </div>
                     {(membership.max_devices || 1) <= 1 && (!tokenInfo || (tokenInfo.kind !== 'public' && tokenInfo.max_devices <= 1)) && (
                       <Button type="button" variant="outline" size="sm" onClick={handleSelfReset} disabled={membership.remaining <= 0}>
