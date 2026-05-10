@@ -1,0 +1,1 @@
+GRANT SELECT ON public.active_shows TO anon, authenticated;
