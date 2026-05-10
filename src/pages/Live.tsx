@@ -463,7 +463,6 @@ export default function Live() {
               OFF AIR
             </span>
           )}
-          <h1 className="text-sm sm:text-lg font-semibold truncate font-sans min-w-0 flex-1">{unlocked?.title || status?.title || 'Live'}</h1>
         </div>
       </div>
 
