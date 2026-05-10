@@ -284,6 +284,25 @@ export default function Live() {
       if (cached) setUnlocked(JSON.parse(cached));
     } catch { /* ignore */ }
 
+    // If a token (membership or personal) is provided without a specific show,
+    // try to redirect to the currently live active show automatically.
+    if (!showId && (tParam || mtParam)) {
+      void supabase.from('active_shows')
+        .select('id,is_live,live_auto_schedule,show_date,show_time')
+        .eq('is_active', true)
+        .eq('is_live', true)
+        .order('show_date', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+        .then(({ data }) => {
+          if (data?.id) {
+            const params = new URLSearchParams(search);
+            params.set('show', data.id);
+            navigate(`/live?${params.toString()}`, { replace: true });
+          }
+        });
+    }
+
     // Gate: if no token URL and no cached unlock, send user to the dedicated /kunci page.
     if (!tParam && !mtParam && !cached) {
       navigate(`/kunci${showId ? `?show=${showId}` : ''}`, { replace: true });
