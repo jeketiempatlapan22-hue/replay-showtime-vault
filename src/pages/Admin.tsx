@@ -834,7 +834,10 @@ export default function Admin() {
             </Card>
 
             <Card>
-              <CardHeader><CardTitle className="font-sans text-base sm:text-lg">Daftar Show ({activeShows.length})</CardTitle></CardHeader>
+              <CardHeader className="flex flex-row items-center justify-between gap-2 flex-wrap">
+                <CardTitle className="font-sans text-base sm:text-lg">Daftar Show ({activeShows.length})</CardTitle>
+                <BulkShowImport onImported={refreshActiveShows} />
+              </CardHeader>
               <CardContent>
                 {activeShows.length === 0 ? (
                   <p className="text-muted-foreground text-center py-8">Belum ada show aktif.</p>
