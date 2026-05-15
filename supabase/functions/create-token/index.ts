@@ -27,47 +27,33 @@ function buildAttractiveMessage(opts: {
   replayPassword?: string;
   livePassword?: string;
 }) {
-  const dateLine = opts.showDate ? `📅 ${opts.showDate}` : '';
-  const pwLines = [
-    opts.replayPassword ? `🔑 Sandi Replay: *${opts.replayPassword}*` : '',
-    opts.livePassword ? `🔑 Sandi Live: *${opts.livePassword}*` : '',
-  ].filter(Boolean);
-  const pwBlock = pwLines.length ? ['', ...pwLines] : [];
-  if (opts.kind === 'master') {
-    return [
-      '✨🎬 *TOKEN AKSES REPLAYTIME* 🎬✨',
-      '',
-      `🎤 *${opts.title}*`,
-      dateLine,
-      '',
-      '🔓 *Token Master* — bisa dibuka di banyak perangkat.',
-      `🔗 ${opts.link}`,
-      ...pwBlock,
-      '',
-      '🎥 *Bonus:* link yang sama juga dapat dipakai untuk menonton *Live* di',
-      `📺 ${opts.liveUrl}`,
-      '',
-      '🌐 Situs: https://replaytime.lovable.app',
-      '💖 Selamat menikmati pertunjukan, jangan lupa bagikan keseruan ini!',
-    ].filter(Boolean).join('\n');
+  const isPersonal = opts.kind === 'personal';
+  const lines: string[] = [];
+  lines.push('🎬 *ReplayTime*');
+  lines.push('━━━━━━━━━━━━━━');
+  lines.push('');
+  lines.push(`🎤 *${opts.title}*`);
+  if (opts.showDate) lines.push(`📅 ${opts.showDate}`);
+  lines.push('');
+  lines.push('🔗 *Link Akses*');
+  lines.push(opts.link);
+  if (opts.replayPassword) {
+    lines.push('');
+    lines.push(`🔐 Sandi Replay: *${opts.replayPassword}*`);
   }
-  return [
-    '✨🔐 *TOKEN SATUAN REPLAYTIME* 🔐✨',
-    '',
-    `🎤 *${opts.title}*`,
-    dateLine,
-    '',
-    '👤 *Token Pribadi* — terkunci untuk *1 perangkat pertama* yang membuka.',
-    `🔗 ${opts.link}`,
-    ...pwBlock,
-    '',
-    '🎥 *Bonus:* link ini juga jadi tiket Anda untuk menonton *Live*:',
-    `📺 ${opts.liveUrl}`,
-    '',
-    '🌐 Situs: https://replaytime.lovable.app',
-    '⚠️ Jangan dibagikan ke orang lain — perangkat lain tidak akan bisa membuka.',
-    '💖 Selamat menonton!',
-  ].filter(Boolean).join('\n');
+  if (opts.liveUrl) {
+    lines.push('');
+    lines.push('📺 *Link Live*');
+    lines.push(opts.liveUrl);
+    if (opts.livePassword) lines.push(`🔐 Sandi Live: *${opts.livePassword}*`);
+  }
+  lines.push('');
+  lines.push('━━━━━━━━━━━━━━');
+  lines.push(isPersonal
+    ? '👤 Khusus *1 perangkat* — jangan dibagikan.'
+    : '✨ Bisa dibuka di banyak perangkat.');
+  lines.push('💖 Selamat menonton!');
+  return lines.join('\n');
 }
 
 Deno.serve(async (req) => {

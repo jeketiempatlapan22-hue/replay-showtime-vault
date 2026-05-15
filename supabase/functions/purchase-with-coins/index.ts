@@ -123,7 +123,7 @@ Deno.serve(async (req) => {
     const sm = new Map((settings ?? []).map((s) => [s.key, s.value]));
     const origin = (sm.get('site_origin') || 'https://replaytime.lovable.app').replace(/\/+$/, '');
     const tpl = sm.get('wa_message_template') ||
-      '🎬 *{title}*\n{date_line}\n🔗 Link Akses:\n{link}\n{password_line}{live_link_block}\n— *ReplayTime* 💖';
+      '🎬 *ReplayTime*\n━━━━━━━━━━━━━━\n\n🎤 *{title}*\n{date_line}🔗 *Link Akses*\n{link}\n{password_line}{live_link_block}━━━━━━━━━━━━━━\n✨ Selamat menonton! 💖';
     const replayPart = resolvedReplayId ? `&replay=${resolvedReplayId}` : '';
     const link = `${origin}/akses?token=${accessToken}${replayPart}`;
     let password = ''; let liveLink = '';
@@ -138,9 +138,9 @@ Deno.serve(async (req) => {
     }
     const dateStr = new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
     const message = tpl
-      .replace(/\{date_line\}\n?/g, dateStr ? `📅 ${dateStr}\n` : '')
-      .replace(/\{password_line\}\n?/g, password ? `🔐 Sandi: *${password}*\n` : '')
-      .replace(/\{live_link_block\}\n?/g, liveLink ? `\n📺 Link Live:\n${liveLink}\n` : '')
+      .replace(/\{date_line\}/g, dateStr ? `📅 ${dateStr}\n\n` : '')
+      .replace(/\{password_line\}/g, password ? `🔐 Sandi: *${password}*\n\n` : '')
+      .replace(/\{live_link_block\}/g, liveLink ? `📺 *Link Live*\n${liveLink}\n\n` : '')
       .replace(/\{title\}/g, itemTitle).replace(/\{link\}/g, link)
       .replace(/\{live_link\}/g, liveLink).replace(/\{password\}/g, password)
       .replace(/\{date\}/g, dateStr).replace(/\{order_id\}/g, order?.id || '').replace(/\{site\}/g, origin);
