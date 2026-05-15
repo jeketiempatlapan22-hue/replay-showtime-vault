@@ -354,7 +354,7 @@ export default function Admin() {
   const handleLogout = async () => { await supabase.auth.signOut(); setIsLoggedIn(false); };
 
   const resetForm = () => {
-    setForm({ title: '', showName: '', date: '', showTime: '19:00', criteria: 'reguler', featuredMember: '', lineup: '', password: '', adminAlias: '', youtubeId: '', imageUrl: '', sourceType: 'youtube', m3u8Url: '', sources: [] });
+    setForm({ title: '', showName: '', date: '', showTime: '19:00', criteria: 'reguler', featuredMember: '', lineup: '', password: '', adminAlias: '', youtubeId: '', imageUrl: '', sourceType: 'youtube', m3u8Url: '', sources: [], priceCoins: 0 });
     setEditingReplay(null);
   };
 
