@@ -66,7 +66,7 @@ export default function Admin() {
   const [editingReplay, setEditingReplay] = useState<ReplayRow | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ReplayRow | null>(null);
 
-  const [form, setForm] = useState({ title: '', showName: '', date: '', showTime: '19:00', criteria: 'reguler', featuredMember: '', lineup: '', password: '', adminAlias: '', youtubeId: '', imageUrl: '', sourceType: 'youtube', m3u8Url: '', sources: [] as PlaylistSource[] });
+  const [form, setForm] = useState({ title: '', showName: '', date: '', showTime: '19:00', criteria: 'reguler', featuredMember: '', lineup: '', password: '', adminAlias: '', youtubeId: '', imageUrl: '', sourceType: 'youtube', m3u8Url: '', sources: [] as PlaylistSource[], priceCoins: 0 });
   const [liveChatEnabled, setLiveChatEnabled] = useState(true);
 
   const [mpYear, setMpYear] = useState(String(new Date().getFullYear()));
@@ -116,16 +116,16 @@ export default function Admin() {
 
   // Active shows state
   const [activeShows, setActiveShows] = useState<ActiveShow[]>([]);
-  const [showForm, setShowForm] = useState<{ id?: string; title: string; show_date: string; show_time: string; lineup: string; category: string; description: string; image_url: string; sort_order: number; is_active: boolean; price_show: number; price_replay: number; pakasir_amount: number; replay_id: string; replay_enabled: boolean; admin_alias: string }>({
+  const [showForm, setShowForm] = useState<{ id?: string; title: string; show_date: string; show_time: string; lineup: string; category: string; description: string; image_url: string; sort_order: number; is_active: boolean; price_show: number; price_replay: number; price_show_coins: number; price_replay_coins: number; pakasir_amount: number; replay_id: string; replay_enabled: boolean; admin_alias: string }>({
     title: '', show_date: '', show_time: '19:00', lineup: '', category: 'reguler', description: '', image_url: '', sort_order: 0, is_active: true,
-    price_show: 0, price_replay: 0, pakasir_amount: 0, replay_id: '', replay_enabled: false, admin_alias: '',
+    price_show: 0, price_replay: 0, price_show_coins: 0, price_replay_coins: 0, pakasir_amount: 0, replay_id: '', replay_enabled: false, admin_alias: '',
   });
   const [showEditing, setShowEditing] = useState(false);
 
   const refreshActiveShows = () => getActiveShows(true).then(setActiveShows);
 
   const resetShowForm = () => {
-    setShowForm({ title: '', show_date: '', show_time: '19:00', lineup: '', category: 'reguler', description: '', image_url: '', sort_order: 0, is_active: true, price_show: 0, price_replay: 0, pakasir_amount: 0, replay_id: '', replay_enabled: false, admin_alias: '' });
+    setShowForm({ title: '', show_date: '', show_time: '19:00', lineup: '', category: 'reguler', description: '', image_url: '', sort_order: 0, is_active: true, price_show: 0, price_replay: 0, price_show_coins: 0, price_replay_coins: 0, pakasir_amount: 0, replay_id: '', replay_enabled: false, admin_alias: '' });
     setShowEditing(false);
   };
 
@@ -148,6 +148,8 @@ export default function Admin() {
         is_active: showForm.is_active,
         price_show: Number(showForm.price_show) || 0,
         price_replay: Number(showForm.price_replay) || 0,
+        price_show_coins: Number(showForm.price_show_coins) || 0,
+        price_replay_coins: Number(showForm.price_replay_coins) || 0,
         pakasir_amount: Number(showForm.pakasir_amount) || 0,
         replay_id: showForm.replay_id || null,
         replay_enabled: showForm.replay_enabled,
@@ -167,6 +169,7 @@ export default function Admin() {
       lineup: s.lineup.join(', '), category: s.category, description: s.description,
       image_url: s.image_url, sort_order: s.sort_order, is_active: s.is_active,
       price_show: s.price_show ?? 0, price_replay: s.price_replay ?? 0,
+      price_show_coins: (s as any).price_show_coins ?? 0, price_replay_coins: (s as any).price_replay_coins ?? 0,
       pakasir_amount: s.pakasir_amount ?? 0, replay_id: s.replay_id ?? '',
       replay_enabled: s.replay_enabled ?? false,
       admin_alias: (s as any).admin_alias ?? '',
@@ -351,7 +354,7 @@ export default function Admin() {
   const handleLogout = async () => { await supabase.auth.signOut(); setIsLoggedIn(false); };
 
   const resetForm = () => {
-    setForm({ title: '', showName: '', date: '', showTime: '19:00', criteria: 'reguler', featuredMember: '', lineup: '', password: '', adminAlias: '', youtubeId: '', imageUrl: '', sourceType: 'youtube', m3u8Url: '', sources: [] });
+    setForm({ title: '', showName: '', date: '', showTime: '19:00', criteria: 'reguler', featuredMember: '', lineup: '', password: '', adminAlias: '', youtubeId: '', imageUrl: '', sourceType: 'youtube', m3u8Url: '', sources: [], priceCoins: 0 });
     setEditingReplay(null);
   };
 
@@ -392,6 +395,7 @@ export default function Admin() {
         source_type: form.sourceType,
         m3u8_url: isYoutube ? '' : form.m3u8Url,
         sources: normalizedSources as any,
+        price_coins: Number(form.priceCoins) || 0,
       };
       if (editingReplay) {
         await updateReplay(editingReplay.id, payload);
@@ -417,6 +421,7 @@ export default function Admin() {
       youtubeId: r.youtube_id, imageUrl: r.image_url,
       sourceType: (r as any).source_type || 'youtube', m3u8Url: (r as any).m3u8_url || '',
       sources: Array.isArray((r as any).sources) ? (r as any).sources : [],
+      priceCoins: (r as any).price_coins ?? 0,
     });
     setShowAddDialog(true);
   };
@@ -804,6 +809,18 @@ export default function Admin() {
                     <Label>Harga Replay (Rp)</Label>
                     <Input type="number" min={0} value={showForm.price_replay} onChange={e => setShowForm({ ...showForm, price_replay: Number(e.target.value) })} placeholder="0" />
                     <p className="text-[11px] text-muted-foreground mt-1">Default Rp 2.000 jika kosong.</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3 pt-2 border-t border-border/40">
+                  <div>
+                    <Label>Harga Show (Koin)</Label>
+                    <Input type="number" min={0} value={showForm.price_show_coins} onChange={e => setShowForm({ ...showForm, price_show_coins: Number(e.target.value) })} placeholder="0" />
+                    <p className="text-[11px] text-muted-foreground mt-1">0 = nonaktif (tab Koin disembunyikan).</p>
+                  </div>
+                  <div>
+                    <Label>Harga Replay (Koin)</Label>
+                    <Input type="number" min={0} value={showForm.price_replay_coins} onChange={e => setShowForm({ ...showForm, price_replay_coins: Number(e.target.value) })} placeholder="0" />
+                    <p className="text-[11px] text-muted-foreground mt-1">0 = nonaktif.</p>
                   </div>
                 </div>
                 <div>
@@ -1442,6 +1459,11 @@ export default function Admin() {
             </div>
             <div><Label>Foto Kartu</Label><ImagePicker value={form.imageUrl} onChange={url => setForm(f => ({ ...f, imageUrl: url }))} /></div>
             <div><Label>Sandi *</Label><Input placeholder="Sandi untuk replay ini" value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} /></div>
+            <div>
+              <Label>Harga Koin (untuk tukar)</Label>
+              <Input type="number" min={0} value={form.priceCoins} onChange={e => setForm(f => ({ ...f, priceCoins: Number(e.target.value) }))} placeholder="0 = nonaktif" />
+              <p className="text-[11px] text-muted-foreground mt-1">Jumlah koin yang user bayar untuk membuka replay ini. 0 = tab Koin disembunyikan.</p>
+            </div>
             <div>
               <Label>Alias Admin <span className="text-xs text-muted-foreground">(rahasia, hanya admin)</span></Label>
               <Input
