@@ -19,18 +19,36 @@ function genToken() {
   return crypto.randomUUID().replace(/-/g, '').slice(0, 24);
 }
 
-async function sendFonnte(phone: string, message: string) {
+async function sendFonnteOnce(phone: string, message: string) {
   const token = Deno.env.get('FONNTE_TOKEN');
   if (!token) return { ok: false, data: { error: 'no token' } };
   const form = new FormData();
   form.append('target', normalizePhone(phone));
   form.append('message', message);
   form.append('countryCode', '62');
-  const res = await fetch('https://api.fonnte.com/send', {
-    method: 'POST', headers: { Authorization: token }, body: form,
-  });
-  const data = await res.json().catch(() => ({}));
-  return { ok: res.ok, data };
+  try {
+    const res = await fetch('https://api.fonnte.com/send', {
+      method: 'POST', headers: { Authorization: token }, body: form,
+      signal: AbortSignal.timeout(8000),
+    });
+    const data = await res.json().catch(() => ({}));
+    return { ok: res.ok && (data as { status?: boolean })?.status !== false, data };
+  } catch (e) {
+    return { ok: false, data: { error: String(e) } };
+  }
+}
+
+// Auto-retry: 3 attempts with 0/1s/3s backoff so transient Fonnte errors
+// do not silently swallow the post-payment notification.
+async function sendFonnte(phone: string, message: string) {
+  const delays = [0, 1000, 3000];
+  let last: { ok: boolean; data: unknown } = { ok: false, data: { error: 'no_attempt' } };
+  for (let i = 0; i < delays.length; i++) {
+    if (delays[i]) await new Promise((r) => setTimeout(r, delays[i]));
+    last = await sendFonnteOnce(phone, message);
+    if (last.ok) return last;
+  }
+  return last;
 }
 
 Deno.serve(async (req) => {
