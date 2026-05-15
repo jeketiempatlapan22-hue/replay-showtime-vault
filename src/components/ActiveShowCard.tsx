@@ -249,10 +249,12 @@ export default function ActiveShowCard({ show, index = 0 }: { show: ActiveShow; 
               <Button className="w-full gap-2" variant="secondary" onClick={goReplay}>
                 <Play className="w-4 h-4" /> Tonton Replay
               </Button>
-            ) : replayPriced ? (
+            ) : replayBuyable ? (
               <Button className="w-full gap-2" onClick={() => openBuy('replay')}>
                 <PlayCircle className="w-4 h-4" />
-                Beli Replay via QRIS &amp; Koin
+                {replayPriced && replayCoinPrice > 0 ? 'Beli Replay via QRIS & Koin'
+                  : replayPriced ? 'Beli Replay via QRIS'
+                  : `Tukar ${replayCoinPrice} Koin untuk Replay`}
               </Button>
             ) : (
               <Button className="w-full gap-2" variant="secondary" onClick={goReplay}>
@@ -266,10 +268,12 @@ export default function ActiveShowCard({ show, index = 0 }: { show: ActiveShow; 
                 <Play className="w-4 h-4" /> Tonton Show
               </Button>
             )
-          ) : showPriced ? (
+          ) : showBuyable ? (
             <Button className="w-full gap-2" onClick={() => openBuy('show')}>
               <ShoppingCart className="w-4 h-4" />
-              Beli Show via QRIS &amp; Koin
+              {showPriced && showCoinPrice > 0 ? 'Beli Show via QRIS & Koin'
+                : showPriced ? 'Beli Show via QRIS'
+                : `Tukar ${showCoinPrice} Koin untuk Show`}
             </Button>
           ) : null}
         </div>
