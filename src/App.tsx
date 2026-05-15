@@ -17,6 +17,8 @@ import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import Akses from "./pages/Akses";
 import Shows from "./pages/Shows";
+import Koin from "./pages/Koin";
+import BottomNav from "./components/BottomNav";
 
 const queryClient = new QueryClient();
 
