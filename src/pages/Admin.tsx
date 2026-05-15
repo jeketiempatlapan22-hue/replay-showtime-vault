@@ -167,6 +167,7 @@ export default function Admin() {
       lineup: s.lineup.join(', '), category: s.category, description: s.description,
       image_url: s.image_url, sort_order: s.sort_order, is_active: s.is_active,
       price_show: s.price_show ?? 0, price_replay: s.price_replay ?? 0,
+      price_show_coins: (s as any).price_show_coins ?? 0, price_replay_coins: (s as any).price_replay_coins ?? 0,
       pakasir_amount: s.pakasir_amount ?? 0, replay_id: s.replay_id ?? '',
       replay_enabled: s.replay_enabled ?? false,
       admin_alias: (s as any).admin_alias ?? '',
