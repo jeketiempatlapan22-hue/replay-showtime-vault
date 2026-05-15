@@ -1178,6 +1178,7 @@ export type Database = {
         }
         Returns: number
       }
+      email_for_identifier: { Args: { _identifier: string }; Returns: string }
       email_for_phone: { Args: { _phone: string }; Returns: string }
       get_active_live: {
         Args: never
