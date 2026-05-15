@@ -307,10 +307,10 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
               <div className="flex items-start gap-2 rounded-md border border-yellow-500/30 bg-yellow-500/10 p-3 text-xs">
                 <Lock className="w-4 h-4 text-yellow-500 shrink-0 mt-0.5" />
                 <div className="flex-1">
-                  <div className="font-semibold mb-0.5">Login diperlukan</div>
-                  <div className="text-muted-foreground">Pembelian QRIS & Koin memerlukan akun.</div>
+                  <div className="font-semibold mb-0.5">Login opsional</div>
+                  <div className="text-muted-foreground">QRIS bisa dipakai tanpa login. Pembelian dengan koin memerlukan akun.</div>
                 </div>
-                <Button size="sm" onClick={() => navigate('/auth?redirect=' + encodeURIComponent(window.location.pathname))}>Login</Button>
+                <Button size="sm" variant="outline" onClick={() => navigate('/auth?redirect=' + encodeURIComponent(window.location.pathname))}>Login</Button>
               </div>
             )}
 
