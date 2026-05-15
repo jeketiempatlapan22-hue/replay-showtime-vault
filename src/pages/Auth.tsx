@@ -202,7 +202,7 @@ export default function Auth() {
           <img src={logoImg} alt="Logo" className="w-14 h-14 rounded-full ring-2 ring-primary/40" />
           <h1 className="text-2xl font-bold text-foreground">{mode === 'login' ? 'Masuk' : 'Daftar Akun'}</h1>
           <p className="text-sm text-muted-foreground">
-            {mode === 'login' ? 'Gunakan email atau nomor HP Anda.' : 'Buat akun dengan email & nomor HP.'}
+            {mode === 'login' ? 'Masuk dengan email, nomor HP, atau username.' : 'Buat akun dengan email & nomor HP.'}
           </p>
         </div>
 
