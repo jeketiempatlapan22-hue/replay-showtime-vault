@@ -112,13 +112,19 @@ async function createTokenInline(
 ): Promise<{ ok: boolean; message?: string; error?: string }> {
   try {
     const { data: replay } = await admin
-      .from('replays').select('id,title,date').eq('id', opts.replayId).maybeSingle();
+      .from('replays').select('id,title,date,password').eq('id', opts.replayId).maybeSingle();
     if (!replay) return { ok: false, error: 'replay_not_found' };
 
     const origin = (opts.settingsMap.get('site_origin') || 'https://replaytime.lovable.app').replace(/\/+$/, '');
-    const liveUrl = `${origin}/live`;
     const token = newToken();
     const isPersonal = opts.kind === 'personal';
+
+    // Sandi: prioritas sandi replay, fallback ke sandi show terkait.
+    const { data: aShow } = await admin
+      .from('active_shows').select('live_password')
+      .eq('replay_id', opts.replayId).eq('is_active', true).maybeSingle();
+    const password = ((replay as any).password ? String((replay as any).password) : '')
+      || (aShow?.live_password ? String(aShow.live_password) : '');
 
     if (isPersonal) {
       const { error } = await admin.from('replay_personal_tokens').insert({
@@ -140,10 +146,13 @@ async function createTokenInline(
           day: '2-digit', month: 'long', year: 'numeric',
         })
       : '';
-    const message = buildAttractiveTokenMessage({
-      kind: opts.kind,
+    const tplStr = (opts.settingsMap.get('wa_message_template') as string) || DEFAULT_WA_TPL;
+    const message = renderWaTemplate(tplStr, {
       title: (replay as { title: string }).title,
-      link, liveUrl, showDate,
+      link,
+      date: showDate,
+      password,
+      site: origin.replace(/^https?:\/\//, ''),
     });
 
     await admin.from('token_deliveries').insert({
