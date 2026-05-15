@@ -226,7 +226,8 @@ export default function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWa
                 </div>
               </div>
               <Button type="button" className="w-full gap-2" onClick={() => setBuyOpen(true)}>
-                <ShoppingCart className="w-4 h-4" /> Beli Replay via QRIS &amp; Koin
+                <ShoppingCart className="w-4 h-4" />
+                {((replay as any).price_coins ?? 0) > 0 ? 'Beli Replay via QRIS & Koin' : 'Beli Replay via QRIS'}
               </Button>
               <Button type="button" variant="outline" className="w-full border-primary/50 text-primary hover:bg-primary hover:text-primary-foreground" onClick={() => setShowPasswordDialog(true)}>
                 <Lock className="w-4 h-4 mr-2" /> Buka dengan Sandi

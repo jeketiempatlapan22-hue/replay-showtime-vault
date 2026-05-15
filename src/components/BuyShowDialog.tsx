@@ -30,6 +30,7 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
   const navigate = useNavigate();
   const { user } = useAuth();
   const [method, setMethod] = useState<'qris' | 'coin'>('qris');
+  const qrisAvailable = amount >= 100;
   const [coinPrice, setCoinPrice] = useState<number>(0);
   const [coinBalance, setCoinBalance] = useState<number>(0);
   const [coinBusy, setCoinBusy] = useState(false);
@@ -76,6 +77,9 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
           price = kind === 'replay' ? ((s as any)?.price_replay_coins || 0) : ((s as any)?.price_show_coins || 0);
         }
         setCoinPrice(price);
+        // Default to coin tab when QRIS is unavailable but coin price is set
+        if (!qrisAvailable && price > 0) setMethod('coin');
+        else if (qrisAvailable && price <= 0) setMethod('qris');
       } catch { setCoinPrice(0); }
       // Balance
       if (user) {
@@ -315,9 +319,13 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
             )}
 
             <Tabs value={method} onValueChange={(v) => setMethod(v as 'qris' | 'coin')}>
-              <TabsList className="grid grid-cols-2 w-full">
-                <TabsTrigger value="qris"><Smartphone className="w-4 h-4 mr-1.5" /> QRIS</TabsTrigger>
-                <TabsTrigger value="coin" disabled={coinPrice <= 0}><Coins className="w-4 h-4 mr-1.5" /> Koin{coinPrice > 0 ? ` (${coinPrice})` : ''}</TabsTrigger>
+              <TabsList className={`grid w-full ${qrisAvailable && coinPrice > 0 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                {qrisAvailable && (
+                  <TabsTrigger value="qris"><Smartphone className="w-4 h-4 mr-1.5" /> QRIS</TabsTrigger>
+                )}
+                {coinPrice > 0 && (
+                  <TabsTrigger value="coin"><Coins className="w-4 h-4 mr-1.5" /> Tukar {coinPrice} Koin</TabsTrigger>
+                )}
               </TabsList>
 
               <TabsContent value="qris" className="space-y-4 mt-4">

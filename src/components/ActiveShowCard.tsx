@@ -51,8 +51,12 @@ export default function ActiveShowCard({ show, index = 0 }: { show: ActiveShow; 
   const replayMode = inlineReplay || (show.replay_enabled && !!show.replay_id);
   const showAmount = (show.price_show || show.pakasir_amount || 0);
   const replayAmount = (show.price_replay || show.pakasir_amount || 0);
+  const showCoinPrice = Number((show as any).price_show_coins || 0);
+  const replayCoinPrice = Number((show as any).price_replay_coins || 0);
   const showPriced = showAmount >= 100;
   const replayPriced = replayAmount >= 100;
+  const showBuyable = showPriced || showCoinPrice > 0;
+  const replayBuyable = replayPriced || replayCoinPrice > 0;
 
   // LIVE detection
   const startMs = target.getTime();
@@ -207,19 +211,22 @@ export default function ActiveShowCard({ show, index = 0 }: { show: ActiveShow; 
         </div>
 
         {/* Price block */}
-        {(replayMode ? replayPriced : showPriced) && (
+        {(replayMode ? replayBuyable : showBuyable) && (
           <div className="rounded-md border border-primary/20 bg-primary/5 p-2.5 space-y-1">
             <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Harga {replayMode ? 'Replay' : 'Show'}</div>
             <div className="flex items-center justify-between gap-2 flex-wrap">
-              <span className="text-base font-bold text-primary">
-                Rp {(replayMode ? replayAmount : showAmount).toLocaleString('id-ID')}
-              </span>
-              {(() => {
-                const coins = replayMode ? (show as any).price_replay_coins : (show as any).price_show_coins;
-                return coins > 0 ? (
-                  <Badge variant="secondary" className="text-xs">atau {coins} koin</Badge>
-                ) : null;
-              })()}
+              {(replayMode ? replayPriced : showPriced) ? (
+                <span className="text-base font-bold text-primary">
+                  Rp {(replayMode ? replayAmount : showAmount).toLocaleString('id-ID')}
+                </span>
+              ) : (
+                <span className="text-xs text-muted-foreground">Hanya tukar koin</span>
+              )}
+              {((replayMode ? replayCoinPrice : showCoinPrice) > 0) && (
+                <Badge variant="secondary" className="text-xs">
+                  {(replayMode ? replayPriced : showPriced) ? 'atau ' : ''}{replayMode ? replayCoinPrice : showCoinPrice} koin
+                </Badge>
+              )}
             </div>
           </div>
         )}
@@ -242,10 +249,12 @@ export default function ActiveShowCard({ show, index = 0 }: { show: ActiveShow; 
               <Button className="w-full gap-2" variant="secondary" onClick={goReplay}>
                 <Play className="w-4 h-4" /> Tonton Replay
               </Button>
-            ) : replayPriced ? (
+            ) : replayBuyable ? (
               <Button className="w-full gap-2" onClick={() => openBuy('replay')}>
                 <PlayCircle className="w-4 h-4" />
-                Beli Replay via QRIS &amp; Koin
+                {replayPriced && replayCoinPrice > 0 ? 'Beli Replay via QRIS & Koin'
+                  : replayPriced ? 'Beli Replay via QRIS'
+                  : `Tukar ${replayCoinPrice} Koin untuk Replay`}
               </Button>
             ) : (
               <Button className="w-full gap-2" variant="secondary" onClick={goReplay}>
@@ -259,10 +268,12 @@ export default function ActiveShowCard({ show, index = 0 }: { show: ActiveShow; 
                 <Play className="w-4 h-4" /> Tonton Show
               </Button>
             )
-          ) : showPriced ? (
+          ) : showBuyable ? (
             <Button className="w-full gap-2" onClick={() => openBuy('show')}>
               <ShoppingCart className="w-4 h-4" />
-              Beli Show via QRIS &amp; Koin
+              {showPriced && showCoinPrice > 0 ? 'Beli Show via QRIS & Koin'
+                : showPriced ? 'Beli Show via QRIS'
+                : `Tukar ${showCoinPrice} Koin untuk Show`}
             </Button>
           ) : null}
         </div>

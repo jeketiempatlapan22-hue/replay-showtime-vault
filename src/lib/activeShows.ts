@@ -13,6 +13,8 @@ export interface ActiveShow {
   is_active: boolean;
   price_show: number;
   price_replay: number;
+  price_show_coins?: number;
+  price_replay_coins?: number;
   pakasir_amount: number;
   replay_id: string | null;
   replay_enabled: boolean;
