@@ -58,6 +58,9 @@ export default function Auth() {
   const [remember, setRemember] = useState(true);
   const [busy, setBusy] = useState(false);
   const [lockSeconds, setLockSeconds] = useState(0);
+  const [forgotOpen, setForgotOpen] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotBusy, setForgotBusy] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
