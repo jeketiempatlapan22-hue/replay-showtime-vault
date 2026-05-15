@@ -191,6 +191,11 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
   };
 
   const handleCreate = async () => {
+    if (!user) {
+      toast.error('Login dulu untuk pembayaran QRIS.');
+      navigate('/auth?redirect=' + encodeURIComponent(window.location.pathname));
+      return;
+    }
     const norm = normalizePhone(phone);
     if (!/^62\d{8,13}$/.test(norm)) {
       toast.error('Nomor WhatsApp tidak valid. Contoh: 0812xxxx');
@@ -235,6 +240,46 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
       const msg = e?.message || 'Gagal membuat order';
       toast.error(`${msg}. Menampilkan QRIS statis sebagai alternatif.`);
       setStatus('static_qris');
+    }
+  };
+
+  const handleCoinPurchase = async () => {
+    if (!user) {
+      toast.error('Login dulu untuk membeli dengan koin.');
+      navigate('/auth?redirect=' + encodeURIComponent(window.location.pathname));
+      return;
+    }
+    const norm = normalizePhone(phone);
+    if (!/^62\d{8,13}$/.test(norm)) {
+      toast.error('Nomor WhatsApp tidak valid.');
+      return;
+    }
+    if (coinPrice <= 0) { toast.error('Item ini belum bisa dibeli pakai koin.'); return; }
+    if (coinBalance < coinPrice) { toast.error('Saldo koin tidak cukup. Silakan top-up.'); navigate('/koin'); return; }
+    try { localStorage.setItem('replaytime-phone', phone); } catch { /* ignore */ }
+    setCoinBusy(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('purchase-with-coins', {
+        body: {
+          phone: norm,
+          show_id: kind === 'replay_only' ? undefined : showId,
+          replay_id: replayId || undefined,
+          item_title: itemTitle,
+          kind,
+        },
+      });
+      if (error) throw error;
+      const r = data as any;
+      if (!r?.ok) throw new Error(r?.error || 'Gagal memproses pembelian');
+      setAccessToken(r.access_token || '');
+      persistPaid(r.access_token || '');
+      setCoinBalance(r.new_balance ?? Math.max(0, coinBalance - coinPrice));
+      setStatus('paid');
+      toast.success('Pembelian berhasil! Token dikirim via WhatsApp.');
+    } catch (e: any) {
+      toast.error(e?.message || 'Gagal memproses pembelian');
+    } finally {
+      setCoinBusy(false);
     }
   };
 
