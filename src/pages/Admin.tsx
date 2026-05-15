@@ -194,6 +194,11 @@ export default function Admin() {
         supabase.from('user_roles').select('role').eq('user_id', session.user.id).eq('role', 'admin').maybeSingle().then(({ data }) => {
           if (data) setIsLoggedIn(true);
         });
+        supabase.from('profiles').select('username,email').eq('user_id', session.user.id).maybeSingle().then(({ data }) => {
+          const uname = (data?.username || '').trim().toLowerCase();
+          const mail = (data?.email || '').trim().toLowerCase();
+          setCanEditAdminUsername(uname === 'mod' || uname === 'dhy' || mail === 'dhy@01.com');
+        });
       }
     });
   }, []);
