@@ -39,6 +39,7 @@ export default function ActiveShowCard({ show, index = 0 }: { show: ActiveShow; 
   const target = getShowDateTime(show);
   const cd = useCountdown(target);
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [buyOpen, setBuyOpen] = useState(false);
   const [buyMode, setBuyMode] = useState<'show' | 'replay'>('show');
   const [inlinePlayerOpen, setInlinePlayerOpen] = useState(false);
