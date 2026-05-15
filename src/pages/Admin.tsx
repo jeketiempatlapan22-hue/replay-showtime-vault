@@ -5,6 +5,7 @@ import BotAdmin from '@/components/admin/BotAdmin';
 import TokenHistoryAdmin from '@/components/admin/TokenHistoryAdmin';
 import MembershipAdmin from '@/components/admin/MembershipAdmin';
 import PakasirAdmin from '@/components/admin/PakasirAdmin';
+import CoinAdmin from '@/components/admin/CoinAdmin';
 import ReplayPersonalTokensDialog from '@/components/admin/ReplayPersonalTokensDialog';
 import ShowLiveControl from '@/components/admin/ShowLiveControl';
 import { getMembers, upsertMember, deleteMember, uploadMemberPhoto, type Member } from '@/lib/members';
