@@ -631,6 +631,7 @@ export default function Admin() {
                 { v: 'bot', label: 'Bot WhatsApp', Icon: Bot },
                 { v: 'history', label: 'Riwayat Token', Icon: History },
                 { v: 'membership', label: 'Membership', Icon: Users },
+                { v: 'pakasir', label: 'Pakasir Webhook', Icon: Settings },
                 { v: 'preview', label: 'Preview', Icon: Eye },
                 { v: 'comments', label: 'Komentar', Icon: MessageCircle },
                 { v: 'security', label: 'Blokir', Icon: ShieldCheck },
