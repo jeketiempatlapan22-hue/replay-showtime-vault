@@ -131,9 +131,9 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Mark paid + generate token
-    const accessToken = order.access_token ?? genToken();
-    if (order.status !== 'paid') {
+    // Mark paid + provision a fresh single-device token row
+    const accessToken = await ensurePurchaseToken(admin, order);
+    if (order.status !== 'paid' || order.access_token !== accessToken) {
       await admin.from('orders').update({
         status: 'paid', paid_at: new Date().toISOString(), access_token: accessToken,
       }).eq('id', order.id);
