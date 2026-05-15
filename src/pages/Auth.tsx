@@ -313,6 +313,61 @@ export default function Auth() {
           <Link to="/" className="text-xs text-muted-foreground hover:text-primary">← Kembali ke beranda</Link>
         </div>
       </div>
+
+      <Dialog open={forgotOpen} onOpenChange={setForgotOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><KeyRound className="w-4 h-4" /> Lupa Sandi</DialogTitle>
+            <DialogDescription className="text-xs">
+              Masukkan email akun Anda. Kami akan mengirim tautan reset ke email tersebut.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="forgot-email" className="text-xs">Email</Label>
+            <Input
+              id="forgot-email"
+              type="email"
+              value={forgotEmail}
+              onChange={(e) => setForgotEmail(e.target.value)}
+              placeholder="email@mail.com"
+              autoComplete="email"
+            />
+            <p className="text-[11px] text-muted-foreground">
+              Jika Anda hanya punya nomor HP/username, hubungi admin via WhatsApp dari halaman Profil untuk reset sandi.
+            </p>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="ghost" onClick={() => setForgotOpen(false)} disabled={forgotBusy}>Batal</Button>
+            <Button
+              onClick={async () => {
+                const em = forgotEmail.trim();
+                if (!em || !em.includes('@')) {
+                  toast({ title: 'Email tidak valid', variant: 'destructive' });
+                  return;
+                }
+                setForgotBusy(true);
+                try {
+                  const { error } = await supabase.auth.resetPasswordForEmail(em, {
+                    redirectTo: `${window.location.origin}/reset-password`,
+                  });
+                  if (error) throw error;
+                  toast({ title: 'Email terkirim', description: 'Cek inbox/spam untuk tautan reset sandi.' });
+                  setForgotOpen(false);
+                } catch (e: unknown) {
+                  const msg = e instanceof Error ? e.message : 'Gagal mengirim email';
+                  toast({ title: 'Gagal', description: msg, variant: 'destructive' });
+                } finally {
+                  setForgotBusy(false);
+                }
+              }}
+              disabled={forgotBusy}
+            >
+              {forgotBusy ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <KeyRound className="w-4 h-4 mr-2" />}
+              Kirim Tautan
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
