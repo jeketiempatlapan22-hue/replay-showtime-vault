@@ -51,8 +51,12 @@ export default function ActiveShowCard({ show, index = 0 }: { show: ActiveShow; 
   const replayMode = inlineReplay || (show.replay_enabled && !!show.replay_id);
   const showAmount = (show.price_show || show.pakasir_amount || 0);
   const replayAmount = (show.price_replay || show.pakasir_amount || 0);
+  const showCoinPrice = Number((show as any).price_show_coins || 0);
+  const replayCoinPrice = Number((show as any).price_replay_coins || 0);
   const showPriced = showAmount >= 100;
   const replayPriced = replayAmount >= 100;
+  const showBuyable = showPriced || showCoinPrice > 0;
+  const replayBuyable = replayPriced || replayCoinPrice > 0;
 
   // LIVE detection
   const startMs = target.getTime();
