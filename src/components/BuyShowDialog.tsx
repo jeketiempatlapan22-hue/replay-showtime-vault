@@ -50,7 +50,7 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
   const [ownerWa, setOwnerWa] = useState<string>('6288809048431');
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
-  // Load admin contact + static QRIS settings when dialog opens
+  // Load admin contact + static QRIS settings + coin price/balance when dialog opens
   useEffect(() => {
     if (!open) return;
     (async () => {
@@ -65,8 +65,36 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
           if (row.key === 'use_static_qris') setUseStaticQris(String(row.value || 'false') === 'true');
         }
       } catch { /* ignore */ }
+      // Coin price for the item
+      try {
+        let price = 0;
+        if (kind === 'replay_only' && replayId) {
+          const { data: r } = await supabase.from('replays').select('price_coins').eq('id', replayId).maybeSingle();
+          price = (r as any)?.price_coins || 0;
+        } else if (showId) {
+          const { data: s } = await supabase.from('active_shows').select('price_show_coins,price_replay_coins').eq('id', showId).maybeSingle();
+          price = kind === 'replay' ? ((s as any)?.price_replay_coins || 0) : ((s as any)?.price_show_coins || 0);
+        }
+        setCoinPrice(price);
+      } catch { setCoinPrice(0); }
+      // Balance
+      if (user) {
+        try {
+          const { data: b } = await supabase.from('coin_balances').select('balance').eq('user_id', user.id).maybeSingle();
+          setCoinBalance((b as any)?.balance || 0);
+          // Autofill phone from profile
+          if (!phone) {
+            const { data: p } = await supabase.from('profiles').select('phone').eq('user_id', user.id).maybeSingle();
+            const ph = (p as any)?.phone || '';
+            if (ph) setPhone(ph);
+          }
+        } catch { /* ignore */ }
+      } else {
+        setCoinBalance(0);
+      }
     })();
-  }, [open]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, showId, replayId, kind, user]);
 
   // Reset on close
   useEffect(() => {
@@ -163,6 +191,11 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
   };
 
   const handleCreate = async () => {
+    if (!user) {
+      toast.error('Login dulu untuk pembayaran QRIS.');
+      navigate('/auth?redirect=' + encodeURIComponent(window.location.pathname));
+      return;
+    }
     const norm = normalizePhone(phone);
     if (!/^62\d{8,13}$/.test(norm)) {
       toast.error('Nomor WhatsApp tidak valid. Contoh: 0812xxxx');
@@ -210,6 +243,46 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
     }
   };
 
+  const handleCoinPurchase = async () => {
+    if (!user) {
+      toast.error('Login dulu untuk membeli dengan koin.');
+      navigate('/auth?redirect=' + encodeURIComponent(window.location.pathname));
+      return;
+    }
+    const norm = normalizePhone(phone);
+    if (!/^62\d{8,13}$/.test(norm)) {
+      toast.error('Nomor WhatsApp tidak valid.');
+      return;
+    }
+    if (coinPrice <= 0) { toast.error('Item ini belum bisa dibeli pakai koin.'); return; }
+    if (coinBalance < coinPrice) { toast.error('Saldo koin tidak cukup. Silakan top-up.'); navigate('/koin'); return; }
+    try { localStorage.setItem('replaytime-phone', phone); } catch { /* ignore */ }
+    setCoinBusy(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('purchase-with-coins', {
+        body: {
+          phone: norm,
+          show_id: kind === 'replay_only' ? undefined : showId,
+          replay_id: replayId || undefined,
+          item_title: itemTitle,
+          kind,
+        },
+      });
+      if (error) throw error;
+      const r = data as any;
+      if (!r?.ok) throw new Error(r?.error || 'Gagal memproses pembelian');
+      setAccessToken(r.access_token || '');
+      persistPaid(r.access_token || '');
+      setCoinBalance(r.new_balance ?? Math.max(0, coinBalance - coinPrice));
+      setStatus('paid');
+      toast.success('Pembelian berhasil! Token dikirim via WhatsApp.');
+    } catch (e: any) {
+      toast.error(e?.message || 'Gagal memproses pembelian');
+    } finally {
+      setCoinBusy(false);
+    }
+  };
+
   const adminWaUrl = (() => {
     const num = (ownerWa || '6288809048431').replace(/\D/g, '');
     const desc = `Halo Admin, saya ingin konfirmasi pembayaran:%0A%0A• Item: ${encodeURIComponent(itemTitle)}%0A• Show: ${encodeURIComponent(showTitle)}%0A• Nominal: Rp ${amount.toLocaleString('id-ID')}%0A• Nomor saya: ${normalizePhone(phone) || '-'}${pakasirOrderId ? `%0A• Order ID: ${pakasirOrderId}` : ''}%0A%0AMohon dikirimkan token akses setelah pembayaran terkonfirmasi. Terima kasih 🙏`;
@@ -234,30 +307,63 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
 
         {status === 'form' && (
           <div className="space-y-4">
-            <div className="rounded-lg bg-primary/10 border border-primary/20 p-3 text-center">
-              <div className="text-xs text-muted-foreground">Total Pembayaran</div>
-              <div className="text-2xl font-bold text-primary">Rp {amount.toLocaleString('id-ID')}</div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="phone-buy">Nomor WhatsApp</Label>
-              <div className="relative">
-                <Smartphone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  id="phone-buy"
-                  type="tel"
-                  inputMode="numeric"
-                  placeholder="0812xxxxxxxx"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  className="pl-9"
-                  autoFocus
-                />
+            {!user && (
+              <div className="flex items-start gap-2 rounded-md border border-yellow-500/30 bg-yellow-500/10 p-3 text-xs">
+                <Lock className="w-4 h-4 text-yellow-500 shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <div className="font-semibold mb-0.5">Login diperlukan</div>
+                  <div className="text-muted-foreground">Pembelian QRIS & Koin memerlukan akun.</div>
+                </div>
+                <Button size="sm" onClick={() => navigate('/auth?redirect=' + encodeURIComponent(window.location.pathname))}>Login</Button>
               </div>
-              <p className="text-xs text-muted-foreground">Token akses akan dikirim ke nomor ini setelah pembayaran lunas.</p>
-            </div>
-            <Button className="w-full" onClick={handleCreate} disabled={!phone}>
-              Lanjut ke Pembayaran
-            </Button>
+            )}
+
+            <Tabs value={method} onValueChange={(v) => setMethod(v as 'qris' | 'coin')}>
+              <TabsList className="grid grid-cols-2 w-full">
+                <TabsTrigger value="qris"><Smartphone className="w-4 h-4 mr-1.5" /> QRIS</TabsTrigger>
+                <TabsTrigger value="coin" disabled={coinPrice <= 0}><Coins className="w-4 h-4 mr-1.5" /> Koin{coinPrice > 0 ? ` (${coinPrice})` : ''}</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="qris" className="space-y-4 mt-4">
+                <div className="rounded-lg bg-primary/10 border border-primary/20 p-3 text-center">
+                  <div className="text-xs text-muted-foreground">Total Pembayaran</div>
+                  <div className="text-2xl font-bold text-primary">Rp {amount.toLocaleString('id-ID')}</div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="phone-buy">Nomor WhatsApp</Label>
+                  <div className="relative">
+                    <Smartphone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input id="phone-buy" type="tel" inputMode="numeric" placeholder="0812xxxxxxxx" value={phone} onChange={(e) => setPhone(e.target.value)} className="pl-9" />
+                  </div>
+                  <p className="text-xs text-muted-foreground">Token akses akan dikirim ke nomor ini setelah pembayaran lunas.</p>
+                </div>
+                <Button className="w-full" onClick={handleCreate} disabled={!phone || !user}>
+                  Lanjut ke Pembayaran
+                </Button>
+              </TabsContent>
+
+              <TabsContent value="coin" className="space-y-4 mt-4">
+                <div className="rounded-lg bg-primary/10 border border-primary/20 p-3 space-y-1">
+                  <div className="flex justify-between text-xs"><span className="text-muted-foreground">Harga</span><span className="font-semibold text-primary">{coinPrice} koin</span></div>
+                  <div className="flex justify-between text-xs"><span className="text-muted-foreground">Saldo Anda</span><span className={`font-semibold ${coinBalance >= coinPrice ? 'text-foreground' : 'text-destructive'}`}>{coinBalance} koin</span></div>
+                  {coinBalance < coinPrice && (
+                    <p className="text-[11px] text-destructive pt-1">Saldo kurang. <button onClick={() => navigate('/koin')} className="underline">Top-up koin</button></p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="phone-coin">Nomor WhatsApp</Label>
+                  <div className="relative">
+                    <Smartphone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input id="phone-coin" type="tel" inputMode="numeric" placeholder="0812xxxxxxxx" value={phone} onChange={(e) => setPhone(e.target.value)} className="pl-9" />
+                  </div>
+                  <p className="text-xs text-muted-foreground">Token akses akan dikirim ke WhatsApp ini.</p>
+                </div>
+                <Button className="w-full" onClick={handleCoinPurchase} disabled={!phone || !user || coinBusy || coinBalance < coinPrice}>
+                  {coinBusy ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Coins className="w-4 h-4 mr-2" />}
+                  Tukar {coinPrice} Koin
+                </Button>
+              </TabsContent>
+            </Tabs>
           </div>
         )}
 
