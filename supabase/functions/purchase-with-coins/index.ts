@@ -127,15 +127,14 @@ Deno.serve(async (req) => {
     const replayPart = resolvedReplayId ? `&replay=${resolvedReplayId}` : '';
     const link = `${origin}/akses?token=${accessToken}${replayPart}`;
     let password = ''; let liveLink = '';
+    const isReplayOnlyPurchase = !!resolvedReplayId && !resolvedShowId;
     if (resolvedShowId) {
       const { data: showRow } = await admin.from('active_shows').select('live_password').eq('id', resolvedShowId).maybeSingle();
       password = String(showRow?.live_password || '').trim();
       if (!resolvedReplayId) liveLink = `${origin}/live?show=${resolvedShowId}&t=${accessToken}`;
     }
-    if (!password && resolvedReplayId && !resolvedShowId) {
-      const { data: rep } = await admin.from('replays').select('password').eq('id', resolvedReplayId).maybeSingle();
-      password = String(rep?.password || '').trim();
-    }
+    // Replay dibeli via kartu replay → token-link sudah cukup, tanpa sandi.
+    if (isReplayOnlyPurchase) password = '';
     const dateStr = new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
     const message = tpl
       .replace(/\{date_line\}/g, dateStr ? `📅 ${dateStr}\n\n` : '')
