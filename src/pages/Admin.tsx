@@ -148,6 +148,8 @@ export default function Admin() {
         is_active: showForm.is_active,
         price_show: Number(showForm.price_show) || 0,
         price_replay: Number(showForm.price_replay) || 0,
+        price_show_coins: Number(showForm.price_show_coins) || 0,
+        price_replay_coins: Number(showForm.price_replay_coins) || 0,
         pakasir_amount: Number(showForm.pakasir_amount) || 0,
         replay_id: showForm.replay_id || null,
         replay_enabled: showForm.replay_enabled,
