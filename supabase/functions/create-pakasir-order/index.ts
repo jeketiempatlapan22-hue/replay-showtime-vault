@@ -117,13 +117,27 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: 'pakasir_unreachable', detail: String(e) }), { status: 502, headers: corsHeaders });
     }
 
+    // Capture user_id from JWT if logged in (required for QRIS purchase, but allow guest fallback for replay_only — frontend enforces login)
+    let userId: string | null = null;
+    try {
+      const auth = req.headers.get('Authorization') || '';
+      const jwt = auth.replace(/^Bearer\s+/i, '');
+      if (jwt) {
+        const userClient = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, { global: { headers: { Authorization: `Bearer ${jwt}` } } });
+        const { data: ud } = await userClient.auth.getUser();
+        userId = ud?.user?.id || null;
+      }
+    } catch { /* ignore */ }
+
     const { data: order, error: orderErr } = await admin.from('orders').insert({
+      user_id: userId,
       user_phone: phone,
       replay_id: resolvedReplayId,
       show_id: resolvedShowId,
       item_title: itemTitle,
       amount,
       status: 'pending',
+      kind,
       pakasir_order_id: orderId,
       pakasir_qr_url: qrUrl,
     }).select('id').single();
