@@ -80,35 +80,23 @@ function newToken(len = 40) {
   return (a + b).slice(0, len);
 }
 
-function buildAttractiveTokenMessage(opts: {
-  kind: 'master' | 'personal' | 'replay';
-  title: string;
-  link: string;
-  liveUrl: string;
-  showDate?: string;
+const DEFAULT_WA_TPL =
+  '🎬 *ReplayTime*\n━━━━━━━━━━━━━━\n\n🎤 *{title}*\n{date_line}🔗 *Link Akses*\n{link}\n{password_line}{live_link_block}━━━━━━━━━━━━━━\n✨ Selamat menonton! 💖';
+
+function renderWaTemplate(tpl: string, vars: {
+  title: string; link: string; date?: string; password?: string; liveLink?: string; orderId?: string; site?: string;
 }) {
-  const isPersonal = opts.kind === 'personal';
-  const lines: string[] = [];
-  lines.push('🎬 *ReplayTime*');
-  lines.push('━━━━━━━━━━━━━━');
-  lines.push('');
-  lines.push(`🎤 *${opts.title}*`);
-  if (opts.showDate) lines.push(`📅 ${opts.showDate}`);
-  lines.push('');
-  lines.push('🔗 *Link Akses*');
-  lines.push(opts.link);
-  if (opts.liveUrl) {
-    lines.push('');
-    lines.push('📺 *Link Live*');
-    lines.push(opts.liveUrl);
-  }
-  lines.push('');
-  lines.push('━━━━━━━━━━━━━━');
-  lines.push(isPersonal
-    ? '👤 Khusus *1 perangkat* — jangan dibagikan.'
-    : '✨ Bisa dibuka di banyak perangkat.');
-  lines.push('💖 Selamat menonton!');
-  return lines.join('\n');
+  return (tpl || DEFAULT_WA_TPL)
+    .replace(/\{date_line\}/g, vars.date ? `📅 ${vars.date}\n\n` : '')
+    .replace(/\{password_line\}/g, vars.password ? `🔐 Sandi: *${vars.password}*\n\n` : '')
+    .replace(/\{live_link_block\}/g, vars.liveLink ? `📺 *Link Live*\n${vars.liveLink}\n\n` : '')
+    .replace(/\{title\}/g, vars.title || '')
+    .replace(/\{link\}/g, vars.link || '')
+    .replace(/\{date\}/g, vars.date || '')
+    .replace(/\{password\}/g, vars.password || '')
+    .replace(/\{live_link\}/g, vars.liveLink || '')
+    .replace(/\{order_id\}/g, vars.orderId || '')
+    .replace(/\{site\}/g, vars.site || '');
 }
 
 async function createTokenInline(
@@ -124,13 +112,19 @@ async function createTokenInline(
 ): Promise<{ ok: boolean; message?: string; error?: string }> {
   try {
     const { data: replay } = await admin
-      .from('replays').select('id,title,date').eq('id', opts.replayId).maybeSingle();
+      .from('replays').select('id,title,date,password').eq('id', opts.replayId).maybeSingle();
     if (!replay) return { ok: false, error: 'replay_not_found' };
 
     const origin = (opts.settingsMap.get('site_origin') || 'https://replaytime.lovable.app').replace(/\/+$/, '');
-    const liveUrl = `${origin}/live`;
     const token = newToken();
     const isPersonal = opts.kind === 'personal';
+
+    // Sandi: prioritas sandi replay, fallback ke sandi show terkait.
+    const { data: aShow } = await admin
+      .from('active_shows').select('live_password')
+      .eq('replay_id', opts.replayId).eq('is_active', true).maybeSingle();
+    const password = ((replay as any).password ? String((replay as any).password) : '')
+      || (aShow?.live_password ? String(aShow.live_password) : '');
 
     if (isPersonal) {
       const { error } = await admin.from('replay_personal_tokens').insert({
@@ -152,10 +146,13 @@ async function createTokenInline(
           day: '2-digit', month: 'long', year: 'numeric',
         })
       : '';
-    const message = buildAttractiveTokenMessage({
-      kind: opts.kind,
+    const tplStr = (opts.settingsMap.get('wa_message_template') as string) || DEFAULT_WA_TPL;
+    const message = renderWaTemplate(tplStr, {
       title: (replay as { title: string }).title,
-      link, liveUrl, showDate,
+      link,
+      date: showDate,
+      password,
+      site: origin.replace(/^https?:\/\//, ''),
     });
 
     await admin.from('token_deliveries').insert({
