@@ -92,7 +92,18 @@ async function sendFonnte(phone: string, message: string) {
   return { ...last, attempts: delays.length };
 }
 
-async function processOrder(admin: ReturnType<typeof createClient>, order: any, apiKey: string, slug: string, origin: string) {
+const DEFAULT_WA_TPL =
+  '🎬 *{title}*\n{date_line}\n🔗 Link Akses:\n{link}\n{password_line}{live_link_block}\n— *ReplayTime* 💖';
+
+function renderTemplate(tpl: string, vars: Record<string, string>) {
+  return tpl
+    .replace(/\{date_line\}\n?/g, vars.date ? `📅 ${vars.date}\n` : '')
+    .replace(/\{password_line\}\n?/g, vars.password ? `🔐 Sandi: *${vars.password}*\n` : '')
+    .replace(/\{live_link_block\}\n?/g, vars.live_link ? `\n📺 Link Live:\n${vars.live_link}\n` : '')
+    .replace(/\{(\w+)\}/g, (_, k) => (vars as Record<string, string>)[k] ?? '');
+}
+
+async function processOrder(admin: ReturnType<typeof createClient>, order: any, apiKey: string, slug: string, origin: string, tpl: string) {
   if (!order.pakasir_order_id) return { id: order.id, skipped: 'no_pakasir_id' };
 
   const url = `https://app.pakasir.com/api/transactiondetail?project=${encodeURIComponent(slug)}&amount=${order.amount}&order_id=${encodeURIComponent(order.pakasir_order_id)}&api_key=${encodeURIComponent(apiKey)}`;
@@ -138,24 +149,34 @@ async function processOrder(admin: ReturnType<typeof createClient>, order: any, 
   const replayPart = order.replay_id ? `&replay=${order.replay_id}` : '';
   const link = `${origin}/akses?token=${accessToken}${replayPart}`;
 
-  let showExtras = '';
-  if (order.show_id && !order.replay_id) {
+  // Pull replay password (admin-set on the active show card) when available.
+  let password = '';
+  let liveLink = '';
+  if (order.show_id) {
     const { data: showRow } = await admin
       .from('active_shows').select('live_password').eq('id', order.show_id).maybeSingle();
-    const liveLink = `${origin}/live?show=${order.show_id}&t=${accessToken}`;
-    const pwd = String(showRow?.live_password || '').trim();
-    showExtras = pwd
-      ? `\n\n🔐 *Sandi tonton LIVE:*\n${pwd}\n_Masukkan sandi ini di halaman Live untuk masuk._\n\n▶️ Link tonton Live:\n${liveLink}`
-      : `\n\n▶️ Link tonton Live:\n${liveLink}`;
+    password = String(showRow?.live_password || '').trim();
+    if (!order.replay_id) {
+      liveLink = `${origin}/live?show=${order.show_id}&t=${accessToken}`;
+    }
+  }
+  // Fallback: standalone replay → use replays.password.
+  if (!password && order.replay_id && !order.show_id) {
+    const { data: rep } = await admin
+      .from('replays').select('password').eq('id', order.replay_id).maybeSingle();
+    password = String(rep?.password || '').trim();
   }
 
-  const message =
-    `✅ *Pembayaran Berhasil*\n\n` +
-    `${order.item_title}\n` +
-    `Order: ${order.pakasir_order_id}\n\n` +
-    `🔗 Link akses Anda:\n${link}` +
-    showExtras +
-    `\n\n_Klik link di atas untuk membuka. Jangan bagikan ke orang lain._`;
+  const dateStr = new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
+  const message = renderTemplate(tpl, {
+    title: order.item_title || '',
+    date: dateStr,
+    link,
+    live_link: liveLink,
+    password,
+    order_id: order.pakasir_order_id || '',
+    site: origin,
+  });
 
   const sent = await sendFonnte(order.user_phone, message);
   // If Fonnte fails, release the claim so a later run can retry.
@@ -186,8 +207,11 @@ Deno.serve(async (req) => {
   }
 
   const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
-  const { data: settings } = await admin.from('site_settings').select('value').eq('key', 'site_origin').maybeSingle();
-  const origin = (settings?.value || 'https://replaytime.lovable.app').replace(/\/+$/, '');
+  const { data: settings } = await admin
+    .from('site_settings').select('key,value').in('key', ['site_origin', 'wa_message_template']);
+  const sm = new Map((settings ?? []).map((s) => [s.key, s.value]));
+  const origin = (sm.get('site_origin') || 'https://replaytime.lovable.app').replace(/\/+$/, '');
+  const tpl = sm.get('wa_message_template') || DEFAULT_WA_TPL;
 
   // Pull recent pending orders (last 7 days, newest first, generous cap).
   // Pakasir dynamic QRIS payments can be paid hours after creation; we keep
@@ -212,7 +236,7 @@ Deno.serve(async (req) => {
   const freshCutoff = Date.now() - 30 * 60_000; // 30 min
   for (const o of orders ?? []) {
     try {
-      const r = await processOrder(admin, o, apiKey, slug, origin);
+      const r = await processOrder(admin, o, apiKey, slug, origin, tpl);
       results.push(r);
       // Track fresh-still-pending orders for fast-lane rescan within this same invocation.
       if (r?.status === 'pending' && new Date(o.created_at).getTime() >= freshCutoff) {
@@ -236,7 +260,7 @@ Deno.serve(async (req) => {
         .from('orders').select('*').in('id', ids).eq('status', 'pending');
       if (!refreshed?.length) return;
       for (const o of refreshed) {
-        try { await processOrder(admin, o, apiKey, slug, origin); } catch { /* keep going */ }
+        try { await processOrder(admin, o, apiKey, slug, origin, tpl); } catch { /* keep going */ }
       }
     }
   })();
