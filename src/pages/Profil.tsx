@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, User, Mail, Phone, Save, LogOut, Coins, AtSign } from 'lucide-react';
+import { ArrowLeft, User, Mail, Phone, Save, LogOut, Coins, AtSign, KeyRound, MessageCircle, Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -19,6 +19,38 @@ export default function Profil() {
   const [balance, setBalance] = useState(0);
   const [busy, setBusy] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [newPwd, setNewPwd] = useState('');
+  const [newPwd2, setNewPwd2] = useState('');
+  const [showPwd, setShowPwd] = useState(false);
+  const [pwdBusy, setPwdBusy] = useState(false);
+  const [adminPhone, setAdminPhone] = useState<string>('');
+
+  useEffect(() => {
+    supabase.from('bot_admins').select('phone').eq('enabled', true).limit(1).maybeSingle()
+      .then(({ data }) => { if ((data as any)?.phone) setAdminPhone(String((data as any).phone).replace(/\D/g, '')); });
+  }, []);
+
+  const handleChangePassword = async () => {
+    if (newPwd.length < 8) { toast.error('Kata sandi minimal 8 karakter'); return; }
+    if (newPwd !== newPwd2) { toast.error('Konfirmasi kata sandi tidak cocok'); return; }
+    setPwdBusy(true);
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPwd });
+      if (error) throw error;
+      setNewPwd(''); setNewPwd2('');
+      toast.success('Kata sandi berhasil diganti');
+    } catch (e: any) {
+      toast.error(e?.message || 'Gagal mengganti kata sandi');
+    } finally {
+      setPwdBusy(false);
+    }
+  };
+
+  const handleContactAdmin = () => {
+    const phone = adminPhone || '6281234567890';
+    const msg = encodeURIComponent(`Halo Admin, saya butuh bantuan terkait akun saya.\nEmail: ${user?.email || '-'}\nNomor HP terdaftar: ${phone || '-'}`);
+    window.open(`https://wa.me/${phone}?text=${msg}`, '_blank');
+  };
 
   useEffect(() => {
     if (loading) return;
@@ -133,6 +165,65 @@ export default function Profil() {
           </CardHeader>
           <CardContent>
             <Button variant="outline" className="w-full" onClick={() => navigate('/koin')}>Kelola Koin</Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base"><KeyRound className="w-4 h-4" /> Ganti Kata Sandi</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="space-y-2">
+              <Label className="text-xs">Kata sandi baru</Label>
+              <div className="relative">
+                <Input
+                  type={showPwd ? 'text' : 'password'}
+                  value={newPwd}
+                  onChange={e => setNewPwd(e.target.value)}
+                  placeholder="Minimal 8 karakter"
+                  autoComplete="new-password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPwd(s => !s)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  aria-label="Tampilkan kata sandi"
+                >
+                  {showPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs">Ulangi kata sandi baru</Label>
+              <Input
+                type={showPwd ? 'text' : 'password'}
+                value={newPwd2}
+                onChange={e => setNewPwd2(e.target.value)}
+                placeholder="Ulangi kata sandi"
+                autoComplete="new-password"
+              />
+            </div>
+            <Button onClick={handleChangePassword} disabled={pwdBusy || !newPwd || !newPwd2} className="w-full">
+              <KeyRound className="w-4 h-4 mr-2" />
+              {pwdBusy ? 'Memproses...' : 'Ganti Kata Sandi'}
+            </Button>
+            <p className="text-[11px] text-muted-foreground">
+              Perubahan langsung berlaku tanpa konfirmasi admin.
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-amber-500/30 bg-amber-500/5">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base"><MessageCircle className="w-4 h-4 text-amber-600" /> Butuh Bantuan?</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-xs text-muted-foreground">
+              Mengalami masalah login, lupa email, atau ingin ubah nomor HP? Hubungi admin via WhatsApp.
+            </p>
+            <Button onClick={handleContactAdmin} variant="outline" className="w-full border-amber-500/40 hover:bg-amber-500/10">
+              <MessageCircle className="w-4 h-4 mr-2" /> Hubungi Admin via WhatsApp
+            </Button>
           </CardContent>
         </Card>
 
