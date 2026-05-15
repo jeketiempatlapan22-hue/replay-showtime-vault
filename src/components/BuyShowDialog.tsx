@@ -50,7 +50,7 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
   const [ownerWa, setOwnerWa] = useState<string>('6288809048431');
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
-  // Load admin contact + static QRIS settings when dialog opens
+  // Load admin contact + static QRIS settings + coin price/balance when dialog opens
   useEffect(() => {
     if (!open) return;
     (async () => {
@@ -65,8 +65,36 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
           if (row.key === 'use_static_qris') setUseStaticQris(String(row.value || 'false') === 'true');
         }
       } catch { /* ignore */ }
+      // Coin price for the item
+      try {
+        let price = 0;
+        if (kind === 'replay_only' && replayId) {
+          const { data: r } = await supabase.from('replays').select('price_coins').eq('id', replayId).maybeSingle();
+          price = (r as any)?.price_coins || 0;
+        } else if (showId) {
+          const { data: s } = await supabase.from('active_shows').select('price_show_coins,price_replay_coins').eq('id', showId).maybeSingle();
+          price = kind === 'replay' ? ((s as any)?.price_replay_coins || 0) : ((s as any)?.price_show_coins || 0);
+        }
+        setCoinPrice(price);
+      } catch { setCoinPrice(0); }
+      // Balance
+      if (user) {
+        try {
+          const { data: b } = await supabase.from('coin_balances').select('balance').eq('user_id', user.id).maybeSingle();
+          setCoinBalance((b as any)?.balance || 0);
+          // Autofill phone from profile
+          if (!phone) {
+            const { data: p } = await supabase.from('profiles').select('phone').eq('user_id', user.id).maybeSingle();
+            const ph = (p as any)?.phone || '';
+            if (ph) setPhone(ph);
+          }
+        } catch { /* ignore */ }
+      } else {
+        setCoinBalance(0);
+      }
     })();
-  }, [open]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, showId, replayId, kind, user]);
 
   // Reset on close
   useEffect(() => {
