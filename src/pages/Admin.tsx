@@ -8,6 +8,7 @@ import PakasirAdmin from '@/components/admin/PakasirAdmin';
 import CoinAdmin from '@/components/admin/CoinAdmin';
 import ReplayPersonalTokensDialog from '@/components/admin/ReplayPersonalTokensDialog';
 import ShowLiveControl from '@/components/admin/ShowLiveControl';
+import BulkShowImport from '@/components/admin/BulkShowImport';
 import { getMembers, upsertMember, deleteMember, uploadMemberPhoto, type Member } from '@/lib/members';
 import { getActiveShows, upsertActiveShow, deleteActiveShow, type ActiveShow } from '@/lib/activeShows';
 import { Switch } from '@/components/ui/switch';
