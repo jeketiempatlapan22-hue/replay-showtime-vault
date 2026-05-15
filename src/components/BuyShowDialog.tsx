@@ -333,7 +333,7 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
                   </div>
                   <p className="text-xs text-muted-foreground">Token akses akan dikirim ke nomor ini setelah pembayaran lunas.</p>
                 </div>
-                <Button className="w-full" onClick={handleCreate} disabled={!phone || !user}>
+                <Button className="w-full" onClick={handleCreate} disabled={!phone}>
                   Lanjut ke Pembayaran
                 </Button>
               </TabsContent>
