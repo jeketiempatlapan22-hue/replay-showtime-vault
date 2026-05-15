@@ -236,7 +236,7 @@ export default function Auth() {
                 <Label htmlFor="password">Sandi</Label>
                 <button
                   type="button"
-                  onClick={() => { setForgotEmail(identifier.includes('@') ? identifier : ''); setForgotOpen(true); }}
+                  onClick={() => { setForgotIdentifier(identifier || ''); setForgotNewPw(''); setForgotNewPw2(''); setForgotOpen(true); }}
                   className="text-xs text-primary hover:underline font-medium"
                 >
                   Lupa sandi?
