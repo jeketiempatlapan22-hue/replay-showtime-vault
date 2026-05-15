@@ -19,6 +19,7 @@ import Akses from "./pages/Akses";
 import Shows from "./pages/Shows";
 import Koin from "./pages/Koin";
 import Profil from "./pages/Profil";
+import ResetPassword from "./pages/ResetPassword";
 import BottomNav from "./components/BottomNav";
 
 const queryClient = new QueryClient();
