@@ -656,28 +656,24 @@ Deno.serve(async (req) => {
             const origin = (map.get('site_origin') || 'https://replaytime.lovable.app').replace(/\/+$/, '');
             const link = `${origin}/live?show=${s.id}&t=${token}`;
             const header = isPublic ? '🎁 *TOKEN LIVE PUBLIK*' : '🔐 *TOKEN LIVE SATUAN*';
-            const access = isPublic ? `🔓 Bisa dibuka di ${maxDevices} perangkat.` : '👤 Hanya untuk *1 perangkat pertama*.';
+            const access = isPublic ? '🔓 Bisa dibuka di banyak perangkat.' : '👤 Hanya untuk *1 perangkat pertama*.';
             const livePwd = s.live_password ? String(s.live_password) : '';
             reply = [
               header,
-              '━━━━━━━━━━━━━━━━━━━━',
               '',
-              `🎤  *${s.title}*`,
+              `🎤 *${s.title}*`,
+              `📅 ${s.show_date} ${String(s.show_time).slice(0,5)}`,
               '',
-              `📅  ${s.show_date} ${String(s.show_time).slice(0,5)}`,
-              '',
-              '🔗  *Link Akses Live:*',
-              '',
+              '🔗 *Link Live:*',
               link,
               '',
-              '🎬Link Replay : replaytime.lovable.app',
-              '',
-              livePwd ? `🗝️Sandi : ${livePwd}` : '',
+              '🎬 Link Replay: replaytime.lovable.app',
+              livePwd ? `🗝️ Sandi: ${livePwd}` : '',
               '',
               access,
               '',
-              '━━━━━━━━━━━━━━━━━━━━',
-            ].filter((l) => l !== '' || true).join('\n');
+              '— *ReplayTime* 💖',
+            ].filter((l) => l !== '').join('\n');
           }
         }
       }
