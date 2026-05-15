@@ -1198,12 +1198,15 @@ export default function Admin() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <p className="text-xs text-muted-foreground">Nama ini akan ditampilkan sebagai penanda saat admin berkomentar di kartu replay (otomatis diawali ikon 🛡️).</p>
+                <p className="text-xs text-muted-foreground">Nama ini akan ditampilkan sebagai penanda saat admin berkomentar di kartu replay (otomatis diawali ikon 🛡️). Username admin terkunci pada <b>admin wota</b> dan hanya akun <b>MOD</b> atau <b>dhy</b> yang dapat mengubahnya.</p>
                 <div className="flex gap-2">
-                  <Input placeholder="cth: AdminDhy" value={adminUsername} onChange={e => setAdminUsername(e.target.value.slice(0, 30))} />
-                  <Button onClick={handleSaveAdminUsername} size="sm" className="h-10 shrink-0"><Save className="w-4 h-4 mr-1" />Simpan</Button>
+                  <Input placeholder="admin wota" value={adminUsername} onChange={e => setAdminUsername(e.target.value.slice(0, 30))} disabled={!canEditAdminUsername} />
+                  <Button onClick={handleSaveAdminUsername} size="sm" className="h-10 shrink-0" disabled={!canEditAdminUsername}><Save className="w-4 h-4 mr-1" />Simpan</Button>
                 </div>
-                <p className="text-[11px] text-muted-foreground">Pratinjau: <span className="font-medium text-foreground">🛡️ {(adminUsername || 'Admin').trim()}</span></p>
+                <p className="text-[11px] text-muted-foreground">Pratinjau: <span className="font-medium text-foreground">🛡️ {(adminUsername || 'admin wota').trim()}</span></p>
+                {!canEditAdminUsername && (
+                  <p className="text-[11px] text-amber-500">🔒 Akun ini tidak diizinkan mengubah username admin.</p>
+                )}
               </CardContent>
             </Card>
 
