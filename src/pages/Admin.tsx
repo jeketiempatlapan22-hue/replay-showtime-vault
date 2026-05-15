@@ -6,6 +6,7 @@ import TokenHistoryAdmin from '@/components/admin/TokenHistoryAdmin';
 import MembershipAdmin from '@/components/admin/MembershipAdmin';
 import PakasirAdmin from '@/components/admin/PakasirAdmin';
 import CoinAdmin from '@/components/admin/CoinAdmin';
+import UserManagement from '@/components/admin/UserManagement';
 import ReplayPersonalTokensDialog from '@/components/admin/ReplayPersonalTokensDialog';
 import ShowLiveControl from '@/components/admin/ShowLiveControl';
 import BulkShowImport from '@/components/admin/BulkShowImport';
@@ -635,6 +636,7 @@ export default function Admin() {
                 { v: 'membership', label: 'Membership', Icon: Users },
                 { v: 'pakasir', label: 'Pakasir Webhook', Icon: Settings },
                 { v: 'coins', label: 'Koin', Icon: Sparkles },
+                { v: 'users', label: 'Manajemen User', Icon: Users },
                 { v: 'preview', label: 'Preview', Icon: Eye },
                 { v: 'comments', label: 'Komentar', Icon: MessageCircle },
                 { v: 'security', label: 'Blokir', Icon: ShieldCheck },
@@ -653,7 +655,7 @@ export default function Admin() {
           </SheetContent>
         </Sheet>
         <Button variant="ghost" size="icon" onClick={() => navigate('/')} className="shrink-0" title="Beranda"><ArrowLeft className="w-5 h-5" /></Button>
-        <h1 className="text-base sm:text-xl font-bold font-sans text-foreground flex-1 min-w-0 truncate">Admin · {({ replays: 'Replay', shows: 'Streaming Show', members: 'Member', bot: 'Bot WA', history: 'Riwayat', membership: 'Membership', pakasir: 'Pakasir Webhook', coins: 'Koin', preview: 'Preview', comments: 'Komentar', security: 'Blokir', settings: 'Setelan' } as Record<string, string>)[activeTab]}</h1>
+        <h1 className="text-base sm:text-xl font-bold font-sans text-foreground flex-1 min-w-0 truncate">Admin · {({ replays: 'Replay', shows: 'Streaming Show', members: 'Member', bot: 'Bot WA', history: 'Riwayat', membership: 'Membership', pakasir: 'Pakasir Webhook', coins: 'Koin', users: 'Manajemen User', preview: 'Preview', comments: 'Komentar', security: 'Blokir', settings: 'Setelan' } as Record<string, string>)[activeTab]}</h1>
         <div className="flex items-center gap-1 sm:gap-2 shrink-0">
           <Button size="sm" onClick={() => { resetForm(); setShowAddDialog(true); }} className="text-xs sm:text-sm">
             <Plus className="w-4 h-4 sm:mr-1" /> <span className="hidden sm:inline">Tambah</span>
@@ -665,7 +667,7 @@ export default function Admin() {
       <div className="max-w-6xl mx-auto px-2 sm:px-4 py-4">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="hidden">
-            <TabsTrigger value="replays" /><TabsTrigger value="shows" /><TabsTrigger value="members" /><TabsTrigger value="bot" /><TabsTrigger value="history" /><TabsTrigger value="membership" /><TabsTrigger value="pakasir" /><TabsTrigger value="coins" /><TabsTrigger value="preview" /><TabsTrigger value="comments" /><TabsTrigger value="security" /><TabsTrigger value="settings" />
+            <TabsTrigger value="replays" /><TabsTrigger value="shows" /><TabsTrigger value="members" /><TabsTrigger value="bot" /><TabsTrigger value="history" /><TabsTrigger value="membership" /><TabsTrigger value="pakasir" /><TabsTrigger value="coins" /><TabsTrigger value="users" /><TabsTrigger value="preview" /><TabsTrigger value="comments" /><TabsTrigger value="security" /><TabsTrigger value="settings" />
           </TabsList>
 
           <TabsContent value="bot"><BotAdmin /></TabsContent>
@@ -673,6 +675,7 @@ export default function Admin() {
           <TabsContent value="membership"><MembershipAdmin /></TabsContent>
           <TabsContent value="pakasir"><PakasirAdmin /></TabsContent>
           <TabsContent value="coins"><CoinAdmin /></TabsContent>
+          <TabsContent value="users"><UserManagement /></TabsContent>
 
           {/* ===== REPLAYS TAB ===== */}
           <TabsContent value="replays">
