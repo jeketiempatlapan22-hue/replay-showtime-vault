@@ -238,6 +238,66 @@ export default function PakasirAdmin() {
           </p>
         </CardContent>
       </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base sm:text-lg">Template Pesan WhatsApp</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-xs text-muted-foreground">
+            Template ini dipakai saat <b>token & link replay</b> dikirim setelah pembayaran QRIS lunas.
+            Pakai placeholder berikut — sistem otomatis menyembunyikan baris kosong:
+          </p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 text-[11px]">
+            {[
+              ['{title}', 'Nama show / replay'],
+              ['{date}', 'Tanggal hari ini'],
+              ['{date_line}', 'Baris tanggal (📅)'],
+              ['{link}', 'Link akses replay'],
+              ['{live_link}', 'Link tonton Live'],
+              ['{live_link_block}', 'Blok link Live (📺)'],
+              ['{password}', 'Sandi dari kartu show'],
+              ['{password_line}', 'Baris sandi (🔐)'],
+              ['{order_id}', 'Order ID Pakasir'],
+              ['{site}', 'replaytime.lovable.app'],
+            ].map(([k, d]) => (
+              <code key={k} className="bg-muted/40 rounded px-1.5 py-1 text-foreground" title={d}>
+                {k} <span className="text-muted-foreground">— {d}</span>
+              </code>
+            ))}
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs">Template</Label>
+            <Textarea
+              value={tpl}
+              onChange={(e) => setTpl(e.target.value)}
+              rows={10}
+              className="font-mono text-xs whitespace-pre"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs">Pratinjau</Label>
+            <pre className="rounded-md border border-border bg-muted/30 p-3 text-xs whitespace-pre-wrap font-sans">
+              {renderPreview(tpl)}
+            </pre>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <Button onClick={saveTpl} disabled={savingTpl || tpl === tplLoaded}>
+              {savingTpl ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+              Simpan Template
+            </Button>
+            <Button variant="outline" onClick={() => setTpl(DEFAULT_WA_TPL)}>
+              <RotateCcw className="w-4 h-4 mr-2" /> Reset Default
+            </Button>
+            <Button variant="ghost" onClick={() => setTpl(tplLoaded)} disabled={tpl === tplLoaded}>
+              Batalkan Perubahan
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
