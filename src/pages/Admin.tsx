@@ -1460,6 +1460,11 @@ export default function Admin() {
             <div><Label>Foto Kartu</Label><ImagePicker value={form.imageUrl} onChange={url => setForm(f => ({ ...f, imageUrl: url }))} /></div>
             <div><Label>Sandi *</Label><Input placeholder="Sandi untuk replay ini" value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} /></div>
             <div>
+              <Label>Harga Koin (untuk tukar)</Label>
+              <Input type="number" min={0} value={form.priceCoins} onChange={e => setForm(f => ({ ...f, priceCoins: Number(e.target.value) }))} placeholder="0 = nonaktif" />
+              <p className="text-[11px] text-muted-foreground mt-1">Jumlah koin yang user bayar untuk membuka replay ini. 0 = tab Koin disembunyikan.</p>
+            </div>
+            <div>
               <Label>Alias Admin <span className="text-xs text-muted-foreground">(rahasia, hanya admin)</span></Label>
               <Input
                 placeholder="cth: aniv2024 — kode pendek untuk panggil di bot WhatsApp"
