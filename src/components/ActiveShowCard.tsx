@@ -90,6 +90,32 @@ export default function ActiveShowCard({ show, index = 0 }: { show: ActiveShow; 
     };
   }, [show.id]);
 
+  // Cross-device sync: if user is logged in, fetch their paid orders for this show
+  useEffect(() => {
+    if (!user || !show.id) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from('orders')
+        .select('access_token,kind,status')
+        .eq('user_id', user.id)
+        .eq('show_id', show.id)
+        .eq('status', 'paid')
+        .not('access_token', 'is', null)
+        .limit(5);
+      if (cancelled || !data || data.length === 0) return;
+      const row = data.find((r: any) => r.access_token);
+      if (row?.access_token) {
+        try {
+          setShowPurchase(show.id, { token: row.access_token, kind: (row.kind === 'replay' ? 'replay' : 'show'), paidAt: Date.now() });
+          setPurchasedToken(row.access_token);
+          setHasAccess(true);
+        } catch { /* ignore */ }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user, show.id]);
+
   const openBuy = (mode: 'show' | 'replay') => { setBuyMode(mode); setBuyOpen(true); };
   const goReplay = () => {
     if (inlineReplay) { setInlinePlayerOpen(true); return; }
