@@ -82,6 +82,7 @@ Deno.serve(async (req) => {
   }
 
   const accessToken = order.access_token ?? genToken();
+  // (claim happens after we mark paid, just before the Fonnte send below)
   await admin.from('orders').update({
     status: 'paid', paid_at: new Date().toISOString(), access_token: accessToken,
   }).eq('id', order.id);
@@ -120,9 +121,26 @@ Deno.serve(async (req) => {
     showExtras +
     `\n\n_Klik link di atas untuk membuka. Jangan bagikan ke orang lain._`;
 
-  const sent = await sendFonnte(order.user_phone, message);
+  // Atomic claim: only the first caller flips token_sent_at NULL -> now().
+  const claimedAt = new Date().toISOString();
+  const { data: claimed } = await admin
+    .from('orders')
+    .update({ token_sent_at: claimedAt })
+    .eq('id', order.id)
+    .is('token_sent_at', null)
+    .select('id');
+  if (!claimed || claimed.length === 0) {
+    return new Response(JSON.stringify({ ok: true, already: true }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
 
-  await admin.from('orders').update({ token_sent_at: new Date().toISOString() }).eq('id', order.id);
+  const sent = await sendFonnte(order.user_phone, message);
+  // Release the claim if Fonnte failed so a retry path can resend later.
+  if (!sent.ok) {
+    await admin.from('orders').update({ token_sent_at: null })
+      .eq('id', order.id).eq('token_sent_at', claimedAt);
+  }
   await admin.from('token_deliveries').insert({
     phone: order.user_phone, replay_id: order.replay_id, replay_title: order.item_title,
     order_id: order.id, access_token: accessToken, link,
