@@ -763,25 +763,7 @@ Deno.serve(async (req) => {
   };
 
   if (!testMode && ADMIN_ONLY.has(cmd) && isBotAdmin) {
-    const displayCommand = [cmd, arg].filter(Boolean).join(' ');
-    const instantReply = [
-      '⚡ *Command diterima*',
-      '',
-      `Perintah: *${displayCommand}*`,
-      'Bot sedang memproses dan akan mengirim hasilnya sebentar lagi.',
-    ].join('\n');
-
     const background = (async () => {
-      await sendAndAudit(admin, {
-        phone: phoneNorm,
-        message: instantReply,
-        inboxId,
-        testMode,
-        deliverTest,
-        command: cmd,
-        device: deviceNorm,
-        fromMe,
-      });
       await processAndSendReply();
     })().catch(async (e) => {
       const errorMsg = e instanceof Error ? e.message : 'unknown_error';
