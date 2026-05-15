@@ -319,9 +319,13 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
             )}
 
             <Tabs value={method} onValueChange={(v) => setMethod(v as 'qris' | 'coin')}>
-              <TabsList className="grid grid-cols-2 w-full">
-                <TabsTrigger value="qris"><Smartphone className="w-4 h-4 mr-1.5" /> QRIS</TabsTrigger>
-                <TabsTrigger value="coin" disabled={coinPrice <= 0}><Coins className="w-4 h-4 mr-1.5" /> Koin{coinPrice > 0 ? ` (${coinPrice})` : ''}</TabsTrigger>
+              <TabsList className={`grid w-full ${qrisAvailable && coinPrice > 0 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                {qrisAvailable && (
+                  <TabsTrigger value="qris"><Smartphone className="w-4 h-4 mr-1.5" /> QRIS</TabsTrigger>
+                )}
+                {coinPrice > 0 && (
+                  <TabsTrigger value="coin"><Coins className="w-4 h-4 mr-1.5" /> Tukar {coinPrice} Koin</TabsTrigger>
+                )}
               </TabsList>
 
               <TabsContent value="qris" className="space-y-4 mt-4">
