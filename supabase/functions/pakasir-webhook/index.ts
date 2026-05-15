@@ -154,7 +154,16 @@ Deno.serve(async (req) => {
       });
       if (!gerr) newBal = bal as number;
     }
-    const msg = `✅ *Top-up berhasil*\n+${order.coin_amount} koin sudah masuk.${newBal != null ? `\nSaldo sekarang: *${newBal}* koin` : ''}\n\nTerima kasih 💖 — *ReplayTime*`;
+    const msg = [
+      '✅ *Top-up Berhasil*',
+      '━━━━━━━━━━━━━━',
+      '',
+      `🪙 +${order.coin_amount} koin masuk ke akun Anda.`,
+      newBal != null ? `💰 Saldo sekarang: *${newBal}* koin` : '',
+      '',
+      '━━━━━━━━━━━━━━',
+      '💖 Terima kasih — *ReplayTime*',
+    ].filter(Boolean).join('\n');
     const sent = await sendFonnte(order.user_phone, msg);
     if (!sent.ok) {
       await admin.from('orders').update({ token_sent_at: null }).eq('id', order.id).eq('token_sent_at', claimedAt);
@@ -179,7 +188,7 @@ Deno.serve(async (req) => {
   const sm = new Map((settings ?? []).map((s) => [s.key, s.value]));
   const origin = (sm.get('site_origin') || 'https://replaytime.lovable.app').replace(/\/+$/, '');
   const tpl = sm.get('wa_message_template') ||
-    '🎬 *{title}*\n{date_line}\n🔗 Link Akses:\n{link}\n{password_line}{live_link_block}\n— *ReplayTime* 💖';
+    '🎬 *ReplayTime*\n━━━━━━━━━━━━━━\n\n🎤 *{title}*\n{date_line}🔗 *Link Akses*\n{link}\n{password_line}{live_link_block}━━━━━━━━━━━━━━\n✨ Selamat menonton! 💖';
   const replayPart = order.replay_id ? `&replay=${order.replay_id}` : '';
   const link = `${origin}/akses?token=${accessToken}${replayPart}`;
 
@@ -199,9 +208,9 @@ Deno.serve(async (req) => {
 
   const dateStr = new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
   const message = tpl
-    .replace(/\{date_line\}\n?/g, dateStr ? `📅 ${dateStr}\n` : '')
-    .replace(/\{password_line\}\n?/g, password ? `🔐 Sandi: *${password}*\n` : '')
-    .replace(/\{live_link_block\}\n?/g, liveLink ? `\n📺 Link Live:\n${liveLink}\n` : '')
+    .replace(/\{date_line\}/g, dateStr ? `📅 ${dateStr}\n\n` : '')
+    .replace(/\{password_line\}/g, password ? `🔐 Sandi: *${password}*\n\n` : '')
+    .replace(/\{live_link_block\}/g, liveLink ? `📺 *Link Live*\n${liveLink}\n\n` : '')
     .replace(/\{title\}/g, order.item_title || '')
     .replace(/\{link\}/g, link)
     .replace(/\{live_link\}/g, liveLink)

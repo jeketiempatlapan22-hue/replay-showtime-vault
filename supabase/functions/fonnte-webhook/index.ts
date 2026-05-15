@@ -88,28 +88,26 @@ function buildAttractiveTokenMessage(opts: {
   showDate?: string;
 }) {
   const isPersonal = opts.kind === 'personal';
-  const header = isPersonal
-    ? '🔐 *TOKEN PRIBADI — REPLAYTIME*'
-    : '🎬 *TOKEN REPLAY — REPLAYTIME*';
-
   const lines: string[] = [];
-  lines.push(header);
+  lines.push('🎬 *ReplayTime*');
+  lines.push('━━━━━━━━━━━━━━');
   lines.push('');
-  lines.push(`🎤 *${opts.title}*${opts.showDate ? `\n📅 ${opts.showDate}` : ''}`);
+  lines.push(`🎤 *${opts.title}*`);
+  if (opts.showDate) lines.push(`📅 ${opts.showDate}`);
   lines.push('');
-  lines.push('🔗 *Link Akses:*');
+  lines.push('🔗 *Link Akses*');
   lines.push(opts.link);
-  lines.push('');
   if (opts.liveUrl) {
-    lines.push('📺 *Link Live:*');
-    lines.push(opts.liveUrl);
     lines.push('');
+    lines.push('📺 *Link Live*');
+    lines.push(opts.liveUrl);
   }
-  lines.push(isPersonal
-    ? '👤 Token ini hanya untuk *1 perangkat*. Jangan dibagikan.'
-    : '✨ Bisa dibuka di banyak perangkat. Selamat menonton!');
   lines.push('');
-  lines.push('— *ReplayTime* 💖');
+  lines.push('━━━━━━━━━━━━━━');
+  lines.push(isPersonal
+    ? '👤 Khusus *1 perangkat* — jangan dibagikan.'
+    : '✨ Bisa dibuka di banyak perangkat.');
+  lines.push('💖 Selamat menonton!');
   return lines.join('\n');
 }
 
