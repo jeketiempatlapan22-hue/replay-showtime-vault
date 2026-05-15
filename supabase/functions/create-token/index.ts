@@ -125,10 +125,14 @@ Deno.serve(async (req) => {
     day: '2-digit', month: 'long', year: 'numeric',
   }) : '';
 
-  const message = buildAttractiveMessage({
-    kind, title: replay.title, link, liveUrl, showDate,
-    replayPassword: replay.password ? String(replay.password) : '',
-    livePassword,
+  const tplStr = (settingsMap.get('wa_message_template') as string) || DEFAULT_WA_TPL;
+  const message = renderWaTemplate(tplStr, {
+    title: replay.title,
+    link,
+    date: showDate,
+    password,
+    liveLink: livePassword ? liveUrl : '',
+    site: origin.replace(/^https?:\/\//, ''),
   });
 
   await admin.from('token_deliveries').insert({
