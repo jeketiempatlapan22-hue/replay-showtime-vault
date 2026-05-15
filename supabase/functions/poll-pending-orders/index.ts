@@ -149,24 +149,34 @@ async function processOrder(admin: ReturnType<typeof createClient>, order: any, 
   const replayPart = order.replay_id ? `&replay=${order.replay_id}` : '';
   const link = `${origin}/akses?token=${accessToken}${replayPart}`;
 
-  let showExtras = '';
-  if (order.show_id && !order.replay_id) {
+  // Pull replay password (admin-set on the active show card) when available.
+  let password = '';
+  let liveLink = '';
+  if (order.show_id) {
     const { data: showRow } = await admin
       .from('active_shows').select('live_password').eq('id', order.show_id).maybeSingle();
-    const liveLink = `${origin}/live?show=${order.show_id}&t=${accessToken}`;
-    const pwd = String(showRow?.live_password || '').trim();
-    showExtras = pwd
-      ? `\n\n🔐 *Sandi tonton LIVE:*\n${pwd}\n_Masukkan sandi ini di halaman Live untuk masuk._\n\n▶️ Link tonton Live:\n${liveLink}`
-      : `\n\n▶️ Link tonton Live:\n${liveLink}`;
+    password = String(showRow?.live_password || '').trim();
+    if (!order.replay_id) {
+      liveLink = `${origin}/live?show=${order.show_id}&t=${accessToken}`;
+    }
+  }
+  // Fallback: standalone replay → use replays.password.
+  if (!password && order.replay_id && !order.show_id) {
+    const { data: rep } = await admin
+      .from('replays').select('password').eq('id', order.replay_id).maybeSingle();
+    password = String(rep?.password || '').trim();
   }
 
-  const message =
-    `✅ *Pembayaran Berhasil*\n\n` +
-    `${order.item_title}\n` +
-    `Order: ${order.pakasir_order_id}\n\n` +
-    `🔗 Link akses Anda:\n${link}` +
-    showExtras +
-    `\n\n_Klik link di atas untuk membuka. Jangan bagikan ke orang lain._`;
+  const dateStr = new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
+  const message = renderTemplate(tpl, {
+    title: order.item_title || '',
+    date: dateStr,
+    link,
+    live_link: liveLink,
+    password,
+    order_id: order.pakasir_order_id || '',
+    site: origin,
+  });
 
   const sent = await sendFonnte(order.user_phone, message);
   // If Fonnte fails, release the claim so a later run can retry.
