@@ -106,15 +106,16 @@ export default function Auth() {
         return;
       }
 
-      // 2) Resolve email if user typed phone
+      // 2) Resolve email if user typed phone or username
       let loginEmail = identifier.trim();
       if (!loginEmail.includes('@')) {
-        const phoneNorm = normalizePhone(loginEmail);
-        const { data, error } = await supabase.rpc('email_for_phone', { _phone: phoneNorm });
+        const looksPhone = /^[0-9+\s\-()]+$/.test(loginEmail);
+        const arg = looksPhone ? normalizePhone(loginEmail) : loginEmail;
+        const { data, error } = await supabase.rpc('email_for_identifier' as never, { _identifier: arg } as never);
         if (error) throw error;
         if (!data) {
           await recordAttempt(lockKey, false);
-          toast({ title: 'Akun tidak ditemukan', description: 'Nomor HP belum terdaftar.', variant: 'destructive' });
+          toast({ title: 'Akun tidak ditemukan', description: 'Email, nomor HP, atau username belum terdaftar.', variant: 'destructive' });
           setBusy(false);
           return;
         }
