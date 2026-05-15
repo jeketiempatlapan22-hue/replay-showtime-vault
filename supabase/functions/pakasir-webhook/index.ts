@@ -135,7 +135,7 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ ok: true, already: true }), { headers: corsHeaders });
   }
 
-  const accessToken = order.access_token ?? genToken();
+  const accessToken = await ensurePurchaseToken(admin, order);
   // (claim happens after we mark paid, just before the Fonnte send below)
   await admin.from('orders').update({
     status: 'paid', paid_at: new Date().toISOString(), access_token: accessToken,
