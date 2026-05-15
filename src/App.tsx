@@ -69,6 +69,7 @@ const App = () => (
               <Route path="/live" element={<Live />} />
               <Route path="/kunci" element={<Kunci />} />
               <Route path="/auth" element={<Auth />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/akses" element={<Akses />} />
               <Route path="/shows" element={<Shows />} />
               <Route path="/show" element={<Shows />} />
