@@ -421,7 +421,7 @@ export default function Admin() {
       youtubeId: r.youtube_id, imageUrl: r.image_url,
       sourceType: (r as any).source_type || 'youtube', m3u8Url: (r as any).m3u8_url || '',
       sources: Array.isArray((r as any).sources) ? (r as any).sources : [],
-      priceCoins: (r as any).price_coins ?? 0,
+      priceCoins: ((r as any).price_coins ?? 1),
     });
     setShowAddDialog(true);
   };
