@@ -103,7 +103,9 @@ export type Database = {
           live_url: string
           pakasir_amount: number
           price_replay: number
+          price_replay_coins: number
           price_show: number
+          price_show_coins: number
           replay_enabled: boolean
           replay_id: string | null
           replay_m3u8_url: string
@@ -133,7 +135,9 @@ export type Database = {
           live_url?: string
           pakasir_amount?: number
           price_replay?: number
+          price_replay_coins?: number
           price_show?: number
+          price_show_coins?: number
           replay_enabled?: boolean
           replay_id?: string | null
           replay_m3u8_url?: string
@@ -163,7 +167,9 @@ export type Database = {
           live_url?: string
           pakasir_amount?: number
           price_replay?: number
+          price_replay_coins?: number
           price_show?: number
+          price_show_coins?: number
           replay_enabled?: boolean
           replay_id?: string | null
           replay_m3u8_url?: string
@@ -363,6 +369,93 @@ export type Database = {
           id?: string
           last_name?: string
           reason?: string
+        }
+        Relationships: []
+      }
+      coin_balances: {
+        Row: {
+          balance: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          balance?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          balance?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      coin_packages: {
+        Row: {
+          coins: number
+          created_at: string
+          enabled: boolean
+          id: string
+          label: string
+          price_idr: number
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          coins?: number
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          label?: string
+          price_idr?: number
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          coins?: number
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          label?: string
+          price_idr?: number
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      coin_transactions: {
+        Row: {
+          created_at: string
+          delta: number
+          id: string
+          meta: Json
+          reason: string
+          related_order_id: string | null
+          related_replay_id: string | null
+          related_show_id: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          delta: number
+          id?: string
+          meta?: Json
+          reason: string
+          related_order_id?: string | null
+          related_replay_id?: string | null
+          related_show_id?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          delta?: number
+          id?: string
+          meta?: Json
+          reason?: string
+          related_order_id?: string | null
+          related_replay_id?: string | null
+          related_show_id?: string | null
+          user_id?: string
         }
         Relationships: []
       }
@@ -691,9 +784,12 @@ export type Database = {
         Row: {
           access_token: string | null
           amount: number
+          coin_amount: number
+          coin_package_id: string | null
           created_at: string
           id: string
           item_title: string
+          kind: string
           paid_at: string | null
           pakasir_order_id: string | null
           pakasir_qr_url: string
@@ -708,9 +804,12 @@ export type Database = {
         Insert: {
           access_token?: string | null
           amount?: number
+          coin_amount?: number
+          coin_package_id?: string | null
           created_at?: string
           id?: string
           item_title?: string
+          kind?: string
           paid_at?: string | null
           pakasir_order_id?: string | null
           pakasir_qr_url?: string
@@ -725,9 +824,12 @@ export type Database = {
         Update: {
           access_token?: string | null
           amount?: number
+          coin_amount?: number
+          coin_package_id?: string | null
           created_at?: string
           id?: string
           item_title?: string
+          kind?: string
           paid_at?: string | null
           pakasir_order_id?: string | null
           pakasir_qr_url?: string
@@ -872,6 +974,7 @@ export type Database = {
           lineup: string[]
           m3u8_url: string
           password: string
+          price_coins: number
           show_name: string
           show_time: string | null
           source_type: string
@@ -893,6 +996,7 @@ export type Database = {
           lineup?: string[]
           m3u8_url?: string
           password: string
+          price_coins?: number
           show_name?: string
           show_time?: string | null
           source_type?: string
@@ -914,6 +1018,7 @@ export type Database = {
           lineup?: string[]
           m3u8_url?: string
           password?: string
+          price_coins?: number
           show_name?: string
           show_time?: string | null
           source_type?: string
@@ -1059,6 +1164,17 @@ export type Database = {
         }[]
       }
       cron_clear_live_messages: { Args: never; Returns: undefined }
+      debit_coins_for_purchase: {
+        Args: {
+          _meta?: Json
+          _price: number
+          _reason: string
+          _replay_id: string
+          _show_id: string
+          _user_id: string
+        }
+        Returns: number
+      }
       email_for_phone: { Args: { _phone: string }; Returns: string }
       get_active_live: {
         Args: never
@@ -1088,6 +1204,16 @@ export type Database = {
           title: string
           type: string
         }[]
+      }
+      grant_coins: {
+        Args: {
+          _delta: number
+          _meta?: Json
+          _order_id?: string
+          _reason: string
+          _user_id: string
+        }
+        Returns: number
       }
       has_role: {
         Args: {
