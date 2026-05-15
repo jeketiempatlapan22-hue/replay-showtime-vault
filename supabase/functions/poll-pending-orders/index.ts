@@ -114,8 +114,8 @@ async function processOrder(admin: ReturnType<typeof createClient>, order: any, 
     return { id: order.id, status: pStatus || 'pending' };
   }
 
-  const accessToken = order.access_token ?? genToken();
-  if (order.status !== 'paid') {
+  const accessToken = await ensurePurchaseToken(admin, order);
+  if (order.status !== 'paid' || order.access_token !== accessToken) {
     await admin.from('orders').update({
       status: 'paid', paid_at: new Date().toISOString(), access_token: accessToken,
     }).eq('id', order.id);
