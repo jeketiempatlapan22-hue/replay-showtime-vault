@@ -319,44 +319,63 @@ export default function Auth() {
       <Dialog open={forgotOpen} onOpenChange={setForgotOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2"><KeyRound className="w-4 h-4" /> Lupa Sandi</DialogTitle>
+            <DialogTitle className="flex items-center gap-2"><KeyRound className="w-4 h-4" /> Ganti Sandi</DialogTitle>
             <DialogDescription className="text-xs">
-              Masukkan email akun Anda. Kami akan mengirim tautan reset ke email tersebut.
+              Masukkan email, nomor HP, atau username akun Anda lalu sandi baru. Sandi langsung berubah tanpa OTP/email.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-2">
-            <Label htmlFor="forgot-email" className="text-xs">Email</Label>
-            <Input
-              id="forgot-email"
-              type="email"
-              value={forgotEmail}
-              onChange={(e) => setForgotEmail(e.target.value)}
-              placeholder="email@mail.com"
-              autoComplete="email"
-            />
-            <p className="text-[11px] text-muted-foreground">
-              Jika Anda hanya punya nomor HP/username, hubungi admin via WhatsApp dari halaman Profil untuk reset sandi.
-            </p>
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <Label htmlFor="forgot-id" className="text-xs">Email / No HP / Username</Label>
+              <Input
+                id="forgot-id"
+                value={forgotIdentifier}
+                onChange={(e) => setForgotIdentifier(e.target.value)}
+                placeholder="email@mail.com / 0812... / username"
+                autoComplete="username"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="forgot-pw" className="text-xs">Sandi Baru (min. 6 karakter)</Label>
+              <Input
+                id="forgot-pw"
+                type="password"
+                value={forgotNewPw}
+                onChange={(e) => setForgotNewPw(e.target.value)}
+                autoComplete="new-password"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="forgot-pw2" className="text-xs">Ulangi Sandi Baru</Label>
+              <Input
+                id="forgot-pw2"
+                type="password"
+                value={forgotNewPw2}
+                onChange={(e) => setForgotNewPw2(e.target.value)}
+                autoComplete="new-password"
+              />
+            </div>
           </div>
           <DialogFooter className="gap-2">
             <Button variant="ghost" onClick={() => setForgotOpen(false)} disabled={forgotBusy}>Batal</Button>
             <Button
               onClick={async () => {
-                const em = forgotEmail.trim();
-                if (!em || !em.includes('@')) {
-                  toast({ title: 'Email tidak valid', variant: 'destructive' });
-                  return;
-                }
+                const id = forgotIdentifier.trim();
+                if (!id) { toast({ title: 'Identitas wajib diisi', variant: 'destructive' }); return; }
+                if (forgotNewPw.length < 6) { toast({ title: 'Sandi minimal 6 karakter', variant: 'destructive' }); return; }
+                if (forgotNewPw !== forgotNewPw2) { toast({ title: 'Konfirmasi sandi tidak cocok', variant: 'destructive' }); return; }
                 setForgotBusy(true);
                 try {
-                  const { error } = await supabase.auth.resetPasswordForEmail(em, {
-                    redirectTo: `${window.location.origin}/reset-password`,
+                  const { data, error } = await supabase.functions.invoke('self-reset-password', {
+                    body: { identifier: id, password: forgotNewPw },
                   });
                   if (error) throw error;
-                  toast({ title: 'Email terkirim', description: 'Cek inbox/spam untuk tautan reset sandi.' });
+                  if ((data as { error?: string })?.error) throw new Error((data as { message?: string }).message || 'Gagal mengganti sandi');
+                  toast({ title: 'Sandi berhasil diganti', description: 'Silakan login dengan sandi baru.' });
                   setForgotOpen(false);
+                  setPassword(forgotNewPw);
                 } catch (e: unknown) {
-                  const msg = e instanceof Error ? e.message : 'Gagal mengirim email';
+                  const msg = e instanceof Error ? e.message : 'Gagal mengganti sandi';
                   toast({ title: 'Gagal', description: msg, variant: 'destructive' });
                 } finally {
                   setForgotBusy(false);
@@ -365,7 +384,7 @@ export default function Auth() {
               disabled={forgotBusy}
             >
               {forgotBusy ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <KeyRound className="w-4 h-4 mr-2" />}
-              Kirim Tautan
+              Ganti Sandi
             </Button>
           </DialogFooter>
         </DialogContent>
