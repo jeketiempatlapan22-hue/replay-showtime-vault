@@ -219,10 +219,10 @@ export default function Auth() {
         {mode === 'login' ? (
           <form onSubmit={handleLogin} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="identifier">Email atau Nomor HP</Label>
+              <Label htmlFor="identifier">Email, Nomor HP, atau Username</Label>
               <Input
                 id="identifier"
-                placeholder="contoh: 08123456789 atau email@mail.com"
+                placeholder="email@mail.com / 08123456789 / username"
                 value={identifier}
                 onChange={(e) => setIdentifier(e.target.value)}
                 autoComplete="username"
