@@ -124,14 +124,16 @@ Deno.serve(async (req) => {
     const origin = (sm.get('site_origin') || 'https://replaytime.lovable.app').replace(/\/+$/, '');
     const tpl = sm.get('wa_message_template') ||
       '🎬 *ReplayTime*\n━━━━━━━━━━━━━━\n\n🎤 *{title}*\n{date_line}🔗 *Link Akses*\n{link}\n{password_line}{live_link_block}━━━━━━━━━━━━━━\n✨ Selamat menonton! 💖';
-    const replayPart = resolvedReplayId ? `&replay=${resolvedReplayId}` : '';
-    const link = `${origin}/akses?token=${accessToken}${replayPart}`;
-    let password = ''; let liveLink = '';
+    // Untuk pembelian SHOW: link langsung ke halaman live dengan token (akan diverifikasi unlock-live).
+    // Untuk pembelian REPLAY: tetap via halaman /akses agar masuk replay player.
     const isReplayOnlyPurchase = !!resolvedReplayId && !resolvedShowId;
-    if (resolvedShowId) {
+    const link = resolvedShowId && !resolvedReplayId
+      ? `${origin}/live?show=${resolvedShowId}&t=${accessToken}`
+      : `${origin}/akses?token=${accessToken}${resolvedReplayId ? `&replay=${resolvedReplayId}` : ''}`;
+    let password = ''; const liveLink = '';
+    if (resolvedShowId && !resolvedReplayId) {
       const { data: showRow } = await admin.from('active_shows').select('live_password').eq('id', resolvedShowId).maybeSingle();
       password = String(showRow?.live_password || '').trim();
-      if (!resolvedReplayId) liveLink = `${origin}/live?show=${resolvedShowId}&t=${accessToken}`;
     }
     // Replay dibeli via kartu replay → token-link sudah cukup, tanpa sandi.
     if (isReplayOnlyPurchase) password = '';
