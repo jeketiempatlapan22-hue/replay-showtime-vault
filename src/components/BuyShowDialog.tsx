@@ -77,6 +77,9 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
           price = kind === 'replay' ? ((s as any)?.price_replay_coins || 0) : ((s as any)?.price_show_coins || 0);
         }
         setCoinPrice(price);
+        // Default to coin tab when QRIS is unavailable but coin price is set
+        if (!qrisAvailable && price > 0) setMethod('coin');
+        else if (qrisAvailable && price <= 0) setMethod('qris');
       } catch { setCoinPrice(0); }
       // Balance
       if (user) {
