@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Calendar, Clock, Tag, Users, Radio, ShoppingCart, PlayCircle, X, Lock } from 'lucide-react';
+import { Calendar, Clock, Tag, Users, Radio, ShoppingCart, PlayCircle, X, Lock, Play } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
@@ -9,8 +9,10 @@ import HlsPlayer from '@/components/HlsPlayer';
 import EmbedPlayer from '@/components/EmbedPlayer';
 import { type ActiveShow, getShowDateTime } from '@/lib/activeShows';
 import { useNavigate } from 'react-router-dom';
-import { getShowPurchase } from '@/lib/purchases';
+import { getShowPurchase, setShowPurchase } from '@/lib/purchases';
 import { MEMBERSHIP_UPDATED_EVENT, readMembershipCredentials } from '@/lib/membershipAccess';
+import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
 
 const CATEGORY_LABELS: Record<string, string> = {
   reguler: 'Reguler', sts: 'STS', last_show: 'Last Show', aniv: 'Anniversary', special: 'Show Spesial',
