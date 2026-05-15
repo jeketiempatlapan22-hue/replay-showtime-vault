@@ -36,7 +36,10 @@ export interface ActiveShow {
 export async function getActiveShows(adminMode = false): Promise<ActiveShow[]> {
   let query = supabase.from('active_shows').select('*');
   if (!adminMode) query = query.eq('is_active', true);
-  const { data, error } = await query.order('sort_order').order('show_date');
+  const { data, error } = await query
+    .order('show_date', { ascending: true })
+    .order('show_time', { ascending: true })
+    .order('sort_order', { ascending: true });
   if (error) { console.error(error); return []; }
   return (data || []) as unknown as ActiveShow[];
 }
