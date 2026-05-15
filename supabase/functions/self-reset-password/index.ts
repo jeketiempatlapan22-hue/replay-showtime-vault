@@ -107,6 +107,6 @@ Deno.serve(async (req) => {
     await admin.rpc('record_login_attempt', { _identifier: lockKey, _success: true });
     return json({ ok: true });
   } catch (e) {
-    return json({ error: 'server_error', message: String((e as Error)?.message || e) }, 500);
+    return json({ ok: false, error: 'server_error', message: String((e as Error)?.message || e) });
   }
 });
