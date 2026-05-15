@@ -664,13 +664,14 @@ Deno.serve(async (req) => {
               '🔗 *Link Live:*',
               link,
               '',
-              '🎬 Link Replay: replaytime.lovable.app',
-              livePwd ? `🗝️ Sandi: ${livePwd}` : '',
+              '🎬 *Link Replay:*',
+              'replaytime.lovable.app',
+              livePwd ? `🗝️ Sandi: *${livePwd}*` : null,
               '',
               access,
               '',
               '— *ReplayTime* 💖',
-            ].filter((l) => l !== '').join('\n');
+            ].filter((l) => l !== null).join('\n');
           }
         }
       }
