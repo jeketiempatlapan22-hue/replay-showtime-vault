@@ -191,11 +191,7 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
   };
 
   const handleCreate = async () => {
-    if (!user) {
-      toast.error('Login dulu untuk pembayaran QRIS.');
-      navigate('/auth?redirect=' + encodeURIComponent(window.location.pathname));
-      return;
-    }
+    // QRIS tidak wajib login — siapa pun yang punya nomor HP boleh membayar.
     const norm = normalizePhone(phone);
     if (!/^62\d{8,13}$/.test(norm)) {
       toast.error('Nomor WhatsApp tidak valid. Contoh: 0812xxxx');
