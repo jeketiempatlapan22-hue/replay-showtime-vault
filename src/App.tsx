@@ -30,7 +30,7 @@ function ProtectedShell({ children }: { children: React.ReactNode }) {
   const [checking, setChecking] = useState(true);
 
   // Skip protection on admin route
-  const isAdminRoute = location.pathname.startsWith('/adpan') || location.pathname.startsWith('/auth');
+  const isAdminRoute = location.pathname.startsWith('/adpan') || location.pathname.startsWith('/auth') || location.pathname.startsWith('/reset-password');
 
   // Check existing block status on mount
   useEffect(() => {
