@@ -4,8 +4,29 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
-import { Copy, CheckCircle2, XCircle, Loader2, ExternalLink, RefreshCw, AlertTriangle } from 'lucide-react';
+import { Copy, CheckCircle2, XCircle, Loader2, ExternalLink, RefreshCw, AlertTriangle, Save, RotateCcw } from 'lucide-react';
+
+const DEFAULT_WA_TPL =
+  '🎬 *{title}*\n{date_line}\n🔗 Link Akses:\n{link}\n{password_line}{live_link_block}\n— *ReplayTime* 💖';
+
+function renderPreview(tpl: string) {
+  const vars = {
+    title: 'Show • Sample Konser',
+    date: '15 Mei 2026',
+    link: 'https://replaytime.lovable.app/akses?token=abc123&replay=xyz',
+    live_link: 'https://replaytime.lovable.app/live?show=xyz&t=abc123',
+    password: 'KONSER48',
+    order_id: 'rt-demo-001',
+    site: 'https://replaytime.lovable.app',
+  };
+  return tpl
+    .replace(/\{date_line\}\n?/g, vars.date ? `📅 ${vars.date}\n` : '')
+    .replace(/\{password_line\}\n?/g, vars.password ? `🔐 Sandi: *${vars.password}*\n` : '')
+    .replace(/\{live_link_block\}\n?/g, vars.live_link ? `\n📺 Link Live:\n${vars.live_link}\n` : '')
+    .replace(/\{(\w+)\}/g, (_, k) => (vars as Record<string, string>)[k] ?? '');
+}
 
 interface CheckRow { name: string; ok: boolean; detail: string }
 
