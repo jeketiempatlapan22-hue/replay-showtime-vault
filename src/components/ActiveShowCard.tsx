@@ -238,7 +238,11 @@ export default function ActiveShowCard({ show, index = 0 }: { show: ActiveShow; 
             )
           )}
           {replayMode ? (
-            replayPriced ? (
+            purchasedToken ? (
+              <Button className="w-full gap-2" variant="secondary" onClick={goReplay}>
+                <Play className="w-4 h-4" /> Tonton Replay
+              </Button>
+            ) : replayPriced ? (
               <Button className="w-full gap-2" onClick={() => openBuy('replay')}>
                 <PlayCircle className="w-4 h-4" />
                 Beli Replay via QRIS &amp; Koin
@@ -247,6 +251,12 @@ export default function ActiveShowCard({ show, index = 0 }: { show: ActiveShow; 
               <Button className="w-full gap-2" variant="secondary" onClick={goReplay}>
                 <PlayCircle className="w-4 h-4" />
                 Tonton Replay
+              </Button>
+            )
+          ) : purchasedToken ? (
+            !isLiveNow && (
+              <Button className="w-full gap-2" variant="secondary" onClick={goLive}>
+                <Play className="w-4 h-4" /> Tonton Show
               </Button>
             )
           ) : showPriced ? (
