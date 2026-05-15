@@ -141,39 +141,42 @@ Deno.serve(async (req) => {
     status: 'paid', paid_at: new Date().toISOString(), access_token: accessToken,
   }).eq('id', order.id);
 
-  // Build link
-  const { data: settings } = await admin.from('site_settings').select('key,value').eq('key', 'site_origin').maybeSingle();
-  const origin = settings?.value || '';
+  // Build link + load template/origin
+  const { data: settings } = await admin
+    .from('site_settings').select('key,value').in('key', ['site_origin', 'wa_message_template']);
+  const sm = new Map((settings ?? []).map((s) => [s.key, s.value]));
+  const origin = (sm.get('site_origin') || 'https://replaytime.lovable.app').replace(/\/+$/, '');
+  const tpl = sm.get('wa_message_template') ||
+    '🎬 *{title}*\n{date_line}\n🔗 Link Akses:\n{link}\n{password_line}{live_link_block}\n— *ReplayTime* 💖';
   const replayPart = order.replay_id ? `&replay=${order.replay_id}` : '';
   const link = `${origin}/akses?token=${accessToken}${replayPart}`;
 
-  // If this is an active-show purchase (not standalone replay), include per-show live password + live link.
-  let showExtras = '';
-  if (order.show_id && !order.replay_id) {
+  let password = '';
+  let liveLink = '';
+  if (order.show_id) {
     const { data: showRow } = await admin
-      .from('active_shows')
-      .select('live_password, live_require_password')
-      .eq('id', order.show_id)
-      .maybeSingle();
-    const liveLink = `${origin}/live?show=${order.show_id}&t=${accessToken}`;
-    const pwd = String(showRow?.live_password || '').trim();
-    if (pwd) {
-      showExtras =
-        `\n\n🔐 *Sandi tonton LIVE:*\n${pwd}\n` +
-        `_Masukkan sandi ini di halaman Live untuk masuk._` +
-        `\n\n▶️ Link tonton Live:\n${liveLink}`;
-    } else {
-      showExtras = `\n\n▶️ Link tonton Live:\n${liveLink}`;
-    }
+      .from('active_shows').select('live_password').eq('id', order.show_id).maybeSingle();
+    password = String(showRow?.live_password || '').trim();
+    if (!order.replay_id) liveLink = `${origin}/live?show=${order.show_id}&t=${accessToken}`;
+  }
+  if (!password && order.replay_id && !order.show_id) {
+    const { data: rep } = await admin
+      .from('replays').select('password').eq('id', order.replay_id).maybeSingle();
+    password = String(rep?.password || '').trim();
   }
 
-  const message =
-    `✅ *Pembayaran Berhasil*\n\n` +
-    `${order.item_title}\n` +
-    `Order: ${orderId}\n\n` +
-    `🔗 Link akses Anda:\n${link}` +
-    showExtras +
-    `\n\n_Klik link di atas untuk membuka. Jangan bagikan ke orang lain._`;
+  const dateStr = new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
+  const message = tpl
+    .replace(/\{date_line\}\n?/g, dateStr ? `📅 ${dateStr}\n` : '')
+    .replace(/\{password_line\}\n?/g, password ? `🔐 Sandi: *${password}*\n` : '')
+    .replace(/\{live_link_block\}\n?/g, liveLink ? `\n📺 Link Live:\n${liveLink}\n` : '')
+    .replace(/\{title\}/g, order.item_title || '')
+    .replace(/\{link\}/g, link)
+    .replace(/\{live_link\}/g, liveLink)
+    .replace(/\{password\}/g, password)
+    .replace(/\{date\}/g, dateStr)
+    .replace(/\{order_id\}/g, orderId)
+    .replace(/\{site\}/g, origin);
 
   // Atomic claim: only the first caller flips token_sent_at NULL -> now().
   const claimedAt = new Date().toISOString();
