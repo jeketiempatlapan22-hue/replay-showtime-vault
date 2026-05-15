@@ -211,19 +211,22 @@ export default function ActiveShowCard({ show, index = 0 }: { show: ActiveShow; 
         </div>
 
         {/* Price block */}
-        {(replayMode ? replayPriced : showPriced) && (
+        {(replayMode ? replayBuyable : showBuyable) && (
           <div className="rounded-md border border-primary/20 bg-primary/5 p-2.5 space-y-1">
             <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Harga {replayMode ? 'Replay' : 'Show'}</div>
             <div className="flex items-center justify-between gap-2 flex-wrap">
-              <span className="text-base font-bold text-primary">
-                Rp {(replayMode ? replayAmount : showAmount).toLocaleString('id-ID')}
-              </span>
-              {(() => {
-                const coins = replayMode ? (show as any).price_replay_coins : (show as any).price_show_coins;
-                return coins > 0 ? (
-                  <Badge variant="secondary" className="text-xs">atau {coins} koin</Badge>
-                ) : null;
-              })()}
+              {(replayMode ? replayPriced : showPriced) ? (
+                <span className="text-base font-bold text-primary">
+                  Rp {(replayMode ? replayAmount : showAmount).toLocaleString('id-ID')}
+                </span>
+              ) : (
+                <span className="text-xs text-muted-foreground">Hanya tukar koin</span>
+              )}
+              {((replayMode ? replayCoinPrice : showCoinPrice) > 0) && (
+                <Badge variant="secondary" className="text-xs">
+                  {(replayMode ? replayPriced : showPriced) ? 'atau ' : ''}{replayMode ? replayCoinPrice : showCoinPrice} koin
+                </Badge>
+              )}
             </div>
           </div>
         )}
