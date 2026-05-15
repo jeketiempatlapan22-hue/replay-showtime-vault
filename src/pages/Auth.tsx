@@ -59,7 +59,9 @@ export default function Auth() {
   const [busy, setBusy] = useState(false);
   const [lockSeconds, setLockSeconds] = useState(0);
   const [forgotOpen, setForgotOpen] = useState(false);
-  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotIdentifier, setForgotIdentifier] = useState('');
+  const [forgotNewPw, setForgotNewPw] = useState('');
+  const [forgotNewPw2, setForgotNewPw2] = useState('');
   const [forgotBusy, setForgotBusy] = useState(false);
 
   useEffect(() => {
