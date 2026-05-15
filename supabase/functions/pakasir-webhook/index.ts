@@ -82,6 +82,7 @@ Deno.serve(async (req) => {
   }
 
   const accessToken = order.access_token ?? genToken();
+  // (claim happens after we mark paid, just before the Fonnte send below)
   await admin.from('orders').update({
     status: 'paid', paid_at: new Date().toISOString(), access_token: accessToken,
   }).eq('id', order.id);
