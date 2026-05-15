@@ -216,8 +216,17 @@ export default function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWa
             </Button>
           ) : (
             <div className="space-y-2 mt-2">
+              <div className="rounded-md border border-primary/20 bg-primary/5 p-2.5 space-y-1">
+                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Harga Replay</div>
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <span className="text-base font-bold text-primary">Rp {REPLAY_DEFAULT_PRICE.toLocaleString('id-ID')}</span>
+                  {((replay as any).price_coins ?? 0) > 0 && (
+                    <Badge variant="secondary" className="text-xs">atau {(replay as any).price_coins} koin</Badge>
+                  )}
+                </div>
+              </div>
               <Button type="button" className="w-full gap-2" onClick={() => setBuyOpen(true)}>
-                <ShoppingCart className="w-4 h-4" /> Beli Replay · Rp {REPLAY_DEFAULT_PRICE.toLocaleString('id-ID')}
+                <ShoppingCart className="w-4 h-4" /> Beli Replay via QRIS &amp; Koin
               </Button>
               <Button type="button" variant="outline" className="w-full border-primary/50 text-primary hover:bg-primary hover:text-primary-foreground" onClick={() => setShowPasswordDialog(true)}>
                 <Lock className="w-4 h-4 mr-2" /> Buka dengan Sandi
