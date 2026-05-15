@@ -18,42 +18,23 @@ function newToken(len = 40) {
   return (a + b).slice(0, len);
 }
 
-function buildAttractiveMessage(opts: {
-  kind: 'master' | 'personal';
-  title: string;
-  link: string;
-  liveUrl: string;
-  showDate?: string;
-  replayPassword?: string;
-  livePassword?: string;
+const DEFAULT_WA_TPL =
+  '🎬 *ReplayTime*\n━━━━━━━━━━━━━━\n\n🎤 *{title}*\n{date_line}🔗 *Link Akses*\n{link}\n{password_line}{live_link_block}━━━━━━━━━━━━━━\n✨ Selamat menonton! 💖';
+
+function renderWaTemplate(tpl: string, vars: {
+  title: string; link: string; date?: string; password?: string; liveLink?: string; orderId?: string; site?: string;
 }) {
-  const isPersonal = opts.kind === 'personal';
-  const lines: string[] = [];
-  lines.push('🎬 *ReplayTime*');
-  lines.push('━━━━━━━━━━━━━━');
-  lines.push('');
-  lines.push(`🎤 *${opts.title}*`);
-  if (opts.showDate) lines.push(`📅 ${opts.showDate}`);
-  lines.push('');
-  lines.push('🔗 *Link Akses*');
-  lines.push(opts.link);
-  if (opts.replayPassword) {
-    lines.push('');
-    lines.push(`🔐 Sandi Replay: *${opts.replayPassword}*`);
-  }
-  if (opts.liveUrl) {
-    lines.push('');
-    lines.push('📺 *Link Live*');
-    lines.push(opts.liveUrl);
-    if (opts.livePassword) lines.push(`🔐 Sandi Live: *${opts.livePassword}*`);
-  }
-  lines.push('');
-  lines.push('━━━━━━━━━━━━━━');
-  lines.push(isPersonal
-    ? '👤 Khusus *1 perangkat* — jangan dibagikan.'
-    : '✨ Bisa dibuka di banyak perangkat.');
-  lines.push('💖 Selamat menonton!');
-  return lines.join('\n');
+  return (tpl || DEFAULT_WA_TPL)
+    .replace(/\{date_line\}/g, vars.date ? `📅 ${vars.date}\n\n` : '')
+    .replace(/\{password_line\}/g, vars.password ? `🔐 Sandi: *${vars.password}*\n\n` : '')
+    .replace(/\{live_link_block\}/g, vars.liveLink ? `📺 *Link Live*\n${vars.liveLink}\n\n` : '')
+    .replace(/\{title\}/g, vars.title || '')
+    .replace(/\{link\}/g, vars.link || '')
+    .replace(/\{date\}/g, vars.date || '')
+    .replace(/\{password\}/g, vars.password || '')
+    .replace(/\{live_link\}/g, vars.liveLink || '')
+    .replace(/\{order_id\}/g, vars.orderId || '')
+    .replace(/\{site\}/g, vars.site || '');
 }
 
 Deno.serve(async (req) => {
