@@ -395,6 +395,7 @@ export default function Admin() {
         source_type: form.sourceType,
         m3u8_url: isYoutube ? '' : form.m3u8Url,
         sources: normalizedSources as any,
+        price_coins: Number(form.priceCoins) || 0,
       };
       if (editingReplay) {
         await updateReplay(editingReplay.id, payload);
