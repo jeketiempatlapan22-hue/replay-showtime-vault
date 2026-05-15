@@ -99,6 +99,8 @@ Deno.serve(async (req) => {
     .eq('replay_id', replayId)
     .eq('is_active', true)
     .maybeSingle();
+  // Sandi prioritas: sandi replay yang dibeli; fallback ke sandi show terkait.
+  const password = (replay.password ? String(replay.password) : '') || (aShow?.live_password ? String(aShow.live_password) : '');
   if (aShow?.live_password) {
     livePassword = String(aShow.live_password);
   } else {
