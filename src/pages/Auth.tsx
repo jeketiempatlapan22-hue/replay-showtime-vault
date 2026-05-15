@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Loader2, LogIn, UserPlus, ShieldAlert } from 'lucide-react';
+import { Loader2, LogIn, UserPlus, ShieldAlert, KeyRound } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { toast } from '@/hooks/use-toast';
 import logoImg from '@/assets/logo.png';
 
@@ -57,6 +58,9 @@ export default function Auth() {
   const [remember, setRemember] = useState(true);
   const [busy, setBusy] = useState(false);
   const [lockSeconds, setLockSeconds] = useState(0);
+  const [forgotOpen, setForgotOpen] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotBusy, setForgotBusy] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -102,15 +106,16 @@ export default function Auth() {
         return;
       }
 
-      // 2) Resolve email if user typed phone
+      // 2) Resolve email if user typed phone or username
       let loginEmail = identifier.trim();
       if (!loginEmail.includes('@')) {
-        const phoneNorm = normalizePhone(loginEmail);
-        const { data, error } = await supabase.rpc('email_for_phone', { _phone: phoneNorm });
+        const looksPhone = /^[0-9+\s\-()]+$/.test(loginEmail);
+        const arg = looksPhone ? normalizePhone(loginEmail) : loginEmail;
+        const { data, error } = await supabase.rpc('email_for_identifier' as never, { _identifier: arg } as never);
         if (error) throw error;
         if (!data) {
           await recordAttempt(lockKey, false);
-          toast({ title: 'Akun tidak ditemukan', description: 'Nomor HP belum terdaftar.', variant: 'destructive' });
+          toast({ title: 'Akun tidak ditemukan', description: 'Email, nomor HP, atau username belum terdaftar.', variant: 'destructive' });
           setBusy(false);
           return;
         }
@@ -197,7 +202,7 @@ export default function Auth() {
           <img src={logoImg} alt="Logo" className="w-14 h-14 rounded-full ring-2 ring-primary/40" />
           <h1 className="text-2xl font-bold text-foreground">{mode === 'login' ? 'Masuk' : 'Daftar Akun'}</h1>
           <p className="text-sm text-muted-foreground">
-            {mode === 'login' ? 'Gunakan email atau nomor HP Anda.' : 'Buat akun dengan email & nomor HP.'}
+            {mode === 'login' ? 'Masuk dengan email, nomor HP, atau username.' : 'Buat akun dengan email & nomor HP.'}
           </p>
         </div>
 
@@ -214,10 +219,10 @@ export default function Auth() {
         {mode === 'login' ? (
           <form onSubmit={handleLogin} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="identifier">Email atau Nomor HP</Label>
+              <Label htmlFor="identifier">Email, Nomor HP, atau Username</Label>
               <Input
                 id="identifier"
-                placeholder="contoh: 08123456789 atau email@mail.com"
+                placeholder="email@mail.com / 08123456789 / username"
                 value={identifier}
                 onChange={(e) => setIdentifier(e.target.value)}
                 autoComplete="username"
@@ -225,7 +230,16 @@ export default function Auth() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Sandi</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password">Sandi</Label>
+                <button
+                  type="button"
+                  onClick={() => { setForgotEmail(identifier.includes('@') ? identifier : ''); setForgotOpen(true); }}
+                  className="text-xs text-primary hover:underline font-medium"
+                >
+                  Lupa sandi?
+                </button>
+              </div>
               <Input
                 id="password"
                 type="password"
@@ -299,6 +313,61 @@ export default function Auth() {
           <Link to="/" className="text-xs text-muted-foreground hover:text-primary">← Kembali ke beranda</Link>
         </div>
       </div>
+
+      <Dialog open={forgotOpen} onOpenChange={setForgotOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><KeyRound className="w-4 h-4" /> Lupa Sandi</DialogTitle>
+            <DialogDescription className="text-xs">
+              Masukkan email akun Anda. Kami akan mengirim tautan reset ke email tersebut.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="forgot-email" className="text-xs">Email</Label>
+            <Input
+              id="forgot-email"
+              type="email"
+              value={forgotEmail}
+              onChange={(e) => setForgotEmail(e.target.value)}
+              placeholder="email@mail.com"
+              autoComplete="email"
+            />
+            <p className="text-[11px] text-muted-foreground">
+              Jika Anda hanya punya nomor HP/username, hubungi admin via WhatsApp dari halaman Profil untuk reset sandi.
+            </p>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="ghost" onClick={() => setForgotOpen(false)} disabled={forgotBusy}>Batal</Button>
+            <Button
+              onClick={async () => {
+                const em = forgotEmail.trim();
+                if (!em || !em.includes('@')) {
+                  toast({ title: 'Email tidak valid', variant: 'destructive' });
+                  return;
+                }
+                setForgotBusy(true);
+                try {
+                  const { error } = await supabase.auth.resetPasswordForEmail(em, {
+                    redirectTo: `${window.location.origin}/reset-password`,
+                  });
+                  if (error) throw error;
+                  toast({ title: 'Email terkirim', description: 'Cek inbox/spam untuk tautan reset sandi.' });
+                  setForgotOpen(false);
+                } catch (e: unknown) {
+                  const msg = e instanceof Error ? e.message : 'Gagal mengirim email';
+                  toast({ title: 'Gagal', description: msg, variant: 'destructive' });
+                } finally {
+                  setForgotBusy(false);
+                }
+              }}
+              disabled={forgotBusy}
+            >
+              {forgotBusy ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <KeyRound className="w-4 h-4 mr-2" />}
+              Kirim Tautan
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -19,6 +19,7 @@ import Akses from "./pages/Akses";
 import Shows from "./pages/Shows";
 import Koin from "./pages/Koin";
 import Profil from "./pages/Profil";
+import ResetPassword from "./pages/ResetPassword";
 import BottomNav from "./components/BottomNav";
 
 const queryClient = new QueryClient();
@@ -29,7 +30,7 @@ function ProtectedShell({ children }: { children: React.ReactNode }) {
   const [checking, setChecking] = useState(true);
 
   // Skip protection on admin route
-  const isAdminRoute = location.pathname.startsWith('/adpan') || location.pathname.startsWith('/auth');
+  const isAdminRoute = location.pathname.startsWith('/adpan') || location.pathname.startsWith('/auth') || location.pathname.startsWith('/reset-password');
 
   // Check existing block status on mount
   useEffect(() => {
@@ -68,6 +69,7 @@ const App = () => (
               <Route path="/live" element={<Live />} />
               <Route path="/kunci" element={<Kunci />} />
               <Route path="/auth" element={<Auth />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/akses" element={<Akses />} />
               <Route path="/shows" element={<Shows />} />
               <Route path="/show" element={<Shows />} />
