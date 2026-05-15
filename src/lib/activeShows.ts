@@ -64,5 +64,8 @@ export async function deleteActiveShow(id: string) {
 }
 
 export function getShowDateTime(s: ActiveShow): Date {
-  return new Date(`${s.show_date}T${s.show_time}`);
+  // show_date + show_time disimpan sebagai jam WIB (Asia/Jakarta, UTC+7).
+  // Parse sebagai instant absolut agar countdown akurat di semua zona (WIB/WITA/WIT/luar negeri).
+  const time = (s.show_time || '00:00:00').padEnd(8, ':00').slice(0, 8);
+  return new Date(`${s.show_date}T${time}+07:00`);
 }
