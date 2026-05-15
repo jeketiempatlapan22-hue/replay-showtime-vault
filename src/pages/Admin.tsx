@@ -4,6 +4,7 @@ import { ArrowLeft, Plus, Trash2, Edit2, Key, Save, Palette, MessageCircle, LogO
 import BotAdmin from '@/components/admin/BotAdmin';
 import TokenHistoryAdmin from '@/components/admin/TokenHistoryAdmin';
 import MembershipAdmin from '@/components/admin/MembershipAdmin';
+import PakasirAdmin from '@/components/admin/PakasirAdmin';
 import ReplayPersonalTokensDialog from '@/components/admin/ReplayPersonalTokensDialog';
 import ShowLiveControl from '@/components/admin/ShowLiveControl';
 import { getMembers, upsertMember, deleteMember, uploadMemberPhoto, type Member } from '@/lib/members';
