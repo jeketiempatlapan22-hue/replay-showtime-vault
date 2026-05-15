@@ -70,9 +70,11 @@ const App = () => (
               <Route path="/akses" element={<Akses />} />
               <Route path="/shows" element={<Shows />} />
               <Route path="/show" element={<Shows />} />
+              <Route path="/koin" element={<Koin />} />
               <Route path="/adpan" element={<Admin />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
+            <BottomNav />
           </ProtectedShell>
         </ErrorBoundary>
       </BrowserRouter>
