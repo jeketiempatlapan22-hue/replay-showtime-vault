@@ -80,6 +80,7 @@ export default function Admin() {
   const [staticQrisUrl, setStaticQrisUrl] = useState('');
   const [useStaticQris, setUseStaticQris] = useState(false);
   const [adminUsername, setAdminUsername] = useState('');
+  const [canEditAdminUsername, setCanEditAdminUsername] = useState(false);
 
   // Comments state
   const [allComments, setAllComments] = useState<Comment[]>([]);
