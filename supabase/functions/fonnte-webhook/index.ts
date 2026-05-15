@@ -664,13 +664,14 @@ Deno.serve(async (req) => {
               '🔗 *Link Live:*',
               link,
               '',
-              '🎬 Link Replay: replaytime.lovable.app',
-              livePwd ? `🗝️ Sandi: ${livePwd}` : '',
+              '🎬 *Link Replay:*',
+              'replaytime.lovable.app',
+              livePwd ? `🗝️ Sandi: *${livePwd}*` : null,
               '',
               access,
               '',
               '— *ReplayTime* 💖',
-            ].filter((l) => l !== '').join('\n');
+            ].filter((l) => l !== null).join('\n');
           }
         }
       }
@@ -724,7 +725,7 @@ Deno.serve(async (req) => {
         '🧪 *MODE TEST — WEBHOOK OK*',
         '',
         `📱 Nomor: +${phoneNorm}`,
-        fromGroup ? `👥 Grup: +${participantNorm}` : '',
+        fromGroup ? `👥 Grup: +${participantNorm}` : null,
         `🔧 Device: ${deviceNorm || '-'}`,
         `📨 Command: *${text}*`,
         `⏰ Waktu: ${new Date().toLocaleString('id-ID')}`,
@@ -734,7 +735,7 @@ Deno.serve(async (req) => {
         `✅ Admin: ${isBotAdmin ? 'terverifikasi' : 'tidak'}`,
         '',
         '_Tidak ada token/link yang dikirim — ini hanya simulasi._',
-      ].filter(Boolean);
+      ].filter((l) => l !== null);
       reply = testLines.join('\n');
     }
   }

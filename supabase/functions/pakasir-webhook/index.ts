@@ -159,11 +159,11 @@ Deno.serve(async (req) => {
       '━━━━━━━━━━━━━━',
       '',
       `🪙 +${order.coin_amount} koin masuk ke akun Anda.`,
-      newBal != null ? `💰 Saldo sekarang: *${newBal}* koin` : '',
+      newBal != null ? `💰 Saldo sekarang: *${newBal}* koin` : null,
       '',
       '━━━━━━━━━━━━━━',
       '💖 Terima kasih — *ReplayTime*',
-    ].filter(Boolean).join('\n');
+    ].filter((l) => l !== null).join('\n');
     const sent = await sendFonnte(order.user_phone, msg);
     if (!sent.ok) {
       await admin.from('orders').update({ token_sent_at: null }).eq('id', order.id).eq('token_sent_at', claimedAt);
