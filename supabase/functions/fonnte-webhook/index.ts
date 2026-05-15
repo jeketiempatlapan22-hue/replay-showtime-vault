@@ -141,18 +141,20 @@ async function createTokenInline(
     }
 
     const link = `${origin}/akses?token=${token}&replay=${opts.replayId}`;
+    const siteOnly = origin.replace(/^https?:\/\//, '');
     const showDate = (replay as { date?: string }).date
       ? new Date((replay as { date: string }).date).toLocaleDateString('id-ID', {
           day: '2-digit', month: 'long', year: 'numeric',
         })
       : '';
+    // Info Replay (bot): tampilkan domain saja + sandi (tanpa token di link).
     const tplStr = (opts.settingsMap.get('wa_message_template') as string) || DEFAULT_WA_TPL;
     const message = renderWaTemplate(tplStr, {
       title: (replay as { title: string }).title,
-      link,
+      link: siteOnly,
       date: showDate,
       password,
-      site: origin.replace(/^https?:\/\//, ''),
+      site: siteOnly,
     });
 
     await admin.from('token_deliveries').insert({

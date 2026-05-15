@@ -194,17 +194,16 @@ Deno.serve(async (req) => {
 
   let password = '';
   let liveLink = '';
+  const isReplayOnlyPurchase = !!order.replay_id && !order.show_id;
   if (order.show_id) {
     const { data: showRow } = await admin
       .from('active_shows').select('live_password').eq('id', order.show_id).maybeSingle();
     password = String(showRow?.live_password || '').trim();
     if (!order.replay_id) liveLink = `${origin}/live?show=${order.show_id}&t=${accessToken}`;
   }
-  if (!password && order.replay_id && !order.show_id) {
-    const { data: rep } = await admin
-      .from('replays').select('password').eq('id', order.replay_id).maybeSingle();
-    password = String(rep?.password || '').trim();
-  }
+  // Pembelian replay via kartu replay: link token sudah cukup, sandi tidak dikirim
+  // agar user langsung masuk ke halaman replay.
+  if (isReplayOnlyPurchase) password = '';
 
   const dateStr = new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
   const message = tpl
