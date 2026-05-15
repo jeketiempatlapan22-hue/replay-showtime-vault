@@ -52,7 +52,13 @@ async function processOrder(admin: ReturnType<typeof createClient>, order: any, 
   const tx = pjson?.transaction || pjson?.payment || {};
   const pStatus = String(tx.status || pjson?.status || '').toLowerCase();
   const isPaid = pStatus === 'completed' || pStatus === 'paid' || pStatus === 'success';
-  if (!isPaid) return { id: order.id, status: pStatus || 'pending' };
+  if (!isPaid) {
+    // Persist terminal non-paid statuses (canceled/expired/failed) so we stop re-polling them.
+    if (pStatus === 'canceled' || pStatus === 'cancelled' || pStatus === 'expired' || pStatus === 'failed') {
+      await admin.from('orders').update({ status: pStatus }).eq('id', order.id);
+    }
+    return { id: order.id, status: pStatus || 'pending' };
+  }
 
   const accessToken = order.access_token ?? genToken();
   if (order.status !== 'paid') {
@@ -112,16 +118,19 @@ Deno.serve(async (req) => {
   const { data: settings } = await admin.from('site_settings').select('value').eq('key', 'site_origin').maybeSingle();
   const origin = (settings?.value || 'https://replaytime.lovable.app').replace(/\/+$/, '');
 
-  // Pull recent pending orders (last 24h, oldest first, capped)
-  const since = new Date(Date.now() - 24 * 3600_000).toISOString();
+  // Pull recent pending orders (last 7 days, newest first, generous cap).
+  // Pakasir dynamic QRIS payments can be paid hours after creation; we keep
+  // a wide window so even users who close the dialog still get their token.
+  const since = new Date(Date.now() - 7 * 24 * 3600_000).toISOString();
   const { data: orders, error } = await admin
     .from('orders')
     .select('*')
     .eq('status', 'pending')
     .gte('created_at', since)
     .not('pakasir_order_id', 'is', null)
-    .order('created_at', { ascending: true })
-    .limit(40);
+    .order('created_at', { ascending: false })
+    .limit(100);
+  console.log(`[poll] scanning ${orders?.length ?? 0} pending orders since ${since}`);
 
   if (error) {
     return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: corsHeaders });
