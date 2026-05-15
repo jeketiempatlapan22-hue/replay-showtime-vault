@@ -370,7 +370,8 @@ export default function Auth() {
                     body: { identifier: id, password: forgotNewPw },
                   });
                   if (error) throw error;
-                  if ((data as { error?: string })?.error) throw new Error((data as { message?: string }).message || 'Gagal mengganti sandi');
+                  const result = data as { ok?: boolean; error?: string; message?: string } | null;
+                  if (!result?.ok) throw new Error(result?.message || 'Gagal mengganti sandi');
                   toast({ title: 'Sandi berhasil diganti', description: 'Silakan login dengan sandi baru.' });
                   setForgotOpen(false);
                   setPassword(forgotNewPw);
