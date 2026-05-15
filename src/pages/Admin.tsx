@@ -66,7 +66,7 @@ export default function Admin() {
   const [editingReplay, setEditingReplay] = useState<ReplayRow | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ReplayRow | null>(null);
 
-  const [form, setForm] = useState({ title: '', showName: '', date: '', showTime: '19:00', criteria: 'reguler', featuredMember: '', lineup: '', password: '', adminAlias: '', youtubeId: '', imageUrl: '', sourceType: 'youtube', m3u8Url: '', sources: [] as PlaylistSource[], priceCoins: 0 });
+  const [form, setForm] = useState({ title: '', showName: '', date: '', showTime: '19:00', criteria: 'reguler', featuredMember: '', lineup: '', password: '', adminAlias: '', youtubeId: '', imageUrl: '', sourceType: 'youtube', m3u8Url: '', sources: [] as PlaylistSource[], priceCoins: 1 });
   const [liveChatEnabled, setLiveChatEnabled] = useState(true);
 
   const [mpYear, setMpYear] = useState(String(new Date().getFullYear()));
@@ -354,7 +354,7 @@ export default function Admin() {
   const handleLogout = async () => { await supabase.auth.signOut(); setIsLoggedIn(false); };
 
   const resetForm = () => {
-    setForm({ title: '', showName: '', date: '', showTime: '19:00', criteria: 'reguler', featuredMember: '', lineup: '', password: '', adminAlias: '', youtubeId: '', imageUrl: '', sourceType: 'youtube', m3u8Url: '', sources: [], priceCoins: 0 });
+    setForm({ title: '', showName: '', date: '', showTime: '19:00', criteria: 'reguler', featuredMember: '', lineup: '', password: '', adminAlias: '', youtubeId: '', imageUrl: '', sourceType: 'youtube', m3u8Url: '', sources: [], priceCoins: 1 });
     setEditingReplay(null);
   };
 
@@ -395,7 +395,7 @@ export default function Admin() {
         source_type: form.sourceType,
         m3u8_url: isYoutube ? '' : form.m3u8Url,
         sources: normalizedSources as any,
-        price_coins: Number(form.priceCoins) || 0,
+        price_coins: Number.isFinite(Number(form.priceCoins)) ? Math.max(0, Number(form.priceCoins)) : 1,
       };
       if (editingReplay) {
         await updateReplay(editingReplay.id, payload);
@@ -421,7 +421,7 @@ export default function Admin() {
       youtubeId: r.youtube_id, imageUrl: r.image_url,
       sourceType: (r as any).source_type || 'youtube', m3u8Url: (r as any).m3u8_url || '',
       sources: Array.isArray((r as any).sources) ? (r as any).sources : [],
-      priceCoins: (r as any).price_coins ?? 0,
+      priceCoins: ((r as any).price_coins ?? 1),
     });
     setShowAddDialog(true);
   };
@@ -1461,8 +1461,8 @@ export default function Admin() {
             <div><Label>Sandi *</Label><Input placeholder="Sandi untuk replay ini" value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} /></div>
             <div>
               <Label>Harga Koin (untuk tukar)</Label>
-              <Input type="number" min={0} value={form.priceCoins} onChange={e => setForm(f => ({ ...f, priceCoins: Number(e.target.value) }))} placeholder="0 = nonaktif" />
-              <p className="text-[11px] text-muted-foreground mt-1">Jumlah koin yang user bayar untuk membuka replay ini. 0 = tab Koin disembunyikan.</p>
+              <Input type="number" min={0} value={form.priceCoins} onChange={e => setForm(f => ({ ...f, priceCoins: Number(e.target.value) }))} placeholder="default 1 koin" />
+              <p className="text-[11px] text-muted-foreground mt-1">Default 1 koin. Ubah ke nominal lain jika perlu, atau set 0 untuk menyembunyikan tab Koin.</p>
             </div>
             <div>
               <Label>Alias Admin <span className="text-xs text-muted-foreground">(rahasia, hanya admin)</span></Label>
