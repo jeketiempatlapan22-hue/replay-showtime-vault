@@ -20,7 +20,7 @@ function genToken() {
   return crypto.randomUUID().replace(/-/g, '').slice(0, 24);
 }
 
-async function sendFonnte(phone: string, message: string) {
+async function sendFonnteOnce(phone: string, message: string) {
   const token = Deno.env.get('FONNTE_TOKEN');
   if (!token) return { ok: false, data: { error: 'no token' } };
   const form = new FormData();
@@ -30,12 +30,27 @@ async function sendFonnte(phone: string, message: string) {
   try {
     const res = await fetch('https://api.fonnte.com/send', {
       method: 'POST', headers: { Authorization: token }, body: form,
+      signal: AbortSignal.timeout(8000),
     });
     const data = await res.json().catch(() => ({}));
     return { ok: res.ok && (data as { status?: boolean })?.status !== false, data };
   } catch (e) {
     return { ok: false, data: { error: String(e) } };
   }
+}
+
+// Auto-retry Fonnte send up to 3 attempts with exponential backoff (1s, 3s).
+// This handles transient Fonnte 5xx, network blips, or rate-limit hiccups so
+// the user reliably receives their token even if the first send fails.
+async function sendFonnte(phone: string, message: string) {
+  const delays = [0, 1000, 3000];
+  let last: { ok: boolean; data: unknown } = { ok: false, data: { error: 'no_attempt' } };
+  for (let i = 0; i < delays.length; i++) {
+    if (delays[i]) await new Promise((r) => setTimeout(r, delays[i]));
+    last = await sendFonnteOnce(phone, message);
+    if (last.ok) return { ...last, attempts: i + 1 };
+  }
+  return { ...last, attempts: delays.length };
 }
 
 async function processOrder(admin: ReturnType<typeof createClient>, order: any, apiKey: string, slug: string, origin: string) {
