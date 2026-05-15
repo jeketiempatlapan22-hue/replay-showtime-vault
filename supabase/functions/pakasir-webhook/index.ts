@@ -19,6 +19,42 @@ function genToken() {
   return crypto.randomUUID().replace(/-/g, '').slice(0, 24);
 }
 
+// Provision a fresh single-device token row for this paid order.
+// Always issues a brand-new token (never reuses a stale order.access_token)
+// and writes the matching row into active_show_tokens / replay_personal_tokens
+// with max_devices = 1. Idempotent: if a row already exists for the order's
+// current token, returns it as-is.
+async function ensurePurchaseToken(admin: ReturnType<typeof createClient>, order: any): Promise<string> {
+  if (order.access_token) {
+    if (order.show_id && !order.replay_id) {
+      const { data: existing } = await admin
+        .from('active_show_tokens').select('id')
+        .eq('show_id', order.show_id).eq('token', order.access_token).maybeSingle();
+      if (existing) return order.access_token;
+    } else if (order.replay_id) {
+      const { data: existing } = await admin
+        .from('replay_personal_tokens').select('id')
+        .eq('replay_id', order.replay_id).eq('token', order.access_token).maybeSingle();
+      if (existing) return order.access_token;
+    }
+  }
+  const newTok = genToken();
+  if (order.show_id && !order.replay_id) {
+    await admin.from('active_show_tokens').insert({
+      show_id: order.show_id, token: newTok,
+      label: `pakasir:${order.user_phone || ''}`.slice(0, 120),
+      kind: 'personal', max_devices: 1, revoked: false,
+    });
+  } else if (order.replay_id) {
+    await admin.from('replay_personal_tokens').insert({
+      replay_id: order.replay_id, token: newTok,
+      label: `pakasir:${order.user_phone || ''}`.slice(0, 120),
+      max_devices: 1, revoked: false,
+    });
+  }
+  return newTok;
+}
+
 async function sendFonnteOnce(phone: string, message: string) {
   const token = Deno.env.get('FONNTE_TOKEN');
   if (!token) return { ok: false, data: { error: 'no token' } };
@@ -99,7 +135,7 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ ok: true, already: true }), { headers: corsHeaders });
   }
 
-  const accessToken = order.access_token ?? genToken();
+  const accessToken = await ensurePurchaseToken(admin, order);
   // (claim happens after we mark paid, just before the Fonnte send below)
   await admin.from('orders').update({
     status: 'paid', paid_at: new Date().toISOString(), access_token: accessToken,
