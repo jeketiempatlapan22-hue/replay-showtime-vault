@@ -696,6 +696,50 @@ Deno.serve(async (req) => {
           }
         }
       }
+    } else if (cmd === '/golive' || cmd === '/unlive') {
+      // Toggle is_live flag for a show by alias or id-prefix.
+      // Format: /golive <alias|id>   /unlive <alias|id>
+      const code = arg.trim().toLowerCase();
+      const turnOn = cmd === '/golive';
+      if (!code) {
+        const { data: shows } = await admin
+          .from('active_shows').select('id,title,show_date,show_time,admin_alias,is_live')
+          .eq('is_active', true).order('show_date', { ascending: false }).limit(10);
+        const lines = (shows ?? []).map((s: any) => {
+          const aliasLine = s.admin_alias ? `\n  🏷️ alias: \`${s.admin_alias}\`` : '';
+          const liveTag = s.is_live ? ' 🔴 LIVE' : '';
+          return `• \`${s.id.slice(0,8)}\` — ${s.title}${liveTag}\n  📅 ${s.show_date} ${String(s.show_time).slice(0,5)}${aliasLine}`;
+        });
+        reply = `ℹ️ Format: *${cmd} <kode|alias>*\n_${turnOn ? 'Aktifkan' : 'Nonaktifkan'} status LIVE untuk show._\n\n` +
+          (lines.length ? `🎤 *DAFTAR SHOW AKTIF*\n\n${lines.join('\n\n')}` : '📭 Belum ada show aktif.');
+      } else {
+        const { data: byAlias } = await admin
+          .from('active_shows').select('id,title,is_live,admin_alias').ilike('admin_alias', code).limit(2);
+        let matches = byAlias ?? [];
+        if (!matches.length) {
+          const { data: byId } = await admin
+            .from('active_shows').select('id,title,is_live,admin_alias').ilike('id', `${code}%`).limit(2);
+          matches = byId ?? [];
+        }
+        if (!matches.length) reply = `❌ Show dengan kode/alias *${code}* tidak ditemukan.`;
+        else if (matches.length > 1) reply = `⚠️ Kode *${code}* ambigu (${matches.length} match). Pakai alias unik atau id lebih panjang.`;
+        else {
+          const s: any = matches[0];
+          if (turnOn) {
+            // Auto-disable any other show currently live to keep a single active LIVE.
+            await admin.from('active_shows').update({ is_live: false }).neq('id', s.id).eq('is_live', true);
+          }
+          const { error } = await admin.from('active_shows')
+            .update({ is_live: turnOn }).eq('id', s.id);
+          if (error) {
+            reply = `❌ Gagal mengubah status. ${error.message}`;
+          } else {
+            reply = turnOn
+              ? `🔴 *LIVE DIAKTIFKAN*\n\n🎤 ${s.title}\n🆔 \`${s.id.slice(0,8)}\`${s.admin_alias ? `\n🏷️ ${s.admin_alias}` : ''}\n\n✅ Show ini sekarang tampil sebagai LIVE di halaman utama.`
+              : `⚫ *LIVE DINONAKTIFKAN*\n\n🎤 ${s.title}\n🆔 \`${s.id.slice(0,8)}\`${s.admin_alias ? `\n🏷️ ${s.admin_alias}` : ''}\n\n✅ Show ini tidak lagi tampil sebagai LIVE.`;
+          }
+        }
+      }
     } else if (cmd === '/test') {
       const fromGroup = !!participantNorm && participantNorm !== phoneNorm;
       const testLines = [
