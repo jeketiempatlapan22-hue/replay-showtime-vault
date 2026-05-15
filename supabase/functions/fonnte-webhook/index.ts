@@ -87,44 +87,29 @@ function buildAttractiveTokenMessage(opts: {
   liveUrl: string;
   showDate?: string;
 }) {
-  const header = opts.kind === 'personal'
-    ? '🔐 *TOKEN SATUAN — REPLAYTIME*'
-    : opts.kind === 'replay'
-      ? '🎬 *TOKEN REPLAY — REPLAYTIME*'
-      : '🎁 *TOKEN AKSES — REPLAYTIME*';
-
-  const accessLine = opts.kind === 'personal'
-    ? '👤  *Token Pribadi* — hanya untuk *1 perangkat pertama* yang membuka link.'
-    : '🔓  *Token Multi-Device* — bisa dibuka di banyak perangkat.';
-
-  const closing = opts.kind === 'personal'
-    ? '⚠️  Mohon *jangan dibagikan* — perangkat lain tidak akan bisa membuka.'
-    : '✨  Selamat menonton, semoga makin seru!';
+  const isPersonal = opts.kind === 'personal';
+  const header = isPersonal
+    ? '🔐 *TOKEN PRIBADI — REPLAYTIME*'
+    : '🎬 *TOKEN REPLAY — REPLAYTIME*';
 
   const lines: string[] = [];
   lines.push(header);
-  lines.push('━━━━━━━━━━━━━━━━━━━━');
   lines.push('');
-  lines.push(`🎤  *${opts.title}*`);
-  if (opts.showDate) lines.push(`📅  ${opts.showDate}`);
+  lines.push(`🎤 *${opts.title}*${opts.showDate ? `\n📅 ${opts.showDate}` : ''}`);
   lines.push('');
-  lines.push('💡  *Cukup klik link di bawah* — langsung masuk ke halaman replay,');
-  lines.push('     tanpa perlu memasukkan kode apa pun.');
-  lines.push('');
-  lines.push('🔗  *Link Akses Replay:*');
+  lines.push('🔗 *Link Akses:*');
   lines.push(opts.link);
   lines.push('');
   if (opts.liveUrl) {
-    lines.push('📺  *Bonus:* link yang sama juga bisa untuk *Live*');
-    lines.push(`     ${opts.liveUrl}`);
+    lines.push('📺 *Link Live:*');
+    lines.push(opts.liveUrl);
     lines.push('');
   }
-  lines.push(accessLine);
+  lines.push(isPersonal
+    ? '👤 Token ini hanya untuk *1 perangkat*. Jangan dibagikan.'
+    : '✨ Bisa dibuka di banyak perangkat. Selamat menonton!');
   lines.push('');
-  lines.push('━━━━━━━━━━━━━━━━━━━━');
-  lines.push(closing);
-  lines.push('');
-  lines.push('— ReplayTime 💖');
+  lines.push('— *ReplayTime* 💖');
   return lines.join('\n');
 }
 
@@ -671,28 +656,24 @@ Deno.serve(async (req) => {
             const origin = (map.get('site_origin') || 'https://replaytime.lovable.app').replace(/\/+$/, '');
             const link = `${origin}/live?show=${s.id}&t=${token}`;
             const header = isPublic ? '🎁 *TOKEN LIVE PUBLIK*' : '🔐 *TOKEN LIVE SATUAN*';
-            const access = isPublic ? `🔓 Bisa dibuka di ${maxDevices} perangkat.` : '👤 Hanya untuk *1 perangkat pertama*.';
+            const access = isPublic ? '🔓 Bisa dibuka di banyak perangkat.' : '👤 Hanya untuk *1 perangkat pertama*.';
             const livePwd = s.live_password ? String(s.live_password) : '';
             reply = [
               header,
-              '━━━━━━━━━━━━━━━━━━━━',
               '',
-              `🎤  *${s.title}*`,
+              `🎤 *${s.title}*`,
+              `📅 ${s.show_date} ${String(s.show_time).slice(0,5)}`,
               '',
-              `📅  ${s.show_date} ${String(s.show_time).slice(0,5)}`,
-              '',
-              '🔗  *Link Akses Live:*',
-              '',
+              '🔗 *Link Live:*',
               link,
               '',
-              '🎬Link Replay : replaytime.lovable.app',
-              '',
-              livePwd ? `🗝️Sandi : ${livePwd}` : '',
+              '🎬 Link Replay: replaytime.lovable.app',
+              livePwd ? `🗝️ Sandi: ${livePwd}` : '',
               '',
               access,
               '',
-              '━━━━━━━━━━━━━━━━━━━━',
-            ].filter((l) => l !== '' || true).join('\n');
+              '— *ReplayTime* 💖',
+            ].filter((l) => l !== '').join('\n');
           }
         }
       }
@@ -778,25 +759,7 @@ Deno.serve(async (req) => {
   };
 
   if (!testMode && ADMIN_ONLY.has(cmd) && isBotAdmin) {
-    const displayCommand = [cmd, arg].filter(Boolean).join(' ');
-    const instantReply = [
-      '⚡ *Command diterima*',
-      '',
-      `Perintah: *${displayCommand}*`,
-      'Bot sedang memproses dan akan mengirim hasilnya sebentar lagi.',
-    ].join('\n');
-
     const background = (async () => {
-      await sendAndAudit(admin, {
-        phone: phoneNorm,
-        message: instantReply,
-        inboxId,
-        testMode,
-        deliverTest,
-        command: cmd,
-        device: deviceNorm,
-        fromMe,
-      });
       await processAndSendReply();
     })().catch(async (e) => {
       const errorMsg = e instanceof Error ? e.message : 'unknown_error';
