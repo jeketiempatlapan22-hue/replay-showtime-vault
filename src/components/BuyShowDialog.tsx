@@ -30,6 +30,7 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
   const navigate = useNavigate();
   const { user } = useAuth();
   const [method, setMethod] = useState<'qris' | 'coin'>('qris');
+  const qrisAvailable = amount >= 100;
   const [coinPrice, setCoinPrice] = useState<number>(0);
   const [coinBalance, setCoinBalance] = useState<number>(0);
   const [coinBusy, setCoinBusy] = useState(false);
