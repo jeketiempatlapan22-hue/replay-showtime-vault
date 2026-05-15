@@ -52,7 +52,13 @@ async function processOrder(admin: ReturnType<typeof createClient>, order: any, 
   const tx = pjson?.transaction || pjson?.payment || {};
   const pStatus = String(tx.status || pjson?.status || '').toLowerCase();
   const isPaid = pStatus === 'completed' || pStatus === 'paid' || pStatus === 'success';
-  if (!isPaid) return { id: order.id, status: pStatus || 'pending' };
+  if (!isPaid) {
+    // Persist terminal non-paid statuses (canceled/expired/failed) so we stop re-polling them.
+    if (pStatus === 'canceled' || pStatus === 'cancelled' || pStatus === 'expired' || pStatus === 'failed') {
+      await admin.from('orders').update({ status: pStatus }).eq('id', order.id);
+    }
+    return { id: order.id, status: pStatus || 'pending' };
+  }
 
   const accessToken = order.access_token ?? genToken();
   if (order.status !== 'paid') {
