@@ -809,6 +809,18 @@ export default function Admin() {
                     <p className="text-[11px] text-muted-foreground mt-1">Default Rp 2.000 jika kosong.</p>
                   </div>
                 </div>
+                <div className="grid grid-cols-2 gap-3 pt-2 border-t border-border/40">
+                  <div>
+                    <Label>Harga Show (Koin)</Label>
+                    <Input type="number" min={0} value={showForm.price_show_coins} onChange={e => setShowForm({ ...showForm, price_show_coins: Number(e.target.value) })} placeholder="0" />
+                    <p className="text-[11px] text-muted-foreground mt-1">0 = nonaktif (tab Koin disembunyikan).</p>
+                  </div>
+                  <div>
+                    <Label>Harga Replay (Koin)</Label>
+                    <Input type="number" min={0} value={showForm.price_replay_coins} onChange={e => setShowForm({ ...showForm, price_replay_coins: Number(e.target.value) })} placeholder="0" />
+                    <p className="text-[11px] text-muted-foreground mt-1">0 = nonaktif.</p>
+                  </div>
+                </div>
                 <div>
                   <Label>Pakasir Amount (Rp) — fallback opsional</Label>
                   <Input type="number" min={0} value={showForm.pakasir_amount} onChange={e => setShowForm({ ...showForm, pakasir_amount: Number(e.target.value) })} placeholder="Kosongkan jika tidak perlu" />
