@@ -169,15 +169,42 @@ Deno.serve(async (req) => {
   }
 
   const results: any[] = [];
+  const freshPending: any[] = [];
+  const freshCutoff = Date.now() - 30 * 60_000; // 30 min
   for (const o of orders ?? []) {
     try {
-      results.push(await processOrder(admin, o, apiKey, slug, origin));
+      const r = await processOrder(admin, o, apiKey, slug, origin);
+      results.push(r);
+      // Track fresh-still-pending orders for fast-lane rescan within this same invocation.
+      if (r?.status === 'pending' && new Date(o.created_at).getTime() >= freshCutoff) {
+        freshPending.push(o);
+      }
     } catch (e) {
       results.push({ id: o.id, error: String(e) });
     }
   }
 
-  return new Response(JSON.stringify({ ok: true, scanned: results.length, results }), {
+  // Fast-lane fallback: when the Pakasir webhook does not arrive, do two extra
+  // polls of fresh (<30 min old) still-pending orders inside this same invocation
+  // at +20s and +40s. Combined with the per-minute cron this gives ~20s effective
+  // detection latency for new payments without needing sub-minute cron support.
+  const fastLane = (async () => {
+    if (freshPending.length === 0) return;
+    for (const delay of [20_000, 20_000]) {
+      await new Promise((r) => setTimeout(r, delay));
+      const ids = freshPending.map((o) => o.id);
+      const { data: refreshed } = await admin
+        .from('orders').select('*').in('id', ids).eq('status', 'pending');
+      if (!refreshed?.length) return;
+      for (const o of refreshed) {
+        try { await processOrder(admin, o, apiKey, slug, origin); } catch { /* keep going */ }
+      }
+    }
+  })();
+  const runtime = (globalThis as unknown as { EdgeRuntime?: { waitUntil?: (p: Promise<unknown>) => void } }).EdgeRuntime;
+  if (runtime?.waitUntil) runtime.waitUntil(fastLane); else fastLane.catch(() => {});
+
+  return new Response(JSON.stringify({ ok: true, scanned: results.length, fast_lane: freshPending.length, results }), {
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });
 });
