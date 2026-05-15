@@ -125,9 +125,25 @@ Deno.serve(async (req) => {
       showExtras +
       `\n\n_Klik link di atas untuk membuka. Jangan bagikan ke orang lain._`;
 
-    const sent = await sendFonnte(order.user_phone, message);
+    // Atomic claim: only the first caller flips token_sent_at NULL -> now().
+    const claimedAt = new Date().toISOString();
+    const { data: claimed } = await admin
+      .from('orders')
+      .update({ token_sent_at: claimedAt })
+      .eq('id', order.id)
+      .is('token_sent_at', null)
+      .select('id');
+    if (!claimed || claimed.length === 0) {
+      return new Response(JSON.stringify({ ok: true, status: 'paid', access_token: accessToken, already: true }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
-    await admin.from('orders').update({ token_sent_at: new Date().toISOString() }).eq('id', order.id);
+    const sent = await sendFonnte(order.user_phone, message);
+    if (!sent.ok) {
+      await admin.from('orders').update({ token_sent_at: null })
+        .eq('id', order.id).eq('token_sent_at', claimedAt);
+    }
     await admin.from('token_deliveries').insert({
       phone: order.user_phone, replay_id: order.replay_id, replay_title: order.item_title,
       order_id: order.id, access_token: accessToken, link,
