@@ -113,6 +113,25 @@ export default function PakasirAdmin() {
     try { await navigator.clipboard.writeText(text); toast.success('Disalin'); } catch { /* ignore */ }
   };
 
+  const saveTpl = async () => {
+    setSavingTpl(true);
+    try {
+      const { data: existing } = await supabase
+        .from('site_settings').select('id').eq('key', 'wa_message_template').maybeSingle();
+      if (existing?.id) {
+        await supabase.from('site_settings').update({ value: tpl }).eq('id', existing.id);
+      } else {
+        await supabase.from('site_settings').insert({ key: 'wa_message_template', value: tpl });
+      }
+      setTplLoaded(tpl);
+      toast.success('Template tersimpan');
+    } catch (e: any) {
+      toast.error('Gagal menyimpan: ' + (e?.message || e));
+    } finally {
+      setSavingTpl(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <Card>
