@@ -285,22 +285,30 @@ export default function Live() {
     } catch { /* ignore */ }
 
     // If a token (membership or personal) is provided without a specific show,
-    // try to redirect to the currently live active show automatically.
+    // redirect to the currently-live active show — or, if none is live, to the
+    // nearest UPCOMING active show so membership users still see a countdown.
     if (!showId && (tParam || mtParam)) {
-      void supabase.from('active_shows')
-        .select('id,is_live,live_auto_schedule,show_date,show_time')
-        .eq('is_active', true)
-        .eq('is_live', true)
-        .order('show_date', { ascending: false })
-        .limit(1)
-        .maybeSingle()
-        .then(({ data }) => {
-          if (data?.id) {
-            const params = new URLSearchParams(search);
-            params.set('show', data.id);
-            navigate(`/live?${params.toString()}`, { replace: true });
-          }
-        });
+      void (async () => {
+        const { data: liveRow } = await supabase.from('active_shows')
+          .select('id').eq('is_active', true).eq('is_live', true)
+          .order('show_date', { ascending: false }).limit(1).maybeSingle();
+        let targetId = liveRow?.id as string | undefined;
+        if (!targetId) {
+          const today = new Date().toISOString().slice(0, 10);
+          const { data: upcoming } = await supabase.from('active_shows')
+            .select('id,show_date,show_time').eq('is_active', true)
+            .gte('show_date', today)
+            .order('show_date', { ascending: true })
+            .order('show_time', { ascending: true })
+            .limit(1).maybeSingle();
+          targetId = upcoming?.id;
+        }
+        if (targetId) {
+          const params = new URLSearchParams(search);
+          params.set('show', targetId);
+          navigate(`/live?${params.toString()}`, { replace: true });
+        }
+      })();
     }
 
     // Gate: if no token URL and no cached unlock, send user to the dedicated /kunci page.
