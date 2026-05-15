@@ -131,6 +131,37 @@ Deno.serve(async (req) => {
       });
     }
 
+    // === COIN TOP-UP branch ===
+    if (order.kind === 'coin_topup') {
+      if (order.status !== 'paid') {
+        await admin.from('orders').update({ status: 'paid', paid_at: new Date().toISOString() }).eq('id', order.id);
+      }
+      const claimedAt = new Date().toISOString();
+      const { data: claimed } = await admin.from('orders').update({ token_sent_at: claimedAt })
+        .eq('id', order.id).is('token_sent_at', null).select('id');
+      if (claimed && claimed.length > 0) {
+        let newBal: number | null = null;
+        if (order.user_id && order.coin_amount > 0) {
+          const { data: bal, error: gerr } = await admin.rpc('grant_coins', {
+            _user_id: order.user_id, _delta: order.coin_amount,
+            _reason: 'topup', _meta: { order_id: order.id } as any, _order_id: order.id,
+          });
+          if (!gerr) newBal = bal as number;
+        }
+        const msg = `✅ *Top-up berhasil*\n+${order.coin_amount} koin sudah masuk.${newBal != null ? `\nSaldo sekarang: *${newBal}* koin` : ''}\n\nTerima kasih 💖 — *ReplayTime*`;
+        const sent = await sendFonnte(order.user_phone, msg);
+        if (!sent.ok) {
+          await admin.from('orders').update({ token_sent_at: null }).eq('id', order.id).eq('token_sent_at', claimedAt);
+        }
+        await admin.from('wa_outbox').insert({
+          phone: order.user_phone, message: msg, status: sent.ok ? 'sent' : 'failed',
+          error: sent.ok ? null : JSON.stringify(sent.data),
+          related_order_id: order.id, fonnte_response: sent.data as Record<string, unknown>,
+        });
+      }
+      return new Response(JSON.stringify({ ok: true, status: 'paid', topup: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
     // Mark paid + provision a fresh single-device token row
     const accessToken = await ensurePurchaseToken(admin, order);
     if (order.status !== 'paid' || order.access_token !== accessToken) {
