@@ -177,6 +177,24 @@ export default function ActiveShowCard({ show, index = 0 }: { show: ActiveShow; 
           )}
         </div>
 
+        {/* Price block */}
+        {(replayMode ? replayPriced : showPriced) && (
+          <div className="rounded-md border border-primary/20 bg-primary/5 p-2.5 space-y-1">
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Harga {replayMode ? 'Replay' : 'Show'}</div>
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <span className="text-base font-bold text-primary">
+                Rp {(replayMode ? replayAmount : showAmount).toLocaleString('id-ID')}
+              </span>
+              {(() => {
+                const coins = replayMode ? (show as any).price_replay_coins : (show as any).price_show_coins;
+                return coins > 0 ? (
+                  <Badge variant="secondary" className="text-xs">atau {coins} koin</Badge>
+                ) : null;
+              })()}
+            </div>
+          </div>
+        )}
+
         {/* Action buttons */}
         <div className="pt-2 space-y-2">
           {isLiveNow && (
@@ -194,7 +212,7 @@ export default function ActiveShowCard({ show, index = 0 }: { show: ActiveShow; 
             replayPriced ? (
               <Button className="w-full gap-2" onClick={() => openBuy('replay')}>
                 <PlayCircle className="w-4 h-4" />
-                Tonton Replay · Rp {replayAmount.toLocaleString('id-ID')}
+                Beli Replay via QRIS &amp; Koin
               </Button>
             ) : (
               <Button className="w-full gap-2" variant="secondary" onClick={goReplay}>
@@ -205,7 +223,7 @@ export default function ActiveShowCard({ show, index = 0 }: { show: ActiveShow; 
           ) : showPriced ? (
             <Button className="w-full gap-2" onClick={() => openBuy('show')}>
               <ShoppingCart className="w-4 h-4" />
-              Beli Show · Rp {showAmount.toLocaleString('id-ID')}
+              Beli Show via QRIS &amp; Koin
             </Button>
           ) : null}
         </div>
