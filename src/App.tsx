@@ -18,6 +18,7 @@ import NotFound from "./pages/NotFound";
 import Akses from "./pages/Akses";
 import Shows from "./pages/Shows";
 import Koin from "./pages/Koin";
+import Profil from "./pages/Profil";
 import BottomNav from "./components/BottomNav";
 
 const queryClient = new QueryClient();
@@ -71,6 +72,7 @@ const App = () => (
               <Route path="/shows" element={<Shows />} />
               <Route path="/show" element={<Shows />} />
               <Route path="/koin" element={<Koin />} />
+              <Route path="/profil" element={<Profil />} />
               <Route path="/adpan" element={<Admin />} />
               <Route path="*" element={<NotFound />} />
             </Routes>

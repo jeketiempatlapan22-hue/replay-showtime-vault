@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Calendar, Clock, Tag, Users, Radio, ShoppingCart, PlayCircle, X, Lock } from 'lucide-react';
+import { Calendar, Clock, Tag, Users, Radio, ShoppingCart, PlayCircle, X, Lock, Play } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
@@ -9,8 +9,10 @@ import HlsPlayer from '@/components/HlsPlayer';
 import EmbedPlayer from '@/components/EmbedPlayer';
 import { type ActiveShow, getShowDateTime } from '@/lib/activeShows';
 import { useNavigate } from 'react-router-dom';
-import { getShowPurchase } from '@/lib/purchases';
+import { getShowPurchase, setShowPurchase } from '@/lib/purchases';
 import { MEMBERSHIP_UPDATED_EVENT, readMembershipCredentials } from '@/lib/membershipAccess';
+import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
 
 const CATEGORY_LABELS: Record<string, string> = {
   reguler: 'Reguler', sts: 'STS', last_show: 'Last Show', aniv: 'Anniversary', special: 'Show Spesial',
@@ -37,6 +39,7 @@ export default function ActiveShowCard({ show, index = 0 }: { show: ActiveShow; 
   const target = getShowDateTime(show);
   const cd = useCountdown(target);
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [buyOpen, setBuyOpen] = useState(false);
   const [buyMode, setBuyMode] = useState<'show' | 'replay'>('show');
   const [inlinePlayerOpen, setInlinePlayerOpen] = useState(false);
@@ -86,6 +89,32 @@ export default function ActiveShowCard({ show, index = 0 }: { show: ActiveShow; 
       window.removeEventListener(MEMBERSHIP_UPDATED_EVENT, refresh);
     };
   }, [show.id]);
+
+  // Cross-device sync: if user is logged in, fetch their paid orders for this show
+  useEffect(() => {
+    if (!user || !show.id) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from('orders')
+        .select('access_token,kind,status')
+        .eq('user_id', user.id)
+        .eq('show_id', show.id)
+        .eq('status', 'paid')
+        .not('access_token', 'is', null)
+        .limit(5);
+      if (cancelled || !data || data.length === 0) return;
+      const row = data.find((r: any) => r.access_token);
+      if (row?.access_token) {
+        try {
+          setShowPurchase(show.id, { token: row.access_token, kind: (row.kind === 'replay' ? 'replay' : 'show'), paidAt: Date.now() });
+          setPurchasedToken(row.access_token);
+          setHasAccess(true);
+        } catch { /* ignore */ }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user, show.id]);
 
   const openBuy = (mode: 'show' | 'replay') => { setBuyMode(mode); setBuyOpen(true); };
   const goReplay = () => {
@@ -209,7 +238,11 @@ export default function ActiveShowCard({ show, index = 0 }: { show: ActiveShow; 
             )
           )}
           {replayMode ? (
-            replayPriced ? (
+            purchasedToken ? (
+              <Button className="w-full gap-2" variant="secondary" onClick={goReplay}>
+                <Play className="w-4 h-4" /> Tonton Replay
+              </Button>
+            ) : replayPriced ? (
               <Button className="w-full gap-2" onClick={() => openBuy('replay')}>
                 <PlayCircle className="w-4 h-4" />
                 Beli Replay via QRIS &amp; Koin
@@ -218,6 +251,12 @@ export default function ActiveShowCard({ show, index = 0 }: { show: ActiveShow; 
               <Button className="w-full gap-2" variant="secondary" onClick={goReplay}>
                 <PlayCircle className="w-4 h-4" />
                 Tonton Replay
+              </Button>
+            )
+          ) : purchasedToken ? (
+            !isLiveNow && (
+              <Button className="w-full gap-2" variant="secondary" onClick={goLive}>
+                <Play className="w-4 h-4" /> Tonton Show
               </Button>
             )
           ) : showPriced ? (

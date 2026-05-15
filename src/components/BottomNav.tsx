@@ -33,7 +33,7 @@ export default function BottomNav() {
     { to: '/', label: 'Beranda', Icon: Home, match: (p: string) => p === '/' },
     { to: '/shows', label: 'Shows', Icon: Tv, match: (p: string) => p.startsWith('/shows') || p.startsWith('/show') },
     { to: '/koin', label: 'Koin', Icon: Coins, match: (p: string) => p.startsWith('/koin') },
-    { to: user ? '/koin' : '/auth', label: user ? 'Akun' : 'Masuk', Icon: User, match: (p: string) => p.startsWith('/auth') },
+    { to: user ? '/profil' : '/auth', label: user ? 'Akun' : 'Masuk', Icon: User, match: (p: string) => p.startsWith('/profil') || p.startsWith('/auth') },
   ];
 
   return (
