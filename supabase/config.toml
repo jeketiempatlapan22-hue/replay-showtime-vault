@@ -26,3 +26,6 @@ verify_jwt = false
 
 [functions.poll-pending-orders]
 verify_jwt = false
+
+[functions.pakasir-webhook-selftest]
+verify_jwt = false
