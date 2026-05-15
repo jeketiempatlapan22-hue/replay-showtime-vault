@@ -307,30 +307,63 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
 
         {status === 'form' && (
           <div className="space-y-4">
-            <div className="rounded-lg bg-primary/10 border border-primary/20 p-3 text-center">
-              <div className="text-xs text-muted-foreground">Total Pembayaran</div>
-              <div className="text-2xl font-bold text-primary">Rp {amount.toLocaleString('id-ID')}</div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="phone-buy">Nomor WhatsApp</Label>
-              <div className="relative">
-                <Smartphone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  id="phone-buy"
-                  type="tel"
-                  inputMode="numeric"
-                  placeholder="0812xxxxxxxx"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  className="pl-9"
-                  autoFocus
-                />
+            {!user && (
+              <div className="flex items-start gap-2 rounded-md border border-yellow-500/30 bg-yellow-500/10 p-3 text-xs">
+                <Lock className="w-4 h-4 text-yellow-500 shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <div className="font-semibold mb-0.5">Login diperlukan</div>
+                  <div className="text-muted-foreground">Pembelian QRIS & Koin memerlukan akun.</div>
+                </div>
+                <Button size="sm" onClick={() => navigate('/auth?redirect=' + encodeURIComponent(window.location.pathname))}>Login</Button>
               </div>
-              <p className="text-xs text-muted-foreground">Token akses akan dikirim ke nomor ini setelah pembayaran lunas.</p>
-            </div>
-            <Button className="w-full" onClick={handleCreate} disabled={!phone}>
-              Lanjut ke Pembayaran
-            </Button>
+            )}
+
+            <Tabs value={method} onValueChange={(v) => setMethod(v as 'qris' | 'coin')}>
+              <TabsList className="grid grid-cols-2 w-full">
+                <TabsTrigger value="qris"><Smartphone className="w-4 h-4 mr-1.5" /> QRIS</TabsTrigger>
+                <TabsTrigger value="coin" disabled={coinPrice <= 0}><Coins className="w-4 h-4 mr-1.5" /> Koin{coinPrice > 0 ? ` (${coinPrice})` : ''}</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="qris" className="space-y-4 mt-4">
+                <div className="rounded-lg bg-primary/10 border border-primary/20 p-3 text-center">
+                  <div className="text-xs text-muted-foreground">Total Pembayaran</div>
+                  <div className="text-2xl font-bold text-primary">Rp {amount.toLocaleString('id-ID')}</div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="phone-buy">Nomor WhatsApp</Label>
+                  <div className="relative">
+                    <Smartphone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input id="phone-buy" type="tel" inputMode="numeric" placeholder="0812xxxxxxxx" value={phone} onChange={(e) => setPhone(e.target.value)} className="pl-9" />
+                  </div>
+                  <p className="text-xs text-muted-foreground">Token akses akan dikirim ke nomor ini setelah pembayaran lunas.</p>
+                </div>
+                <Button className="w-full" onClick={handleCreate} disabled={!phone || !user}>
+                  Lanjut ke Pembayaran
+                </Button>
+              </TabsContent>
+
+              <TabsContent value="coin" className="space-y-4 mt-4">
+                <div className="rounded-lg bg-primary/10 border border-primary/20 p-3 space-y-1">
+                  <div className="flex justify-between text-xs"><span className="text-muted-foreground">Harga</span><span className="font-semibold text-primary">{coinPrice} koin</span></div>
+                  <div className="flex justify-between text-xs"><span className="text-muted-foreground">Saldo Anda</span><span className={`font-semibold ${coinBalance >= coinPrice ? 'text-foreground' : 'text-destructive'}`}>{coinBalance} koin</span></div>
+                  {coinBalance < coinPrice && (
+                    <p className="text-[11px] text-destructive pt-1">Saldo kurang. <button onClick={() => navigate('/koin')} className="underline">Top-up koin</button></p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="phone-coin">Nomor WhatsApp</Label>
+                  <div className="relative">
+                    <Smartphone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input id="phone-coin" type="tel" inputMode="numeric" placeholder="0812xxxxxxxx" value={phone} onChange={(e) => setPhone(e.target.value)} className="pl-9" />
+                  </div>
+                  <p className="text-xs text-muted-foreground">Token akses akan dikirim ke WhatsApp ini.</p>
+                </div>
+                <Button className="w-full" onClick={handleCoinPurchase} disabled={!phone || !user || coinBusy || coinBalance < coinPrice}>
+                  {coinBusy ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Coins className="w-4 h-4 mr-2" />}
+                  Tukar {coinPrice} Koin
+                </Button>
+              </TabsContent>
+            </Tabs>
           </div>
         )}
 
