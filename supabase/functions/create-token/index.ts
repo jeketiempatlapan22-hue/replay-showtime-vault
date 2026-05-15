@@ -121,18 +121,20 @@ Deno.serve(async (req) => {
   }
 
   const link = `${origin}/akses?token=${token}&replay=${replayId}`;
+  const siteOnly = origin.replace(/^https?:\/\//, '');
   const showDate = replay.date ? new Date(replay.date).toLocaleDateString('id-ID', {
     day: '2-digit', month: 'long', year: 'numeric',
   }) : '';
 
+  // Info Replay (admin/bot generated): hanya tampilkan domain + sandi.
+  // Tidak menyertakan token di link agar user mengakses via halaman utama dengan sandi.
   const tplStr = (settingsMap.get('wa_message_template') as string) || DEFAULT_WA_TPL;
   const message = renderWaTemplate(tplStr, {
     title: replay.title,
-    link,
+    link: siteOnly,
     date: showDate,
     password,
-    liveLink: livePassword ? liveUrl : '',
-    site: origin.replace(/^https?:\/\//, ''),
+    site: siteOnly,
   });
 
   await admin.from('token_deliveries').insert({
