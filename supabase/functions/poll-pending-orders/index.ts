@@ -68,6 +68,19 @@ async function processOrder(admin: ReturnType<typeof createClient>, order: any, 
   }
   if (order.token_sent_at) return { id: order.id, status: 'already_sent' };
 
+  // Atomically claim the delivery slot: only one worker can flip
+  // token_sent_at from NULL -> now(). Others get 0 rows back and exit.
+  const claimedAt = new Date().toISOString();
+  const { data: claimed } = await admin
+    .from('orders')
+    .update({ token_sent_at: claimedAt })
+    .eq('id', order.id)
+    .is('token_sent_at', null)
+    .select('id');
+  if (!claimed || claimed.length === 0) {
+    return { id: order.id, status: 'already_sent' };
+  }
+
   const replayPart = order.replay_id ? `&replay=${order.replay_id}` : '';
   const link = `${origin}/akses?token=${accessToken}${replayPart}`;
 
@@ -91,7 +104,11 @@ async function processOrder(admin: ReturnType<typeof createClient>, order: any, 
     `\n\n_Klik link di atas untuk membuka. Jangan bagikan ke orang lain._`;
 
   const sent = await sendFonnte(order.user_phone, message);
-  await admin.from('orders').update({ token_sent_at: new Date().toISOString() }).eq('id', order.id);
+  // If Fonnte fails, release the claim so a later run can retry.
+  if (!sent.ok) {
+    await admin.from('orders').update({ token_sent_at: null })
+      .eq('id', order.id).eq('token_sent_at', claimedAt);
+  }
   await admin.from('token_deliveries').insert({
     phone: order.user_phone, replay_id: order.replay_id, replay_title: order.item_title,
     order_id: order.id, access_token: accessToken, link,
