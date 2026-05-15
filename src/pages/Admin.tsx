@@ -395,7 +395,7 @@ export default function Admin() {
         source_type: form.sourceType,
         m3u8_url: isYoutube ? '' : form.m3u8Url,
         sources: normalizedSources as any,
-        price_coins: Number(form.priceCoins) || 0,
+        price_coins: Number.isFinite(Number(form.priceCoins)) ? Math.max(0, Number(form.priceCoins)) : 1,
       };
       if (editingReplay) {
         await updateReplay(editingReplay.id, payload);
