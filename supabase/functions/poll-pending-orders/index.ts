@@ -92,7 +92,18 @@ async function sendFonnte(phone: string, message: string) {
   return { ...last, attempts: delays.length };
 }
 
-async function processOrder(admin: ReturnType<typeof createClient>, order: any, apiKey: string, slug: string, origin: string) {
+const DEFAULT_WA_TPL =
+  '🎬 *{title}*\n{date_line}\n🔗 Link Akses:\n{link}\n{password_line}{live_link_block}\n— *ReplayTime* 💖';
+
+function renderTemplate(tpl: string, vars: Record<string, string>) {
+  return tpl
+    .replace(/\{date_line\}\n?/g, vars.date ? `📅 ${vars.date}\n` : '')
+    .replace(/\{password_line\}\n?/g, vars.password ? `🔐 Sandi: *${vars.password}*\n` : '')
+    .replace(/\{live_link_block\}\n?/g, vars.live_link ? `\n📺 Link Live:\n${vars.live_link}\n` : '')
+    .replace(/\{(\w+)\}/g, (_, k) => (vars as Record<string, string>)[k] ?? '');
+}
+
+async function processOrder(admin: ReturnType<typeof createClient>, order: any, apiKey: string, slug: string, origin: string, tpl: string) {
   if (!order.pakasir_order_id) return { id: order.id, skipped: 'no_pakasir_id' };
 
   const url = `https://app.pakasir.com/api/transactiondetail?project=${encodeURIComponent(slug)}&amount=${order.amount}&order_id=${encodeURIComponent(order.pakasir_order_id)}&api_key=${encodeURIComponent(apiKey)}`;
