@@ -40,15 +40,20 @@ export default function PakasirAdmin() {
   const [verifiedAt, setVerifiedAt] = useState<string>('');
   const [stats, setStats] = useState({ pending: 0, paid24h: 0, sent24h: 0, lastPaid: '' });
   const [pollRunning, setPollRunning] = useState(false);
+  const [tpl, setTpl] = useState<string>(DEFAULT_WA_TPL);
+  const [tplLoaded, setTplLoaded] = useState<string>(DEFAULT_WA_TPL);
+  const [savingTpl, setSavingTpl] = useState(false);
 
   const loadStatus = async () => {
     try {
       const { data: s } = await supabase
         .from('site_settings')
         .select('key,value')
-        .in('key', ['pakasir_webhook_verified_at']);
+        .in('key', ['pakasir_webhook_verified_at', 'wa_message_template']);
       const verified = s?.find(r => r.key === 'pakasir_webhook_verified_at')?.value || '';
       setVerifiedAt(verified);
+      const t = s?.find(r => r.key === 'wa_message_template')?.value;
+      if (t) { setTpl(t); setTplLoaded(t); }
 
       const since = new Date(Date.now() - 24 * 3600_000).toISOString();
       const [pending, paid24h, sent24h, lastPaid] = await Promise.all([
