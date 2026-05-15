@@ -17,6 +17,8 @@ import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import Akses from "./pages/Akses";
 import Shows from "./pages/Shows";
+import Koin from "./pages/Koin";
+import BottomNav from "./components/BottomNav";
 
 const queryClient = new QueryClient();
 
@@ -68,9 +70,11 @@ const App = () => (
               <Route path="/akses" element={<Akses />} />
               <Route path="/shows" element={<Shows />} />
               <Route path="/show" element={<Shows />} />
+              <Route path="/koin" element={<Koin />} />
               <Route path="/adpan" element={<Admin />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
+            <BottomNav />
           </ProtectedShell>
         </ErrorBoundary>
       </BrowserRouter>

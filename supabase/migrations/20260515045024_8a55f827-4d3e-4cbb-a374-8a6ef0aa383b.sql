@@ -1,0 +1,2 @@
+REVOKE EXECUTE ON FUNCTION public.grant_coins(uuid,integer,text,jsonb,uuid) FROM anon, public;
+REVOKE EXECUTE ON FUNCTION public.debit_coins_for_purchase(uuid,integer,text,uuid,uuid,jsonb) FROM anon, public;

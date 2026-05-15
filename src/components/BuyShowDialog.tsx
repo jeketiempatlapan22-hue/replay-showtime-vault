@@ -1,12 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import QRCode from 'qrcode';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
-import { Loader2, CheckCircle2, Copy, Smartphone, ExternalLink, MessageCircle, AlertTriangle } from 'lucide-react';
+import { Loader2, CheckCircle2, Copy, Smartphone, ExternalLink, MessageCircle, AlertTriangle, Coins, Lock } from 'lucide-react';
 import { setShowPurchase, setReplayPurchase } from '@/lib/purchases';
 
 interface Props {
@@ -14,18 +17,22 @@ interface Props {
   onOpenChange: (open: boolean) => void;
   showId: string;
   showTitle: string;
-  amount: number; // pakasir_amount in rupiah
-  itemTitle: string; // e.g. "Show: Title" or "Replay: Title"
+  amount: number;
+  itemTitle: string;
   replayId?: string | null;
-  /** 'show' | 'replay' (tied to active show) | 'replay_only' (standalone replay card) */
   kind?: 'show' | 'replay' | 'replay_only';
 }
 
 type Status = 'form' | 'creating' | 'qr' | 'paid' | 'expired' | 'static_qris';
-
 const EXPIRY_MS = 30 * 60 * 1000;
 
 export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, amount, itemTitle, replayId, kind = 'show' }: Props) {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const [method, setMethod] = useState<'qris' | 'coin'>('qris');
+  const [coinPrice, setCoinPrice] = useState<number>(0);
+  const [coinBalance, setCoinBalance] = useState<number>(0);
+  const [coinBusy, setCoinBusy] = useState(false);
   const [phone, setPhone] = useState(() => { try { return localStorage.getItem('replaytime-phone') || ''; } catch { return ''; } });
   const [status, setStatus] = useState<Status>('form');
   const [orderId, setOrderId] = useState<string | null>(null);

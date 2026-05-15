@@ -1,69 +1,61 @@
-## Masalah & Penyebab
+# Sistem Koin & Bottom Navigation
 
-### 1. Galeri foto kosong
-Bucket `card-images` & `member-photos` **tidak punya RLS policy SELECT** di `storage.objects`. Akibatnya `supabase.storage.list(...)` mengembalikan array kosong meski file masih ada (11 foto masih utuh di storage). File tetap bisa diakses lewat URL publik, tetapi tidak bisa dilist.
+## 1. Database (migration)
 
-### 2. User tidak menerima token setelah bayar
-- Tidak ada satupun log webhook `pakasir-webhook` masuk → callback Pakasir tidak pernah memanggil server kita (kemungkinan URL webhook belum/blm benar di dashboard Pakasir, atau callback gagal di tengah jalan).
-- Semua 10 order terakhir berstatus `pending`, tidak ada `paid_at`.
-- Setting `site_origin` juga kosong → meski webhook jalan, link akses jadi `?token=...` tanpa domain.
-- Tidak ada mekanisme fallback (polling status ke Pakasir) jika webhook gagal.
+**Tabel baru:**
+- `coin_balances` — `user_id` (PK), `balance` int, `updated_at`. RLS: user lihat saldo sendiri, admin lihat semua.
+- `coin_transactions` — `id`, `user_id`, `delta` int (positif = kredit, negatif = debit), `reason` text (`topup`, `purchase_show`, `purchase_replay`, `admin_grant`, `admin_revoke`), `related_order_id`, `related_show_id`, `related_replay_id`, `meta` jsonb, `created_at`. RLS: user lihat sendiri, admin manage.
+- `coin_packages` — `id`, `label`, `price_idr` int, `coins` int, `sort_order`, `enabled`. Public read, admin manage.
 
-### 3. Belum ada alternatif QRIS statis & tombol kontak admin
+**Kolom baru:**
+- `active_shows.price_show_coins` int, `active_shows.price_replay_coins` int (0 = nonaktif).
+- `replays.price_coins` int (0 = nonaktif).
+- `orders.kind` text (`show`|`replay`|`replay_only`|`coin_topup`), `orders.coin_package_id`, `orders.coin_amount` int.
 
----
+**Function:**
+- `grant_coins(_user_id, _delta, _reason, _meta)` SECURITY DEFINER untuk transaksi atomik (insert tx + upsert balance).
 
-## Rencana Perbaikan
+## 2. Edge Functions
 
-### A. Galeri foto — RLS storage
-Migration menambah policy SELECT publik untuk dua bucket:
-- `Anyone can view card-images` (SELECT, bucket_id='card-images')
-- `Anyone can view member-photos` (SELECT, bucket_id='member-photos')
+**Baru:**
+- `create-coin-topup` — auth required, buat order Pakasir kind=`coin_topup` dengan `coin_amount` & `coin_package_id`.
+- `purchase-with-coins` — auth required, verifikasi `phone`, lock baris `coin_balances`, debit, terbitkan token (`active_show_tokens` atau `replay_personal_tokens` max_devices=1), kirim WA via template yang sudah ada, catat di `coin_transactions` & `token_deliveries`. Idempotent per (user_id, show_id/replay_id) sambil order pending dihindari.
 
-Setelah ini, galeri akan kembali menampilkan semua foto.
+**Modifikasi (pakasir-webhook, check-pakasir-status, poll-pending-orders):**
+- Saat `kind='coin_topup'` & paid: kredit koin lewat `grant_coins`, kirim WA "Top-up berhasil", JANGAN buat token.
+- Selain itu: alur lama tetap.
 
-### B. Pengiriman token QRIS dinamis — fallback polling
-Tambahkan edge function baru **`check-pakasir-status`** yang:
-1. Menerima `order_id` (UUID order kita).
-2. Memanggil endpoint Pakasir `transactiondetail` (atau `status`) memakai `PAKASIR_API_KEY` + `PAKASIR_PROJECT_SLUG` + `pakasir_order_id`.
-3. Jika status = `completed/paid/success` dan order belum dibayar:
-   - Update order: `status='paid'`, generate `access_token`, `paid_at`.
-   - Kirim WhatsApp via Fonnte dengan format yang sama persis seperti webhook (link akses + sandi live untuk show).
-   - Tulis ke `token_deliveries` & `wa_outbox`.
+## 3. Frontend
 
-`BuyShowDialog.tsx` polling 3 detik diubah: selain cek tabel `orders`, juga panggil `check-pakasir-status` setiap 5 detik. Jadi token tetap terkirim walau webhook Pakasir gagal.
+**Bottom Navigation (`src/components/BottomNav.tsx`):**
+- Mobile only (`md:hidden`), fixed bottom, 4 tab: Home (`/`), Shows (`/shows`), Koin (`/koin`), Akun (`/auth` atau profile).
+- Badge saldo koin di tab Koin (jika login).
 
-Webhook `pakasir-webhook` tetap dipertahankan (jalur cepat). Logika kirim WA dipindah ke helper internal supaya dipakai bersama oleh webhook + status checker (DRY, mencegah double-send dengan check `token_sent_at`).
+**Halaman `/koin` (`src/pages/Koin.tsx`):**
+- Wajib login (redirect `/auth`).
+- Card saldo besar, daftar paket top-up (klik → `create-coin-topup` → tampilkan QR Pakasir reuse `BuyShowDialog`-style flow), riwayat transaksi.
 
-### C. Set `site_origin` otomatis
-Migration insert `site_origin = 'https://replaytime.lovable.app'` ke `site_settings` agar link WhatsApp lengkap.
+**`BuyShowDialog` — tab pembayaran:**
+- Tab "QRIS" (existing) — **wajib login**, jika belum login tampilkan tombol "Login dulu".
+- Tab "Koin" — tampil hanya jika `price_*_coins > 0`. Tampilkan saldo, harga koin, tombol "Tukar Koin". Wajib phone (autofill dari profile, bisa edit). Klik → `purchase-with-coins` → toast sukses + token tampil.
+- Default tab: Koin jika tersedia & saldo cukup; selain itu QRIS.
 
-### D. Notifikasi sesuai show yang dibeli
-Format pesan WA (sudah ada per show di webhook) dipindah ke helper bersama. Memastikan: untuk pembelian show aktif, pesan menyertakan **sandi tonton LIVE** dari kolom `active_shows.live_password` + link `/live?show=<id>&t=<token>`. Untuk replay: link `/akses?token=...&replay=<id>`. Sama persis seperti format pesan bot admin sekarang.
+**Admin (`src/components/admin/CoinAdmin.tsx` + tab di `Admin.tsx`):**
+- CRUD `coin_packages` (label, price_idr, coins, enabled, sort).
+- Cari user (by email/phone) → lihat saldo & riwayat → tombol Tambah/Kurangi koin (alasan wajib).
+- Daftar transaksi terbaru.
+- Field harga koin (`price_show_coins`, `price_replay_coins`) ditambahkan di form edit show & replay (di komponen yang sudah ada).
 
-### E. Fallback QRIS statis + tombol Hubungi Admin
-- Tambah dua kolom setting baru: `static_qris_url` (URL gambar QRIS statis, diupload admin) dan opsional `owner_wa_number` (default `6288809048431`).
-- UI Admin: tambah field upload QRIS statis & input nomor admin (Settings panel).
-- `BuyShowDialog.tsx`:
-  - Jika `create-pakasir-order` gagal (status `creating` → error), tampilkan blok "QRIS Dinamis gagal — gunakan QRIS statis":
-    - Tampilkan gambar QRIS statis dari setting.
-    - Catatan nominal yang harus ditransfer.
-    - Tombol **Hubungi Admin** → `https://wa.me/6288809048431?text=...` (auto-isi: order id sementara, nominal, judul show/replay, nomor user).
-  - Tombol "Hubungi Admin" juga selalu ditampilkan kecil di footer dialog QRIS dinamis (sebagai jaring pengaman).
+## 4. Validasi & keamanan
 
----
+- QRIS purchase: cek `useAuth().user`. Jika tidak login → tombol diganti "Login untuk beli dengan QRIS".
+- Koin purchase: cek auth + phone non-empty (E.164 normalisasi sederhana 8/0/62 → 62…).
+- `purchase-with-coins` & `grant_coins` di server: validasi balance ≥ price, debit dengan `UPDATE … WHERE balance >= price RETURNING` untuk anti race.
+- Token koin: max_devices = 1 (sama seperti QRIS).
+- Idempotency: cek apakah user sudah punya token aktif untuk show/replay tsb sebelum debit.
 
-## Detail Teknis
+## 5. Catatan
 
-**Files baru/ubah:**
-- `supabase/migrations/<ts>_gallery_rls_and_settings.sql` — policy SELECT card-images & member-photos, insert `site_origin`, `owner_wa_number`, `static_qris_url`.
-- `supabase/functions/check-pakasir-status/index.ts` — polling status + kirim token (dipanggil dari client).
-- `supabase/functions/pakasir-webhook/index.ts` — refactor untuk pakai shared helper (atau duplikasi minor; tetap idempotent via `token_sent_at`).
-- `supabase/config.toml` — `[functions.check-pakasir-status] verify_jwt = false`.
-- `src/components/BuyShowDialog.tsx` — tambah polling status function, blok fallback QRIS statis, tombol Hubungi Admin.
-- `src/pages/Admin.tsx` — input upload QRIS statis & nomor owner.
-
-**Catatan untuk user (penting):** Pastikan di dashboard Pakasir, **Webhook URL** disetel ke:
-`https://zkuxrztgotfenywmopjn.supabase.co/functions/v1/pakasir-webhook`
-
-Polling client tetap menjadi safety net jika dashboard belum disetel.
+- Pesan WA reuse template `wa_message_template` di `site_settings` (tidak diubah).
+- Top-up berhasil pakai pesan terpisah sederhana ("✅ Top-up berhasil. +N koin. Saldo: X").
+- Tidak mengubah alur Pakasir non-coin agar tetap kompatibel.
