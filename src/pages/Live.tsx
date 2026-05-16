@@ -396,10 +396,8 @@ export default function Live() {
   const allSources = useMemo<PrivateSource[]>(() => {
     if (!unlocked) return [];
     const list: PrivateSource[] = [];
-    // IDN source first (di depan player utama) when admin filled in IDN Show ID
-    if (status?.idn_show_id) {
-      list.push({ label: 'IDN', type: 'm3u8', url: `idn://${status.idn_show_id}` });
-    }
+    // IDN source selalu tampil (di depan player utama), meskipun admin belum isi IDN Show ID
+    list.push({ label: 'IDN', type: 'm3u8', url: `idn://${status?.idn_show_id || ''}` });
     const main: PrivateSource = { label: 'Player Utama', type: unlocked.type, url: unlocked.url };
     if (main.url) list.push(main);
     list.push(...(unlocked.sources || []).filter(s => s.url));
@@ -421,6 +419,11 @@ export default function Live() {
   useEffect(() => {
     if (!activeSource || !activeSource.url.startsWith('idn://')) { setIdnError(''); return; }
     const idnId = activeSource.url.slice('idn://'.length);
+    if (!idnId) {
+      setIdnResolved(null);
+      setIdnError('IDN Show ID belum diatur admin. Hubungi admin untuk mengaktifkan stream IDN.');
+      return;
+    }
     const key = `idn:${idnId}`;
     let cancelled = false;
     let refreshTimer: number | null = null;
