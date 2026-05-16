@@ -572,24 +572,31 @@ export default function Live() {
                 <h2 className="text-base sm:text-lg font-bold text-foreground font-sans leading-tight flex-1 min-w-0">
                   {unlocked?.title || status?.title || 'Live'}
                 </h2>
-                <button
-                  type="button"
-                  aria-label="Picture in Picture"
-                  title="Picture in Picture"
-                  onClick={async () => {
-                    try {
-                      const d = document as any;
-                      if (d.pictureInPictureElement) { await d.exitPictureInPicture?.(); return; }
-                      const v = document.querySelector('video') as HTMLVideoElement | null;
-                      if (v && (v as any).requestPictureInPicture) {
-                        await (v as any).requestPictureInPicture();
-                      }
-                    } catch { /* ignore */ }
-                  }}
-                  className="shrink-0 inline-flex items-center justify-center w-9 h-9 rounded-full bg-secondary text-foreground hover:bg-primary hover:text-primary-foreground border border-border transition-colors"
-                >
-                  <PictureInPicture2 className="w-4 h-4" />
-                </button>
+                {(() => {
+                  const d = typeof document !== 'undefined' ? (document as any) : null;
+                  const supported = !!d && 'pictureInPictureEnabled' in d && !!d.pictureInPictureEnabled;
+                  if (!supported) return null;
+                  return (
+                    <button
+                      type="button"
+                      aria-label="Picture in Picture"
+                      title="Picture in Picture"
+                      onClick={async () => {
+                        try {
+                          const doc = document as any;
+                          if (doc.pictureInPictureElement) { await doc.exitPictureInPicture?.(); return; }
+                          const v = document.querySelector('video') as HTMLVideoElement | null;
+                          if (v && typeof (v as any).requestPictureInPicture === 'function' && !(v as any).disablePictureInPicture) {
+                            await (v as any).requestPictureInPicture();
+                          }
+                        } catch { /* ignore */ }
+                      }}
+                      className="shrink-0 inline-flex items-center justify-center w-9 h-9 rounded-full bg-secondary text-foreground hover:bg-primary hover:text-primary-foreground border border-border transition-colors"
+                    >
+                      <PictureInPicture2 className="w-4 h-4" />
+                    </button>
+                  );
+                })()}
               </div>
               {status?.lineup && status.lineup.length > 0 && (
                 <div className="space-y-2">
