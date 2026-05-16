@@ -123,7 +123,7 @@ export default function Live() {
   const [statusLoading, setStatusLoading] = useState(true);
   const [unlocked, setUnlocked] = useState<UnlockedConfig | null>(null);
   const [membership, setMembership] = useState<MembershipInfo | null>(null);
-  const [, setPwError] = useState('');
+  const [pwError, setPwError] = useState('');
   const [, setSubmitting] = useState(false);
   const [failedSourceKeys, setFailedSourceKeys] = useState<string[]>([]);
   const [tokenInfo, setTokenInfo] = useState<{ kind: string; max_devices: number } | null>(null);
