@@ -123,6 +123,7 @@ export default function ShowLiveControl({ showId, showTitle }: Props) {
         replay_mode: replayMode,
         replay_m3u8_url: replayM3u8.trim(),
         replay_youtube_url: normalizedReplayYt,
+        idn_show_id: idnShowId.trim(),
       } as any).eq('id', showId);
       if (error) throw error;
       setLiveUrl(normalizedLiveUrl);
