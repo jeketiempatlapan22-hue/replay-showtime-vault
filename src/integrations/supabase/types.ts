@@ -103,6 +103,7 @@ export type Database = {
           created_at: string
           description: string
           id: string
+          idn_show_id: string
           image_url: string
           is_active: boolean
           is_live: boolean
@@ -135,6 +136,7 @@ export type Database = {
           created_at?: string
           description?: string
           id?: string
+          idn_show_id?: string
           image_url?: string
           is_active?: boolean
           is_live?: boolean
@@ -167,6 +169,7 @@ export type Database = {
           created_at?: string
           description?: string
           id?: string
+          idn_show_id?: string
           image_url?: string
           is_active?: boolean
           is_live?: boolean

@@ -29,7 +29,7 @@ type SrcType = 'm3u8' | 'youtube' | 'cloudflare';
 interface PublicSource { label: string; type: SrcType }
 interface PrivateSource extends PublicSource { url: string }
 interface MembershipInfo { expires_at?: string; resets_used: number; resets_max: number; remaining: number; includes_replays?: boolean; max_devices?: number }
-interface LiveStatus { enabled: boolean; title: string; type: string; require_password: boolean; sources: PublicSource[]; lineup: string[]; show_date?: string; show_time?: string; image_url?: string }
+interface LiveStatus { enabled: boolean; title: string; type: string; require_password: boolean; sources: PublicSource[]; lineup: string[]; show_date?: string; show_time?: string; image_url?: string; idn_show_id?: string }
 interface UnlockedConfig { title: string; type: SrcType; url: string; sources: PrivateSource[]; watermark: string; enabled: boolean }
 type SourceLike = Partial<Record<keyof PrivateSource, unknown>>;
 
@@ -137,7 +137,7 @@ export default function Live() {
   const fetchStatus = () => {
     if (showId) {
       return supabase.from('active_shows')
-        .select('id,title,is_live,live_type,live_require_password,lineup,show_date,show_time,is_active,image_url')
+        .select('id,title,is_live,live_type,live_require_password,lineup,show_date,show_time,is_active,image_url,idn_show_id')
         .eq('id', showId).maybeSingle()
         .then(({ data }) => {
           if (!data || !data.is_active) {
@@ -156,6 +156,7 @@ export default function Live() {
               lineup: Array.isArray(data.lineup) ? data.lineup : [],
               show_date: data.show_date, show_time: data.show_time,
               image_url: data.image_url || '',
+              idn_show_id: (data as any).idn_show_id || '',
             };
           });
           // Stream URLs are no longer readable from the public table — only the
@@ -393,11 +394,16 @@ export default function Live() {
 
   const allSources = useMemo<PrivateSource[]>(() => {
     if (!unlocked) return [];
+    const list: PrivateSource[] = [];
+    // IDN source first (di depan player utama) when admin filled in IDN Show ID
+    if (status?.idn_show_id) {
+      list.push({ label: 'IDN', type: 'm3u8', url: `idn://${status.idn_show_id}` });
+    }
     const main: PrivateSource = { label: 'Player Utama', type: unlocked.type, url: unlocked.url };
-    const extras = (unlocked.sources || []).filter(s => s.url);
-    if (!main.url) return extras;
-    return [main, ...extras];
-  }, [unlocked]);
+    if (main.url) list.push(main);
+    list.push(...(unlocked.sources || []).filter(s => s.url));
+    return list;
+  }, [unlocked, status?.idn_show_id]);
 
   useEffect(() => {
     setFailedSourceKeys([]);
@@ -406,6 +412,33 @@ export default function Live() {
   const safeIdx = Math.min(sourceIdx, Math.max(0, allSources.length - 1));
   const activeSource = allSources[safeIdx];
   const sourceKey = (source: PrivateSource, index: number) => `${index}:${source.type}:${source.url}`;
+
+  // Resolve IDN stream (playback URL + signed headers) on demand
+  const [idnResolved, setIdnResolved] = useState<{ key: string; url: string; headers: Record<string, string> } | null>(null);
+  const [idnError, setIdnError] = useState<string>('');
+  useEffect(() => {
+    if (!activeSource || !activeSource.url.startsWith('idn://')) { setIdnError(''); return; }
+    const idnId = activeSource.url.slice('idn://'.length);
+    const key = `idn:${idnId}`;
+    if (idnResolved?.key === key) return;
+    let cancelled = false;
+    setIdnError('');
+    setIdnResolved(null);
+    (async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke('get-idn-stream', { body: { showId: idnId } });
+        if (cancelled) return;
+        if (error || !data?.playback_url) {
+          setIdnError(data?.error || error?.message || 'Gagal mengambil token IDN.');
+          return;
+        }
+        setIdnResolved({ key, url: data.playback_url, headers: data.headers || {} });
+      } catch (e: any) {
+        if (!cancelled) setIdnError(e?.message || 'Gagal menghubungi server IDN.');
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [activeSource?.url, idnResolved?.key]);
 
   const selectSource = (i: number) => {
     setSourceIdx(i);
@@ -522,7 +555,21 @@ export default function Live() {
             {liveActive && activeSource ? (
               <>
                 <Suspense fallback={<PlayerFallback />}>
-                  {activeSource.type === 'm3u8'
+                  {activeSource.url.startsWith('idn://') ? (
+                    idnError ? (
+                      <div className="aspect-video w-full rounded-2xl bg-destructive/10 border border-destructive/40 flex flex-col items-center justify-center gap-3 p-4 text-center">
+                        <div className="text-2xl">⚠️</div>
+                        <p className="text-sm text-foreground">Gagal memuat stream IDN: {idnError}</p>
+                        <Button size="sm" variant="outline" onClick={() => { setIdnResolved(null); setIdnError(''); }}>Coba lagi</Button>
+                      </div>
+                    ) : !idnResolved ? (
+                      <div className="aspect-video w-full rounded-2xl bg-card/80 border border-border flex items-center justify-center">
+                        <Loader2 className="w-8 h-8 text-primary animate-spin" />
+                      </div>
+                    ) : (
+                      <HlsPlayer key={`idn-${idnResolved.key}`} src={idnResolved.url} headers={idnResolved.headers} title={unlocked.title} watermark={unlocked.watermark} onFatalError={handleSourceFatalError} hideSeekButtons />
+                    )
+                  ) : activeSource.type === 'm3u8'
                     ? <HlsPlayer key={`m3u8-${safeIdx}`} src={activeSource.url} title={unlocked.title} watermark={unlocked.watermark} onFatalError={handleSourceFatalError} hideSeekButtons />
                     : <EmbedPlayer key={`em-${safeIdx}-${activeSource.type}`} type={activeSource.type} source={activeSource.url} title={unlocked.title} watermark={unlocked.watermark} hideSeekButtons isLive />}
                 </Suspense>

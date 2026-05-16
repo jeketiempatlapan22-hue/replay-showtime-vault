@@ -35,6 +35,7 @@ export default function ShowLiveControl({ showId, showTitle }: Props) {
   const [replayMode, setReplayMode] = useState(false);
   const [replayM3u8, setReplayM3u8] = useState('');
   const [replayYt, setReplayYt] = useState('');
+  const [idnShowId, setIdnShowId] = useState('');
 
   const [newLabel, setNewLabel] = useState('');
   const [newType, setNewType] = useState<SrcType>('m3u8');
@@ -44,7 +45,7 @@ export default function ShowLiveControl({ showId, showTitle }: Props) {
     if (!showId) return;
     setLoading(true);
     supabase.from('active_shows').select(
-      'is_live,live_auto_schedule,live_url,live_type,live_sources,live_password,live_require_password,replay_mode,replay_m3u8_url,replay_youtube_url'
+      'is_live,live_auto_schedule,live_url,live_type,live_sources,live_password,live_require_password,replay_mode,replay_m3u8_url,replay_youtube_url,idn_show_id'
     ).eq('id', showId).maybeSingle().then(({ data }) => {
       if (data) {
         setIsLive(!!data.is_live);
@@ -57,6 +58,7 @@ export default function ShowLiveControl({ showId, showTitle }: Props) {
         setReplayMode(!!data.replay_mode);
         setReplayM3u8(data.replay_m3u8_url || '');
         setReplayYt(data.replay_youtube_url || '');
+        setIdnShowId((data as any).idn_show_id || '');
       }
       setLoading(false);
     });
@@ -121,6 +123,7 @@ export default function ShowLiveControl({ showId, showTitle }: Props) {
         replay_mode: replayMode,
         replay_m3u8_url: replayM3u8.trim(),
         replay_youtube_url: normalizedReplayYt,
+        idn_show_id: idnShowId.trim(),
       } as any).eq('id', showId);
       if (error) throw error;
       setLiveUrl(normalizedLiveUrl);
@@ -179,6 +182,17 @@ export default function ShowLiveControl({ showId, showTitle }: Props) {
             <Input value={liveUrl} onChange={e => setLiveUrl(e.target.value)} placeholder={liveType === 'cloudflare' ? 'Cloudflare UID atau URL' : 'https://...m3u8'} />
           )}
         </div>
+      </div>
+
+      {/* IDN Show ID */}
+      <div>
+        <Label className="text-xs flex items-center gap-1">📺 IDN Show ID (untuk Player IDN)</Label>
+        <Input
+          value={idnShowId}
+          onChange={e => setIdnShowId(e.target.value)}
+          placeholder="Show ID dari IDN (mis. 1234567). Kosongkan untuk menonaktifkan player IDN."
+        />
+        <p className="text-[11px] text-muted-foreground mt-1">Saat diisi, sumber "IDN" akan otomatis tampil di playlist player Live. Token stream diambil otomatis dari server.</p>
       </div>
 
       {/* Sumber video */}

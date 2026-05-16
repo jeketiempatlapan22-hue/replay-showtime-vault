@@ -11,6 +11,8 @@ interface Props {
   onFatalError?: () => void;
   onPipChange?: (active: boolean) => void;
   hideSeekButtons?: boolean;
+  /** Optional custom HTTP headers attached to ALL HLS requests (manifest + segments). */
+  headers?: Record<string, string>;
 }
 
 export interface HlsPlayerHandle {
@@ -33,7 +35,7 @@ interface QualityLevel {
   bitrate?: number;
 }
 
-const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, onFatalError, onPipChange, hideSeekButtons = false }, ref) => {
+const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, onFatalError, onPipChange, hideSeekButtons = false, headers }, ref) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const hideControlsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -220,7 +222,13 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
     const initialBwEstimate = isWeak ? 250_000 : 700_000;
 
     if (Hls.isSupported()) {
+      const hdrs = headers;
       hls = new Hls({
+        xhrSetup: hdrs && Object.keys(hdrs).length > 0 ? (xhr) => {
+          try {
+            Object.entries(hdrs).forEach(([k, v]) => { if (v != null) xhr.setRequestHeader(k, String(v)); });
+          } catch { /* ignore — some headers may be forbidden */ }
+        } : undefined,
         enableWorker: true,
         // Disable LL-HLS auto-detection: it caused stalls/restarts on regular streams whose URL contains "live"
         lowLatencyMode: false,
@@ -427,7 +435,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
       // Reset native source to prevent leaked playback when switching providers
       try { video.removeAttribute('src'); video.load(); } catch { /* ignore */ }
     };
-  }, [src]);
+  }, [src, headers ? JSON.stringify(headers) : '']);
 
   const selectQuality = (levelIndex: number) => {
     if (!hlsRef.current) return;
