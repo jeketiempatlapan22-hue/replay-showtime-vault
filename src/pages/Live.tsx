@@ -413,7 +413,8 @@ export default function Live() {
   const activeSource = allSources[safeIdx];
   const sourceKey = (source: PrivateSource, index: number) => `${index}:${source.type}:${source.url}`;
 
-  // Resolve IDN stream (playback URL + signed headers) on demand
+  // Resolve IDN stream: frontend langsung fetch token ke hanabira48, lalu jadikan HEADER
+  // untuk request ke proxy playback. Tidak via edge function — sesuai permintaan.
   const [idnResolved, setIdnResolved] = useState<{ key: string; url: string; headers: Record<string, string> } | null>(null);
   const [idnError, setIdnError] = useState<string>('');
   useEffect(() => {
@@ -426,15 +427,24 @@ export default function Live() {
     setIdnResolved(null);
     (async () => {
       try {
-        const { data, error } = await supabase.functions.invoke('get-idn-stream', { body: { showId: idnId } });
+        const res = await fetch(`https://hanabira48.com/api/stream-token?showId=${encodeURIComponent(idnId)}`, {
+          headers: { 'Accept': 'application/json' },
+        });
+        if (!res.ok) throw new Error(`Token HTTP ${res.status}`);
+        const j: any = await res.json();
+        const xapi = j.xapi ?? j.xApi ?? j.x_api ?? j.api ?? j.apiKey ?? '';
+        const xsec = j.xsec ?? j.xSec ?? j.x_sec ?? j.sec ?? j.secret ?? '';
+        const xshowid = String(j.xshowid ?? j.xShowId ?? j.x_show_id ?? j.showId ?? idnId);
+        const xtoken = j.xtoken ?? j.xToken ?? j.x_token ?? j.token ?? '';
+        if (!xapi || !xsec || !xtoken) throw new Error('Token tidak lengkap dari server IDN');
         if (cancelled) return;
-        if (error || !data?.playback_url) {
-          setIdnError(data?.error || error?.message || 'Gagal mengambil token IDN.');
-          return;
-        }
-        setIdnResolved({ key, url: data.playback_url, headers: data.headers || {} });
+        setIdnResolved({
+          key,
+          url: 'https://proxy.mediastream48.workers.dev/api/proxy/playback',
+          headers: { xapi: String(xapi), xsec: String(xsec), xshowid, xtoken: String(xtoken) },
+        });
       } catch (e: any) {
-        if (!cancelled) setIdnError(e?.message || 'Gagal menghubungi server IDN.');
+        if (!cancelled) setIdnError(e?.message || 'Gagal mengambil token IDN.');
       }
     })();
     return () => { cancelled = true; };
