@@ -184,6 +184,17 @@ export default function ShowLiveControl({ showId, showTitle }: Props) {
         </div>
       </div>
 
+      {/* IDN Show ID */}
+      <div>
+        <Label className="text-xs flex items-center gap-1">📺 IDN Show ID (untuk Player IDN)</Label>
+        <Input
+          value={idnShowId}
+          onChange={e => setIdnShowId(e.target.value)}
+          placeholder="Show ID dari IDN (mis. 1234567). Kosongkan untuk menonaktifkan player IDN."
+        />
+        <p className="text-[11px] text-muted-foreground mt-1">Saat diisi, sumber "IDN" akan otomatis tampil di playlist player Live. Token stream diambil otomatis dari server.</p>
+      </div>
+
       {/* Sumber video */}
       <div className="space-y-2">
         <Label className="text-xs flex items-center gap-1">📋 Sumber Video Tambahan</Label>
