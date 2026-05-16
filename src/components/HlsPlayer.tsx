@@ -11,6 +11,8 @@ interface Props {
   onFatalError?: () => void;
   onPipChange?: (active: boolean) => void;
   hideSeekButtons?: boolean;
+  /** Optional custom HTTP headers attached to ALL HLS requests (manifest + segments). */
+  headers?: Record<string, string>;
 }
 
 export interface HlsPlayerHandle {
