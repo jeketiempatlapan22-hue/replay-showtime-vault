@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, lazy, Suspense } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Loader2, Users, Eye } from 'lucide-react';
+import { ArrowLeft, Loader2, Users, Eye, PictureInPicture2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 import { supabase } from '@/integrations/supabase/client';
@@ -568,9 +568,29 @@ export default function Live() {
 
             {/* SHOW TITLE + LINEUP */}
             <div className="rounded-2xl bg-card/80 border border-border p-3 sm:p-4 space-y-3">
-              <h2 className="text-base sm:text-lg font-bold text-foreground font-sans leading-tight">
-                {unlocked?.title || status?.title || 'Live'}
-              </h2>
+              <div className="flex items-start justify-between gap-2">
+                <h2 className="text-base sm:text-lg font-bold text-foreground font-sans leading-tight flex-1 min-w-0">
+                  {unlocked?.title || status?.title || 'Live'}
+                </h2>
+                <button
+                  type="button"
+                  aria-label="Picture in Picture"
+                  title="Picture in Picture"
+                  onClick={async () => {
+                    try {
+                      const d = document as any;
+                      if (d.pictureInPictureElement) { await d.exitPictureInPicture?.(); return; }
+                      const v = document.querySelector('video') as HTMLVideoElement | null;
+                      if (v && (v as any).requestPictureInPicture) {
+                        await (v as any).requestPictureInPicture();
+                      }
+                    } catch { /* ignore */ }
+                  }}
+                  className="shrink-0 inline-flex items-center justify-center w-9 h-9 rounded-full bg-secondary text-foreground hover:bg-primary hover:text-primary-foreground border border-border transition-colors"
+                >
+                  <PictureInPicture2 className="w-4 h-4" />
+                </button>
+              </div>
               {status?.lineup && status.lineup.length > 0 && (
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">

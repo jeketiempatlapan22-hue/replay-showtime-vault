@@ -138,13 +138,36 @@ Deno.serve(async (req) => {
     // Replay dibeli via kartu replay → token-link sudah cukup, tanpa sandi.
     if (isReplayOnlyPurchase) password = '';
     const dateStr = new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
-    const message = tpl
-      .replace(/\{date_line\}/g, dateStr ? `📅 ${dateStr}\n\n` : '')
-      .replace(/\{password_line\}/g, password ? `🔐 Sandi: *${password}*\n\n` : '')
-      .replace(/\{live_link_block\}/g, liveLink ? `📺 *Link Live*\n${liveLink}\n\n` : '')
-      .replace(/\{title\}/g, itemTitle).replace(/\{link\}/g, link)
-      .replace(/\{live_link\}/g, liveLink).replace(/\{password\}/g, password)
-      .replace(/\{date\}/g, dateStr).replace(/\{order_id\}/g, order?.id || '').replace(/\{site\}/g, origin);
+    const plainSite = (origin || 'https://replaytime.lovable.app').replace(/^https?:\/\//, '').replace(/\/+$/, '');
+    let message: string;
+    if (resolvedShowId && !resolvedReplayId) {
+      message = [
+        '🎬 *ReplayTime*',
+        '━━━━━━━━━━━━━━',
+        '',
+        `🎤 *${itemTitle}*`,
+        `📅 ${dateStr}`,
+        '',
+        '🔗 *Link Masuk Live*',
+        link,
+        '',
+        password ? `🔐 Sandi: *${password}*` : null,
+        password ? '' : null,
+        '🎞️ *Link Replay*',
+        plainSite,
+        '',
+        '━━━━━━━━━━━━━━',
+        '✨ Selamat menonton! 💖',
+      ].filter((l) => l !== null).join('\n');
+    } else {
+      message = tpl
+        .replace(/\{date_line\}/g, dateStr ? `📅 ${dateStr}\n\n` : '')
+        .replace(/\{password_line\}/g, password ? `🔐 Sandi: *${password}*\n\n` : '')
+        .replace(/\{live_link_block\}/g, liveLink ? `📺 *Link Live*\n${liveLink}\n\n` : '')
+        .replace(/\{title\}/g, itemTitle).replace(/\{link\}/g, link)
+        .replace(/\{live_link\}/g, liveLink).replace(/\{password\}/g, password)
+        .replace(/\{date\}/g, dateStr).replace(/\{order_id\}/g, order?.id || '').replace(/\{site\}/g, origin);
+    }
 
     const sent = await sendFonnte(phone, message);
     await admin.from('token_deliveries').insert({
