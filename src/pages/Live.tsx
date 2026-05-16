@@ -156,6 +156,7 @@ export default function Live() {
               lineup: Array.isArray(data.lineup) ? data.lineup : [],
               show_date: data.show_date, show_time: data.show_time,
               image_url: data.image_url || '',
+              idn_show_id: (data as any).idn_show_id || '',
             };
           });
           // Stream URLs are no longer readable from the public table — only the
