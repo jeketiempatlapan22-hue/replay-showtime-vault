@@ -350,8 +350,16 @@ export default function Live() {
       else if (mtParam) void doUnlock({ mtoken: mtParam, mpassword: search.get('mp') || search.get('mpassword') || '' }, true);
     }, 60000);
 
+    // Polling fallback agar perubahan admin (mis. mengisi IDN Show ID) cepat terdeteksi
+    // tanpa harus menunggu event realtime atau reload manual.
+    const statusPoll = window.setInterval(() => {
+      if (document.visibilityState !== 'visible') return;
+      void fetchStatus();
+    }, 10000);
+
     return () => {
       window.clearInterval(revalidate);
+      window.clearInterval(statusPoll);
       supabase.removeChannel(cfgChannel);
       supabase.removeChannel(tokChannel);
     };
