@@ -555,7 +555,21 @@ export default function Live() {
             {liveActive && activeSource ? (
               <>
                 <Suspense fallback={<PlayerFallback />}>
-                  {activeSource.type === 'm3u8'
+                  {activeSource.url.startsWith('idn://') ? (
+                    idnError ? (
+                      <div className="aspect-video w-full rounded-2xl bg-destructive/10 border border-destructive/40 flex flex-col items-center justify-center gap-3 p-4 text-center">
+                        <div className="text-2xl">⚠️</div>
+                        <p className="text-sm text-foreground">Gagal memuat stream IDN: {idnError}</p>
+                        <Button size="sm" variant="outline" onClick={() => { setIdnResolved(null); setIdnError(''); }}>Coba lagi</Button>
+                      </div>
+                    ) : !idnResolved ? (
+                      <div className="aspect-video w-full rounded-2xl bg-card/80 border border-border flex items-center justify-center">
+                        <Loader2 className="w-8 h-8 text-primary animate-spin" />
+                      </div>
+                    ) : (
+                      <HlsPlayer key={`idn-${idnResolved.key}`} src={idnResolved.url} headers={idnResolved.headers} title={unlocked.title} watermark={unlocked.watermark} onFatalError={handleSourceFatalError} hideSeekButtons />
+                    )
+                  ) : activeSource.type === 'm3u8'
                     ? <HlsPlayer key={`m3u8-${safeIdx}`} src={activeSource.url} title={unlocked.title} watermark={unlocked.watermark} onFatalError={handleSourceFatalError} hideSeekButtons />
                     : <EmbedPlayer key={`em-${safeIdx}-${activeSource.type}`} type={activeSource.type} source={activeSource.url} title={unlocked.title} watermark={unlocked.watermark} hideSeekButtons isLive />}
                 </Suspense>
