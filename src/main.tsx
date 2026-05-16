@@ -2,6 +2,17 @@ import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
 
+// Redirect ke domain utama (mempertahankan path + query + hash supaya token tetap berfungsi)
+const PRIMARY_HOST = 'realtime48stream.my.id';
+const REDIRECT_HOSTS = new Set([
+  'replaytime.lovable.app',
+  'www.realtime48stream.my.id',
+]);
+if (typeof window !== 'undefined' && REDIRECT_HOSTS.has(window.location.hostname)) {
+  const { pathname, search, hash } = window.location;
+  window.location.replace(`https://${PRIMARY_HOST}${pathname}${search}${hash}`);
+}
+
 // Suppress DOM reconciliation errors globally (prevents Chrome blank screen)
 window.addEventListener('error', (event) => {
   const msg = event.error?.message || event.message || '';
