@@ -396,10 +396,8 @@ export default function Live() {
   const allSources = useMemo<PrivateSource[]>(() => {
     if (!unlocked) return [];
     const list: PrivateSource[] = [];
-    // IDN source first (di depan player utama) when admin filled in IDN Show ID
-    if (status?.idn_show_id) {
-      list.push({ label: 'IDN', type: 'm3u8', url: `idn://${status.idn_show_id}` });
-    }
+    // IDN source selalu tampil (di depan player utama), meskipun admin belum isi IDN Show ID
+    list.push({ label: 'IDN', type: 'm3u8', url: `idn://${status?.idn_show_id || ''}` });
     const main: PrivateSource = { label: 'Player Utama', type: unlocked.type, url: unlocked.url };
     if (main.url) list.push(main);
     list.push(...(unlocked.sources || []).filter(s => s.url));
