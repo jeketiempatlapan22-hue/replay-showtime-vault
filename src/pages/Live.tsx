@@ -493,7 +493,7 @@ export default function Live() {
         </div>
       </div>
 
-      <div className="w-full max-w-screen-2xl mx-auto px-2 sm:px-4 lg:px-6 py-3 sm:py-4 space-y-3">
+      <div className="w-full max-w-screen-2xl mx-auto px-2 sm:px-4 lg:px-6 py-3 sm:py-4 pb-28 sm:pb-32 space-y-3">
         {statusLoading ? (
           <div className="flex items-center justify-center py-20"><Loader2 className="w-10 h-10 text-primary animate-spin" /></div>
         ) : !unlocked ? (
