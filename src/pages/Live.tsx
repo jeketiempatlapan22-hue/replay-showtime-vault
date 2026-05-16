@@ -499,8 +499,23 @@ export default function Live() {
       <div className="w-full max-w-screen-2xl mx-auto px-2 sm:px-4 lg:px-6 py-3 sm:py-4 pb-28 sm:pb-32 space-y-3">
         {statusLoading ? (
           <div className="flex items-center justify-center py-20"><Loader2 className="w-10 h-10 text-primary animate-spin" /></div>
+        ) : !unlocked && pwError ? (
+          <div className="mx-auto max-w-md w-full rounded-2xl border border-destructive/40 bg-destructive/10 p-5 sm:p-6 space-y-4 text-center">
+            <div className="text-3xl">⚠️</div>
+            <h2 className="text-base sm:text-lg font-bold text-foreground">Tidak bisa membuka live</h2>
+            <p className="text-sm text-muted-foreground whitespace-pre-line">{pwError}</p>
+            <div className="flex flex-col sm:flex-row gap-2 pt-1">
+              <Button variant="outline" className="flex-1" onClick={() => { setPwError(''); const t = search.get('t'); const mt = search.get('mtoken'); const mp = search.get('mp') || search.get('mpassword') || ''; if (mt) void doUnlock({ mtoken: mt, mpassword: mp }); else if (t) void doUnlock({ token: t }); }}>
+                Coba lagi
+              </Button>
+              <Button variant="secondary" className="flex-1" onClick={() => navigate(`/kunci${showId ? `?show=${showId}` : ''}`)}>
+                Masukkan sandi
+              </Button>
+              <Button className="flex-1" onClick={() => navigate('/')}>Kembali</Button>
+            </div>
+          </div>
         ) : !unlocked ? (
-          // No cached unlock + no token URL → redirect to /kunci is in flight (or token unlock in progress).
+          // Initial unlock attempt in flight
           <div className="flex items-center justify-center py-20"><Loader2 className="w-10 h-10 text-primary animate-spin" /></div>
         ) : (
           <>
