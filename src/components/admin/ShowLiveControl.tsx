@@ -45,7 +45,7 @@ export default function ShowLiveControl({ showId, showTitle }: Props) {
     if (!showId) return;
     setLoading(true);
     supabase.from('active_shows').select(
-      'is_live,live_auto_schedule,live_url,live_type,live_sources,live_password,live_require_password,replay_mode,replay_m3u8_url,replay_youtube_url'
+      'is_live,live_auto_schedule,live_url,live_type,live_sources,live_password,live_require_password,replay_mode,replay_m3u8_url,replay_youtube_url,idn_show_id'
     ).eq('id', showId).maybeSingle().then(({ data }) => {
       if (data) {
         setIsLive(!!data.is_live);
@@ -58,6 +58,7 @@ export default function ShowLiveControl({ showId, showTitle }: Props) {
         setReplayMode(!!data.replay_mode);
         setReplayM3u8(data.replay_m3u8_url || '');
         setReplayYt(data.replay_youtube_url || '');
+        setIdnShowId((data as any).idn_show_id || '');
       }
       setLoading(false);
     });
