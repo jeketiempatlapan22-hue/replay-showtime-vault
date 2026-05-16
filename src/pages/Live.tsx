@@ -394,11 +394,16 @@ export default function Live() {
 
   const allSources = useMemo<PrivateSource[]>(() => {
     if (!unlocked) return [];
+    const list: PrivateSource[] = [];
+    // IDN source first (di depan player utama) when admin filled in IDN Show ID
+    if (status?.idn_show_id) {
+      list.push({ label: 'IDN', type: 'm3u8', url: `idn://${status.idn_show_id}` });
+    }
     const main: PrivateSource = { label: 'Player Utama', type: unlocked.type, url: unlocked.url };
-    const extras = (unlocked.sources || []).filter(s => s.url);
-    if (!main.url) return extras;
-    return [main, ...extras];
-  }, [unlocked]);
+    if (main.url) list.push(main);
+    list.push(...(unlocked.sources || []).filter(s => s.url));
+    return list;
+  }, [unlocked, status?.idn_show_id]);
 
   useEffect(() => {
     setFailedSourceKeys([]);
@@ -407,6 +412,33 @@ export default function Live() {
   const safeIdx = Math.min(sourceIdx, Math.max(0, allSources.length - 1));
   const activeSource = allSources[safeIdx];
   const sourceKey = (source: PrivateSource, index: number) => `${index}:${source.type}:${source.url}`;
+
+  // Resolve IDN stream (playback URL + signed headers) on demand
+  const [idnResolved, setIdnResolved] = useState<{ key: string; url: string; headers: Record<string, string> } | null>(null);
+  const [idnError, setIdnError] = useState<string>('');
+  useEffect(() => {
+    if (!activeSource || !activeSource.url.startsWith('idn://')) { setIdnError(''); return; }
+    const idnId = activeSource.url.slice('idn://'.length);
+    const key = `idn:${idnId}`;
+    if (idnResolved?.key === key) return;
+    let cancelled = false;
+    setIdnError('');
+    setIdnResolved(null);
+    (async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke('get-idn-stream', { body: { showId: idnId } });
+        if (cancelled) return;
+        if (error || !data?.playback_url) {
+          setIdnError(data?.error || error?.message || 'Gagal mengambil token IDN.');
+          return;
+        }
+        setIdnResolved({ key, url: data.playback_url, headers: data.headers || {} });
+      } catch (e: any) {
+        if (!cancelled) setIdnError(e?.message || 'Gagal menghubungi server IDN.');
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [activeSource?.url, idnResolved?.key]);
 
   const selectSource = (i: number) => {
     setSourceIdx(i);
