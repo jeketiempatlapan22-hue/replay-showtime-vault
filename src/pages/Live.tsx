@@ -35,7 +35,6 @@ type SourceLike = Partial<Record<keyof PrivateSource, unknown>>;
 
 const SS_KEY_BASE = 'replaytime-live-unlocked';
 const SS_SRC_KEY = 'replaytime-live-source-idx';
-const IDN_PLAYBACK_URL = 'https://proxy.mediastream48.workers.dev/api/proxy/playback';
 const IDN_TOKEN_REFRESH_MS = 115 * 60 * 1000;
 
 const typeLabel = (t: string) => t === 'youtube' ? 'YouTube' : t === 'cloudflare' ? 'Cloudflare' : 'M3U8 / HLS';
@@ -429,30 +428,34 @@ export default function Live() {
     if (idnResolved?.key !== key) setIdnResolved(null);
     const refreshIdnToken = async (initial = false) => {
       try {
-        const res = await fetch(`https://hanabira48.com/api/stream-token?showId=${encodeURIComponent(idnId)}`, {
-          headers: { 'Accept': 'application/json' },
+        const { data, error } = await supabase.functions.invoke('idn-stream-token', {
+          body: { showId: idnId },
         });
-        if (!res.ok) throw new Error(`Token HTTP ${res.status}`);
-        const j: any = await res.json();
-        const xapi = j.xapi ?? j.xApi ?? j.x_api ?? j.api ?? j.apiKey ?? '';
-        const xsec = j.xsec ?? j.xSec ?? j.x_sec ?? j.sec ?? j.secret ?? '';
-        const xshowid = String(j.xshowid ?? j.xShowId ?? j.x_show_id ?? j.showId ?? idnId);
-        const xtoken = j.xtoken ?? j.xToken ?? j.x_token ?? j.token ?? '';
-        if (!xapi || !xsec || !xtoken) throw new Error('Token tidak lengkap dari server IDN');
+        if (error) throw new Error(error.message || 'Gagal memanggil server token');
+        const j: any = data || {};
+        if (j?.error) throw new Error(j.error);
+        const xApiToken = String(j.xApiToken || '');
+        const xSecKey = String(j.xSecKey || '');
+        const xTokenId = String(j.xTokenId || '');
+        const xShowId = String(j.xShowId || idnId);
+        const playbackUrl = String(j.playbackUrl || '');
+        if (!xApiToken || !xSecKey || !xTokenId || !playbackUrl) {
+          throw new Error('Respon token IDN tidak lengkap');
+        }
         if (cancelled) return;
         setIdnError('');
         setIdnResolved({
           key,
-          url: IDN_PLAYBACK_URL,
+          url: playbackUrl,
           headers: {
-            'X-Api-Token': String(xapi),
-            'X-Sec-Key': String(xsec),
-            'X-Showid': xshowid,
-            'X-Token-Id': String(xtoken),
+            'x-api-token': xApiToken,
+            'x-sec-key': xSecKey,
+            'x-showid': xShowId,
+            'x-token-id': xTokenId,
           },
         });
       } catch (e: any) {
-        if (!cancelled && initial) setIdnError(e?.message || 'Gagal mengambil token IDN.');
+        if (!cancelled && initial) setIdnError(e?.message || 'Gagal mengambil token IDN. Pastikan kamu sudah login.');
       }
     };
     void refreshIdnToken(true);
