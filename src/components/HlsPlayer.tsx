@@ -47,6 +47,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
   const lastProgressRef = useRef({ time: 0, checkedAt: Date.now(), recoveries: 0 });
   const onFatalErrorRef = useRef(onFatalError);
   const initialLiveEdgeSyncRef = useRef(false);
+  const headersRef = useRef<Record<string, string> | undefined>(headers);
 
   const initialVolume = (() => { try { const v = parseFloat(localStorage.getItem('replaytime-volume') || ''); return isFinite(v) ? Math.max(0, Math.min(1, v)) : 1; } catch { return 1; } })();
   // Default unmuted; one-time per session, clear stale persisted mute so user starts with sound on.
@@ -119,6 +120,10 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
   useEffect(() => {
     onFatalErrorRef.current = onFatalError;
   }, [onFatalError]);
+
+  useEffect(() => {
+    headersRef.current = headers;
+  }, [headers]);
 
   useEffect(() => {
     loadingRef.current = loading;
@@ -222,13 +227,15 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
     const initialBwEstimate = isWeak ? 250_000 : 700_000;
 
     if (Hls.isSupported()) {
-      const hdrs = headers;
       hls = new Hls({
-        xhrSetup: hdrs && Object.keys(hdrs).length > 0 ? (xhr) => {
+        xhrSetup: (xhr) => {
           try {
-            Object.entries(hdrs).forEach(([k, v]) => { if (v != null) xhr.setRequestHeader(k, String(v)); });
+            const hdrs = headersRef.current;
+            if (hdrs && Object.keys(hdrs).length > 0) {
+              Object.entries(hdrs).forEach(([k, v]) => { if (v != null) xhr.setRequestHeader(k, String(v)); });
+            }
           } catch { /* ignore — some headers may be forbidden */ }
-        } : undefined,
+        },
         enableWorker: true,
         // Disable LL-HLS auto-detection: it caused stalls/restarts on regular streams whose URL contains "live"
         lowLatencyMode: false,
@@ -435,7 +442,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
       // Reset native source to prevent leaked playback when switching providers
       try { video.removeAttribute('src'); video.load(); } catch { /* ignore */ }
     };
-  }, [src, headers ? JSON.stringify(headers) : '']);
+  }, [src]);
 
   const selectQuality = (levelIndex: number) => {
     if (!hlsRef.current) return;
