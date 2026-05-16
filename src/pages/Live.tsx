@@ -35,6 +35,8 @@ type SourceLike = Partial<Record<keyof PrivateSource, unknown>>;
 
 const SS_KEY_BASE = 'replaytime-live-unlocked';
 const SS_SRC_KEY = 'replaytime-live-source-idx';
+const IDN_PLAYBACK_URL = 'https://proxy.mediastream48.workers.dev/api/proxy/playback';
+const IDN_TOKEN_REFRESH_MS = 115 * 60 * 1000;
 
 const typeLabel = (t: string) => t === 'youtube' ? 'YouTube' : t === 'cloudflare' ? 'Cloudflare' : 'M3U8 / HLS';
 
@@ -414,18 +416,18 @@ export default function Live() {
   const sourceKey = (source: PrivateSource, index: number) => `${index}:${source.type}:${source.url}`;
 
   // Resolve IDN stream: frontend langsung fetch token ke hanabira48, lalu jadikan HEADER
-  // untuk request ke proxy playback. Tidak via edge function — sesuai permintaan.
+  // untuk request playback. Tidak via edge function — domain sudah whitelist.
   const [idnResolved, setIdnResolved] = useState<{ key: string; url: string; headers: Record<string, string> } | null>(null);
   const [idnError, setIdnError] = useState<string>('');
   useEffect(() => {
     if (!activeSource || !activeSource.url.startsWith('idn://')) { setIdnError(''); return; }
     const idnId = activeSource.url.slice('idn://'.length);
     const key = `idn:${idnId}`;
-    if (idnResolved?.key === key) return;
     let cancelled = false;
+    let refreshTimer: number | null = null;
     setIdnError('');
-    setIdnResolved(null);
-    (async () => {
+    if (idnResolved?.key !== key) setIdnResolved(null);
+    const refreshIdnToken = async (initial = false) => {
       try {
         const res = await fetch(`https://hanabira48.com/api/stream-token?showId=${encodeURIComponent(idnId)}`, {
           headers: { 'Accept': 'application/json' },
@@ -438,17 +440,25 @@ export default function Live() {
         const xtoken = j.xtoken ?? j.xToken ?? j.x_token ?? j.token ?? '';
         if (!xapi || !xsec || !xtoken) throw new Error('Token tidak lengkap dari server IDN');
         if (cancelled) return;
+        setIdnError('');
         setIdnResolved({
           key,
-          url: 'https://proxy.mediastream48.workers.dev/api/proxy/playback',
-          headers: { xapi: String(xapi), xsec: String(xsec), xshowid, xtoken: String(xtoken) },
+          url: IDN_PLAYBACK_URL,
+          headers: {
+            'X-Api-Token': String(xapi),
+            'X-Sec-Key': String(xsec),
+            'X-Showid': xshowid,
+            'X-Token-Id': String(xtoken),
+          },
         });
       } catch (e: any) {
-        if (!cancelled) setIdnError(e?.message || 'Gagal mengambil token IDN.');
+        if (!cancelled && initial) setIdnError(e?.message || 'Gagal mengambil token IDN.');
       }
-    })();
-    return () => { cancelled = true; };
-  }, [activeSource?.url, idnResolved?.key]);
+    };
+    void refreshIdnToken(true);
+    refreshTimer = window.setInterval(() => { void refreshIdnToken(false); }, IDN_TOKEN_REFRESH_MS);
+    return () => { cancelled = true; if (refreshTimer) window.clearInterval(refreshTimer); };
+  }, [activeSource?.url]);
 
   const selectSource = (i: number) => {
     setSourceIdx(i);
