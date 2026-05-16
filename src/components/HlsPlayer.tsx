@@ -222,7 +222,13 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
     const initialBwEstimate = isWeak ? 250_000 : 700_000;
 
     if (Hls.isSupported()) {
+      const hdrs = headers;
       hls = new Hls({
+        xhrSetup: hdrs && Object.keys(hdrs).length > 0 ? (xhr) => {
+          try {
+            Object.entries(hdrs).forEach(([k, v]) => { if (v != null) xhr.setRequestHeader(k, String(v)); });
+          } catch { /* ignore — some headers may be forbidden */ }
+        } : undefined,
         enableWorker: true,
         // Disable LL-HLS auto-detection: it caused stalls/restarts on regular streams whose URL contains "live"
         lowLatencyMode: false,
