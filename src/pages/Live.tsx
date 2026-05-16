@@ -493,7 +493,7 @@ export default function Live() {
         </div>
       </div>
 
-      <div className="w-full max-w-screen-2xl mx-auto px-2 sm:px-4 lg:px-6 py-3 sm:py-4 space-y-3">
+      <div className="w-full max-w-screen-2xl mx-auto px-2 sm:px-4 lg:px-6 py-3 sm:py-4 pb-28 sm:pb-32 space-y-3">
         {statusLoading ? (
           <div className="flex items-center justify-center py-20"><Loader2 className="w-10 h-10 text-primary animate-spin" /></div>
         ) : !unlocked ? (
@@ -572,24 +572,31 @@ export default function Live() {
                 <h2 className="text-base sm:text-lg font-bold text-foreground font-sans leading-tight flex-1 min-w-0">
                   {unlocked?.title || status?.title || 'Live'}
                 </h2>
-                <button
-                  type="button"
-                  aria-label="Picture in Picture"
-                  title="Picture in Picture"
-                  onClick={async () => {
-                    try {
-                      const d = document as any;
-                      if (d.pictureInPictureElement) { await d.exitPictureInPicture?.(); return; }
-                      const v = document.querySelector('video') as HTMLVideoElement | null;
-                      if (v && (v as any).requestPictureInPicture) {
-                        await (v as any).requestPictureInPicture();
-                      }
-                    } catch { /* ignore */ }
-                  }}
-                  className="shrink-0 inline-flex items-center justify-center w-9 h-9 rounded-full bg-secondary text-foreground hover:bg-primary hover:text-primary-foreground border border-border transition-colors"
-                >
-                  <PictureInPicture2 className="w-4 h-4" />
-                </button>
+                {(() => {
+                  const d = typeof document !== 'undefined' ? (document as any) : null;
+                  const supported = !!d && 'pictureInPictureEnabled' in d && !!d.pictureInPictureEnabled;
+                  if (!supported) return null;
+                  return (
+                    <button
+                      type="button"
+                      aria-label="Picture in Picture"
+                      title="Picture in Picture"
+                      onClick={async () => {
+                        try {
+                          const doc = document as any;
+                          if (doc.pictureInPictureElement) { await doc.exitPictureInPicture?.(); return; }
+                          const v = document.querySelector('video') as HTMLVideoElement | null;
+                          if (v && typeof (v as any).requestPictureInPicture === 'function' && !(v as any).disablePictureInPicture) {
+                            await (v as any).requestPictureInPicture();
+                          }
+                        } catch { /* ignore */ }
+                      }}
+                      className="shrink-0 inline-flex items-center justify-center w-9 h-9 rounded-full bg-secondary text-foreground hover:bg-primary hover:text-primary-foreground border border-border transition-colors"
+                    >
+                      <PictureInPicture2 className="w-4 h-4" />
+                    </button>
+                  );
+                })()}
               </div>
               {status?.lineup && status.lineup.length > 0 && (
                 <div className="space-y-2">
