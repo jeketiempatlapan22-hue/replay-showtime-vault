@@ -115,10 +115,20 @@ Deno.serve(async (req) => {
       }
 
       if (token) {
+        // Look up by token alone first to distinguish wrong_show vs revoked/missing.
         const { data: t } = await supabase
-          .from("active_show_tokens").select("*").eq("token", token).eq("show_id", resolvedShowId).maybeSingle();
-        if (!t || t.revoked) return json({ valid: false, reason: "revoked" });
+          .from("active_show_tokens").select("*").eq("token", token).maybeSingle();
+        if (!t) return json({ valid: false, reason: "token_not_found" });
+        if (t.revoked) return json({ valid: false, reason: "revoked" });
+        if (t.show_id !== resolvedShowId) return json({ valid: false, reason: "wrong_show" });
+        if (t.expires_at && new Date(t.expires_at).getTime() < Date.now()) {
+          return json({ valid: false, reason: "expired", expires_at: t.expires_at });
+        }
         if (!browser_id) return json({ valid: false, reason: "no_device" });
+        // Single-use enforcement: only the first device may bind. Subsequent devices are rejected.
+        if (t.single_use && t.used_at && t.used_by_browser_id && t.used_by_browser_id !== browser_id) {
+          return json({ valid: false, reason: "single_use_consumed", used_at: t.used_at });
+        }
         const { data: existing } = await supabase
           .from("active_show_token_devices").select("id").eq("token_id", t.id).eq("browser_id", browser_id).maybeSingle();
         if (!existing) {
@@ -133,8 +143,14 @@ Deno.serve(async (req) => {
             return json({ valid: false, reason: "device_limit" });
           }
           await supabase.from("active_show_token_devices").insert({ token_id: t.id, browser_id });
+          // Mark single_use consumption on first successful bind (atomic guard via WHERE used_at IS NULL).
+          if (t.single_use && !t.used_at) {
+            await supabase.from("active_show_tokens")
+              .update({ used_at: new Date().toISOString(), used_by_browser_id: browser_id })
+              .eq("id", t.id).is("used_at", null);
+          }
         }
-        return json({ ...okPayload, watermark: `RT-${String(token).slice(-4).toUpperCase()}`, token_kind: t.kind || 'personal', max_devices: t.max_devices || 1 });
+        return json({ ...okPayload, watermark: `RT-${String(token).slice(-4).toUpperCase()}`, token_kind: t.kind || 'personal', max_devices: t.max_devices || 1, expires_at: t.expires_at || null, single_use: !!t.single_use });
       }
 
       if (show.live_require_password) {
