@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, lazy, Suspense } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Loader2, Users, Eye } from 'lucide-react';
+import { ArrowLeft, Loader2, Users, Eye, PictureInPicture2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 import { supabase } from '@/integrations/supabase/client';
