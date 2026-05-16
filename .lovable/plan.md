@@ -1,61 +1,42 @@
-# Sistem Koin & Bottom Navigation
+# Menjadikan realtime48stream.my.id sebagai Domain Utama
 
-## 1. Database (migration)
+## Tujuan
+- realtime48stream.my.id = domain utama untuk semua halaman & token.
+- Link lama seperti `https://replaytime.lovable.app/live?mtoken=...&mp=...` tetap bisa diakses dan otomatis berpindah ke domain utama tanpa kehilangan token/parameter.
 
-**Tabel baru:**
-- `coin_balances` — `user_id` (PK), `balance` int, `updated_at`. RLS: user lihat saldo sendiri, admin lihat semua.
-- `coin_transactions` — `id`, `user_id`, `delta` int (positif = kredit, negatif = debit), `reason` text (`topup`, `purchase_show`, `purchase_replay`, `admin_grant`, `admin_revoke`), `related_order_id`, `related_show_id`, `related_replay_id`, `meta` jsonb, `created_at`. RLS: user lihat sendiri, admin manage.
-- `coin_packages` — `id`, `label`, `price_idr` int, `coins` int, `sort_order`, `enabled`. Public read, admin manage.
+## Yang perlu kamu lakukan sendiri (1x, di pengaturan Lovable)
+Buka **Project Settings → Domains** lalu di samping `realtime48stream.my.id` klik **Set as primary**. Setelah ini, kalau ada yang menulis langsung `https://realtime48stream.my.id/...` semuanya jalan normal, dan domain Lovable bawaan tetap aktif sebagai cadangan.
 
-**Kolom baru:**
-- `active_shows.price_show_coins` int, `active_shows.price_replay_coins` int (0 = nonaktif).
-- `replays.price_coins` int (0 = nonaktif).
-- `orders.kind` text (`show`|`replay`|`replay_only`|`coin_topup`), `orders.coin_package_id`, `orders.coin_amount` int.
+## Yang aku kerjakan di kode
 
-**Function:**
-- `grant_coins(_user_id, _delta, _reason, _meta)` SECURITY DEFINER untuk transaksi atomik (insert tx + upsert balance).
+Tambahkan redirect ringan sisi klien sehingga setiap kali halaman dimuat dari host non‑utama (mis. `replaytime.lovable.app` atau preview lain), browser otomatis pindah ke `realtime48stream.my.id` sambil **mempertahankan path, query string, dan hash** secara utuh.
 
-## 2. Edge Functions
+### Perubahan file
 
-**Baru:**
-- `create-coin-topup` — auth required, buat order Pakasir kind=`coin_topup` dengan `coin_amount` & `coin_package_id`.
-- `purchase-with-coins` — auth required, verifikasi `phone`, lock baris `coin_balances`, debit, terbitkan token (`active_show_tokens` atau `replay_personal_tokens` max_devices=1), kirim WA via template yang sudah ada, catat di `coin_transactions` & `token_deliveries`. Idempotent per (user_id, show_id/replay_id) sambil order pending dihindari.
+**`src/main.tsx`** — tambahkan blok redirect sebelum `createRoot(...).render(...)`:
 
-**Modifikasi (pakasir-webhook, check-pakasir-status, poll-pending-orders):**
-- Saat `kind='coin_topup'` & paid: kredit koin lewat `grant_coins`, kirim WA "Top-up berhasil", JANGAN buat token.
-- Selain itu: alur lama tetap.
+```ts
+const PRIMARY_HOST = 'realtime48stream.my.id';
+const REDIRECT_HOSTS = new Set([
+  'replaytime.lovable.app',
+  'www.realtime48stream.my.id',
+]);
+if (typeof window !== 'undefined' && REDIRECT_HOSTS.has(window.location.hostname)) {
+  const { pathname, search, hash } = window.location;
+  window.location.replace(`https://${PRIMARY_HOST}${pathname}${search}${hash}`);
+}
+```
 
-## 3. Frontend
+Properti penting:
+- Berjalan **sebelum React mount**, jadi pengguna tidak melihat UI sempat tampil di domain lama.
+- `pathname + search + hash` dipertahankan, sehingga URL seperti `/live?mtoken=SNUC2ELPN6J3&mp=NDTTKQTG` ter‑forward apa adanya — token, password master, dan parameter lain tetap utuh.
+- Host preview Lovable (`id-preview--*.lovable.app`) **tidak** ikut di‑redirect supaya pratinjau editor tetap bisa dipakai.
+- `window.location.replace` dipakai (bukan `assign`) supaya tidak menambah entri history yang membingungkan tombol Back.
 
-**Bottom Navigation (`src/components/BottomNav.tsx`):**
-- Mobile only (`md:hidden`), fixed bottom, 4 tab: Home (`/`), Shows (`/shows`), Koin (`/koin`), Akun (`/auth` atau profile).
-- Badge saldo koin di tab Koin (jika login).
+### Tidak perlu diubah
+- Edge functions, RPC, dan logika token tidak melakukan validasi berbasis hostname, jadi semua tetap kompatibel.
+- Storage key (`replaytime-*` di localStorage/sessionStorage) bersifat per‑origin; ini disengaja dan tidak diutak‑atik supaya nama key konsisten dengan data lama yang sudah tersimpan di perangkat pengguna.
 
-**Halaman `/koin` (`src/pages/Koin.tsx`):**
-- Wajib login (redirect `/auth`).
-- Card saldo besar, daftar paket top-up (klik → `create-coin-topup` → tampilkan QR Pakasir reuse `BuyShowDialog`-style flow), riwayat transaksi.
-
-**`BuyShowDialog` — tab pembayaran:**
-- Tab "QRIS" (existing) — **wajib login**, jika belum login tampilkan tombol "Login dulu".
-- Tab "Koin" — tampil hanya jika `price_*_coins > 0`. Tampilkan saldo, harga koin, tombol "Tukar Koin". Wajib phone (autofill dari profile, bisa edit). Klik → `purchase-with-coins` → toast sukses + token tampil.
-- Default tab: Koin jika tersedia & saldo cukup; selain itu QRIS.
-
-**Admin (`src/components/admin/CoinAdmin.tsx` + tab di `Admin.tsx`):**
-- CRUD `coin_packages` (label, price_idr, coins, enabled, sort).
-- Cari user (by email/phone) → lihat saldo & riwayat → tombol Tambah/Kurangi koin (alasan wajib).
-- Daftar transaksi terbaru.
-- Field harga koin (`price_show_coins`, `price_replay_coins`) ditambahkan di form edit show & replay (di komponen yang sudah ada).
-
-## 4. Validasi & keamanan
-
-- QRIS purchase: cek `useAuth().user`. Jika tidak login → tombol diganti "Login untuk beli dengan QRIS".
-- Koin purchase: cek auth + phone non-empty (E.164 normalisasi sederhana 8/0/62 → 62…).
-- `purchase-with-coins` & `grant_coins` di server: validasi balance ≥ price, debit dengan `UPDATE … WHERE balance >= price RETURNING` untuk anti race.
-- Token koin: max_devices = 1 (sama seperti QRIS).
-- Idempotency: cek apakah user sudah punya token aktif untuk show/replay tsb sebelum debit.
-
-## 5. Catatan
-
-- Pesan WA reuse template `wa_message_template` di `site_settings` (tidak diubah).
-- Top-up berhasil pakai pesan terpisah sederhana ("✅ Top-up berhasil. +N koin. Saldo: X").
-- Tidak mengubah alur Pakasir non-coin agar tetap kompatibel.
+## Catatan
+- Setelah domain utama di‑set di Project Settings dan kode di atas dideploy, semua tautan lama otomatis mendarat di `realtime48stream.my.id` dengan token tetap berfungsi.
+- Domain Lovable bawaan tetap aktif sebagai jaring pengaman; ia hanya bertugas mengarahkan ulang.
