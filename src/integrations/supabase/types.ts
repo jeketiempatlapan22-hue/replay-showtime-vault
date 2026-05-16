@@ -46,33 +46,45 @@ export type Database = {
       active_show_tokens: {
         Row: {
           created_at: string
+          expires_at: string | null
           id: string
           kind: string
           label: string
           max_devices: number
           revoked: boolean
           show_id: string
+          single_use: boolean
           token: string
+          used_at: string | null
+          used_by_browser_id: string | null
         }
         Insert: {
           created_at?: string
+          expires_at?: string | null
           id?: string
           kind?: string
           label?: string
           max_devices?: number
           revoked?: boolean
           show_id: string
+          single_use?: boolean
           token: string
+          used_at?: string | null
+          used_by_browser_id?: string | null
         }
         Update: {
           created_at?: string
+          expires_at?: string | null
           id?: string
           kind?: string
           label?: string
           max_devices?: number
           revoked?: boolean
           show_id?: string
+          single_use?: boolean
           token?: string
+          used_at?: string | null
+          used_by_browser_id?: string | null
         }
         Relationships: [
           {

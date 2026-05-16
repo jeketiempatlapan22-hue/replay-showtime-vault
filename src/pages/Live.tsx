@@ -123,7 +123,7 @@ export default function Live() {
   const [statusLoading, setStatusLoading] = useState(true);
   const [unlocked, setUnlocked] = useState<UnlockedConfig | null>(null);
   const [membership, setMembership] = useState<MembershipInfo | null>(null);
-  const [, setPwError] = useState('');
+  const [pwError, setPwError] = useState('');
   const [, setSubmitting] = useState(false);
   const [failedSourceKeys, setFailedSourceKeys] = useState<string[]>([]);
   const [tokenInfo, setTokenInfo] = useState<{ kind: string; max_devices: number } | null>(null);
@@ -198,19 +198,22 @@ export default function Live() {
   const reasonMessage = (reason?: string): string => {
     switch (reason) {
       case 'blocked': return 'Perangkat ini telah diblokir oleh admin.';
-      case 'device_limit': return 'Token ini sudah terikat ke perangkat lain. Klik "Reset perangkat membership saya" jika ingin pindah perangkat.';
+      case 'device_limit': return 'Token ini sudah terikat ke perangkat lain. Pakai link/sandi ulang di perangkat lama, atau hubungi admin untuk reset.';
       case 'no_device': return 'ID perangkat tidak terdeteksi. Aktifkan penyimpanan browser lalu muat ulang halaman.';
       case 'bad_password': return 'Sandi yang dimasukkan salah. Coba lagi.';
       case 'bad_membership_password': return 'Sandi membership salah. Periksa kembali sandi Anda.';
-      case 'revoked': return 'Token tidak valid atau telah dicabut.';
-      case 'expired': return 'Membership Anda telah berakhir. Silakan perpanjang ke admin.';
+      case 'revoked': return 'Token sudah dicabut oleh admin dan tidak dapat dipakai lagi.';
+      case 'token_not_found': return 'Token tidak ditemukan. Periksa kembali link akses yang Anda terima.';
+      case 'wrong_show': return 'Token ini bukan untuk show yang sedang Anda buka. Pakai link sesuai show yang dibeli.';
+      case 'expired': return 'Token sudah kedaluwarsa. Silakan beli ulang atau hubungi admin.';
+      case 'single_use_consumed': return 'Token sekali pakai ini sudah digunakan di perangkat lain dan tidak bisa dipakai lagi di sini.';
       case 'not_started': return 'Membership belum aktif (belum mencapai waktu mulai).';
       case 'scope': return 'Membership ini tidak mencakup akses replay.';
       case 'off': return 'Live belum aktif.';
       case 'password_or_token_required': return 'Masukkan sandi atau gunakan link token.';
       case 'multi_device_no_reset': return 'Membership multi-device/publik tidak dapat direset manual.';
       case 'quota_exhausted': return 'Kuota reset manual sudah habis.';
-      default: return 'Gagal membuka akses live.';
+      default: return 'Gagal membuka akses live. Coba muat ulang halaman atau hubungi admin.';
     }
   };
 
@@ -496,8 +499,23 @@ export default function Live() {
       <div className="w-full max-w-screen-2xl mx-auto px-2 sm:px-4 lg:px-6 py-3 sm:py-4 pb-28 sm:pb-32 space-y-3">
         {statusLoading ? (
           <div className="flex items-center justify-center py-20"><Loader2 className="w-10 h-10 text-primary animate-spin" /></div>
+        ) : !unlocked && pwError ? (
+          <div className="mx-auto max-w-md w-full rounded-2xl border border-destructive/40 bg-destructive/10 p-5 sm:p-6 space-y-4 text-center">
+            <div className="text-3xl">⚠️</div>
+            <h2 className="text-base sm:text-lg font-bold text-foreground">Tidak bisa membuka live</h2>
+            <p className="text-sm text-muted-foreground whitespace-pre-line">{pwError}</p>
+            <div className="flex flex-col sm:flex-row gap-2 pt-1">
+              <Button variant="outline" className="flex-1" onClick={() => { setPwError(''); const t = search.get('t'); const mt = search.get('mtoken'); const mp = search.get('mp') || search.get('mpassword') || ''; if (mt) void doUnlock({ mtoken: mt, mpassword: mp }); else if (t) void doUnlock({ token: t }); }}>
+                Coba lagi
+              </Button>
+              <Button variant="secondary" className="flex-1" onClick={() => navigate(`/kunci${showId ? `?show=${showId}` : ''}`)}>
+                Masukkan sandi
+              </Button>
+              <Button className="flex-1" onClick={() => navigate('/')}>Kembali</Button>
+            </div>
+          </div>
         ) : !unlocked ? (
-          // No cached unlock + no token URL → redirect to /kunci is in flight (or token unlock in progress).
+          // Initial unlock attempt in flight
           <div className="flex items-center justify-center py-20"><Loader2 className="w-10 h-10 text-primary animate-spin" /></div>
         ) : (
           <>
