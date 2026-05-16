@@ -207,17 +207,41 @@ Deno.serve(async (req) => {
   if (isReplayOnlyPurchase) password = '';
 
   const dateStr = new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
-  const message = tpl
-    .replace(/\{date_line\}/g, dateStr ? `📅 ${dateStr}\n\n` : '')
-    .replace(/\{password_line\}/g, password ? `🔐 Sandi: *${password}*\n\n` : '')
-    .replace(/\{live_link_block\}/g, liveLink ? `📺 *Link Live*\n${liveLink}\n\n` : '')
-    .replace(/\{title\}/g, order.item_title || '')
-    .replace(/\{link\}/g, link)
-    .replace(/\{live_link\}/g, liveLink)
-    .replace(/\{password\}/g, password)
-    .replace(/\{date\}/g, dateStr)
-    .replace(/\{order_id\}/g, orderId)
-    .replace(/\{site\}/g, origin);
+  const plainSite = (origin || 'https://replaytime.lovable.app').replace(/^https?:\/\//, '').replace(/\/+$/, '');
+  let message: string;
+  if (order.show_id && !order.replay_id) {
+    // SHOW purchase: kirim link token live + link replay plain (tanpa parameter), pertahankan sandi.
+    message = [
+      '🎬 *ReplayTime*',
+      '━━━━━━━━━━━━━━',
+      '',
+      `🎤 *${order.item_title || ''}*`,
+      `📅 ${dateStr}`,
+      '',
+      '🔗 *Link Masuk Live*',
+      link,
+      '',
+      password ? `🔐 Sandi: *${password}*` : null,
+      password ? '' : null,
+      '🎞️ *Link Replay*',
+      plainSite,
+      '',
+      '━━━━━━━━━━━━━━',
+      '✨ Selamat menonton! 💖',
+    ].filter((l) => l !== null).join('\n');
+  } else {
+    message = tpl
+      .replace(/\{date_line\}/g, dateStr ? `📅 ${dateStr}\n\n` : '')
+      .replace(/\{password_line\}/g, password ? `🔐 Sandi: *${password}*\n\n` : '')
+      .replace(/\{live_link_block\}/g, liveLink ? `📺 *Link Live*\n${liveLink}\n\n` : '')
+      .replace(/\{title\}/g, order.item_title || '')
+      .replace(/\{link\}/g, link)
+      .replace(/\{live_link\}/g, liveLink)
+      .replace(/\{password\}/g, password)
+      .replace(/\{date\}/g, dateStr)
+      .replace(/\{order_id\}/g, orderId)
+      .replace(/\{site\}/g, origin);
+  }
 
   // Atomic claim: only the first caller flips token_sent_at NULL -> now().
   const claimedAt = new Date().toISOString();
