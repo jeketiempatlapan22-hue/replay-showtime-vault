@@ -419,6 +419,11 @@ export default function Live() {
   useEffect(() => {
     if (!activeSource || !activeSource.url.startsWith('idn://')) { setIdnError(''); return; }
     const idnId = activeSource.url.slice('idn://'.length);
+    if (!idnId) {
+      setIdnResolved(null);
+      setIdnError('IDN Show ID belum diatur admin. Hubungi admin untuk mengaktifkan stream IDN.');
+      return;
+    }
     const key = `idn:${idnId}`;
     let cancelled = false;
     let refreshTimer: number | null = null;
