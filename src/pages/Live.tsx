@@ -198,19 +198,22 @@ export default function Live() {
   const reasonMessage = (reason?: string): string => {
     switch (reason) {
       case 'blocked': return 'Perangkat ini telah diblokir oleh admin.';
-      case 'device_limit': return 'Token ini sudah terikat ke perangkat lain. Klik "Reset perangkat membership saya" jika ingin pindah perangkat.';
+      case 'device_limit': return 'Token ini sudah terikat ke perangkat lain. Pakai link/sandi ulang di perangkat lama, atau hubungi admin untuk reset.';
       case 'no_device': return 'ID perangkat tidak terdeteksi. Aktifkan penyimpanan browser lalu muat ulang halaman.';
       case 'bad_password': return 'Sandi yang dimasukkan salah. Coba lagi.';
       case 'bad_membership_password': return 'Sandi membership salah. Periksa kembali sandi Anda.';
-      case 'revoked': return 'Token tidak valid atau telah dicabut.';
-      case 'expired': return 'Membership Anda telah berakhir. Silakan perpanjang ke admin.';
+      case 'revoked': return 'Token sudah dicabut oleh admin dan tidak dapat dipakai lagi.';
+      case 'token_not_found': return 'Token tidak ditemukan. Periksa kembali link akses yang Anda terima.';
+      case 'wrong_show': return 'Token ini bukan untuk show yang sedang Anda buka. Pakai link sesuai show yang dibeli.';
+      case 'expired': return 'Token sudah kedaluwarsa. Silakan beli ulang atau hubungi admin.';
+      case 'single_use_consumed': return 'Token sekali pakai ini sudah digunakan di perangkat lain dan tidak bisa dipakai lagi di sini.';
       case 'not_started': return 'Membership belum aktif (belum mencapai waktu mulai).';
       case 'scope': return 'Membership ini tidak mencakup akses replay.';
       case 'off': return 'Live belum aktif.';
       case 'password_or_token_required': return 'Masukkan sandi atau gunakan link token.';
       case 'multi_device_no_reset': return 'Membership multi-device/publik tidak dapat direset manual.';
       case 'quota_exhausted': return 'Kuota reset manual sudah habis.';
-      default: return 'Gagal membuka akses live.';
+      default: return 'Gagal membuka akses live. Coba muat ulang halaman atau hubungi admin.';
     }
   };
 
