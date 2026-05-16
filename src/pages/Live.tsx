@@ -137,7 +137,7 @@ export default function Live() {
   const fetchStatus = () => {
     if (showId) {
       return supabase.from('active_shows')
-        .select('id,title,is_live,live_type,live_require_password,lineup,show_date,show_time,is_active,image_url')
+        .select('id,title,is_live,live_type,live_require_password,lineup,show_date,show_time,is_active,image_url,idn_show_id')
         .eq('id', showId).maybeSingle()
         .then(({ data }) => {
           if (!data || !data.is_active) {
