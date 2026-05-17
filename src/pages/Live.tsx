@@ -30,7 +30,7 @@ interface PublicSource { label: string; type: SrcType }
 interface PrivateSource extends PublicSource { url: string }
 interface MembershipInfo { expires_at?: string; resets_used: number; resets_max: number; remaining: number; includes_replays?: boolean; max_devices?: number }
 interface LiveStatus { enabled: boolean; title: string; type: string; require_password: boolean; sources: PublicSource[]; lineup: string[]; show_date?: string; show_time?: string; image_url?: string; idn_show_id?: string }
-interface UnlockedConfig { title: string; type: SrcType; url: string; sources: PrivateSource[]; watermark: string; enabled: boolean }
+interface UnlockedConfig { title: string; type: SrcType; url: string; sources: PrivateSource[]; watermark: string; enabled: boolean; idn_show_id?: string }
 type SourceLike = Partial<Record<keyof PrivateSource, unknown>>;
 
 const SS_KEY_BASE = 'replaytime-live-unlocked';
@@ -233,6 +233,7 @@ export default function Live() {
           sources: toPrivateSources(data.sources),
           watermark: data.watermark || '',
           enabled: !!data.enabled,
+          idn_show_id: data.idn_show_id || '',
         };
         // For silent revalidation, NEVER overwrite the existing player URL/sources.
         // Doing so would change the React key on the player and remount it, restarting the live stream from the beginning.
@@ -242,6 +243,7 @@ export default function Live() {
           setUnlocked(prev => {
             if (!prev) return cfg;
             const next = { ...prev, enabled: cfg.enabled, title: cfg.title, type: cfg.type };
+            if (cfg.idn_show_id) next.idn_show_id = cfg.idn_show_id;
             if (!prev.url && cfg.url) next.url = cfg.url;
             if ((!prev.sources || prev.sources.length === 0) && cfg.sources?.length) next.sources = cfg.sources;
             try { sessionStorage.setItem(`${SS_KEY_BASE}${showId?'-'+showId:''}`, JSON.stringify(next)); } catch { /* ignore */ }
@@ -288,6 +290,14 @@ export default function Live() {
       cached = sessionStorage.getItem(`${SS_KEY_BASE}${showId?'-'+showId:''}`);
       if (cached) setUnlocked(JSON.parse(cached));
     } catch { /* ignore */ }
+
+    // Refresh cached unlock immediately so old sessionStorage (saved before IDN Show ID
+    // existed in the payload) does not leave the IDN tab stuck with an empty idn:// URL.
+    if (cached) {
+      const mp = search.get('mp') || search.get('mpassword') || '';
+      if (mtParam) void doUnlock({ mtoken: mtParam, mpassword: mp }, true);
+      else if (tParam) void doUnlock({ token: tParam }, true);
+    }
 
     // If a token (membership or personal) is provided without a specific show,
     // redirect to the currently-live active show — or, if none is live, to the
@@ -367,6 +377,11 @@ export default function Live() {
   }, []);
 
   useEffect(() => {
+    if (showId) void fetchStatus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showId]);
+
+  useEffect(() => {
     const t = search.get('t');
     const mt = search.get('mtoken');
     const mp = search.get('mp') || search.get('mpassword') || '';
@@ -404,8 +419,10 @@ export default function Live() {
   const allSources = useMemo<PrivateSource[]>(() => {
     if (!unlocked) return [];
     const list: PrivateSource[] = [];
-    // IDN source selalu tampil (di depan player utama), meskipun admin belum isi IDN Show ID
-    list.push({ label: 'IDN', type: 'm3u8', url: `idn://${status?.idn_show_id || ''}` });
+    const idnShowId = status?.idn_show_id || unlocked.idn_show_id || '';
+    // IDN source tampil di depan player utama dan memakai ID dari status terbaru
+    // atau dari payload unlock agar link token langsung jalan tanpa reload kedua.
+    list.push({ label: 'IDN', type: 'm3u8', url: `idn://${idnShowId}` });
     const main: PrivateSource = { label: 'Player Utama', type: unlocked.type, url: unlocked.url };
     if (main.url) list.push(main);
     list.push(...(unlocked.sources || []).filter(s => s.url));
@@ -424,6 +441,7 @@ export default function Live() {
   // untuk request playback. Tidak via edge function — domain sudah whitelist.
   const [idnResolved, setIdnResolved] = useState<{ key: string; url: string; headers: Record<string, string> } | null>(null);
   const [idnError, setIdnError] = useState<string>('');
+  const [idnRetryNonce, setIdnRetryNonce] = useState(0);
   useEffect(() => {
     if (!activeSource || !activeSource.url.startsWith('idn://')) { setIdnError(''); return; }
     const idnId = activeSource.url.slice('idn://'.length);
@@ -472,7 +490,7 @@ export default function Live() {
     void refreshIdnToken(true);
     refreshTimer = window.setInterval(() => { void refreshIdnToken(false); }, IDN_TOKEN_REFRESH_MS);
     return () => { cancelled = true; if (refreshTimer) window.clearInterval(refreshTimer); };
-  }, [activeSource?.url]);
+  }, [activeSource?.url, idnRetryNonce]);
 
   const selectSource = (i: number) => {
     setSourceIdx(i);
@@ -594,7 +612,7 @@ export default function Live() {
                       <div className="aspect-video w-full rounded-2xl bg-destructive/10 border border-destructive/40 flex flex-col items-center justify-center gap-3 p-4 text-center">
                         <div className="text-2xl">⚠️</div>
                         <p className="text-sm text-foreground">Gagal memuat stream IDN: {idnError}</p>
-                        <Button size="sm" variant="outline" onClick={() => { setIdnResolved(null); setIdnError(''); }}>Coba lagi</Button>
+                        <Button size="sm" variant="outline" onClick={() => { setIdnResolved(null); setIdnError(''); void fetchStatus(); setIdnRetryNonce(n => n + 1); }}>Coba lagi</Button>
                       </div>
                     ) : !idnResolved ? (
                       <div className="aspect-video w-full rounded-2xl bg-card/80 border border-border flex items-center justify-center">
