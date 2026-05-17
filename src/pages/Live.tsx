@@ -369,6 +369,11 @@ export default function Live() {
   }, []);
 
   useEffect(() => {
+    if (showId) void fetchStatus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showId]);
+
+  useEffect(() => {
     const t = search.get('t');
     const mt = search.get('mtoken');
     const mp = search.get('mp') || search.get('mpassword') || '';
@@ -428,6 +433,7 @@ export default function Live() {
   // untuk request playback. Tidak via edge function — domain sudah whitelist.
   const [idnResolved, setIdnResolved] = useState<{ key: string; url: string; headers: Record<string, string> } | null>(null);
   const [idnError, setIdnError] = useState<string>('');
+  const [idnRetryNonce, setIdnRetryNonce] = useState(0);
   useEffect(() => {
     if (!activeSource || !activeSource.url.startsWith('idn://')) { setIdnError(''); return; }
     const idnId = activeSource.url.slice('idn://'.length);
@@ -476,7 +482,7 @@ export default function Live() {
     void refreshIdnToken(true);
     refreshTimer = window.setInterval(() => { void refreshIdnToken(false); }, IDN_TOKEN_REFRESH_MS);
     return () => { cancelled = true; if (refreshTimer) window.clearInterval(refreshTimer); };
-  }, [activeSource?.url]);
+  }, [activeSource?.url, idnRetryNonce]);
 
   const selectSource = (i: number) => {
     setSourceIdx(i);
