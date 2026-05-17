@@ -406,8 +406,10 @@ export default function Live() {
   const allSources = useMemo<PrivateSource[]>(() => {
     if (!unlocked) return [];
     const list: PrivateSource[] = [];
-    // IDN source selalu tampil (di depan player utama), meskipun admin belum isi IDN Show ID
-    list.push({ label: 'IDN', type: 'm3u8', url: `idn://${status?.idn_show_id || ''}` });
+    const idnShowId = status?.idn_show_id || unlocked.idn_show_id || '';
+    // IDN source tampil di depan player utama dan memakai ID dari status terbaru
+    // atau dari payload unlock agar link token langsung jalan tanpa reload kedua.
+    list.push({ label: 'IDN', type: 'm3u8', url: `idn://${idnShowId}` });
     const main: PrivateSource = { label: 'Player Utama', type: unlocked.type, url: unlocked.url };
     if (main.url) list.push(main);
     list.push(...(unlocked.sources || []).filter(s => s.url));
