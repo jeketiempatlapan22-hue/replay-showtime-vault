@@ -291,6 +291,14 @@ export default function Live() {
       if (cached) setUnlocked(JSON.parse(cached));
     } catch { /* ignore */ }
 
+    // Refresh cached unlock immediately so old sessionStorage (saved before IDN Show ID
+    // existed in the payload) does not leave the IDN tab stuck with an empty idn:// URL.
+    if (cached) {
+      const mp = search.get('mp') || search.get('mpassword') || '';
+      if (mtParam) void doUnlock({ mtoken: mtParam, mpassword: mp }, true);
+      else if (tParam) void doUnlock({ token: tParam }, true);
+    }
+
     // If a token (membership or personal) is provided without a specific show,
     // redirect to the currently-live active show — or, if none is live, to the
     // nearest UPCOMING active show so membership users still see a countdown.
