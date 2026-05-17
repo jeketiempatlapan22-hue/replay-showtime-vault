@@ -228,13 +228,15 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
 
     if (Hls.isSupported()) {
       hls = new Hls({
-        xhrSetup: (xhr) => {
-          try {
-            const hdrs = headersRef.current;
-            if (hdrs && Object.keys(hdrs).length > 0) {
-              Object.entries(hdrs).forEach(([k, v]) => { if (v != null) xhr.setRequestHeader(k, String(v)); });
-            }
-          } catch { /* ignore — some headers may be forbidden */ }
+        xhrSetup: (xhr, url) => {
+          const hdrs = headersRef.current;
+          if (!hdrs || Object.keys(hdrs).length === 0) return;
+          // setRequestHeader hanya valid setelah XHR dibuka. Sebelumnya error itu
+          // tertelan, jadi request IDN terkirim tanpa x-api-token/x-sec-key/x-token-id/x-showid.
+          if (xhr.readyState === 0) xhr.open('GET', url, true);
+          Object.entries(hdrs).forEach(([k, v]) => {
+            if (v != null && String(v).length > 0) xhr.setRequestHeader(k, String(v));
+          });
         },
         enableWorker: true,
         // Disable LL-HLS auto-detection: it caused stalls/restarts on regular streams whose URL contains "live"
