@@ -72,7 +72,7 @@ Deno.serve(async (req) => {
       xSecKey: X_SEC_KEY,
       xApiToken,
       playbackUrl: PLAYBACK_URL,
-      expiresIn: 7200,
+      expiresIn: 90,
     }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   } catch (e) {
     return new Response(JSON.stringify({ error: (e as Error).message }), {
