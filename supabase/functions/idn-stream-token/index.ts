@@ -1,6 +1,7 @@
-// Generates IDN (hanabira48) playback headers server-side.
-// Requires authenticated user. Returns { xShowId, xTokenId, xSecKey, xApiToken, playbackUrl }.
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
+// Generates IDN (hanabira48) playback credentials server-side.
+// Public (no auth required). Returns { xShowId, xTokenId, xSecKey, xApiToken, playbackUrl }.
+// Client uses these as request headers when calling the worker proxy playback URL.
+
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -12,7 +13,7 @@ const corsHeaders = {
 const X_TOKEN_ID = '114e0e89-f8b4-44ee-9354-bb06805cc02f';
 const X_SEC_KEY = '49c647f3-c84b-4b93-9b84-9d1ad158428e';
 const PARTNER_SECRET = Deno.env.get('HANABIRA_PARTNER_SECRET') || 'Hanabirastream2026';
-const PLAYBACK_URL = 'https://api.hanabira48.com/api/stream/v2/playback';
+const PLAYBACK_URL = 'https://idn.mediastream48.workers.dev/api/proxy/playback';
 
 function b64url(bytes: Uint8Array): string {
   let bin = '';
@@ -53,24 +54,8 @@ async function generateApiToken(showId: string): Promise<string> {
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   try {
-    // Require authenticated user
-    const authHeader = req.headers.get('Authorization') || '';
-    if (!authHeader.startsWith('Bearer ')) {
-      return new Response(JSON.stringify({ error: 'Unauthorized: login diperlukan' }), {
-        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_ANON_KEY')!,
-      { global: { headers: { Authorization: authHeader } } },
-    );
-    const { data: { user }, error: userErr } = await supabase.auth.getUser();
-    if (userErr || !user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized: sesi tidak valid' }), {
-        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
+    // Public endpoint — no auth required. Credentials are short-lived (2h) and
+    // tied to a specific showId set by admin.
 
     const body = await req.json().catch(() => ({}));
     const showId = String(body?.showId || '').trim();
