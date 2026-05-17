@@ -1,7 +1,7 @@
 // Generates IDN (hanabira48) playback credentials server-side.
 // Public (no auth required). Returns { xShowId, xTokenId, xSecKey, xApiToken, playbackUrl }.
 // Client uses these as request headers when calling the worker proxy playback URL.
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
+
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
