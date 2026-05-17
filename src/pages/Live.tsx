@@ -35,7 +35,7 @@ type SourceLike = Partial<Record<keyof PrivateSource, unknown>>;
 
 const SS_KEY_BASE = 'replaytime-live-unlocked';
 const SS_SRC_KEY = 'replaytime-live-source-idx';
-const IDN_TOKEN_REFRESH_MS = 115 * 60 * 1000;
+const IDN_TOKEN_REFRESH_MS = 60 * 1000;
 
 const typeLabel = (t: string) => t === 'youtube' ? 'YouTube' : t === 'cloudflare' ? 'Cloudflare' : 'M3U8 / HLS';
 

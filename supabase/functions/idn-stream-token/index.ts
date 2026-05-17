@@ -36,7 +36,7 @@ async function generateApiToken(showId: string): Promise<string> {
   // Step B: Payload
   const now = Math.floor(Date.now() / 1000);
   const header = { alg: 'HS256', typ: 'JWT' };
-  const payload = { sid: showId, tid: X_TOKEN_ID, exp: now + 7200 };
+  const payload = { sid: showId, tid: X_TOKEN_ID, exp: now + 90 };
   const signingInput = `${b64urlStr(JSON.stringify(header))}.${b64urlStr(JSON.stringify(payload))}`;
 
   // Step C: HMAC-SHA256
@@ -72,7 +72,7 @@ Deno.serve(async (req) => {
       xSecKey: X_SEC_KEY,
       xApiToken,
       playbackUrl: PLAYBACK_URL,
-      expiresIn: 7200,
+      expiresIn: 90,
     }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   } catch (e) {
     return new Response(JSON.stringify({ error: (e as Error).message }), {
