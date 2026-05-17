@@ -30,7 +30,7 @@ interface PublicSource { label: string; type: SrcType }
 interface PrivateSource extends PublicSource { url: string }
 interface MembershipInfo { expires_at?: string; resets_used: number; resets_max: number; remaining: number; includes_replays?: boolean; max_devices?: number }
 interface LiveStatus { enabled: boolean; title: string; type: string; require_password: boolean; sources: PublicSource[]; lineup: string[]; show_date?: string; show_time?: string; image_url?: string; idn_show_id?: string }
-interface UnlockedConfig { title: string; type: SrcType; url: string; sources: PrivateSource[]; watermark: string; enabled: boolean }
+interface UnlockedConfig { title: string; type: SrcType; url: string; sources: PrivateSource[]; watermark: string; enabled: boolean; idn_show_id?: string }
 type SourceLike = Partial<Record<keyof PrivateSource, unknown>>;
 
 const SS_KEY_BASE = 'replaytime-live-unlocked';
@@ -233,6 +233,7 @@ export default function Live() {
           sources: toPrivateSources(data.sources),
           watermark: data.watermark || '',
           enabled: !!data.enabled,
+          idn_show_id: data.idn_show_id || '',
         };
         // For silent revalidation, NEVER overwrite the existing player URL/sources.
         // Doing so would change the React key on the player and remount it, restarting the live stream from the beginning.
@@ -242,6 +243,7 @@ export default function Live() {
           setUnlocked(prev => {
             if (!prev) return cfg;
             const next = { ...prev, enabled: cfg.enabled, title: cfg.title, type: cfg.type };
+            if (cfg.idn_show_id) next.idn_show_id = cfg.idn_show_id;
             if (!prev.url && cfg.url) next.url = cfg.url;
             if ((!prev.sources || prev.sources.length === 0) && cfg.sources?.length) next.sources = cfg.sources;
             try { sessionStorage.setItem(`${SS_KEY_BASE}${showId?'-'+showId:''}`, JSON.stringify(next)); } catch { /* ignore */ }
