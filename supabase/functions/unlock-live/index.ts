@@ -91,7 +91,7 @@ Deno.serve(async (req) => {
     if (resolvedShowId) {
       const { data: show } = await supabase
         .from("active_shows")
-        .select("id,title,is_live,live_auto_schedule,live_url,live_type,live_sources,live_password,live_require_password,show_date,show_time,is_active")
+        .select("id,title,is_live,live_auto_schedule,live_url,live_type,live_sources,live_password,live_require_password,show_date,show_time,is_active,idn_show_id")
         .eq("id", resolvedShowId).maybeSingle();
       if (!show || !show.is_active) {
         if (show_id) return json({ valid: false, reason: "off" });
@@ -104,6 +104,7 @@ Deno.serve(async (req) => {
         url: show.live_url || "",
         sources: Array.isArray(show.live_sources) ? show.live_sources : [],
         show_date: show.show_date, show_time: show.show_time,
+        idn_show_id: show.idn_show_id || "",
         watermark: `RT-${String(show.id).slice(0, 4).toUpperCase()}`,
       };
 
