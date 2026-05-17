@@ -604,7 +604,7 @@ export default function Live() {
                       <div className="aspect-video w-full rounded-2xl bg-destructive/10 border border-destructive/40 flex flex-col items-center justify-center gap-3 p-4 text-center">
                         <div className="text-2xl">⚠️</div>
                         <p className="text-sm text-foreground">Gagal memuat stream IDN: {idnError}</p>
-                        <Button size="sm" variant="outline" onClick={() => { setIdnResolved(null); setIdnError(''); }}>Coba lagi</Button>
+                        <Button size="sm" variant="outline" onClick={() => { setIdnResolved(null); setIdnError(''); void fetchStatus(); setIdnRetryNonce(n => n + 1); }}>Coba lagi</Button>
                       </div>
                     ) : !idnResolved ? (
                       <div className="aspect-video w-full rounded-2xl bg-card/80 border border-border flex items-center justify-center">
