@@ -248,34 +248,6 @@ Deno.serve(async (req) => {
     ].join('\n');
   } else {
     message = fillTpl(tpl, dateStr, link, '');
-  }
-    // REPLAY purchase: selalu kirim link token langsung agar user bisa menonton tanpa input sandi.
-    message = [
-      '🎬 *RealTime48*',
-      '━━━━━━━━━━━━━━',
-      '',
-      `🎤 *${order.item_title || ''}*`,
-      `📅 ${dateStr}`,
-      '',
-      '🎞️ *Link Replay*',
-      link,
-      '',
-      '━━━━━━━━━━━━━━',
-      '✨ Selamat menonton! 💖',
-    ].join('\n');
-  } else {
-    message = tpl
-      .replace(/\{date_line\}/g, dateStr ? `📅 ${dateStr}\n\n` : '')
-      .replace(/\{password_line\}/g, password ? `🔐 Sandi: *${password}*\n\n` : '')
-      .replace(/\{live_link_block\}/g, liveLink ? `📺 *Link Live*\n${liveLink}\n\n` : '')
-      .replace(/\{title\}/g, order.item_title || '')
-      .replace(/\{link\}/g, link)
-      .replace(/\{live_link\}/g, liveLink)
-      .replace(/\{password\}/g, password)
-      .replace(/\{date\}/g, dateStr)
-      .replace(/\{order_id\}/g, orderId)
-      .replace(/\{site\}/g, origin);
-  }
 
   // Atomic claim: only the first caller flips token_sent_at NULL -> now().
   const claimedAt = new Date().toISOString();
