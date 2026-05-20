@@ -118,49 +118,44 @@ Deno.serve(async (req) => {
       access_token: accessToken, show_id: resolvedShowId, replay_id: resolvedReplayId,
     }).select('id').single();
 
-    // Build WA message via shared template
-    const { data: settings } = await admin.from('site_settings').select('key,value').in('key', ['site_origin','wa_message_template']);
+    // Build WA message via shared templates (editable di Admin → Pakasir).
+    const { data: settings } = await admin.from('site_settings').select('key,value').in('key', ['site_origin','wa_message_template','wa_show_template']);
     const sm = new Map((settings ?? []).map((s) => [s.key, s.value]));
     const origin = (sm.get('site_origin') || 'https://replaytime.lovable.app').replace(/\/+$/, '');
     const tpl = sm.get('wa_message_template') ||
       '🎬 *ReplayTime*\n━━━━━━━━━━━━━━\n\n🎤 *{title}*\n{date_line}🔗 *Link Akses*\n{link}\n{password_line}{live_link_block}━━━━━━━━━━━━━━\n✨ Selamat menonton! 💖';
-    // Untuk pembelian SHOW: link langsung ke halaman live dengan token (akan diverifikasi unlock-live).
-    // Untuk pembelian REPLAY: tetap via halaman /akses agar masuk replay player.
+    const showTpl = sm.get('wa_show_template') ||
+      '🔐 *TOKEN LIVE SATUAN*\n\n🎤 *{title}*\n\n📅 {date}\n\n🔗 *Link Live:*\n{live_link}\n\n🎬 *Link Replay:* {site}\n\n{password_line}👤 Hanya untuk *1 perangkat pertama*.\n\n— *ReplayTime* 💖';
     const isReplayOnlyPurchase = !!resolvedReplayId && !resolvedShowId;
     const link = resolvedShowId && !resolvedReplayId
       ? `${origin}/live?show=${resolvedShowId}&t=${accessToken}`
       : `${origin}/akses?token=${accessToken}${resolvedReplayId ? `&replay=${resolvedReplayId}` : ''}`;
-    let password = ''; const liveLink = '';
+    let password = '';
+    let showDate = '';
     if (resolvedShowId && !resolvedReplayId) {
-      const { data: showRow } = await admin.from('active_shows').select('live_password').eq('id', resolvedShowId).maybeSingle();
+      const { data: showRow } = await admin.from('active_shows').select('live_password,show_date,show_time').eq('id', resolvedShowId).maybeSingle();
       password = String(showRow?.live_password || '').trim();
+      if (showRow?.show_date) {
+        const d = String(showRow.show_date);
+        const t = String(showRow.show_time || '').slice(0, 5);
+        showDate = t ? `${d} ${t}` : d;
+      }
     }
-    // Replay dibeli via kartu replay → token-link sudah cukup, tanpa sandi.
     if (isReplayOnlyPurchase) password = '';
     const dateStr = new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
     const plainSite = (origin || 'https://replaytime.lovable.app').replace(/^https?:\/\//, '').replace(/\/+$/, '');
+    const fillTpl = (t: string, dateValue: string, linkValue: string, liveLinkValue: string) => t
+      .replace(/\{date_line\}/g, dateValue ? `📅 ${dateValue}\n\n` : '')
+      .replace(/\{password_line\}/g, password ? `🗝️ Sandi: *${password}*\n\n` : '')
+      .replace(/\{live_link_block\}/g, liveLinkValue ? `📺 *Link Live*\n${liveLinkValue}\n\n` : '')
+      .replace(/\{title\}/g, itemTitle).replace(/\{link\}/g, linkValue)
+      .replace(/\{live_link\}/g, liveLinkValue).replace(/\{password\}/g, password)
+      .replace(/\{date\}/g, dateValue).replace(/\{order_id\}/g, order?.id || '').replace(/\{site\}/g, plainSite);
     let message: string;
     if (resolvedShowId && !resolvedReplayId) {
-      message = [
-        '🎬 *ReplayTime*',
-        '━━━━━━━━━━━━━━',
-        '',
-        `🎤 *${itemTitle}*`,
-        `📅 ${dateStr}`,
-        '',
-        '🔗 *Link Masuk Live*',
-        link,
-        '',
-        password ? `🔐 Sandi: *${password}*` : null,
-        password ? '' : null,
-        '🎞️ *Link Replay*',
-        plainSite,
-        '',
-        '━━━━━━━━━━━━━━',
-        '✨ Selamat menonton! 💖',
-      ].filter((l) => l !== null).join('\n');
+      // SHOW purchase: pakai template editable (wa_show_template).
+      message = fillTpl(showTpl, showDate || dateStr, link, link);
     } else if (isReplayOnlyPurchase) {
-      // REPLAY purchase via koin: kirim link token langsung (tanpa sandi).
       message = [
         '🎬 *RealTime48*',
         '━━━━━━━━━━━━━━',
@@ -175,13 +170,7 @@ Deno.serve(async (req) => {
         '✨ Selamat menonton! 💖',
       ].join('\n');
     } else {
-      message = tpl
-        .replace(/\{date_line\}/g, dateStr ? `📅 ${dateStr}\n\n` : '')
-        .replace(/\{password_line\}/g, password ? `🔐 Sandi: *${password}*\n\n` : '')
-        .replace(/\{live_link_block\}/g, liveLink ? `📺 *Link Live*\n${liveLink}\n\n` : '')
-        .replace(/\{title\}/g, itemTitle).replace(/\{link\}/g, link)
-        .replace(/\{live_link\}/g, liveLink).replace(/\{password\}/g, password)
-        .replace(/\{date\}/g, dateStr).replace(/\{order_id\}/g, order?.id || '').replace(/\{site\}/g, origin);
+      message = fillTpl(tpl, dateStr, link, '');
     }
 
     const sent = await sendFonnte(phone, message);
