@@ -159,6 +159,21 @@ Deno.serve(async (req) => {
         '━━━━━━━━━━━━━━',
         '✨ Selamat menonton! 💖',
       ].filter((l) => l !== null).join('\n');
+    } else if (isReplayOnlyPurchase) {
+      // REPLAY purchase via koin: kirim link token langsung (tanpa sandi).
+      message = [
+        '🎬 *RealTime48*',
+        '━━━━━━━━━━━━━━',
+        '',
+        `🎤 *${itemTitle}*`,
+        `📅 ${dateStr}`,
+        '',
+        '🎞️ *Link Replay*',
+        link,
+        '',
+        '━━━━━━━━━━━━━━',
+        '✨ Selamat menonton! 💖',
+      ].join('\n');
     } else {
       message = tpl
         .replace(/\{date_line\}/g, dateStr ? `📅 ${dateStr}\n\n` : '')
