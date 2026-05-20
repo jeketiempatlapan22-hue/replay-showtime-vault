@@ -11,6 +11,22 @@ import { Copy, CheckCircle2, XCircle, Loader2, ExternalLink, RefreshCw, AlertTri
 const DEFAULT_WA_TPL =
   '🎬 *{title}*\n{date_line}\n🔗 Link Akses:\n{link}\n{password_line}{live_link_block}\n— *ReplayTime* 💖';
 
+const DEFAULT_SHOW_TPL =
+  '🔐 *TOKEN LIVE SATUAN*\n\n🎤 *{title}*\n\n📅 {date}\n\n🔗 *Link Live:*\n{live_link}\n\n🎬 *Link Replay:* {site}\n\n{password_line}👤 Hanya untuk *1 perangkat pertama*.\n\n— *ReplayTime* 💖';
+
+function renderShowPreview(tpl: string) {
+  const vars = {
+    title: 'PASSION 200% - Ladies Night',
+    date: '2026-05-19 19:00',
+    live_link: 'https://replaytime.lovable.app/live?show=3e6c0444&t=b390f1055',
+    password: 'Ladies',
+    site: 'replaytime.lovable.app',
+  };
+  return tpl
+    .replace(/\{password_line\}\n?/g, vars.password ? `🗝️ Sandi: *${vars.password}*\n\n` : '')
+    .replace(/\{(\w+)\}/g, (_, k) => (vars as Record<string, string>)[k] ?? '');
+}
+
 function renderPreview(tpl: string) {
   const vars = {
     title: 'Show • Sample Konser',
