@@ -184,11 +184,13 @@ Deno.serve(async (req) => {
 
   // Build link + load template/origin
   const { data: settings } = await admin
-    .from('site_settings').select('key,value').in('key', ['site_origin', 'wa_message_template']);
+    .from('site_settings').select('key,value').in('key', ['site_origin', 'wa_message_template', 'wa_show_template']);
   const sm = new Map((settings ?? []).map((s) => [s.key, s.value]));
   const origin = (sm.get('site_origin') || 'https://replaytime.lovable.app').replace(/\/+$/, '');
   const tpl = sm.get('wa_message_template') ||
     '🎬 *ReplayTime*\n━━━━━━━━━━━━━━\n\n🎤 *{title}*\n{date_line}🔗 *Link Akses*\n{link}\n{password_line}{live_link_block}━━━━━━━━━━━━━━\n✨ Selamat menonton! 💖';
+  const showTpl = sm.get('wa_show_template') ||
+    '🔐 *TOKEN LIVE SATUAN*\n\n🎤 *{title}*\n\n📅 {date}\n\n🔗 *Link Live:*\n{live_link}\n\n🎬 *Link Replay:* {site}\n\n{password_line}👤 Hanya untuk *1 perangkat pertama*.\n\n— *ReplayTime* 💖';
   // SHOW purchase: link langsung ke /live (token diverifikasi unlock-live).
   // REPLAY purchase: tetap via /akses agar membuka replay player.
   const isReplayOnlyPurchase = !!order.replay_id && !order.show_id;
@@ -197,39 +199,56 @@ Deno.serve(async (req) => {
     : `${origin}/akses?token=${accessToken}${order.replay_id ? `&replay=${order.replay_id}` : ''}`;
 
   let password = '';
-  const liveLink = '';
+  let showDate = '';
   if (order.show_id && !order.replay_id) {
     const { data: showRow } = await admin
-      .from('active_shows').select('live_password').eq('id', order.show_id).maybeSingle();
+      .from('active_shows').select('live_password,show_date,show_time').eq('id', order.show_id).maybeSingle();
     password = String(showRow?.live_password || '').trim();
+    if (showRow?.show_date) {
+      const d = String(showRow.show_date);
+      const t = String(showRow.show_time || '').slice(0, 5);
+      showDate = t ? `${d} ${t}` : d;
+    }
   }
   // Pembelian replay via kartu replay: link token sudah cukup, sandi tidak dikirim.
   if (isReplayOnlyPurchase) password = '';
 
   const dateStr = new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
   const plainSite = (origin || 'https://replaytime.lovable.app').replace(/^https?:\/\//, '').replace(/\/+$/, '');
+  const fillTpl = (t: string, dateValue: string, linkValue: string, liveLinkValue: string) => t
+    .replace(/\{date_line\}/g, dateValue ? `📅 ${dateValue}\n\n` : '')
+    .replace(/\{password_line\}/g, password ? `🗝️ Sandi: *${password}*\n\n` : '')
+    .replace(/\{live_link_block\}/g, liveLinkValue ? `📺 *Link Live*\n${liveLinkValue}\n\n` : '')
+    .replace(/\{title\}/g, order.item_title || '')
+    .replace(/\{link\}/g, linkValue)
+    .replace(/\{live_link\}/g, liveLinkValue)
+    .replace(/\{password\}/g, password)
+    .replace(/\{date\}/g, dateValue)
+    .replace(/\{order_id\}/g, orderId)
+    .replace(/\{site\}/g, plainSite);
+
   let message: string;
   if (order.show_id && !order.replay_id) {
-    // SHOW purchase: kirim link token live + link replay plain (tanpa parameter), pertahankan sandi.
+    // SHOW purchase: pakai template editable dari admin (wa_show_template).
+    message = fillTpl(showTpl, showDate || dateStr, link, link);
+  } else if (isReplayOnlyPurchase) {
+    // REPLAY purchase: selalu kirim link token langsung.
     message = [
-      '🎬 *ReplayTime*',
+      '🎬 *RealTime48*',
       '━━━━━━━━━━━━━━',
       '',
       `🎤 *${order.item_title || ''}*`,
       `📅 ${dateStr}`,
       '',
-      '🔗 *Link Masuk Live*',
-      link,
-      '',
-      password ? `🔐 Sandi: *${password}*` : null,
-      password ? '' : null,
       '🎞️ *Link Replay*',
-      plainSite,
+      link,
       '',
       '━━━━━━━━━━━━━━',
       '✨ Selamat menonton! 💖',
-    ].filter((l) => l !== null).join('\n');
-  } else if (isReplayOnlyPurchase) {
+    ].join('\n');
+  } else {
+    message = fillTpl(tpl, dateStr, link, '');
+  }
     // REPLAY purchase: selalu kirim link token langsung agar user bisa menonton tanpa input sandi.
     message = [
       '🎬 *RealTime48*',
