@@ -11,6 +11,22 @@ import { Copy, CheckCircle2, XCircle, Loader2, ExternalLink, RefreshCw, AlertTri
 const DEFAULT_WA_TPL =
   '🎬 *{title}*\n{date_line}\n🔗 Link Akses:\n{link}\n{password_line}{live_link_block}\n— *ReplayTime* 💖';
 
+const DEFAULT_SHOW_TPL =
+  '🔐 *TOKEN LIVE SATUAN*\n\n🎤 *{title}*\n\n📅 {date}\n\n🔗 *Link Live:*\n{live_link}\n\n🎬 *Link Replay:* {site}\n\n{password_line}👤 Hanya untuk *1 perangkat pertama*.\n\n— *ReplayTime* 💖';
+
+function renderShowPreview(tpl: string) {
+  const vars = {
+    title: 'PASSION 200% - Ladies Night',
+    date: '2026-05-19 19:00',
+    live_link: 'https://replaytime.lovable.app/live?show=3e6c0444&t=b390f1055',
+    password: 'Ladies',
+    site: 'replaytime.lovable.app',
+  };
+  return tpl
+    .replace(/\{password_line\}\n?/g, vars.password ? `🗝️ Sandi: *${vars.password}*\n\n` : '')
+    .replace(/\{(\w+)\}/g, (_, k) => (vars as Record<string, string>)[k] ?? '');
+}
+
 function renderPreview(tpl: string) {
   const vars = {
     title: 'Show • Sample Konser',
@@ -43,17 +59,22 @@ export default function PakasirAdmin() {
   const [tpl, setTpl] = useState<string>(DEFAULT_WA_TPL);
   const [tplLoaded, setTplLoaded] = useState<string>(DEFAULT_WA_TPL);
   const [savingTpl, setSavingTpl] = useState(false);
+  const [showTpl, setShowTpl] = useState<string>(DEFAULT_SHOW_TPL);
+  const [showTplLoaded, setShowTplLoaded] = useState<string>(DEFAULT_SHOW_TPL);
+  const [savingShowTpl, setSavingShowTpl] = useState(false);
 
   const loadStatus = async () => {
     try {
       const { data: s } = await supabase
         .from('site_settings')
         .select('key,value')
-        .in('key', ['pakasir_webhook_verified_at', 'wa_message_template']);
+        .in('key', ['pakasir_webhook_verified_at', 'wa_message_template', 'wa_show_template']);
       const verified = s?.find(r => r.key === 'pakasir_webhook_verified_at')?.value || '';
       setVerifiedAt(verified);
       const t = s?.find(r => r.key === 'wa_message_template')?.value;
       if (t) { setTpl(t); setTplLoaded(t); }
+      const st = s?.find(r => r.key === 'wa_show_template')?.value;
+      if (st) { setShowTpl(st); setShowTplLoaded(st); }
 
       const since = new Date(Date.now() - 24 * 3600_000).toISOString();
       const [pending, paid24h, sent24h, lastPaid] = await Promise.all([
@@ -131,6 +152,26 @@ export default function PakasirAdmin() {
       setSavingTpl(false);
     }
   };
+
+  const saveShowTpl = async () => {
+    setSavingShowTpl(true);
+    try {
+      const { data: existing } = await supabase
+        .from('site_settings').select('id').eq('key', 'wa_show_template').maybeSingle();
+      if (existing?.id) {
+        await supabase.from('site_settings').update({ value: showTpl }).eq('id', existing.id);
+      } else {
+        await supabase.from('site_settings').insert({ key: 'wa_show_template', value: showTpl });
+      }
+      setShowTplLoaded(showTpl);
+      toast.success('Template Live Show tersimpan');
+    } catch (e: any) {
+      toast.error('Gagal menyimpan: ' + (e?.message || e));
+    } finally {
+      setSavingShowTpl(false);
+    }
+  };
+
 
   return (
     <div className="space-y-4">
@@ -293,6 +334,62 @@ export default function PakasirAdmin() {
               <RotateCcw className="w-4 h-4 mr-2" /> Reset Default
             </Button>
             <Button variant="ghost" onClick={() => setTpl(tplLoaded)} disabled={tpl === tplLoaded}>
+              Batalkan Perubahan
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base sm:text-lg">Template Pesan WhatsApp — Live Show</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-xs text-muted-foreground">
+            Template ini dipakai saat <b>token Live Show</b> dikirim (lewat QRIS Pakasir maupun pembelian koin).
+            Placeholder yang tersedia:
+          </p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 text-[11px]">
+            {[
+              ['{title}', 'Nama show'],
+              ['{date}', 'Tanggal & jam show'],
+              ['{live_link}', 'Link token Live'],
+              ['{password}', 'Sandi live show'],
+              ['{password_line}', 'Baris sandi (🗝️)'],
+              ['{site}', 'replaytime.lovable.app'],
+            ].map(([k, d]) => (
+              <code key={k} className="bg-muted/40 rounded px-1.5 py-1 text-foreground" title={d}>
+                {k} <span className="text-muted-foreground">— {d}</span>
+              </code>
+            ))}
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs">Template</Label>
+            <Textarea
+              value={showTpl}
+              onChange={(e) => setShowTpl(e.target.value)}
+              rows={12}
+              className="font-mono text-xs whitespace-pre"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs">Pratinjau</Label>
+            <pre className="rounded-md border border-border bg-muted/30 p-3 text-xs whitespace-pre-wrap font-sans">
+              {renderShowPreview(showTpl)}
+            </pre>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <Button onClick={saveShowTpl} disabled={savingShowTpl || showTpl === showTplLoaded}>
+              {savingShowTpl ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+              Simpan Template
+            </Button>
+            <Button variant="outline" onClick={() => setShowTpl(DEFAULT_SHOW_TPL)}>
+              <RotateCcw className="w-4 h-4 mr-2" /> Reset Default
+            </Button>
+            <Button variant="ghost" onClick={() => setShowTpl(showTplLoaded)} disabled={showTpl === showTplLoaded}>
               Batalkan Perubahan
             </Button>
           </div>
