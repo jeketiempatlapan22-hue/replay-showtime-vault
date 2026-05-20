@@ -248,6 +248,8 @@ Deno.serve(async (req) => {
     ].join('\n');
   } else {
     message = fillTpl(tpl, dateStr, link, '');
+  }
+
 
   // Atomic claim: only the first caller flips token_sent_at NULL -> now().
   const claimedAt = new Date().toISOString();
