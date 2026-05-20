@@ -59,6 +59,9 @@ export default function PakasirAdmin() {
   const [tpl, setTpl] = useState<string>(DEFAULT_WA_TPL);
   const [tplLoaded, setTplLoaded] = useState<string>(DEFAULT_WA_TPL);
   const [savingTpl, setSavingTpl] = useState(false);
+  const [showTpl, setShowTpl] = useState<string>(DEFAULT_SHOW_TPL);
+  const [showTplLoaded, setShowTplLoaded] = useState<string>(DEFAULT_SHOW_TPL);
+  const [savingShowTpl, setSavingShowTpl] = useState(false);
 
   const loadStatus = async () => {
     try {
