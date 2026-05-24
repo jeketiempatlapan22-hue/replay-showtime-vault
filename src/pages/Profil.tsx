@@ -94,6 +94,36 @@ export default function Profil() {
     })();
   }, [user, loading, navigate]);
 
+  // Load memberships + realtime
+  useEffect(() => {
+    if (!user) return;
+    const load = async () => {
+      setMemLoading(true);
+      const { data, error } = await supabase.rpc('get_my_memberships' as any);
+      if (!error && Array.isArray(data)) setMemberships(data as any);
+      setMemLoading(false);
+    };
+    void load();
+    const ch = supabase
+      .channel(`mb-orders-${user.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'membership_orders', filter: `user_id=eq.${user.id}` }, () => void load())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'membership_packages' }, () => void load())
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [user]);
+
+  const copyText = async (text: string, label = 'Disalin') => {
+    try { await navigator.clipboard.writeText(text); toast.success(label); }
+    catch { toast.error('Gagal menyalin'); }
+  };
+
+  const openMembership = (m: MyMembership) => {
+    if (!m.token || !m.password) return;
+    saveMembershipCredentials(m.token, m.password);
+    navigate(`/live?mtoken=${encodeURIComponent(m.token)}&mp=${encodeURIComponent(m.password)}`);
+  };
+
+
   const validUsername = (v: string) => /^[a-zA-Z0-9_.]{3,20}$/.test(v);
 
   const handleSave = async () => {
