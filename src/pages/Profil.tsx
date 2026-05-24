@@ -47,6 +47,8 @@ export default function Profil() {
   const [showPwd, setShowPwd] = useState(false);
   const [pwdBusy, setPwdBusy] = useState(false);
   const [adminPhone, setAdminPhone] = useState<string>('');
+  const [memberships, setMemberships] = useState<MyMembership[]>([]);
+  const [memLoading, setMemLoading] = useState(true);
 
   useEffect(() => {
     supabase.from('bot_admins').select('phone').eq('enabled', true).limit(1).maybeSingle()
