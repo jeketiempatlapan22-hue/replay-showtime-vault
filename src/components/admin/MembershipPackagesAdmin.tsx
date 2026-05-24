@@ -265,6 +265,16 @@ export default function MembershipPackagesAdmin() {
           )}
         </CardContent>
       </Card>
+
+      {ordersFor && (
+        <MembershipOrdersDialog
+          open={!!ordersFor}
+          onOpenChange={(v) => { if (!v) setOrdersFor(null); }}
+          packageId={ordersFor.id}
+          packageName={ordersFor.name}
+        />
+      )}
     </div>
   );
 }
+
