@@ -773,6 +773,8 @@ export type Database = {
           max_devices: number
           name: string
           pakasir_amount: number
+          pause_message: string
+          paused: boolean
           price_coins: number
           price_idr: number
           quota_reserved: number
@@ -791,6 +793,8 @@ export type Database = {
           max_devices?: number
           name: string
           pakasir_amount?: number
+          pause_message?: string
+          paused?: boolean
           price_coins?: number
           price_idr?: number
           quota_reserved?: number
@@ -809,6 +813,8 @@ export type Database = {
           max_devices?: number
           name?: string
           pakasir_amount?: number
+          pause_message?: string
+          paused?: boolean
           price_coins?: number
           price_idr?: number
           quota_reserved?: number
@@ -864,6 +870,7 @@ export type Database = {
           manual_resets_max: number
           manual_resets_used: number
           max_devices: number
+          package_id: string | null
           password: string
           phone: string
           revoked: boolean
@@ -882,6 +889,7 @@ export type Database = {
           manual_resets_max?: number
           manual_resets_used?: number
           max_devices?: number
+          package_id?: string | null
           password?: string
           phone?: string
           revoked?: boolean
@@ -900,6 +908,7 @@ export type Database = {
           manual_resets_max?: number
           manual_resets_used?: number
           max_devices?: number
+          package_id?: string | null
           password?: string
           phone?: string
           revoked?: boolean
