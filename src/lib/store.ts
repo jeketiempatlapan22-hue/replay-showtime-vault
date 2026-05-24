@@ -18,15 +18,11 @@ export async function getReplays(): Promise<ReplayRow[]> {
   return (data || []) as unknown as ReplayRow[];
 }
 
-// Admin-only: returns all columns including secrets. RLS does not block public
-// SELECT, so this is purely a convenience for admin UI — never call from
-// public/user-facing components.
+// Admin-only: returns all columns including secrets via SECURITY DEFINER RPC.
+// Sensitive columns are revoked from anon/authenticated, so a direct table
+// SELECT would not return them. The RPC enforces admin role server-side.
 export async function getReplaysAdmin(): Promise<ReplayRow[]> {
-  const { data, error } = await supabase
-    .from('replays')
-    .select('*')
-    .order('date', { ascending: false })
-    .order('show_time', { ascending: false });
+  const { data, error } = await (supabase as any).rpc('admin_get_replays');
   if (error) throw error;
   return (data || []) as unknown as ReplayRow[];
 }
