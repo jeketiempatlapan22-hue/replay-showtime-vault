@@ -111,9 +111,12 @@ export default function Membership() {
   }, [user]);
 
   const openPicker = (p: Pkg) => {
-    if (!user) { navigate('/auth?next=/membership'); return; }
-    setPicked(p); setPayMode('qris'); setPickOpen(true);
+    // Guest BOLEH beli via QRIS; koin tetap perlu login. Default ke QRIS jika belum login.
+    setPicked(p);
+    setPayMode(user ? 'qris' : 'qris');
+    setPickOpen(true);
   };
+
 
   const submit = async () => {
     if (!picked) return;
@@ -126,10 +129,16 @@ export default function Membership() {
     setSubmitting(true);
     try {
       if (payMode === 'coins') {
+        if (!user) {
+          toast.error('Login dulu untuk membayar dengan koin.');
+          navigate('/auth?next=/membership');
+          setSubmitting(false); return;
+        }
         if (balance < picked.price_coins) {
           toast.error(`Koin kurang. Butuh ${picked.price_coins}, saldo ${balance}.`);
           setSubmitting(false); return;
         }
+
         const { data, error } = await supabase.functions.invoke('purchase-membership-with-coins', {
           body: { package_id: picked.id, email: e, phone: ph },
         });
@@ -329,7 +338,7 @@ export default function Membership() {
               {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : payMode === 'coins' ? 'Tukar Koin' : 'Bayar dengan QRIS'}
             </Button>
             <p className="text-[10px] text-muted-foreground text-center">
-              Slot ditahan 15 menit. Jika tidak dibayar, slot otomatis dilepas.
+              Slot ditahan 5 menit. Jika tidak dibayar, slot otomatis dilepas.
             </p>
           </div>
         </DialogContent>

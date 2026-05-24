@@ -1,4 +1,4 @@
-// Reserve sebuah slot membership lalu buat QRIS pakasir. Wajib login.
+// Reserve sebuah slot membership lalu buat QRIS pakasir. Guest OK untuk QRIS (login opsional).
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
@@ -21,16 +21,20 @@ const genOrderId = () => 'mb' + Date.now().toString(36) + Math.random().toString
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   try {
-    const auth = req.headers.get('Authorization') || '';
-    const jwt = auth.replace(/^Bearer\s+/i, '');
-    if (!jwt) return new Response(JSON.stringify({ error: 'unauthorized' }), { status: 401, headers: corsHeaders });
-
     const url = Deno.env.get('SUPABASE_URL')!;
     const anon = Deno.env.get('SUPABASE_ANON_KEY')!;
-    const userClient = createClient(url, anon, { global: { headers: { Authorization: `Bearer ${jwt}` } } });
-    const { data: ud } = await userClient.auth.getUser();
-    const user = ud?.user;
-    if (!user) return new Response(JSON.stringify({ error: 'unauthorized' }), { status: 401, headers: corsHeaders });
+
+    // Login OPSIONAL untuk QRIS. Jika ada JWT, kita ambil user_id; jika tidak, guest.
+    let userId: string | null = null;
+    const auth = req.headers.get('Authorization') || '';
+    const jwt = auth.replace(/^Bearer\s+/i, '');
+    if (jwt) {
+      try {
+        const userClient = createClient(url, anon, { global: { headers: { Authorization: `Bearer ${jwt}` } } });
+        const { data: ud } = await userClient.auth.getUser();
+        userId = ud?.user?.id || null;
+      } catch { /* ignore — treat as guest */ }
+    }
 
     const body = await req.json().catch(() => ({}));
     const package_id = String(body.package_id || '');
@@ -40,15 +44,17 @@ Deno.serve(async (req) => {
     if (!validEmail(email)) return new Response(JSON.stringify({ error: 'invalid_email' }), { status: 400, headers: corsHeaders });
     if (!validPhone(phone)) return new Response(JSON.stringify({ error: 'invalid_phone' }), { status: 400, headers: corsHeaders });
 
+
     const admin = createClient(url, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
     const slug = Deno.env.get('PAKASIR_PROJECT_SLUG');
     const apiKey = Deno.env.get('PAKASIR_API_KEY') || '';
     if (!slug) return new Response(JSON.stringify({ error: 'pakasir_not_configured' }), { status: 500, headers: corsHeaders });
 
-    // Reserve slot atomically
+    // Reserve slot atomically — guest OK for QRIS (user_id may be null)
     const { data: rsv, error: rerr } = await admin.rpc('reserve_membership_slot', {
-      _package_id: package_id, _user_id: user.id, _email: email, _phone: phone, _kind: 'qris',
+      _package_id: package_id, _user_id: userId, _email: email, _phone: phone, _kind: 'qris',
     });
+
     if (rerr) {
       const msg = rerr.message || '';
       const known = ['sold_out','package_closed','package_not_found','invalid_kind','invalid_email','invalid_phone','invalid_price'];

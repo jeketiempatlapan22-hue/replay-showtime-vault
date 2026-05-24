@@ -27,7 +27,10 @@ interface Pkg {
   includes_replays: boolean;
   status: 'open' | 'closed';
   sort_order: number;
+  paused: boolean;
+  pause_message: string;
 }
+
 
 const emptyForm = {
   id: '' as string | undefined,
@@ -122,6 +125,24 @@ export default function MembershipPackagesAdmin() {
     await supabase.from('membership_packages').update({ status: next }).eq('id', p.id);
     toast.success(`Paket ${next === 'open' ? 'dibuka' : 'ditutup'}`);
   };
+  const togglePause = async (p: Pkg) => {
+    const next = !p.paused;
+    let message = p.pause_message || '';
+    if (next) {
+      const input = prompt('Pesan jeda yang ditampilkan ke user membership paket ini:', message || 'Akses sedang dijeda. Mohon menunggu.');
+      if (input === null) return;
+      message = input;
+    }
+    await supabase.from('membership_packages').update({ paused: next, pause_message: message }).eq('id', p.id);
+    toast.success(next ? 'Akses paket dijeda' : 'Akses paket dilanjutkan');
+  };
+  const editPauseMessage = async (p: Pkg) => {
+    const input = prompt('Edit pesan jeda untuk paket ini:', p.pause_message || '');
+    if (input === null) return;
+    await supabase.from('membership_packages').update({ pause_message: input }).eq('id', p.id);
+    toast.success('Pesan jeda diperbarui');
+  };
+
   const remove = async (id: string) => {
     if (!confirm('Hapus paket ini? Order yang sudah terbuat tetap tersimpan.')) return;
     const { error } = await supabase.from('membership_packages').delete().eq('id', id);
@@ -233,11 +254,17 @@ export default function MembershipPackagesAdmin() {
                             <Badge variant="secondary">DITUTUP</Badge>
                           )}
                           {remaining <= 0 && p.status === 'open' && <Badge variant="destructive">SOLD OUT</Badge>}
+                          {p.paused && <Badge className="bg-orange-500/15 text-orange-600 border-orange-500/30">JEDA</Badge>}
                         </div>
                         <div className="text-xs text-muted-foreground">
                           {p.duration_days} hari · Rp {p.price_idr.toLocaleString('id-ID')} · {p.price_coins} koin · {p.max_devices} perangkat
                           {p.includes_replays ? ' · termasuk replay' : ''}
                         </div>
+                        {p.paused && p.pause_message && (
+                          <div className="text-[11px] text-orange-600 dark:text-orange-400 mt-1 whitespace-pre-line border-l-2 border-orange-500/40 pl-2">
+                            “{p.pause_message}”
+                          </div>
+                        )}
                       </div>
                       <div className="flex gap-1 flex-wrap">
                         <Button size="sm" variant="outline" onClick={() => edit(p)}><Edit2 className="w-3.5 h-3.5 mr-1" />Edit</Button>
@@ -245,8 +272,15 @@ export default function MembershipPackagesAdmin() {
                         <Button size="sm" variant={p.status === 'open' ? 'secondary' : 'default'} onClick={() => toggleStatus(p)}>
                           {p.status === 'open' ? 'Tutup' : 'Buka'}
                         </Button>
+                        <Button size="sm" variant={p.paused ? 'default' : 'secondary'} onClick={() => togglePause(p)}>
+                          {p.paused ? 'Lanjutkan' : 'Jeda'}
+                        </Button>
+                        {p.paused && (
+                          <Button size="sm" variant="ghost" onClick={() => editPauseMessage(p)}>Edit Pesan</Button>
+                        )}
                         <Button size="sm" variant="ghost" onClick={() => remove(p.id)}><Trash2 className="w-3.5 h-3.5 text-destructive" /></Button>
                       </div>
+
 
                     </div>
                     <div className="space-y-1">
