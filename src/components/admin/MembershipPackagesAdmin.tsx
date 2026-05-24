@@ -254,11 +254,17 @@ export default function MembershipPackagesAdmin() {
                             <Badge variant="secondary">DITUTUP</Badge>
                           )}
                           {remaining <= 0 && p.status === 'open' && <Badge variant="destructive">SOLD OUT</Badge>}
+                          {p.paused && <Badge className="bg-orange-500/15 text-orange-600 border-orange-500/30">JEDA</Badge>}
                         </div>
                         <div className="text-xs text-muted-foreground">
                           {p.duration_days} hari · Rp {p.price_idr.toLocaleString('id-ID')} · {p.price_coins} koin · {p.max_devices} perangkat
                           {p.includes_replays ? ' · termasuk replay' : ''}
                         </div>
+                        {p.paused && p.pause_message && (
+                          <div className="text-[11px] text-orange-600 dark:text-orange-400 mt-1 whitespace-pre-line border-l-2 border-orange-500/40 pl-2">
+                            “{p.pause_message}”
+                          </div>
+                        )}
                       </div>
                       <div className="flex gap-1 flex-wrap">
                         <Button size="sm" variant="outline" onClick={() => edit(p)}><Edit2 className="w-3.5 h-3.5 mr-1" />Edit</Button>
@@ -266,8 +272,15 @@ export default function MembershipPackagesAdmin() {
                         <Button size="sm" variant={p.status === 'open' ? 'secondary' : 'default'} onClick={() => toggleStatus(p)}>
                           {p.status === 'open' ? 'Tutup' : 'Buka'}
                         </Button>
+                        <Button size="sm" variant={p.paused ? 'default' : 'secondary'} onClick={() => togglePause(p)}>
+                          {p.paused ? 'Lanjutkan' : 'Jeda'}
+                        </Button>
+                        {p.paused && (
+                          <Button size="sm" variant="ghost" onClick={() => editPauseMessage(p)}>Edit Pesan</Button>
+                        )}
                         <Button size="sm" variant="ghost" onClick={() => remove(p.id)}><Trash2 className="w-3.5 h-3.5 text-destructive" /></Button>
                       </div>
+
 
                     </div>
                     <div className="space-y-1">
