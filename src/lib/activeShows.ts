@@ -43,7 +43,9 @@ export async function getActiveShows(adminMode = false): Promise<ActiveShow[]> {
     if (error) { console.error(error); return []; }
     return (data || []) as unknown as ActiveShow[];
   }
-  const { data, error } = await supabase.from('active_shows').select('*')
+  const { data, error } = await supabase.from('active_shows').select(
+    'id,title,show_date,show_time,lineup,category,description,image_url,sort_order,is_active,created_at,updated_at,price_show,price_replay,pakasir_amount,replay_id,replay_enabled,is_live,live_auto_schedule,live_type,live_require_password,replay_mode,admin_alias,price_show_coins,price_replay_coins,idn_show_id'
+  )
     .eq('is_active', true)
     .order('show_date', { ascending: true })
     .order('show_time', { ascending: true })
