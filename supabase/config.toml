@@ -29,3 +29,10 @@ verify_jwt = false
 
 [functions.pakasir-webhook-selftest]
 verify_jwt = false
+
+[functions.create-membership-order]
+verify_jwt = false
+
+[functions.purchase-membership-with-coins]
+verify_jwt = false
+
