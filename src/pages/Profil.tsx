@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, User, Mail, Phone, Save, LogOut, Coins, AtSign, KeyRound, MessageCircle, Eye, EyeOff } from 'lucide-react';
+import { ArrowLeft, User, Mail, Phone, Save, LogOut, Coins, AtSign, KeyRound, MessageCircle, Eye, EyeOff, Crown, Copy, ExternalLink, Clock, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -9,6 +9,29 @@ import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
+import { saveMembershipCredentials } from '@/lib/membershipAccess';
+
+interface MyMembership {
+  order_id: string;
+  package_id: string;
+  package_name: string;
+  status: string;
+  kind: string;
+  amount: number;
+  coin_amount: number;
+  created_at: string;
+  reserved_until: string | null;
+  paid_at: string | null;
+  token: string | null;
+  password: string | null;
+  expires_at: string | null;
+  duration_days: number | null;
+  max_devices: number | null;
+  days_remaining: number | null;
+  revoked: boolean;
+  package_paused: boolean;
+  pause_message: string | null;
+}
 
 export default function Profil() {
   const navigate = useNavigate();
