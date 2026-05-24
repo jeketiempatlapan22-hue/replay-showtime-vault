@@ -36,9 +36,15 @@ export interface ActiveShow {
 }
 
 export async function getActiveShows(adminMode = false): Promise<ActiveShow[]> {
-  let query = supabase.from('active_shows').select('*');
-  if (!adminMode) query = query.eq('is_active', true);
-  const { data, error } = await query
+  if (adminMode) {
+    // Admin path: SECURITY DEFINER RPC returns all columns (including sensitive
+    // live_url/live_password/live_sources) after server-side admin check.
+    const { data, error } = await (supabase as any).rpc('admin_get_active_shows');
+    if (error) { console.error(error); return []; }
+    return (data || []) as unknown as ActiveShow[];
+  }
+  const { data, error } = await supabase.from('active_shows').select('*')
+    .eq('is_active', true)
     .order('show_date', { ascending: true })
     .order('show_time', { ascending: true })
     .order('sort_order', { ascending: true });
