@@ -215,9 +215,11 @@ export default function Live() {
       case 'password_or_token_required': return 'Masukkan sandi atau gunakan link token.';
       case 'multi_device_no_reset': return 'Membership multi-device/publik tidak dapat direset manual.';
       case 'quota_exhausted': return 'Kuota reset manual sudah habis.';
+      case 'membership_paused': return 'Akses membership sedang dijeda oleh admin.';
       default: return 'Gagal membuka akses live. Coba muat ulang halaman atau hubungi admin.';
     }
   };
+
 
   const doUnlock = async (opts: { token?: string; password?: string; mtoken?: string; mpassword?: string }, silent = false) => {
     if (!silent) { setSubmitting(true); setPwError(''); }
