@@ -14,6 +14,26 @@ const DEFAULT_WA_TPL =
 const DEFAULT_SHOW_TPL =
   '🔐 *TOKEN LIVE SATUAN*\n\n🎤 *{title}*\n\n📅 {date}\n\n🔗 *Link Live:*\n{live_link}\n\n🎬 *Link Replay:* {site}\n\n{password_line}👤 Hanya untuk *1 perangkat pertama*.\n\n— *ReplayTime* 💖';
 
+const DEFAULT_MEMBERSHIP_TPL =
+  '👑 *MEMBERSHIP AKTIF*\n\n📦 *{package_name}*\n📅 Berlaku hingga: {expires_at}\n\n🔗 *Link Akses:*\n{link}\n\n🗝️ Sandi: *{password}*\n\n{replay_info_block}👤 Berlaku untuk *{max_devices} perangkat*.\n\n— *ReplayTime* 💖';
+
+function renderMembershipPreview(tpl: string) {
+  const vars = {
+    package_name: 'Premium 30 Hari',
+    link: 'https://replaytime.lovable.app/live?mtoken=ABC123&mp=PASS9999',
+    password: 'PASS9999',
+    expires_at: '24 Juni 2026',
+    duration_days: '30',
+    max_devices: '1',
+    replay_info: 'Daftar replay yang termasuk:\n• Show A (12/05)\n• Show B (18/05)',
+    site: 'replaytime.lovable.app',
+  };
+  return tpl
+    .replace(/\{replay_info_block\}\n?/g, vars.replay_info ? `🎬 *Info Replay:*\n${vars.replay_info}\n\n` : '')
+    .replace(/\{(\w+)\}/g, (_, k) => (vars as Record<string, string>)[k] ?? '');
+}
+
+
 function renderShowPreview(tpl: string) {
   const vars = {
     title: 'PASSION 200% - Ladies Night',
