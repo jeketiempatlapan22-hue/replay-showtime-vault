@@ -443,6 +443,66 @@ export default function PakasirAdmin() {
           </div>
         </CardContent>
       </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base sm:text-lg">Template Pesan WhatsApp — Membership</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-xs text-muted-foreground">
+            Template ini dipakai saat user berhasil membeli paket membership (QRIS atau koin).
+            Placeholder yang tersedia:
+          </p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 text-[11px]">
+            {[
+              ['{package_name}', 'Nama paket membership'],
+              ['{link}', 'Link akses /live?mtoken=...'],
+              ['{password}', 'Sandi membership'],
+              ['{expires_at}', 'Tanggal berakhir'],
+              ['{duration_days}', 'Durasi (hari)'],
+              ['{max_devices}', 'Jumlah perangkat'],
+              ['{replay_info}', 'Info replay (teks mentah)'],
+              ['{replay_info_block}', 'Blok info replay (🎬)'],
+              ['{site}', 'replaytime.lovable.app'],
+            ].map(([k, d]) => (
+              <code key={k} className="bg-muted/40 rounded px-1.5 py-1 text-foreground" title={d}>
+                {k} <span className="text-muted-foreground">— {d}</span>
+              </code>
+            ))}
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs">Template</Label>
+            <Textarea
+              value={memTpl}
+              onChange={(e) => setMemTpl(e.target.value)}
+              rows={12}
+              className="font-mono text-xs whitespace-pre"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs">Pratinjau</Label>
+            <pre className="rounded-md border border-border bg-muted/30 p-3 text-xs whitespace-pre-wrap font-sans">
+              {renderMembershipPreview(memTpl)}
+            </pre>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <Button onClick={saveMemTpl} disabled={savingMemTpl || memTpl === memTplLoaded}>
+              {savingMemTpl ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+              Simpan Template
+            </Button>
+            <Button variant="outline" onClick={() => setMemTpl(DEFAULT_MEMBERSHIP_TPL)}>
+              <RotateCcw className="w-4 h-4 mr-2" /> Reset Default
+            </Button>
+            <Button variant="ghost" onClick={() => setMemTpl(memTplLoaded)} disabled={memTpl === memTplLoaded}>
+              Batalkan Perubahan
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
+
