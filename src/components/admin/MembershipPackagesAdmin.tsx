@@ -50,6 +50,8 @@ export default function MembershipPackagesAdmin() {
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState({ ...emptyForm });
   const [saving, setSaving] = useState(false);
+  const [ordersFor, setOrdersFor] = useState<Pkg | null>(null);
+
 
   const load = async () => {
     setLoading(true);
