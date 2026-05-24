@@ -1296,6 +1296,121 @@ export type Database = {
     }
     Functions: {
       admin_clear_live_messages: { Args: never; Returns: number }
+      admin_get_active_show: {
+        Args: { _id: string }
+        Returns: {
+          admin_alias: string | null
+          category: string
+          created_at: string
+          description: string
+          id: string
+          idn_show_id: string
+          image_url: string
+          is_active: boolean
+          is_live: boolean
+          lineup: string[]
+          live_auto_schedule: boolean
+          live_password: string
+          live_require_password: boolean
+          live_sources: Json
+          live_type: string
+          live_url: string
+          pakasir_amount: number
+          price_replay: number
+          price_replay_coins: number
+          price_show: number
+          price_show_coins: number
+          replay_enabled: boolean
+          replay_id: string | null
+          replay_m3u8_url: string
+          replay_mode: boolean
+          replay_youtube_url: string
+          show_date: string
+          show_time: string
+          sort_order: number
+          title: string
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "active_shows"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      admin_get_active_shows: {
+        Args: never
+        Returns: {
+          admin_alias: string | null
+          category: string
+          created_at: string
+          description: string
+          id: string
+          idn_show_id: string
+          image_url: string
+          is_active: boolean
+          is_live: boolean
+          lineup: string[]
+          live_auto_schedule: boolean
+          live_password: string
+          live_require_password: boolean
+          live_sources: Json
+          live_type: string
+          live_url: string
+          pakasir_amount: number
+          price_replay: number
+          price_replay_coins: number
+          price_show: number
+          price_show_coins: number
+          replay_enabled: boolean
+          replay_id: string | null
+          replay_m3u8_url: string
+          replay_mode: boolean
+          replay_youtube_url: string
+          show_date: string
+          show_time: string
+          sort_order: number
+          title: string
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "active_shows"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      admin_get_replays: {
+        Args: never
+        Returns: {
+          access_token: string | null
+          admin_alias: string
+          created_at: string
+          criteria: string
+          date: string
+          featured_member: string
+          id: string
+          image_url: string
+          lineup: string[]
+          m3u8_url: string
+          password: string
+          price_coins: number
+          show_name: string
+          show_time: string | null
+          source_type: string
+          sources: Json
+          title: string
+          updated_at: string
+          view_count: number
+          youtube_id: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "replays"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       check_login_lock: {
         Args: { _identifier: string }
         Returns: {
