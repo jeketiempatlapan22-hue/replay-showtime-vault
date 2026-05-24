@@ -129,10 +129,16 @@ export default function Membership() {
     setSubmitting(true);
     try {
       if (payMode === 'coins') {
+        if (!user) {
+          toast.error('Login dulu untuk membayar dengan koin.');
+          navigate('/auth?next=/membership');
+          setSubmitting(false); return;
+        }
         if (balance < picked.price_coins) {
           toast.error(`Koin kurang. Butuh ${picked.price_coins}, saldo ${balance}.`);
           setSubmitting(false); return;
         }
+
         const { data, error } = await supabase.functions.invoke('purchase-membership-with-coins', {
           body: { package_id: picked.id, email: e, phone: ph },
         });
