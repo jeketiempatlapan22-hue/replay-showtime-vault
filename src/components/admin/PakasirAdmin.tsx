@@ -199,6 +199,27 @@ export default function PakasirAdmin() {
     }
   };
 
+  const saveMemTpl = async () => {
+    setSavingMemTpl(true);
+    try {
+      const { data: existing } = await supabase
+        .from('site_settings').select('id').eq('key', 'wa_membership_template').maybeSingle();
+      if (existing?.id) {
+        await supabase.from('site_settings').update({ value: memTpl }).eq('id', existing.id);
+      } else {
+        await supabase.from('site_settings').insert({ key: 'wa_membership_template', value: memTpl });
+      }
+      setMemTplLoaded(memTpl);
+      toast.success('Template Membership tersimpan');
+    } catch (e: any) {
+      toast.error('Gagal menyimpan: ' + (e?.message || e));
+    } finally {
+      setSavingMemTpl(false);
+    }
+  };
+
+
+
 
   return (
     <div className="space-y-4">
