@@ -338,7 +338,7 @@ export default function Membership() {
               {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : payMode === 'coins' ? 'Tukar Koin' : 'Bayar dengan QRIS'}
             </Button>
             <p className="text-[10px] text-muted-foreground text-center">
-              Slot ditahan 15 menit. Jika tidak dibayar, slot otomatis dilepas.
+              Slot ditahan 5 menit. Jika tidak dibayar, slot otomatis dilepas.
             </p>
           </div>
         </DialogContent>
