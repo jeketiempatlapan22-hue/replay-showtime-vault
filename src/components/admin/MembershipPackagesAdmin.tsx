@@ -241,11 +241,13 @@ export default function MembershipPackagesAdmin() {
                       </div>
                       <div className="flex gap-1 flex-wrap">
                         <Button size="sm" variant="outline" onClick={() => edit(p)}><Edit2 className="w-3.5 h-3.5 mr-1" />Edit</Button>
+                        <Button size="sm" variant="outline" onClick={() => setOrdersFor(p)}><ListOrdered className="w-3.5 h-3.5 mr-1" />Pesanan</Button>
                         <Button size="sm" variant={p.status === 'open' ? 'secondary' : 'default'} onClick={() => toggleStatus(p)}>
                           {p.status === 'open' ? 'Tutup' : 'Buka'}
                         </Button>
                         <Button size="sm" variant="ghost" onClick={() => remove(p.id)}><Trash2 className="w-3.5 h-3.5 text-destructive" /></Button>
                       </div>
+
                     </div>
                     <div className="space-y-1">
                       <div className="flex items-center justify-between text-[11px] text-muted-foreground">
