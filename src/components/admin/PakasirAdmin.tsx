@@ -14,6 +14,26 @@ const DEFAULT_WA_TPL =
 const DEFAULT_SHOW_TPL =
   '🔐 *TOKEN LIVE SATUAN*\n\n🎤 *{title}*\n\n📅 {date}\n\n🔗 *Link Live:*\n{live_link}\n\n🎬 *Link Replay:* {site}\n\n{password_line}👤 Hanya untuk *1 perangkat pertama*.\n\n— *ReplayTime* 💖';
 
+const DEFAULT_MEMBERSHIP_TPL =
+  '👑 *MEMBERSHIP AKTIF*\n\n📦 *{package_name}*\n📅 Berlaku hingga: {expires_at}\n\n🔗 *Link Akses:*\n{link}\n\n🗝️ Sandi: *{password}*\n\n{replay_info_block}👤 Berlaku untuk *{max_devices} perangkat*.\n\n— *ReplayTime* 💖';
+
+function renderMembershipPreview(tpl: string) {
+  const vars = {
+    package_name: 'Premium 30 Hari',
+    link: 'https://replaytime.lovable.app/live?mtoken=ABC123&mp=PASS9999',
+    password: 'PASS9999',
+    expires_at: '24 Juni 2026',
+    duration_days: '30',
+    max_devices: '1',
+    replay_info: 'Daftar replay yang termasuk:\n• Show A (12/05)\n• Show B (18/05)',
+    site: 'replaytime.lovable.app',
+  };
+  return tpl
+    .replace(/\{replay_info_block\}\n?/g, vars.replay_info ? `🎬 *Info Replay:*\n${vars.replay_info}\n\n` : '')
+    .replace(/\{(\w+)\}/g, (_, k) => (vars as Record<string, string>)[k] ?? '');
+}
+
+
 function renderShowPreview(tpl: string) {
   const vars = {
     title: 'PASSION 200% - Ladies Night',
@@ -62,19 +82,26 @@ export default function PakasirAdmin() {
   const [showTpl, setShowTpl] = useState<string>(DEFAULT_SHOW_TPL);
   const [showTplLoaded, setShowTplLoaded] = useState<string>(DEFAULT_SHOW_TPL);
   const [savingShowTpl, setSavingShowTpl] = useState(false);
+  const [memTpl, setMemTpl] = useState<string>(DEFAULT_MEMBERSHIP_TPL);
+  const [memTplLoaded, setMemTplLoaded] = useState<string>(DEFAULT_MEMBERSHIP_TPL);
+  const [savingMemTpl, setSavingMemTpl] = useState(false);
+
 
   const loadStatus = async () => {
     try {
       const { data: s } = await supabase
         .from('site_settings')
         .select('key,value')
-        .in('key', ['pakasir_webhook_verified_at', 'wa_message_template', 'wa_show_template']);
+        .in('key', ['pakasir_webhook_verified_at', 'wa_message_template', 'wa_show_template', 'wa_membership_template']);
       const verified = s?.find(r => r.key === 'pakasir_webhook_verified_at')?.value || '';
       setVerifiedAt(verified);
       const t = s?.find(r => r.key === 'wa_message_template')?.value;
       if (t) { setTpl(t); setTplLoaded(t); }
       const st = s?.find(r => r.key === 'wa_show_template')?.value;
       if (st) { setShowTpl(st); setShowTplLoaded(st); }
+      const mt = s?.find(r => r.key === 'wa_membership_template')?.value;
+      if (mt) { setMemTpl(mt); setMemTplLoaded(mt); }
+
 
       const since = new Date(Date.now() - 24 * 3600_000).toISOString();
       const [pending, paid24h, sent24h, lastPaid] = await Promise.all([
@@ -171,6 +198,27 @@ export default function PakasirAdmin() {
       setSavingShowTpl(false);
     }
   };
+
+  const saveMemTpl = async () => {
+    setSavingMemTpl(true);
+    try {
+      const { data: existing } = await supabase
+        .from('site_settings').select('id').eq('key', 'wa_membership_template').maybeSingle();
+      if (existing?.id) {
+        await supabase.from('site_settings').update({ value: memTpl }).eq('id', existing.id);
+      } else {
+        await supabase.from('site_settings').insert({ key: 'wa_membership_template', value: memTpl });
+      }
+      setMemTplLoaded(memTpl);
+      toast.success('Template Membership tersimpan');
+    } catch (e: any) {
+      toast.error('Gagal menyimpan: ' + (e?.message || e));
+    } finally {
+      setSavingMemTpl(false);
+    }
+  };
+
+
 
 
   return (
@@ -395,6 +443,66 @@ export default function PakasirAdmin() {
           </div>
         </CardContent>
       </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base sm:text-lg">Template Pesan WhatsApp — Membership</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-xs text-muted-foreground">
+            Template ini dipakai saat user berhasil membeli paket membership (QRIS atau koin).
+            Placeholder yang tersedia:
+          </p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 text-[11px]">
+            {[
+              ['{package_name}', 'Nama paket membership'],
+              ['{link}', 'Link akses /live?mtoken=...'],
+              ['{password}', 'Sandi membership'],
+              ['{expires_at}', 'Tanggal berakhir'],
+              ['{duration_days}', 'Durasi (hari)'],
+              ['{max_devices}', 'Jumlah perangkat'],
+              ['{replay_info}', 'Info replay (teks mentah)'],
+              ['{replay_info_block}', 'Blok info replay (🎬)'],
+              ['{site}', 'replaytime.lovable.app'],
+            ].map(([k, d]) => (
+              <code key={k} className="bg-muted/40 rounded px-1.5 py-1 text-foreground" title={d}>
+                {k} <span className="text-muted-foreground">— {d}</span>
+              </code>
+            ))}
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs">Template</Label>
+            <Textarea
+              value={memTpl}
+              onChange={(e) => setMemTpl(e.target.value)}
+              rows={12}
+              className="font-mono text-xs whitespace-pre"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs">Pratinjau</Label>
+            <pre className="rounded-md border border-border bg-muted/30 p-3 text-xs whitespace-pre-wrap font-sans">
+              {renderMembershipPreview(memTpl)}
+            </pre>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <Button onClick={saveMemTpl} disabled={savingMemTpl || memTpl === memTplLoaded}>
+              {savingMemTpl ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+              Simpan Template
+            </Button>
+            <Button variant="outline" onClick={() => setMemTpl(DEFAULT_MEMBERSHIP_TPL)}>
+              <RotateCcw className="w-4 h-4 mr-2" /> Reset Default
+            </Button>
+            <Button variant="ghost" onClick={() => setMemTpl(memTplLoaded)} disabled={memTpl === memTplLoaded}>
+              Batalkan Perubahan
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
+

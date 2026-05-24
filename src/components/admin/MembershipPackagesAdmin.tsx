@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Loader2, Plus, Trash2, Save, Edit2, Crown } from 'lucide-react';
+import { Loader2, Plus, Trash2, Save, Edit2, Crown, ListOrdered } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -9,6 +9,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import MembershipOrdersDialog from './MembershipOrdersDialog';
+
 
 interface Pkg {
   id: string;
@@ -48,6 +50,8 @@ export default function MembershipPackagesAdmin() {
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState({ ...emptyForm });
   const [saving, setSaving] = useState(false);
+  const [ordersFor, setOrdersFor] = useState<Pkg | null>(null);
+
 
   const load = async () => {
     setLoading(true);
@@ -237,11 +241,13 @@ export default function MembershipPackagesAdmin() {
                       </div>
                       <div className="flex gap-1 flex-wrap">
                         <Button size="sm" variant="outline" onClick={() => edit(p)}><Edit2 className="w-3.5 h-3.5 mr-1" />Edit</Button>
+                        <Button size="sm" variant="outline" onClick={() => setOrdersFor(p)}><ListOrdered className="w-3.5 h-3.5 mr-1" />Pesanan</Button>
                         <Button size="sm" variant={p.status === 'open' ? 'secondary' : 'default'} onClick={() => toggleStatus(p)}>
                           {p.status === 'open' ? 'Tutup' : 'Buka'}
                         </Button>
                         <Button size="sm" variant="ghost" onClick={() => remove(p.id)}><Trash2 className="w-3.5 h-3.5 text-destructive" /></Button>
                       </div>
+
                     </div>
                     <div className="space-y-1">
                       <div className="flex items-center justify-between text-[11px] text-muted-foreground">
@@ -259,6 +265,16 @@ export default function MembershipPackagesAdmin() {
           )}
         </CardContent>
       </Card>
+
+      {ordersFor && (
+        <MembershipOrdersDialog
+          open={!!ordersFor}
+          onOpenChange={(v) => { if (!v) setOrdersFor(null); }}
+          packageId={ordersFor.id}
+          packageName={ordersFor.name}
+        />
+      )}
     </div>
   );
 }
+
