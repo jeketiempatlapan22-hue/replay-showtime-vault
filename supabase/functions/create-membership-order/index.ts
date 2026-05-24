@@ -50,10 +50,11 @@ Deno.serve(async (req) => {
     const apiKey = Deno.env.get('PAKASIR_API_KEY') || '';
     if (!slug) return new Response(JSON.stringify({ error: 'pakasir_not_configured' }), { status: 500, headers: corsHeaders });
 
-    // Reserve slot atomically
+    // Reserve slot atomically — guest OK for QRIS (user_id may be null)
     const { data: rsv, error: rerr } = await admin.rpc('reserve_membership_slot', {
-      _package_id: package_id, _user_id: user.id, _email: email, _phone: phone, _kind: 'qris',
+      _package_id: package_id, _user_id: userId, _email: email, _phone: phone, _kind: 'qris',
     });
+
     if (rerr) {
       const msg = rerr.message || '';
       const known = ['sold_out','package_closed','package_not_found','invalid_kind','invalid_email','invalid_phone','invalid_price'];
