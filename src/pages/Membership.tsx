@@ -111,9 +111,12 @@ export default function Membership() {
   }, [user]);
 
   const openPicker = (p: Pkg) => {
-    if (!user) { navigate('/auth?next=/membership'); return; }
-    setPicked(p); setPayMode('qris'); setPickOpen(true);
+    // Guest BOLEH beli via QRIS; koin tetap perlu login. Default ke QRIS jika belum login.
+    setPicked(p);
+    setPayMode(user ? 'qris' : 'qris');
+    setPickOpen(true);
   };
+
 
   const submit = async () => {
     if (!picked) return;
