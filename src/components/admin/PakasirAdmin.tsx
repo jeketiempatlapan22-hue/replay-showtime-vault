@@ -92,13 +92,16 @@ export default function PakasirAdmin() {
       const { data: s } = await supabase
         .from('site_settings')
         .select('key,value')
-        .in('key', ['pakasir_webhook_verified_at', 'wa_message_template', 'wa_show_template']);
+        .in('key', ['pakasir_webhook_verified_at', 'wa_message_template', 'wa_show_template', 'wa_membership_template']);
       const verified = s?.find(r => r.key === 'pakasir_webhook_verified_at')?.value || '';
       setVerifiedAt(verified);
       const t = s?.find(r => r.key === 'wa_message_template')?.value;
       if (t) { setTpl(t); setTplLoaded(t); }
       const st = s?.find(r => r.key === 'wa_show_template')?.value;
       if (st) { setShowTpl(st); setShowTplLoaded(st); }
+      const mt = s?.find(r => r.key === 'wa_membership_template')?.value;
+      if (mt) { setMemTpl(mt); setMemTplLoaded(mt); }
+
 
       const since = new Date(Date.now() - 24 * 3600_000).toISOString();
       const [pending, paid24h, sent24h, lastPaid] = await Promise.all([
