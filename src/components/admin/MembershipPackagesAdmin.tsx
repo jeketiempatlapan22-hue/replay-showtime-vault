@@ -125,6 +125,24 @@ export default function MembershipPackagesAdmin() {
     await supabase.from('membership_packages').update({ status: next }).eq('id', p.id);
     toast.success(`Paket ${next === 'open' ? 'dibuka' : 'ditutup'}`);
   };
+  const togglePause = async (p: Pkg) => {
+    const next = !p.paused;
+    let message = p.pause_message || '';
+    if (next) {
+      const input = prompt('Pesan jeda yang ditampilkan ke user membership paket ini:', message || 'Akses sedang dijeda. Mohon menunggu.');
+      if (input === null) return;
+      message = input;
+    }
+    await supabase.from('membership_packages').update({ paused: next, pause_message: message }).eq('id', p.id);
+    toast.success(next ? 'Akses paket dijeda' : 'Akses paket dilanjutkan');
+  };
+  const editPauseMessage = async (p: Pkg) => {
+    const input = prompt('Edit pesan jeda untuk paket ini:', p.pause_message || '');
+    if (input === null) return;
+    await supabase.from('membership_packages').update({ pause_message: input }).eq('id', p.id);
+    toast.success('Pesan jeda diperbarui');
+  };
+
   const remove = async (id: string) => {
     if (!confirm('Hapus paket ini? Order yang sudah terbuat tetap tersimpan.')) return;
     const { error } = await supabase.from('membership_packages').delete().eq('id', id);
