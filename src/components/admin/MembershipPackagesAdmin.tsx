@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Loader2, Plus, Trash2, Save, Edit2, Crown } from 'lucide-react';
+import { Loader2, Plus, Trash2, Save, Edit2, Crown, ListOrdered } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -9,6 +9,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import MembershipOrdersDialog from './MembershipOrdersDialog';
+
 
 interface Pkg {
   id: string;
