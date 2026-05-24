@@ -192,7 +192,8 @@ Deno.serve(async (req) => {
 
     if (mtoken) {
       const r = await verifyMembership(supabase, mtoken, mpassword || "", browser_id || "", isSilent);
-      if (!r.ok) return json({ valid: false, reason: r.reason });
+      if (!r.ok) return json({ valid: false, reason: r.reason, pause_message: (r as any).pause_message, package_name: (r as any).package_name });
+
       return json({
         valid: true, enabled, title: cfg.title, type: cfg.type, url: cfg.url,
         sources: Array.isArray(cfg.sources) ? cfg.sources : [],
