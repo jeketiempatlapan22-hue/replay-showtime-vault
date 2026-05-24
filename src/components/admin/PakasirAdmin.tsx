@@ -82,6 +82,10 @@ export default function PakasirAdmin() {
   const [showTpl, setShowTpl] = useState<string>(DEFAULT_SHOW_TPL);
   const [showTplLoaded, setShowTplLoaded] = useState<string>(DEFAULT_SHOW_TPL);
   const [savingShowTpl, setSavingShowTpl] = useState(false);
+  const [memTpl, setMemTpl] = useState<string>(DEFAULT_MEMBERSHIP_TPL);
+  const [memTplLoaded, setMemTplLoaded] = useState<string>(DEFAULT_MEMBERSHIP_TPL);
+  const [savingMemTpl, setSavingMemTpl] = useState(false);
+
 
   const loadStatus = async () => {
     try {
