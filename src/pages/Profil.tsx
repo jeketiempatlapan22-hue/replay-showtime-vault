@@ -224,6 +224,116 @@ export default function Profil() {
         </Card>
 
         <Card>
+          <CardHeader className="flex-row items-center justify-between">
+            <CardTitle className="flex items-center gap-2 text-base"><Crown className="w-4 h-4 text-primary" /> Membership Saya</CardTitle>
+            <Button size="sm" variant="ghost" onClick={() => navigate('/membership')} className="h-7 text-xs">Beli</Button>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {memLoading ? (
+              <div className="flex justify-center py-4"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>
+            ) : memberships.length === 0 ? (
+              <p className="text-xs text-muted-foreground text-center py-2">
+                Belum ada pesanan membership. <button onClick={() => navigate('/membership')} className="text-primary underline">Lihat paket</button>
+              </p>
+            ) : (
+              memberships.map((m) => {
+                const isPaid = m.status === 'paid';
+                const isReserved = m.status === 'reserved';
+                const expired = m.status === 'expired';
+                const cancelled = m.status === 'cancelled';
+                const tokenExpired = !!(isPaid && m.expires_at && new Date(m.expires_at).getTime() < Date.now());
+                const link = m.token && m.password
+                  ? `${window.location.origin}/live?mtoken=${encodeURIComponent(m.token)}&mp=${encodeURIComponent(m.password)}`
+                  : '';
+                const statusBadge = (() => {
+                  if (m.revoked) return <Badge variant="destructive">Dicabut</Badge>;
+                  if (tokenExpired) return <Badge variant="secondary">Kedaluwarsa</Badge>;
+                  if (isPaid) return <Badge className="bg-green-500/15 text-green-600 border-green-500/30 hover:bg-green-500/15">Aktif</Badge>;
+                  if (isReserved) return <Badge className="bg-amber-500/15 text-amber-600 border-amber-500/30 hover:bg-amber-500/15">Menunggu Bayar</Badge>;
+                  if (expired) return <Badge variant="secondary">Expired</Badge>;
+                  if (cancelled) return <Badge variant="secondary">Dibatalkan</Badge>;
+                  return <Badge variant="outline">{m.status}</Badge>;
+                })();
+                return (
+                  <div key={m.order_id} className="rounded-lg border border-border p-3 space-y-2 bg-card/50">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="font-semibold text-sm leading-tight">{m.package_name || 'Membership'}</div>
+                        <div className="text-[10px] text-muted-foreground font-mono">#{m.order_id.slice(0, 8)}</div>
+                      </div>
+                      {statusBadge}
+                    </div>
+
+                    {m.package_paused && isPaid && !tokenExpired && (
+                      <div className="text-[11px] text-amber-600 bg-amber-500/10 border border-amber-500/30 rounded px-2 py-1.5">
+                        ⏸ Membership dijeda admin. {m.pause_message}
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-2 gap-2 text-[11px]">
+                      <div>
+                        <div className="text-muted-foreground">Metode</div>
+                        <div className="font-medium">
+                          {m.kind === 'coins' ? `${m.coin_amount} koin` : `Rp ${Number(m.amount || 0).toLocaleString('id-ID')}`}
+                        </div>
+                      </div>
+                      {isPaid && m.expires_at && (
+                        <div>
+                          <div className="text-muted-foreground">Sisa Berlaku</div>
+                          <div className="font-medium flex items-center gap-1">
+                            <Clock className="w-3 h-3" />
+                            {tokenExpired ? 'Habis' : `${m.days_remaining ?? 0} hari`}
+                          </div>
+                        </div>
+                      )}
+                      {isReserved && m.reserved_until && (
+                        <div>
+                          <div className="text-muted-foreground">Slot Hingga</div>
+                          <div className="font-medium">
+                            {new Date(m.reserved_until).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {isPaid && m.expires_at && (
+                      <div className="text-[11px] text-muted-foreground">
+                        Berlaku hingga {new Date(m.expires_at).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })}
+                      </div>
+                    )}
+
+                    {isPaid && link && !tokenExpired && !m.revoked && (
+                      <div className="space-y-1.5 pt-1">
+                        <div className="rounded bg-muted px-2 py-1.5 text-[10px] font-mono break-all">{link}</div>
+                        <div className="grid grid-cols-3 gap-1.5">
+                          <Button size="sm" variant="outline" className="h-8 text-[11px]" onClick={() => copyText(link, 'Link disalin')}>
+                            <Copy className="w-3 h-3 mr-1" /> Link
+                          </Button>
+                          <Button size="sm" variant="outline" className="h-8 text-[11px]" onClick={() => copyText(m.password!, 'Sandi disalin')}>
+                            <Copy className="w-3 h-3 mr-1" /> Sandi
+                          </Button>
+                          <Button size="sm" className="h-8 text-[11px]" onClick={() => openMembership(m)}>
+                            <ExternalLink className="w-3 h-3 mr-1" /> Buka
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+
+                    {isReserved && (
+                      <p className="text-[10px] text-muted-foreground">
+                        Selesaikan pembayaran QRIS sebelum slot dilepas. Kuota akan otomatis dikembalikan jika belum dibayar.
+                      </p>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </CardContent>
+        </Card>
+
+
+
+        <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base"><KeyRound className="w-4 h-4" /> Ganti Kata Sandi</CardTitle>
           </CardHeader>
