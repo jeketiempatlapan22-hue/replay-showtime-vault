@@ -1361,6 +1361,35 @@ export type Database = {
           type: string
         }[]
       }
+      get_my_memberships: {
+        Args: never
+        Returns: {
+          amount: number
+          coin_amount: number
+          created_at: string
+          days_remaining: number
+          duration_days: number
+          email: string
+          expires_at: string
+          includes_replays: boolean
+          kind: string
+          max_devices: number
+          order_id: string
+          package_id: string
+          package_name: string
+          package_paused: boolean
+          paid_at: string
+          pakasir_qr_url: string
+          password: string
+          pause_message: string
+          phone: string
+          reserved_until: string
+          revoked: boolean
+          starts_at: string
+          status: string
+          token: string
+        }[]
+      }
       grant_coins: {
         Args: {
           _delta: number
