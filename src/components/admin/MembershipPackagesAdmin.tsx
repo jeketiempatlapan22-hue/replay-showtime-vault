@@ -27,7 +27,10 @@ interface Pkg {
   includes_replays: boolean;
   status: 'open' | 'closed';
   sort_order: number;
+  paused: boolean;
+  pause_message: string;
 }
+
 
 const emptyForm = {
   id: '' as string | undefined,
