@@ -50,10 +50,19 @@ async function verifyMembership(supabase: any, mtoken: string, mpassword: string
   const now = Date.now();
   if (t.expires_at && new Date(t.expires_at).getTime() < now) return { ok: false, reason: "expired" };
   if (t.starts_at && new Date(t.starts_at).getTime() > now) return { ok: false, reason: "not_started" };
+  // Per-package pause check
+  if (t.package_id) {
+    const { data: pkg } = await supabase
+      .from("membership_packages").select("paused,pause_message,name").eq("id", t.package_id).maybeSingle();
+    if (pkg?.paused) {
+      return { ok: false, reason: "membership_paused", pause_message: String(pkg.pause_message || ''), package_name: String(pkg.name || '') };
+    }
+  }
   const bind = await bindMembershipDevice(supabase, t, browser_id, isSilent);
   if (!bind.ok) return bind;
   return { ok: true, token: t, soft: !!bind.soft };
 }
+
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
