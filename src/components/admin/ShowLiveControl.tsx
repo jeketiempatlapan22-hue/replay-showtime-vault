@@ -44,21 +44,20 @@ export default function ShowLiveControl({ showId, showTitle }: Props) {
   useEffect(() => {
     if (!showId) return;
     setLoading(true);
-    supabase.from('active_shows').select(
-      'is_live,live_auto_schedule,live_url,live_type,live_sources,live_password,live_require_password,replay_mode,replay_m3u8_url,replay_youtube_url,idn_show_id'
-    ).eq('id', showId).maybeSingle().then(({ data }) => {
-      if (data) {
-        setIsLive(!!data.is_live);
-        setAutoSchedule(!!data.live_auto_schedule);
-        setLiveUrl(data.live_url || '');
-        setLiveType(((data.live_type as SrcType) || 'm3u8'));
-        setLiveSources(Array.isArray(data.live_sources) ? data.live_sources as any : []);
-        setLivePassword(data.live_password || '');
-        setRequirePw(data.live_require_password !== false);
-        setReplayMode(!!data.replay_mode);
-        setReplayM3u8(data.replay_m3u8_url || '');
-        setReplayYt(data.replay_youtube_url || '');
-        setIdnShowId((data as any).idn_show_id || '');
+    (supabase as any).rpc('admin_get_active_show', { _id: showId }).then(({ data }: any) => {
+      const row = Array.isArray(data) ? data[0] : data;
+      if (row) {
+        setIsLive(!!row.is_live);
+        setAutoSchedule(!!row.live_auto_schedule);
+        setLiveUrl(row.live_url || '');
+        setLiveType(((row.live_type as SrcType) || 'm3u8'));
+        setLiveSources(Array.isArray(row.live_sources) ? row.live_sources as any : []);
+        setLivePassword(row.live_password || '');
+        setRequirePw(row.live_require_password !== false);
+        setReplayMode(!!row.replay_mode);
+        setReplayM3u8(row.replay_m3u8_url || '');
+        setReplayYt(row.replay_youtube_url || '');
+        setIdnShowId((row as any).idn_show_id || '');
       }
       setLoading(false);
     });
