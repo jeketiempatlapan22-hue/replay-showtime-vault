@@ -118,6 +118,57 @@ Deno.serve(async (req) => {
 
   const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 
+  // ===== MEMBERSHIP ORDER branch (separate table) =====
+  const { data: mOrder } = await admin
+    .from('membership_orders').select('*').eq('pakasir_order_id', orderId).maybeSingle();
+  if (mOrder) {
+    if (status !== 'completed' && status !== 'paid' && status !== 'success') {
+      return new Response(JSON.stringify({ ok: true, ignored: true, status }), { headers: corsHeaders });
+    }
+    if (mOrder.status === 'paid' && mOrder.membership_token_id) {
+      return new Response(JSON.stringify({ ok: true, already: true }), { headers: corsHeaders });
+    }
+    // Finalize → issue membership token
+    const { data: fin, error: ferr } = await admin.rpc('finalize_membership_order', { _order_id: mOrder.id });
+    if (ferr) {
+      return new Response(JSON.stringify({ error: 'finalize_failed', detail: ferr.message }), { status: 500, headers: corsHeaders });
+    }
+    const tok = Array.isArray(fin) ? fin[0] : fin;
+
+    const { data: settings } = await admin
+      .from('site_settings').select('key,value').in('key', ['site_origin','wa_membership_template']);
+    const sm = new Map((settings ?? []).map((s) => [s.key, s.value]));
+    const origin = (sm.get('site_origin') || 'https://replaytime.lovable.app').replace(/\/+$/, '');
+    const tpl = sm.get('wa_membership_template') ||
+      '👑 *MEMBERSHIP AKTIF*\n\n📦 *{package_name}*\n📅 Berlaku hingga: {expires_at}\n\n🔗 *Link Akses:*\n{link}\n\n🗝️ Sandi: *{password}*\n\n{replay_info_block}👤 Berlaku untuk *{max_devices} perangkat*.\n\n— *ReplayTime* 💖';
+    const link = `${origin}/live?mtoken=${encodeURIComponent(tok.token)}&mp=${encodeURIComponent(tok.password)}`;
+    const expiresStr = new Date(tok.expires_at).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
+    const msg = tpl
+      .replace(/\{package_name\}/g, tok.package_name || '')
+      .replace(/\{link\}/g, link)
+      .replace(/\{password\}/g, tok.password || '')
+      .replace(/\{expires_at\}/g, expiresStr)
+      .replace(/\{duration_days\}/g, String(tok.duration_days || ''))
+      .replace(/\{max_devices\}/g, String(tok.max_devices || 1))
+      .replace(/\{replay_info\}/g, tok.replay_info || '')
+      .replace(/\{replay_info_block\}/g, tok.replay_info ? `🎬 *Info Replay:*\n${tok.replay_info}\n\n` : '')
+      .replace(/\{site\}/g, origin.replace(/^https?:\/\//, ''));
+    const sent = await sendFonnte(mOrder.phone, msg);
+    await admin.from('wa_outbox').insert({
+      phone: mOrder.phone, message: msg, status: sent.ok ? 'sent' : 'failed',
+      error: sent.ok ? null : JSON.stringify(sent.data),
+      fonnte_response: sent.data as Record<string, unknown>,
+    });
+    await admin.from('token_deliveries').insert({
+      phone: mOrder.phone, replay_id: null, replay_title: `Membership • ${tok.package_name}`,
+      order_id: null, access_token: tok.token, link,
+      source: 'pakasir', requested_by: 'pakasir-webhook-membership',
+    });
+    return new Response(JSON.stringify({ ok: true, membership: true, sent: sent.ok }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+
   const { data: order } = await admin
     .from('orders').select('*').eq('pakasir_order_id', orderId).maybeSingle();
 
@@ -134,6 +185,7 @@ Deno.serve(async (req) => {
   if (order.status === 'paid' && order.token_sent_at) {
     return new Response(JSON.stringify({ ok: true, already: true }), { headers: corsHeaders });
   }
+
 
   // === COIN TOP-UP branch ===
   if (order.kind === 'coin_topup') {

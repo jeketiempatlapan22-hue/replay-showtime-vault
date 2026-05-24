@@ -706,6 +706,120 @@ export type Database = {
         }
         Relationships: []
       }
+      membership_orders: {
+        Row: {
+          amount: number
+          coin_amount: number
+          created_at: string
+          email: string
+          id: string
+          kind: string
+          membership_token_id: string | null
+          package_id: string
+          paid_at: string | null
+          pakasir_order_id: string | null
+          pakasir_qr_url: string
+          phone: string
+          reserved_until: string
+          status: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          amount?: number
+          coin_amount?: number
+          created_at?: string
+          email: string
+          id?: string
+          kind?: string
+          membership_token_id?: string | null
+          package_id: string
+          paid_at?: string | null
+          pakasir_order_id?: string | null
+          pakasir_qr_url?: string
+          phone: string
+          reserved_until?: string
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          amount?: number
+          coin_amount?: number
+          created_at?: string
+          email?: string
+          id?: string
+          kind?: string
+          membership_token_id?: string | null
+          package_id?: string
+          paid_at?: string | null
+          pakasir_order_id?: string | null
+          pakasir_qr_url?: string
+          phone?: string
+          reserved_until?: string
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      membership_packages: {
+        Row: {
+          created_at: string
+          description: string
+          duration_days: number
+          id: string
+          includes_replays: boolean
+          max_devices: number
+          name: string
+          pakasir_amount: number
+          price_coins: number
+          price_idr: number
+          quota_reserved: number
+          quota_total: number
+          replay_info: string
+          sort_order: number
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string
+          duration_days?: number
+          id?: string
+          includes_replays?: boolean
+          max_devices?: number
+          name: string
+          pakasir_amount?: number
+          price_coins?: number
+          price_idr?: number
+          quota_reserved?: number
+          quota_total?: number
+          replay_info?: string
+          sort_order?: number
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          duration_days?: number
+          id?: string
+          includes_replays?: boolean
+          max_devices?: number
+          name?: string
+          pakasir_amount?: number
+          price_coins?: number
+          price_idr?: number
+          quota_reserved?: number
+          quota_total?: number
+          replay_info?: string
+          sort_order?: number
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       membership_token_devices: {
         Row: {
           browser_id: string
@@ -1195,6 +1309,20 @@ export type Database = {
       }
       email_for_identifier: { Args: { _identifier: string }; Returns: string }
       email_for_phone: { Args: { _phone: string }; Returns: string }
+      expire_membership_reservations: { Args: never; Returns: number }
+      finalize_membership_order: {
+        Args: { _order_id: string }
+        Returns: {
+          duration_days: number
+          expires_at: string
+          includes_replays: boolean
+          max_devices: number
+          package_name: string
+          password: string
+          replay_info: string
+          token: string
+        }[]
+      }
       get_active_live: {
         Args: never
         Returns: {
@@ -1250,6 +1378,25 @@ export type Database = {
       record_login_attempt: {
         Args: { _identifier: string; _success: boolean }
         Returns: undefined
+      }
+      release_membership_slot: {
+        Args: { _order_id: string; _reason: string }
+        Returns: boolean
+      }
+      reserve_membership_slot: {
+        Args: {
+          _email: string
+          _kind: string
+          _package_id: string
+          _phone: string
+          _user_id: string
+        }
+        Returns: {
+          amount: number
+          coin_amount: number
+          order_id: string
+          reserved_until: string
+        }[]
       }
     }
     Enums: {
