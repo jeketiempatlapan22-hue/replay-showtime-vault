@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Plus, Trash2, Radio, Film, Save, Loader2, KeyRound } from 'lucide-react';
+import { Plus, Trash2, Radio, Film, Save, Loader2, KeyRound, ArrowRightLeft } from 'lucide-react';
 import ShowLiveTokensDialog from './ShowLiveTokensDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -266,13 +266,33 @@ export default function ShowLiveControl({ showId, showTitle }: Props) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2">
+      <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_auto] gap-2">
         <Button onClick={save} disabled={saving} className="w-full">
           {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
           Simpan Pengaturan Live & Replay
         </Button>
         <Button type="button" variant="outline" onClick={() => setTokensOpen(true)} className="w-full sm:w-auto">
           <KeyRound className="w-4 h-4 mr-2" />Token & Riwayat Akses
+        </Button>
+        <Button
+          type="button"
+          variant="secondary"
+          className="w-full sm:w-auto"
+          onClick={async () => {
+            if (!confirm('Konversi show ini menjadi Replay?\n\nKartu akan PINDAH dari menu Streaming Show ke halaman Replay (show aktif akan dinonaktifkan). Pastikan link replay sudah diisi.')) return;
+            setSaving(true);
+            try {
+              const { data, error } = await (supabase as any).rpc('convert_show_to_replay', { _show_id: showId });
+              if (error) throw error;
+              toast({ title: 'Berhasil dikonversi ke Replay', description: `Replay ID: ${data}` });
+              setTimeout(() => window.location.reload(), 800);
+            } catch (e: any) {
+              toast({ title: 'Gagal konversi', description: e.message, variant: 'destructive' });
+            }
+            setSaving(false);
+          }}
+        >
+          <ArrowRightLeft className="w-4 h-4 mr-2" />Konversi ke Replay
         </Button>
       </div>
       <ShowLiveTokensDialog open={tokensOpen} onOpenChange={setTokensOpen} showId={showId} showTitle={showTitle} />
