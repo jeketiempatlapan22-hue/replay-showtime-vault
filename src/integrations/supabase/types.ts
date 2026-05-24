@@ -1419,6 +1419,7 @@ export type Database = {
           seconds_remaining: number
         }[]
       }
+      convert_show_to_replay: { Args: { _show_id: string }; Returns: string }
       cron_clear_live_messages: { Args: never; Returns: undefined }
       debit_coins_for_purchase: {
         Args: {
