@@ -40,6 +40,34 @@ window.addEventListener('unhandledrejection', (event) => {
   }
 });
 
+// Force cache busting: when a new build is deployed, unregister SW, clear all caches, and hard-reload once.
+const BUILD_KEY = 'app_build_id';
+const RELOAD_FLAG = 'app_build_reloaded';
+if (typeof window !== 'undefined') {
+  try {
+    const current = __APP_BUILD_ID__;
+    const stored = localStorage.getItem(BUILD_KEY);
+    if (stored && stored !== current && !sessionStorage.getItem(RELOAD_FLAG)) {
+      sessionStorage.setItem(RELOAD_FLAG, '1');
+      const done = () => {
+        localStorage.setItem(BUILD_KEY, current);
+        window.location.reload();
+      };
+      Promise.all([
+        'serviceWorker' in navigator
+          ? navigator.serviceWorker.getRegistrations().then(rs => Promise.all(rs.map(r => r.unregister()))).catch(() => {})
+          : Promise.resolve(),
+        'caches' in window
+          ? caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k)))).catch(() => {})
+          : Promise.resolve(),
+      ]).then(done, done);
+    } else {
+      localStorage.setItem(BUILD_KEY, current);
+      sessionStorage.removeItem(RELOAD_FLAG);
+    }
+  } catch { /* ignore */ }
+}
+
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.getRegistrations()
