@@ -217,7 +217,7 @@ export default function MembershipOrdersDialog({
                       </div>
                       {r.membership_token_id && <div className="text-[10px] text-green-600">✓ token aktif</div>}
                       <div className="flex gap-1 justify-end">
-                        <Button size="sm" variant="outline" className="h-6 px-2" onClick={() => resendOne(r.id)} disabled={!!sending[r.id]} title="Kirim ulang WA token + info replay">
+                        <Button size="sm" variant="outline" className="h-6 px-2" onClick={(e) => resendOne(r.id, e.shiftKey)} disabled={!!sending[r.id]} title="Kirim ulang WA. Shift+klik = paksa kirim meski sudah terkirim">
                           {sending[r.id] ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
                         </Button>
                         <Button size="sm" variant="ghost" className="h-6 px-2" onClick={() => startEdit(r)}><Edit2 className="w-3 h-3" /></Button>
