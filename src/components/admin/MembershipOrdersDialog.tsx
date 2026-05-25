@@ -207,7 +207,12 @@ export default function MembershipOrdersDialog({
                         {r.kind === 'qris' ? `Rp ${(r.amount || 0).toLocaleString('id-ID')}` : `${r.coin_amount} koin`}
                       </div>
                       {r.membership_token_id && <div className="text-[10px] text-green-600">✓ token aktif</div>}
-                      <Button size="sm" variant="ghost" className="h-6 px-2" onClick={() => startEdit(r)}><Edit2 className="w-3 h-3" /></Button>
+                      <div className="flex gap-1 justify-end">
+                        <Button size="sm" variant="outline" className="h-6 px-2" onClick={() => resendOne(r.id)} disabled={!!sending[r.id]} title="Kirim ulang WA token + info replay">
+                          {sending[r.id] ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
+                        </Button>
+                        <Button size="sm" variant="ghost" className="h-6 px-2" onClick={() => startEdit(r)}><Edit2 className="w-3 h-3" /></Button>
+                      </div>
                     </div>
                   </div>
                 )}
