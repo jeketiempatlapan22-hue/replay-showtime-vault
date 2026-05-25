@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
-import { Loader2, Plus, Trash2, Copy, RefreshCw, RotateCcw, ChevronDown, ChevronUp } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Loader2, Plus, Trash2, Copy, RefreshCw, RotateCcw, ChevronDown, ChevronUp, Send, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -21,6 +22,7 @@ interface MembershipToken {
   manual_resets_max: number;
   includes_replays: boolean;
   max_devices: number;
+  replay_info: string;
   created_at: string;
 }
 
@@ -38,7 +40,9 @@ export default function MembershipAdmin() {
   const [devices, setDevices] = useState<Record<string, DeviceRow[]>>({});
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
-  const [form, setForm] = useState({ label: '', phone: '', duration_days: 30, includes_replays: true, max_devices: 1 });
+  const [search, setSearch] = useState('');
+  const [sendingId, setSendingId] = useState<string | null>(null);
+  const [form, setForm] = useState({ label: '', phone: '', duration_days: 30, includes_replays: true, max_devices: 1, replay_info: '' });
   const [creating, setCreating] = useState(false);
 
   const load = async () => {
@@ -57,23 +61,51 @@ export default function MembershipAdmin() {
   };
   useEffect(() => { void load(); }, []);
 
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return rows;
+    return rows.filter(r =>
+      (r.label || '').toLowerCase().includes(q) ||
+      (r.phone || '').toLowerCase().includes(q) ||
+      (r.token || '').toLowerCase().includes(q)
+    );
+  }, [rows, search]);
+
   const create = async () => {
+    if (!form.phone.trim()) { toast.error('Nomor WA wajib diisi'); return; }
     setCreating(true);
+    // Selalu generate token & sandi BARU — tidak menyalin token yang sudah ada.
     const token = randStr(12);
     const password = randStr(8);
     const starts_at = new Date().toISOString();
     const expires_at = new Date(Date.now() + form.duration_days * 86400000).toISOString();
     const { error } = await supabase.from('membership_tokens').insert({
-      token, password, label: form.label, phone: form.phone,
+      token, password, label: form.label, phone: form.phone.trim(),
       duration_days: form.duration_days, starts_at, expires_at,
       includes_replays: form.includes_replays,
       max_devices: Math.max(1, Math.min(10000, Number(form.max_devices) || 1)),
+      replay_info: form.replay_info,
+      created_by: 'admin',
     });
     setCreating(false);
     if (error) { toast.error(error.message); return; }
-    toast.success('Membership token dibuat');
-    setForm({ label: '', phone: '', duration_days: 30, includes_replays: true, max_devices: 1 });
+    toast.success('Membership baru dibuat');
+    setForm({ label: '', phone: '', duration_days: 30, includes_replays: true, max_devices: 1, replay_info: '' });
     void load();
+  };
+
+  const sendWa = async (r: MembershipToken) => {
+    if (!r.phone) { toast.error('Token ini belum memiliki nomor WA'); return; }
+    setSendingId(r.id);
+    const { data, error } = await supabase.functions.invoke('send-membership-token-wa', {
+      body: { token_id: r.id },
+    });
+    setSendingId(null);
+    if (error || !data?.ok) {
+      toast.error('Gagal kirim WA: ' + (error?.message || JSON.stringify(data?.data || data || {})));
+    } else {
+      toast.success(`Link membership terkirim ke ${r.phone}`);
+    }
   };
 
   const toggleRevoke = async (r: MembershipToken) => {
@@ -119,33 +151,52 @@ export default function MembershipAdmin() {
   return (
     <div className="space-y-4">
       <Card>
-        <CardHeader><CardTitle className="text-base">Buat Membership Token</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="text-base">Tambah Membership Manual</CardTitle></CardHeader>
         <CardContent className="grid sm:grid-cols-2 gap-3">
-          <div><Label className="text-xs">Label</Label><Input value={form.label} onChange={e => setForm({ ...form, label: e.target.value })} placeholder="cth: Member Premium A" /></div>
-          <div><Label className="text-xs">Nomor WA</Label><Input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} placeholder="62xxx" /></div>
+          <div><Label className="text-xs">Nama / Label</Label><Input value={form.label} onChange={e => setForm({ ...form, label: e.target.value })} placeholder="cth: Budi - Premium" /></div>
+          <div><Label className="text-xs">Nomor WA *</Label><Input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} placeholder="62xxx" /></div>
           <div><Label className="text-xs">Durasi (hari)</Label><Input type="number" value={form.duration_days} onChange={e => setForm({ ...form, duration_days: Number(e.target.value) || 30 })} /></div>
-          <div><Label className="text-xs">Max Device</Label><Input type="number" min={1} value={form.max_devices} onChange={e => setForm({ ...form, max_devices: Number(e.target.value) || 1 })} placeholder="cth: 300" /></div>
+          <div><Label className="text-xs">Max Device</Label><Input type="number" min={1} value={form.max_devices} onChange={e => setForm({ ...form, max_devices: Number(e.target.value) || 1 })} placeholder="cth: 1" /></div>
+          <div className="sm:col-span-2">
+            <Label className="text-xs">Info Replay (opsional)</Label>
+            <Textarea rows={2} value={form.replay_info} onChange={e => setForm({ ...form, replay_info: e.target.value })} placeholder="cth: 5 replay terbaru bulan ini" />
+          </div>
           <div className="flex items-end gap-2">
             <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={form.includes_replays} onChange={e => setForm({ ...form, includes_replays: e.target.checked })} /> Termasuk replay</label>
           </div>
           <div className="sm:col-span-2">
             <Button onClick={create} disabled={creating} className="w-full sm:w-auto">
-              {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Plus className="w-4 h-4 mr-1" />Buat Token</>}
+              {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Plus className="w-4 h-4 mr-1" />Buat & Simpan</>}
             </Button>
           </div>
         </CardContent>
       </Card>
 
       <Card>
-        <CardHeader><CardTitle className="text-base">Daftar Membership</CardTitle></CardHeader>
+        <CardHeader>
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <CardTitle className="text-base">Daftar Membership</CardTitle>
+            <div className="relative w-full sm:w-72">
+              <Search className="w-4 h-4 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder="Cari nomor / nama / token…"
+                className="pl-8"
+              />
+            </div>
+          </div>
+        </CardHeader>
         <CardContent>
           {loading ? (
             <div className="flex justify-center py-6"><Loader2 className="w-5 h-5 animate-spin" /></div>
-          ) : rows.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-4">Belum ada membership.</p>
+          ) : filtered.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-4">
+              {search ? 'Tidak ada hasil untuk pencarian ini.' : 'Belum ada membership.'}
+            </p>
           ) : (
             <div className="space-y-2">
-              {rows.map(r => {
+              {filtered.map(r => {
                 const expired = r.expires_at && new Date(r.expires_at).getTime() < Date.now();
                 const tokenDevices = devices[r.id] || [];
                 const isOpen = !!expanded[r.id];
@@ -156,6 +207,10 @@ export default function MembershipAdmin() {
                         {r.label || '(tanpa label)'} {expired && <span className="text-xs text-destructive">[expired]</span>} {r.revoked && <span className="text-xs text-destructive">[revoked]</span>}
                       </div>
                       <div className="flex gap-1 flex-wrap">
+                        <Button size="sm" variant="default" onClick={() => sendWa(r)} disabled={sendingId === r.id || !r.phone} title="Kirim link & info ke WA">
+                          {sendingId === r.id ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : <Send className="w-3.5 h-3.5 mr-1" />}
+                          Kirim WA
+                        </Button>
                         <Button size="sm" variant="outline" onClick={() => copyLink(r)} title="Salin link"><Copy className="w-3.5 h-3.5 mr-1" />Link</Button>
                         <Button size="sm" variant="outline" onClick={() => editMaxDevices(r)} title="Ubah max device">Max: {r.max_devices ?? 1}</Button>
                         <Button size="sm" variant="outline" onClick={() => resetDevices(r.id)} title="Cabut semua perangkat tertaut"><RefreshCw className="w-3.5 h-3.5 mr-1" />Reset Device</Button>
@@ -169,6 +224,9 @@ export default function MembershipAdmin() {
                       WA: {r.phone || '-'} · Kuota reset: <span className="font-mono">{r.manual_resets_used}/{r.manual_resets_max}</span> · Aktif s/d {new Date(r.expires_at).toLocaleString()}
                       {r.includes_replays ? ' · termasuk replay' : ' · live saja'}
                     </div>
+                    {r.replay_info && (
+                      <div className="text-xs text-muted-foreground italic">🎬 {r.replay_info}</div>
+                    )}
                     <button
                       type="button"
                       className="text-xs text-primary inline-flex items-center gap-1"
