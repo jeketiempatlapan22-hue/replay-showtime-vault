@@ -921,6 +921,7 @@ export type Database = {
           package_id: string | null
           password: string
           phone: string
+          replay_info: string
           revoked: boolean
           starts_at: string
           token: string
@@ -940,6 +941,7 @@ export type Database = {
           package_id?: string | null
           password?: string
           phone?: string
+          replay_info?: string
           revoked?: boolean
           starts_at?: string
           token: string
@@ -959,6 +961,7 @@ export type Database = {
           package_id?: string | null
           password?: string
           phone?: string
+          replay_info?: string
           revoked?: boolean
           starts_at?: string
           token?: string
