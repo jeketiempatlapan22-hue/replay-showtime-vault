@@ -300,6 +300,13 @@ Deno.serve(async (req) => {
 
   // === MEMBERSHIP ORDERS (reserved QRIS yang webhook-nya tidak sampai) ===
   // Bila sudah terbayar di Pakasir → finalize + kirim WA. Idempotent.
+  //
+  // Auto-retry dengan batas terukur:
+  // - Maks 5 percobaan pengiriman WA per order.
+  // - Backoff bertingkat (menit sejak last attempt): 1, 5, 15, 60, 360.
+  // - Dedup: jika order sudah punya token & wa_sent_at, skip.
+  const MAX_WA_ATTEMPTS = 5;
+  const BACKOFF_MIN = [0, 1, 5, 15, 60, 360]; // index = attempts done
   const memResults: any[] = [];
   try {
     const memTpl = (await admin.from('site_settings').select('value').eq('key', 'wa_membership_template').maybeSingle())
@@ -307,23 +314,69 @@ Deno.serve(async (req) => {
       '👑 *MEMBERSHIP AKTIF*\n\n📦 *{package_name}*\n📅 Berlaku hingga: {expires_at}\n\n🔗 *Link Akses:*\n{link}\n\n🗝️ Sandi: *{password}*\n\n{replay_info_block}👤 Berlaku untuk *{max_devices} perangkat*.\n\n— *ReplayTime* 💖';
     const { data: mOrders } = await admin
       .from('membership_orders').select('*')
-      .eq('status', 'reserved').eq('kind', 'qris')
+      .in('status', ['reserved', 'paid'])
+      .eq('kind', 'qris')
       .not('pakasir_order_id', 'is', null)
       .gte('created_at', since)
       .order('created_at', { ascending: false }).limit(100);
     for (const mo of mOrders ?? []) {
       try {
-        const purl = `https://app.pakasir.com/api/transactiondetail?project=${encodeURIComponent(slug)}&amount=${mo.amount}&order_id=${encodeURIComponent(mo.pakasir_order_id)}&api_key=${encodeURIComponent(apiKey)}`;
-        const pres = await fetch(purl);
-        const pjson: any = await pres.json().catch(() => ({}));
-        const tx = pjson?.transaction || pjson?.payment || {};
-        const ps = String(tx.status || pjson?.status || '').toLowerCase();
-        const paid = ps === 'completed' || ps === 'paid' || ps === 'success';
-        if (!paid) { memResults.push({ id: mo.id, status: ps || 'pending' }); continue; }
+        // Skip jika sudah punya token & WA sudah pernah sukses (idempotent guard).
+        if (mo.membership_token_id && mo.wa_sent_at) {
+          memResults.push({ id: mo.id, skipped: 'already_delivered' }); continue;
+        }
+        // Skip jika melewati batas percobaan.
+        const attempts = Number(mo.wa_attempts || 0);
+        if (attempts >= MAX_WA_ATTEMPTS) {
+          memResults.push({ id: mo.id, skipped: 'max_attempts' }); continue;
+        }
+        // Hormati backoff window.
+        if (mo.wa_last_attempt_at) {
+          const waitMin = BACKOFF_MIN[Math.min(attempts, BACKOFF_MIN.length - 1)];
+          const nextOk = new Date(mo.wa_last_attempt_at).getTime() + waitMin * 60_000;
+          if (Date.now() < nextOk) {
+            memResults.push({ id: mo.id, skipped: 'backoff' }); continue;
+          }
+        }
 
-        const { data: fin, error: ferr } = await admin.rpc('finalize_membership_order', { _order_id: mo.id });
-        if (ferr) { memResults.push({ id: mo.id, error: ferr.message }); continue; }
-        const tok: any = Array.isArray(fin) ? fin[0] : fin;
+        let paid = mo.status === 'paid';
+        if (!paid) {
+          const purl = `https://app.pakasir.com/api/transactiondetail?project=${encodeURIComponent(slug)}&amount=${mo.amount}&order_id=${encodeURIComponent(mo.pakasir_order_id)}&api_key=${encodeURIComponent(apiKey)}`;
+          const pres = await fetch(purl);
+          const pjson: any = await pres.json().catch(() => ({}));
+          const tx = pjson?.transaction || pjson?.payment || {};
+          const ps = String(tx.status || pjson?.status || '').toLowerCase();
+          paid = ps === 'completed' || ps === 'paid' || ps === 'success';
+          if (!paid) { memResults.push({ id: mo.id, status: ps || 'pending' }); continue; }
+        }
+
+        let tok: any = null;
+        if (!mo.membership_token_id) {
+          const { data: fin, error: ferr } = await admin.rpc('finalize_membership_order', { _order_id: mo.id });
+          if (ferr) {
+            await admin.from('membership_orders').update({
+              wa_attempts: attempts + 1,
+              wa_last_attempt_at: new Date().toISOString(),
+              wa_last_error: 'finalize_failed:' + ferr.message,
+            }).eq('id', mo.id);
+            memResults.push({ id: mo.id, error: ferr.message }); continue;
+          }
+          tok = Array.isArray(fin) ? fin[0] : fin;
+        } else {
+          const { data: t } = await admin.from('membership_tokens')
+            .select('token,password,expires_at,max_devices,includes_replays,duration_days,package_id')
+            .eq('id', mo.membership_token_id).maybeSingle();
+          const { data: pkg } = await admin.from('membership_packages')
+            .select('name,replay_info,duration_days').eq('id', mo.package_id).maybeSingle();
+          if (!t || !pkg) { memResults.push({ id: mo.id, error: 'token_or_pkg_missing' }); continue; }
+          tok = {
+            token: t.token, password: t.password, expires_at: t.expires_at,
+            max_devices: t.max_devices, includes_replays: t.includes_replays,
+            duration_days: t.duration_days || pkg.duration_days,
+            replay_info: pkg.replay_info || '', package_name: pkg.name,
+          };
+        }
+
         const link = `${origin}/live?mtoken=${encodeURIComponent(tok.token)}&mp=${encodeURIComponent(tok.password)}`;
         const expiresStr = new Date(tok.expires_at).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
         const msg = memTpl
@@ -337,17 +390,26 @@ Deno.serve(async (req) => {
           .replace(/\{replay_info_block\}/g, tok.replay_info ? `🎬 *Info Replay:*\n${tok.replay_info}\n\n` : '')
           .replace(/\{site\}/g, origin.replace(/^https?:\/\//, ''));
         const sent = await sendFonnte(mo.phone, msg);
+        const nowIso = new Date().toISOString();
+        await admin.from('membership_orders').update({
+          wa_attempts: attempts + 1,
+          wa_last_attempt_at: nowIso,
+          wa_last_error: sent.ok ? null : JSON.stringify(sent.data).slice(0, 500),
+          wa_sent_at: sent.ok ? nowIso : mo.wa_sent_at,
+        }).eq('id', mo.id);
         await admin.from('wa_outbox').insert({
           phone: mo.phone, message: msg, status: sent.ok ? 'sent' : 'failed',
           error: sent.ok ? null : JSON.stringify(sent.data),
           related_order_id: mo.id, fonnte_response: sent.data as Record<string, unknown>,
         });
-        await admin.from('token_deliveries').insert({
-          phone: mo.phone, replay_id: null, replay_title: `Membership • ${tok.package_name}`,
-          order_id: null, access_token: tok.token, link,
-          source: 'pakasir-poll', requested_by: 'poll-pending-orders-membership',
-        });
-        memResults.push({ id: mo.id, finalized: true, sent: sent.ok });
+        if (sent.ok) {
+          await admin.from('token_deliveries').insert({
+            phone: mo.phone, replay_id: null, replay_title: `Membership • ${tok.package_name}`,
+            order_id: null, access_token: tok.token, link,
+            source: 'pakasir-poll', requested_by: 'poll-pending-orders-membership',
+          });
+        }
+        memResults.push({ id: mo.id, finalized: !mo.membership_token_id, sent: sent.ok, attempts: attempts + 1 });
       } catch (e) {
         memResults.push({ id: mo.id, error: String(e) });
       }
@@ -355,6 +417,7 @@ Deno.serve(async (req) => {
   } catch (e) {
     console.error('[poll] membership scan error', e);
   }
+
 
   return new Response(JSON.stringify({ ok: true, scanned: results.length, fast_lane: freshPending.length, membership: memResults.length, results, membership_results: memResults }), {
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
