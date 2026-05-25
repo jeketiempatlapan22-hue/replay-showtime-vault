@@ -96,27 +96,33 @@ export default function MembershipOrdersDialog({
 
   const [sending, setSending] = useState<Record<string, boolean>>({});
   const [bulkSending, setBulkSending] = useState(false);
-  const resendOne = async (id: string) => {
+  const resendOne = async (id: string, force = false) => {
     setSending((p) => ({ ...p, [id]: true }));
-    const { data, error } = await supabase.functions.invoke('resend-membership-wa', { body: { order_id: id } });
+    const { data, error } = await supabase.functions.invoke('resend-membership-wa', {
+      body: { order_id: id, force, filter: { scope: 'single', filter, force } },
+    });
     setSending((p) => ({ ...p, [id]: false }));
     if (error) { toast.error(error.message); return; }
     const r = (data as any)?.results?.[0];
     if (r?.sent) toast.success(`WA terkirim ke ${r.phone || ''}`);
+    else if (r?.skipped === 'already_delivered') toast.info('Sudah pernah terkirim. Shift+klik untuk paksa kirim ulang.');
     else if (r?.skipped) toast.warning(`Dilewati: ${r.skipped}`);
     else toast.error(`Gagal: ${r?.error || 'unknown'}`);
     void load();
   };
-  const resendBulk = async () => {
+  const resendBulk = async (force = false) => {
     const targets = filtered.map((r) => r.id);
     if (targets.length === 0) { toast.error('Tidak ada order pada filter ini'); return; }
-    if (!confirm(`Kirim ulang WA untuk ${targets.length} order pada filter "${filter}"?`)) return;
+    const label = force ? 'PAKSA kirim ulang' : 'Kirim ulang';
+    if (!confirm(`${label} WA untuk ${targets.length} order pada filter "${filter}"?`)) return;
     setBulkSending(true);
-    const { data, error } = await supabase.functions.invoke('resend-membership-wa', { body: { order_ids: targets } });
+    const { data, error } = await supabase.functions.invoke('resend-membership-wa', {
+      body: { order_ids: targets, force, filter: { scope: 'bulk', filter, force, count: targets.length } },
+    });
     setBulkSending(false);
     if (error) { toast.error(error.message); return; }
     const d = data as any;
-    toast.success(`Bulk selesai: ${d?.sent || 0}/${d?.total || 0} terkirim`);
+    toast.success(`Bulk: ${d?.sent || 0}/${d?.total || 0} terkirim · ${d?.skipped || 0} dilewati · ${d?.failed || 0} gagal`);
     void load();
   };
 
