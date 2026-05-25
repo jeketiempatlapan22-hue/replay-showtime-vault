@@ -298,7 +298,65 @@ Deno.serve(async (req) => {
   const runtime = (globalThis as unknown as { EdgeRuntime?: { waitUntil?: (p: Promise<unknown>) => void } }).EdgeRuntime;
   if (runtime?.waitUntil) runtime.waitUntil(fastLane); else fastLane.catch(() => {});
 
-  return new Response(JSON.stringify({ ok: true, scanned: results.length, fast_lane: freshPending.length, results }), {
+  // === MEMBERSHIP ORDERS (reserved QRIS yang webhook-nya tidak sampai) ===
+  // Bila sudah terbayar di Pakasir → finalize + kirim WA. Idempotent.
+  const memResults: any[] = [];
+  try {
+    const memTpl = (await admin.from('site_settings').select('value').eq('key', 'wa_membership_template').maybeSingle())
+      .data?.value ||
+      '👑 *MEMBERSHIP AKTIF*\n\n📦 *{package_name}*\n📅 Berlaku hingga: {expires_at}\n\n🔗 *Link Akses:*\n{link}\n\n🗝️ Sandi: *{password}*\n\n{replay_info_block}👤 Berlaku untuk *{max_devices} perangkat*.\n\n— *ReplayTime* 💖';
+    const { data: mOrders } = await admin
+      .from('membership_orders').select('*')
+      .eq('status', 'reserved').eq('kind', 'qris')
+      .not('pakasir_order_id', 'is', null)
+      .gte('created_at', since)
+      .order('created_at', { ascending: false }).limit(100);
+    for (const mo of mOrders ?? []) {
+      try {
+        const purl = `https://app.pakasir.com/api/transactiondetail?project=${encodeURIComponent(slug)}&amount=${mo.amount}&order_id=${encodeURIComponent(mo.pakasir_order_id)}&api_key=${encodeURIComponent(apiKey)}`;
+        const pres = await fetch(purl);
+        const pjson: any = await pres.json().catch(() => ({}));
+        const tx = pjson?.transaction || pjson?.payment || {};
+        const ps = String(tx.status || pjson?.status || '').toLowerCase();
+        const paid = ps === 'completed' || ps === 'paid' || ps === 'success';
+        if (!paid) { memResults.push({ id: mo.id, status: ps || 'pending' }); continue; }
+
+        const { data: fin, error: ferr } = await admin.rpc('finalize_membership_order', { _order_id: mo.id });
+        if (ferr) { memResults.push({ id: mo.id, error: ferr.message }); continue; }
+        const tok: any = Array.isArray(fin) ? fin[0] : fin;
+        const link = `${origin}/live?mtoken=${encodeURIComponent(tok.token)}&mp=${encodeURIComponent(tok.password)}`;
+        const expiresStr = new Date(tok.expires_at).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
+        const msg = memTpl
+          .replace(/\{package_name\}/g, tok.package_name || '')
+          .replace(/\{link\}/g, link)
+          .replace(/\{password\}/g, tok.password || '')
+          .replace(/\{expires_at\}/g, expiresStr)
+          .replace(/\{duration_days\}/g, String(tok.duration_days || ''))
+          .replace(/\{max_devices\}/g, String(tok.max_devices || 1))
+          .replace(/\{replay_info\}/g, tok.replay_info || '')
+          .replace(/\{replay_info_block\}/g, tok.replay_info ? `🎬 *Info Replay:*\n${tok.replay_info}\n\n` : '')
+          .replace(/\{site\}/g, origin.replace(/^https?:\/\//, ''));
+        const sent = await sendFonnte(mo.phone, msg);
+        await admin.from('wa_outbox').insert({
+          phone: mo.phone, message: msg, status: sent.ok ? 'sent' : 'failed',
+          error: sent.ok ? null : JSON.stringify(sent.data),
+          related_order_id: mo.id, fonnte_response: sent.data as Record<string, unknown>,
+        });
+        await admin.from('token_deliveries').insert({
+          phone: mo.phone, replay_id: null, replay_title: `Membership • ${tok.package_name}`,
+          order_id: null, access_token: tok.token, link,
+          source: 'pakasir-poll', requested_by: 'poll-pending-orders-membership',
+        });
+        memResults.push({ id: mo.id, finalized: true, sent: sent.ok });
+      } catch (e) {
+        memResults.push({ id: mo.id, error: String(e) });
+      }
+    }
+  } catch (e) {
+    console.error('[poll] membership scan error', e);
+  }
+
+  return new Response(JSON.stringify({ ok: true, scanned: results.length, fast_lane: freshPending.length, membership: memResults.length, results, membership_results: memResults }), {
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });
 });

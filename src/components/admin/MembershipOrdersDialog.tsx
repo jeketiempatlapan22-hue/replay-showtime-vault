@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Loader2, RefreshCw, ListOrdered, Copy, Check, Edit2, X } from 'lucide-react';
+import { Loader2, RefreshCw, ListOrdered, Copy, Check, Edit2, X, Send } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -91,6 +91,33 @@ export default function MembershipOrdersDialog({
     if (error) { toast.error(error.message); return; }
     toast.success('Data user diperbarui');
     setEditing(null);
+    void load();
+  };
+
+  const [sending, setSending] = useState<Record<string, boolean>>({});
+  const [bulkSending, setBulkSending] = useState(false);
+  const resendOne = async (id: string) => {
+    setSending((p) => ({ ...p, [id]: true }));
+    const { data, error } = await supabase.functions.invoke('resend-membership-wa', { body: { order_id: id } });
+    setSending((p) => ({ ...p, [id]: false }));
+    if (error) { toast.error(error.message); return; }
+    const r = (data as any)?.results?.[0];
+    if (r?.sent) toast.success(`WA terkirim ke ${r.phone || ''}`);
+    else if (r?.skipped) toast.warning(`Dilewati: ${r.skipped}`);
+    else toast.error(`Gagal: ${r?.error || 'unknown'}`);
+    void load();
+  };
+  const resendBulk = async () => {
+    const targets = filtered.map((r) => r.id);
+    if (targets.length === 0) { toast.error('Tidak ada order pada filter ini'); return; }
+    if (!confirm(`Kirim ulang WA untuk ${targets.length} order pada filter "${filter}"?`)) return;
+    setBulkSending(true);
+    const { data, error } = await supabase.functions.invoke('resend-membership-wa', { body: { order_ids: targets } });
+    setBulkSending(false);
+    if (error) { toast.error(error.message); return; }
+    const d = data as any;
+    toast.success(`Bulk selesai: ${d?.sent || 0}/${d?.total || 0} terkirim`);
+    void load();
   };
 
   const copyAllEmails = () => {
@@ -129,7 +156,11 @@ export default function MembershipOrdersDialog({
           <Badge variant={filter === 'paid' ? 'default' : 'outline'} className="cursor-pointer" onClick={() => setFilter('paid')}>Paid: {stats.paid || 0}</Badge>
           <Badge variant={filter === 'reserved' ? 'default' : 'outline'} className="cursor-pointer" onClick={() => setFilter('reserved')}>Reserved: {stats.reserved || 0}</Badge>
           <Badge variant={filter === 'all' ? 'default' : 'outline'} className="cursor-pointer" onClick={() => setFilter('all')}>Semua: {rows.length}</Badge>
-          <div className="ml-auto flex gap-1">
+          <div className="ml-auto flex gap-1 flex-wrap">
+            <Button size="sm" variant="default" className="h-7 text-xs" onClick={resendBulk} disabled={bulkSending}>
+              {bulkSending ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Send className="w-3 h-3 mr-1" />}
+              Kirim Ulang Semua ({filtered.length})
+            </Button>
             <Button size="sm" variant="outline" className="h-7 text-xs" onClick={copyAllPhones}><Copy className="w-3 h-3 mr-1" />Salin Nomor</Button>
             <Button size="sm" variant="outline" className="h-7 text-xs" onClick={copyAllEmails}><Copy className="w-3 h-3 mr-1" />Salin Email</Button>
             <Button size="sm" variant="outline" className="h-7 text-xs" onClick={exportCsv}>CSV</Button>
@@ -176,7 +207,12 @@ export default function MembershipOrdersDialog({
                         {r.kind === 'qris' ? `Rp ${(r.amount || 0).toLocaleString('id-ID')}` : `${r.coin_amount} koin`}
                       </div>
                       {r.membership_token_id && <div className="text-[10px] text-green-600">✓ token aktif</div>}
-                      <Button size="sm" variant="ghost" className="h-6 px-2" onClick={() => startEdit(r)}><Edit2 className="w-3 h-3" /></Button>
+                      <div className="flex gap-1 justify-end">
+                        <Button size="sm" variant="outline" className="h-6 px-2" onClick={() => resendOne(r.id)} disabled={!!sending[r.id]} title="Kirim ulang WA token + info replay">
+                          {sending[r.id] ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
+                        </Button>
+                        <Button size="sm" variant="ghost" className="h-6 px-2" onClick={() => startEdit(r)}><Edit2 className="w-3 h-3" /></Button>
+                      </div>
                     </div>
                   </div>
                 )}
