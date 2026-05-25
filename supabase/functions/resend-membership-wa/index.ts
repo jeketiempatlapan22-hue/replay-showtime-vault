@@ -1,6 +1,12 @@
 // Admin-only: kirim ulang notifikasi WA membership (token + link + replay info).
 // Bisa satu order atau bulk. Untuk order yang masih 'reserved' tapi sebenarnya
 // sudah dibayar di Pakasir, fungsi ini akan cek status dulu lalu finalize.
+//
+// Fitur:
+// - Dedup: jika token sudah ada DAN WA sudah pernah terkirim sukses untuk order
+//   yang sama, skip — kecuali `force: true` dikirim.
+// - Audit log: tiap pemanggilan dicatat di admin_action_logs (siapa, kapan,
+//   filter yang dipakai, daftar order yang dipengaruhi).
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
@@ -86,6 +92,7 @@ Deno.serve(async (req) => {
     const userClient = createClient(url, anon, { global: { headers: { Authorization: authHeader } } });
     const { data: ud } = await userClient.auth.getUser();
     const uid = ud?.user?.id;
+    const actorEmail = ud?.user?.email || '';
     if (!uid) return new Response(JSON.stringify({ error: 'unauthorized' }), { status: 401, headers: corsHeaders });
 
     const admin = createClient(url, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
@@ -94,6 +101,8 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const ids: string[] = Array.isArray(body.order_ids) ? body.order_ids.filter((x: unknown) => typeof x === 'string') : (body.order_id ? [String(body.order_id)] : []);
+    const force: boolean = body.force === true;
+    const filterMeta = body.filter && typeof body.filter === 'object' ? body.filter : {};
     if (ids.length === 0) {
       return new Response(JSON.stringify({ error: 'no_order_ids' }), { status: 400, headers: corsHeaders });
     }
@@ -113,6 +122,12 @@ Deno.serve(async (req) => {
         const { data: order } = await admin.from('membership_orders').select('*').eq('id', oid).maybeSingle();
         if (!order) { results.push({ id: oid, error: 'not_found' }); continue; }
 
+        // Dedup: jika sudah ada token DAN WA sudah terkirim sukses, skip kecuali force.
+        if (!force && order.membership_token_id && order.wa_sent_at) {
+          results.push({ id: oid, skipped: 'already_delivered', phone: order.phone });
+          continue;
+        }
+
         // Bila masih reserved & ada pakasir_order_id → coba cek status dulu.
         if (order.status === 'reserved' && order.kind === 'qris' && order.pakasir_order_id) {
           const paid = await pakasirIsPaid(order.pakasir_order_id, Number(order.amount || 0));
@@ -125,7 +140,14 @@ Deno.serve(async (req) => {
         let tok: any = null;
         if (!order.membership_token_id) {
           const { data: fin, error: ferr } = await admin.rpc('finalize_membership_order', { _order_id: oid });
-          if (ferr) { results.push({ id: oid, error: 'finalize_failed:' + ferr.message }); continue; }
+          if (ferr) {
+            await admin.from('membership_orders').update({
+              wa_attempts: (order.wa_attempts || 0) + 1,
+              wa_last_attempt_at: new Date().toISOString(),
+              wa_last_error: 'finalize_failed:' + ferr.message,
+            }).eq('id', oid);
+            results.push({ id: oid, error: 'finalize_failed:' + ferr.message }); continue;
+          }
           tok = Array.isArray(fin) ? fin[0] : fin;
         } else {
           const { data: t } = await admin.from('membership_tokens').select('token,password,expires_at,max_devices,includes_replays,duration_days,package_id').eq('id', order.membership_token_id).maybeSingle();
@@ -152,6 +174,13 @@ Deno.serve(async (req) => {
         });
 
         const sent = await sendFonnte(order.phone, message);
+        const nowIso = new Date().toISOString();
+        await admin.from('membership_orders').update({
+          wa_attempts: (order.wa_attempts || 0) + 1,
+          wa_last_attempt_at: nowIso,
+          wa_last_error: sent.ok ? null : JSON.stringify(sent.data).slice(0, 500),
+          wa_sent_at: sent.ok ? nowIso : order.wa_sent_at,
+        }).eq('id', oid);
         await admin.from('wa_outbox').insert({
           phone: order.phone, message, status: sent.ok ? 'sent' : 'failed',
           error: sent.ok ? null : JSON.stringify(sent.data),
@@ -169,7 +198,21 @@ Deno.serve(async (req) => {
     }
 
     const ok = results.filter((r) => r.sent).length;
-    return new Response(JSON.stringify({ ok: true, total: ids.length, sent: ok, results }), {
+    const skipped = results.filter((r) => r.skipped).length;
+    const failed = results.filter((r) => r.error).length;
+
+    // Audit log: siapa, kapan, filter, daftar order yang dipengaruhi
+    await admin.from('admin_action_logs').insert({
+      actor_user_id: uid,
+      actor_email: actorEmail,
+      action: ids.length > 1 ? 'membership_resend_bulk' : 'membership_resend_single',
+      filter: { ...filterMeta, force },
+      order_ids: ids,
+      affected_count: ids.length,
+      details: { sent: ok, skipped, failed, results },
+    });
+
+    return new Response(JSON.stringify({ ok: true, total: ids.length, sent: ok, skipped, failed, results }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (e) {
