@@ -198,6 +198,42 @@ export type Database = {
         }
         Relationships: []
       }
+      admin_action_logs: {
+        Row: {
+          action: string
+          actor_email: string | null
+          actor_user_id: string | null
+          affected_count: number
+          created_at: string
+          details: Json
+          filter: Json
+          id: string
+          order_ids: string[]
+        }
+        Insert: {
+          action: string
+          actor_email?: string | null
+          actor_user_id?: string | null
+          affected_count?: number
+          created_at?: string
+          details?: Json
+          filter?: Json
+          id?: string
+          order_ids?: string[]
+        }
+        Update: {
+          action?: string
+          actor_email?: string | null
+          actor_user_id?: string | null
+          affected_count?: number
+          created_at?: string
+          details?: Json
+          filter?: Json
+          id?: string
+          order_ids?: string[]
+        }
+        Relationships: []
+      }
       blocked_browsers: {
         Row: {
           browser_id: string
@@ -724,6 +760,10 @@ export type Database = {
           status: string
           updated_at: string
           user_id: string | null
+          wa_attempts: number
+          wa_last_attempt_at: string | null
+          wa_last_error: string | null
+          wa_sent_at: string | null
         }
         Insert: {
           amount?: number
@@ -742,6 +782,10 @@ export type Database = {
           status?: string
           updated_at?: string
           user_id?: string | null
+          wa_attempts?: number
+          wa_last_attempt_at?: string | null
+          wa_last_error?: string | null
+          wa_sent_at?: string | null
         }
         Update: {
           amount?: number
@@ -760,6 +804,10 @@ export type Database = {
           status?: string
           updated_at?: string
           user_id?: string | null
+          wa_attempts?: number
+          wa_last_attempt_at?: string | null
+          wa_last_error?: string | null
+          wa_sent_at?: string | null
         }
         Relationships: []
       }
