@@ -91,6 +91,33 @@ export default function MembershipOrdersDialog({
     if (error) { toast.error(error.message); return; }
     toast.success('Data user diperbarui');
     setEditing(null);
+    void load();
+  };
+
+  const [sending, setSending] = useState<Record<string, boolean>>({});
+  const [bulkSending, setBulkSending] = useState(false);
+  const resendOne = async (id: string) => {
+    setSending((p) => ({ ...p, [id]: true }));
+    const { data, error } = await supabase.functions.invoke('resend-membership-wa', { body: { order_id: id } });
+    setSending((p) => ({ ...p, [id]: false }));
+    if (error) { toast.error(error.message); return; }
+    const r = (data as any)?.results?.[0];
+    if (r?.sent) toast.success(`WA terkirim ke ${r.phone || ''}`);
+    else if (r?.skipped) toast.warning(`Dilewati: ${r.skipped}`);
+    else toast.error(`Gagal: ${r?.error || 'unknown'}`);
+    void load();
+  };
+  const resendBulk = async () => {
+    const targets = filtered.map((r) => r.id);
+    if (targets.length === 0) { toast.error('Tidak ada order pada filter ini'); return; }
+    if (!confirm(`Kirim ulang WA untuk ${targets.length} order pada filter "${filter}"?`)) return;
+    setBulkSending(true);
+    const { data, error } = await supabase.functions.invoke('resend-membership-wa', { body: { order_ids: targets } });
+    setBulkSending(false);
+    if (error) { toast.error(error.message); return; }
+    const d = data as any;
+    toast.success(`Bulk selesai: ${d?.sent || 0}/${d?.total || 0} terkirim`);
+    void load();
   };
 
   const copyAllEmails = () => {
