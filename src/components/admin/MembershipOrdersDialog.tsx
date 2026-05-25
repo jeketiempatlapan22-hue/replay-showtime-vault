@@ -156,7 +156,11 @@ export default function MembershipOrdersDialog({
           <Badge variant={filter === 'paid' ? 'default' : 'outline'} className="cursor-pointer" onClick={() => setFilter('paid')}>Paid: {stats.paid || 0}</Badge>
           <Badge variant={filter === 'reserved' ? 'default' : 'outline'} className="cursor-pointer" onClick={() => setFilter('reserved')}>Reserved: {stats.reserved || 0}</Badge>
           <Badge variant={filter === 'all' ? 'default' : 'outline'} className="cursor-pointer" onClick={() => setFilter('all')}>Semua: {rows.length}</Badge>
-          <div className="ml-auto flex gap-1">
+          <div className="ml-auto flex gap-1 flex-wrap">
+            <Button size="sm" variant="default" className="h-7 text-xs" onClick={resendBulk} disabled={bulkSending}>
+              {bulkSending ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Send className="w-3 h-3 mr-1" />}
+              Kirim Ulang Semua ({filtered.length})
+            </Button>
             <Button size="sm" variant="outline" className="h-7 text-xs" onClick={copyAllPhones}><Copy className="w-3 h-3 mr-1" />Salin Nomor</Button>
             <Button size="sm" variant="outline" className="h-7 text-xs" onClick={copyAllEmails}><Copy className="w-3 h-3 mr-1" />Salin Email</Button>
             <Button size="sm" variant="outline" className="h-7 text-xs" onClick={exportCsv}>CSV</Button>
