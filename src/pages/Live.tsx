@@ -433,7 +433,7 @@ export default function Live() {
     const idnShowId = status?.idn_show_id || unlocked.idn_show_id || '';
     // IDN source tampil di depan player utama dan memakai ID dari status terbaru
     // atau dari payload unlock agar link token langsung jalan tanpa reload kedua.
-    if (idnShowId) list.push({ label: 'IDN', type: 'm3u8', url: `idn://${idnShowId}` });
+    list.push({ label: 'IDN', type: 'm3u8', url: `idn://${idnShowId}` });
     const main: PrivateSource = { label: 'Player Utama', type: unlocked.type, url: unlocked.url };
     if (main.url) list.push(main);
     list.push(...(unlocked.sources || []).filter(s => s.url));
@@ -454,7 +454,7 @@ export default function Live() {
   const [idnError, setIdnError] = useState<string>('');
   const [idnRetryNonce, setIdnRetryNonce] = useState(0);
   useEffect(() => {
-    if (!activeSource || !activeSource.url.startsWith('idn://')) { setIdnError(''); setIdnResolved(null); return; }
+    if (!activeSource || !activeSource.url.startsWith('idn://')) { setIdnError(''); return; }
     const idnId = activeSource.url.slice('idn://'.length);
     if (!idnId) {
       setIdnResolved(null);
