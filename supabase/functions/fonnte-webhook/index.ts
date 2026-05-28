@@ -424,9 +424,10 @@ Deno.serve(async (req) => {
     const adminPhones = new Set((admins ?? []).map((a: any) => normalizePhone(a.phone)));
     isBotAdmin = candidatePhones.some((p) => adminPhones.has(p));
     if (!isBotAdmin) {
+        const deniedMessage = '🔒 Command ini hanya untuk admin bot. Hubungi owner untuk akses.';
       await sendAndAudit(admin, {
         phone: phoneNorm,
-        message: '🔒 Command ini hanya untuk admin bot. Hubungi owner untuk akses.',
+          message: deniedMessage,
         inboxId,
         testMode,
         deliverTest,
@@ -434,6 +435,9 @@ Deno.serve(async (req) => {
         device: deviceNorm,
         fromMe,
       });
+        if (testMode) {
+          return json({ ok: true, phone: phoneNorm, command: cmd, reply: deniedMessage, delivered: deliverTest });
+        }
       return new Response('ok', { headers: corsHeaders });
     }
   }
