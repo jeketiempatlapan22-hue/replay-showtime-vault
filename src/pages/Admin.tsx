@@ -458,9 +458,9 @@ export default function Admin() {
     }
   };
 
-  const handleToggleMasterPaused = async (month: string, paused: boolean) => {
+  const handleToggleMasterPaused = async (id: string, month: string, paused: boolean) => {
     try {
-      await setMasterPasswordPaused(month, paused);
+      await setMasterPasswordPaused(id, paused);
       toast({ title: 'Berhasil', description: paused ? `Sandi master ${month} dijeda.` : `Sandi master ${month} diaktifkan kembali.` });
       await refreshData();
     } catch {
@@ -468,9 +468,9 @@ export default function Admin() {
     }
   };
 
-  const handleDeleteMasterPassword = async (month: string) => {
+  const handleDeleteMasterPassword = async (id: string, month: string) => {
     try {
-      await deleteMasterPassword(month);
+      await deleteMasterPassword(id);
       toast({ title: 'Berhasil', description: `Sandi master ${month} dihapus.` });
       await refreshData();
     } catch {
