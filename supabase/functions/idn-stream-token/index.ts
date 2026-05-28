@@ -13,7 +13,7 @@ const corsHeaders = {
 const X_TOKEN_ID = '114e0e89-f8b4-44ee-9354-bb06805cc02f';
 const X_SEC_KEY = '49c647f3-c84b-4b93-9b84-9d1ad158428e';
 const PARTNER_SECRET = Deno.env.get('HANABIRA_PARTNER_SECRET') || 'Hanabirastream2026';
-const PLAYBACK_URL = 'https://idn.mediastream48.workers.dev/api/proxy/playback';
+const PLAYBACK_URL = 'https://proxy.mediastream48.workers.dev/api/proxy/playback';
 
 function b64url(bytes: Uint8Array): string {
   let bin = '';
