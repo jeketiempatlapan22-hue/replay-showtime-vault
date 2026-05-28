@@ -248,9 +248,9 @@ Deno.serve(async (req) => {
       if (!valid) {
         const now = new Date();
         const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-        const { data: master } = await supabase
-          .from("master_passwords").select("password,paused").eq("month", monthKey).maybeSingle();
-        valid = !!master && master.paused !== true && master.password === password;
+        const { data: masters } = await supabase
+          .from("master_passwords").select("password,paused").eq("month", monthKey);
+        valid = (masters || []).some((m: any) => m.paused !== true && m.password === password);
       }
       await supabase.rpc('record_login_attempt', { _identifier: lockId, _success: valid });
       if (!valid) return json({ valid: false, reason: "bad_password" });
