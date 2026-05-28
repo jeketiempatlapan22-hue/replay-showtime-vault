@@ -184,6 +184,7 @@ async function isAuthorizedTestRequest(authHeader: string, admin: ReturnType<typ
       global: { headers: { Authorization: authHeader } },
     });
     const { data: claims } = await userClient.auth.getClaims(bearer);
+    if (claims?.claims?.role === 'service_role') return true;
     const userId = claims?.claims?.sub;
     if (!userId) return false;
     const { data: isAdmin } = await admin.rpc('has_role', { _user_id: userId, _role: 'admin' });
@@ -763,7 +764,7 @@ Deno.serve(async (req) => {
       const errorMsg = e instanceof Error ? e.message : 'unknown_error';
       await sendAndAudit(admin, {
         phone: phoneNorm,
-        message: `⚠️ Command *${displayCommand}* gagal diproses. ${errorMsg}`,
+        message: `⚠️ Command *${cmd}* gagal diproses. ${errorMsg}`,
         inboxId,
         testMode,
         deliverTest,
