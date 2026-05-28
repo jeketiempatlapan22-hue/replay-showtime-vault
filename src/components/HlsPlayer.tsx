@@ -246,6 +246,17 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
             if (v != null && String(v).length > 0) xhr.setRequestHeader(k, String(v));
           });
         },
+        fetchSetup: (context, initParams) => {
+          const hdrs = headersRef.current;
+          if (!hdrs || Object.keys(hdrs).length === 0) {
+            return new Request(context.url, initParams);
+          }
+          const mergedHeaders = new Headers(initParams?.headers || {});
+          Object.entries(hdrs).forEach(([k, v]) => {
+            if (v != null && String(v).length > 0) mergedHeaders.set(k, String(v));
+          });
+          return new Request(context.url, { ...initParams, headers: mergedHeaders });
+        },
         enableWorker: true,
         lowLatencyMode: false,
         // Buffer tuning adaptif berdasarkan profil perangkat & jaringan.
