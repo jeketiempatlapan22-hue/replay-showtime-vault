@@ -194,6 +194,13 @@ async function isAuthorizedTestRequest(authHeader: string, admin: ReturnType<typ
   }
 }
 
+function hasValidWebhookSecret(req: Request) {
+  const expectedSecret = Deno.env.get('FONNTE_WEBHOOK_SECRET') || '';
+  if (!expectedSecret) return false;
+  const provided = req.headers.get('x-webhook-secret') || req.headers.get('X-Webhook-Secret') || '';
+  return provided === expectedSecret;
+}
+
 function pickWebhookPayload(input: any) {
   if (Array.isArray(input)) return input[0] ?? {};
   if (Array.isArray(input?.data)) return input.data[0] ?? {};
@@ -261,7 +268,7 @@ Deno.serve(async (req) => {
   const debug = (reason: string, extra: Record<string, unknown> = {}) =>
     testMode ? json({ ok: false, reason, ...extra }) : new Response('ok', { headers: corsHeaders });
 
-  if (testMode && !(await isAuthorizedTestRequest(authHeader, admin))) {
+  if (testMode && !hasValidWebhookSecret(req) && !(await isAuthorizedTestRequest(authHeader, admin))) {
     return json({ ok: false, reason: 'unauthorized' }, 401);
   }
 
@@ -270,10 +277,8 @@ Deno.serve(async (req) => {
   // Falls back to "open" when secret unset (with a 7s rate limit per phone) for
   // backward compatibility with existing Fonnte deployments.
   if (!testMode) {
-    const expectedSecret = Deno.env.get('FONNTE_WEBHOOK_SECRET') || '';
-    if (expectedSecret) {
-      const provided = req.headers.get('x-webhook-secret') || req.headers.get('X-Webhook-Secret') || '';
-      if (provided !== expectedSecret) {
+    if (Deno.env.get('FONNTE_WEBHOOK_SECRET')) {
+      if (!hasValidWebhookSecret(req)) {
         return new Response('ok', { headers: corsHeaders });
       }
     }
