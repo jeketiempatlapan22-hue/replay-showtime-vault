@@ -458,9 +458,9 @@ export default function Admin() {
     }
   };
 
-  const handleToggleMasterPaused = async (month: string, paused: boolean) => {
+  const handleToggleMasterPaused = async (id: string, month: string, paused: boolean) => {
     try {
-      await setMasterPasswordPaused(month, paused);
+      await setMasterPasswordPaused(id, paused);
       toast({ title: 'Berhasil', description: paused ? `Sandi master ${month} dijeda.` : `Sandi master ${month} diaktifkan kembali.` });
       await refreshData();
     } catch {
@@ -468,9 +468,9 @@ export default function Admin() {
     }
   };
 
-  const handleDeleteMasterPassword = async (month: string) => {
+  const handleDeleteMasterPassword = async (id: string, month: string) => {
     try {
-      await deleteMasterPassword(month);
+      await deleteMasterPassword(id);
       toast({ title: 'Berhasil', description: `Sandi master ${month} dihapus.` });
       await refreshData();
     } catch {
@@ -1266,7 +1266,7 @@ export default function Admin() {
                 {masterPasswords.length > 0 && (
                   <div className="flex flex-col gap-2 mt-3">
                     {masterPasswords.map(mp => (
-                      <div key={mp.month} className="flex items-center justify-between gap-2 p-2 rounded-md border border-border bg-secondary/40">
+                      <div key={mp.id} className="flex items-center justify-between gap-2 p-2 rounded-md border border-border bg-secondary/40">
                         <div className="flex items-center gap-2 min-w-0">
                           <Badge variant={mp.paused ? 'outline' : 'secondary'} className="text-xs py-1 px-2 truncate">
                             {mp.month}: {mp.password}
@@ -1276,9 +1276,9 @@ export default function Admin() {
                         <div className="flex items-center gap-2 shrink-0">
                           <div className="flex items-center gap-1">
                             <span className="text-[10px] text-muted-foreground">Aktif</span>
-                            <Switch checked={!mp.paused} onCheckedChange={(v) => handleToggleMasterPaused(mp.month, !v)} />
+                            <Switch checked={!mp.paused} onCheckedChange={(v) => handleToggleMasterPaused(mp.id, mp.month, !v)} />
                           </div>
-                          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleDeleteMasterPassword(mp.month)}>
+                          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleDeleteMasterPassword(mp.id, mp.month)}>
                             <Trash2 className="w-3.5 h-3.5" />
                           </Button>
                         </div>

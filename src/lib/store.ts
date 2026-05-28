@@ -118,23 +118,18 @@ export async function getAllMasterPasswords(): Promise<MasterPasswordRow[]> {
 }
 
 export async function setMasterPassword(month: string, password: string) {
-  const { data: existing } = await supabase.from('master_passwords').select('id').eq('month', month).maybeSingle();
-  if (existing) {
-    const { error } = await supabase.from('master_passwords').update({ password }).eq('id', existing.id);
-    if (error) throw error;
-  } else {
-    const { error } = await supabase.from('master_passwords').insert({ month, password });
-    if (error) throw error;
-  }
-}
-
-export async function setMasterPasswordPaused(month: string, paused: boolean) {
-  const { error } = await supabase.from('master_passwords').update({ paused }).eq('month', month);
+  // Beberapa sandi master per bulan diizinkan — selalu tambah baris baru.
+  const { error } = await supabase.from('master_passwords').insert({ month, password });
   if (error) throw error;
 }
 
-export async function deleteMasterPassword(month: string) {
-  const { error } = await supabase.from('master_passwords').delete().eq('month', month);
+export async function setMasterPasswordPaused(id: string, paused: boolean) {
+  const { error } = await supabase.from('master_passwords').update({ paused }).eq('id', id);
+  if (error) throw error;
+}
+
+export async function deleteMasterPassword(id: string) {
+  const { error } = await supabase.from('master_passwords').delete().eq('id', id);
   if (error) throw error;
 }
 
