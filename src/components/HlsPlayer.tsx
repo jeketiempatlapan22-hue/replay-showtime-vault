@@ -224,43 +224,54 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
     const effective = conn?.effectiveType || '';
     const downlink = typeof conn?.downlink === 'number' ? conn.downlink : 99;
     const isWeak = /^(slow-2g|2g|3g)$/i.test(effective) || downlink < 1.5 || conn?.saveData === true;
-    const initialBwEstimate = isWeak ? 250_000 : 700_000;
+    const initialBwEstimate = isWeak ? 350_000 : 1_200_000;
+    // Adaptive buffer sizing: cukup besar untuk menahan fluktuasi jaringan tanpa memboroskan
+    // memori di perangkat low-end. Mobile/weak network pakai buffer lebih kecil.
+    const isMobile = typeof navigator !== 'undefined' && /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent || '');
+    const deviceMem = (navigator as Navigator & { deviceMemory?: number }).deviceMemory || 4;
+    const lowMem = deviceMem <= 2;
+    const bufferProfile = isWeak || lowMem
+      ? { back: 30, max: 30, maxMax: 60, size: 40 * 1000 * 1000 }
+      : isMobile
+        ? { back: 60, max: 60, maxMax: 180, size: 80 * 1000 * 1000 }
+        : { back: 90, max: 90, maxMax: 600, size: 150 * 1000 * 1000 };
 
     if (Hls.isSupported()) {
       hls = new Hls({
         xhrSetup: (xhr, url) => {
           const hdrs = headersRef.current;
           if (!hdrs || Object.keys(hdrs).length === 0) return;
-          // setRequestHeader hanya valid setelah XHR dibuka. Sebelumnya error itu
-          // tertelan, jadi request IDN terkirim tanpa x-api-token/x-sec-key/x-token-id/x-showid.
           if (xhr.readyState === 0) xhr.open('GET', url, true);
           Object.entries(hdrs).forEach(([k, v]) => {
             if (v != null && String(v).length > 0) xhr.setRequestHeader(k, String(v));
           });
         },
         enableWorker: true,
-        // Disable LL-HLS auto-detection: it caused stalls/restarts on regular streams whose URL contains "live"
         lowLatencyMode: false,
-        // Buffer tuning: konservatif untuk sesi panjang (7+ jam) di perangkat mobile.
-        // Back buffer pendek untuk menahan memory growth, max buffer cukup untuk smooth playback.
-        backBufferLength: 30,
-        maxBufferLength: 30,
-        maxMaxBufferLength: 60,
-        maxBufferSize: 30 * 1000 * 1000,
-        maxBufferHole: 0.75,
+        // Buffer tuning adaptif berdasarkan profil perangkat & jaringan.
+        // Buffer lebih besar di desktop/wifi mengurangi lag akibat fluktuasi sesaat,
+        // buffer ringan di mobile/2G mencegah OOM dan stall pada CPU lemah.
+        backBufferLength: bufferProfile.back,
+        maxBufferLength: bufferProfile.max,
+        maxMaxBufferLength: bufferProfile.maxMax,
+        maxBufferSize: bufferProfile.size,
+        maxBufferHole: 0.5,
         highBufferWatchdogPeriod: 2,
         nudgeOffset: 0.1,
         nudgeMaxRetry: 8,
-        // ABR: mulai dari kualitas terendah supaya cepat play, lalu naikkan
+        // ABR: mulai dari kualitas terendah supaya cepat play, lalu naikkan responsif
         startLevel: -1,
         autoStartLoad: true,
         abrEwmaDefaultEstimate: initialBwEstimate,
-        abrBandWidthFactor: 0.75,
-        abrBandWidthUpFactor: 0.55,
+        abrEwmaFastLive: 3.0,
+        abrEwmaSlowLive: 9.0,
+        abrEwmaFastVoD: 3.0,
+        abrEwmaSlowVoD: 9.0,
+        abrBandWidthFactor: 0.85,
+        abrBandWidthUpFactor: 0.7,
         abrMaxWithRealBitrate: true,
         testBandwidth: true,
         capLevelToPlayerSize: true,
-        // Retry stabil untuk sesi panjang dan penonton ramai
         manifestLoadingTimeOut: 18_000,
         manifestLoadingMaxRetry: 8,
         manifestLoadingRetryDelay: 800,
@@ -273,15 +284,16 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
         fragLoadingMaxRetry: 10,
         fragLoadingRetryDelay: 800,
         fragLoadingMaxRetryTimeout: 10_000,
-        // Stall detection
-        maxStarvationDelay: 8,
-        maxLoadingDelay: 8,
-        // Hindari buffering ulang berlebihan
+        // Stall detection — toleransi sedikit lebih longgar agar fluktuasi
+        // jaringan tidak memicu nudge/recovery yang membuat video tersendat.
+        maxStarvationDelay: 10,
+        maxLoadingDelay: 10,
         appendErrorMaxRetry: 5,
         startPosition: -1,
         liveDurationInfinity: true,
         liveSyncDurationCount: 4,
         liveMaxLatencyDurationCount: 12,
+        progressive: true,
       });
       hlsRef.current = hls;
       hls.loadSource(src);
