@@ -184,6 +184,7 @@ async function isAuthorizedTestRequest(authHeader: string, admin: ReturnType<typ
       global: { headers: { Authorization: authHeader } },
     });
     const { data: claims } = await userClient.auth.getClaims(bearer);
+    if (claims?.claims?.role === 'service_role') return true;
     const userId = claims?.claims?.sub;
     if (!userId) return false;
     const { data: isAdmin } = await admin.rpc('has_role', { _user_id: userId, _role: 'admin' });
@@ -191,6 +192,13 @@ async function isAuthorizedTestRequest(authHeader: string, admin: ReturnType<typ
   } catch {
     return false;
   }
+}
+
+function hasValidWebhookSecret(req: Request) {
+  const expectedSecret = Deno.env.get('FONNTE_WEBHOOK_SECRET') || '';
+  if (!expectedSecret) return false;
+  const provided = req.headers.get('x-webhook-secret') || req.headers.get('X-Webhook-Secret') || '';
+  return provided === expectedSecret;
 }
 
 function pickWebhookPayload(input: any) {
@@ -260,7 +268,7 @@ Deno.serve(async (req) => {
   const debug = (reason: string, extra: Record<string, unknown> = {}) =>
     testMode ? json({ ok: false, reason, ...extra }) : new Response('ok', { headers: corsHeaders });
 
-  if (testMode && !(await isAuthorizedTestRequest(authHeader, admin))) {
+  if (testMode && !hasValidWebhookSecret(req) && !(await isAuthorizedTestRequest(authHeader, admin))) {
     return json({ ok: false, reason: 'unauthorized' }, 401);
   }
 
@@ -269,10 +277,8 @@ Deno.serve(async (req) => {
   // Falls back to "open" when secret unset (with a 7s rate limit per phone) for
   // backward compatibility with existing Fonnte deployments.
   if (!testMode) {
-    const expectedSecret = Deno.env.get('FONNTE_WEBHOOK_SECRET') || '';
-    if (expectedSecret) {
-      const provided = req.headers.get('x-webhook-secret') || req.headers.get('X-Webhook-Secret') || '';
-      if (provided !== expectedSecret) {
+    if (Deno.env.get('FONNTE_WEBHOOK_SECRET')) {
+      if (!hasValidWebhookSecret(req)) {
         return new Response('ok', { headers: corsHeaders });
       }
     }
@@ -418,9 +424,10 @@ Deno.serve(async (req) => {
     const adminPhones = new Set((admins ?? []).map((a: any) => normalizePhone(a.phone)));
     isBotAdmin = candidatePhones.some((p) => adminPhones.has(p));
     if (!isBotAdmin) {
+        const deniedMessage = '🔒 Command ini hanya untuk admin bot. Hubungi owner untuk akses.';
       await sendAndAudit(admin, {
         phone: phoneNorm,
-        message: '🔒 Command ini hanya untuk admin bot. Hubungi owner untuk akses.',
+          message: deniedMessage,
         inboxId,
         testMode,
         deliverTest,
@@ -428,6 +435,9 @@ Deno.serve(async (req) => {
         device: deviceNorm,
         fromMe,
       });
+        if (testMode) {
+          return json({ ok: true, phone: phoneNorm, command: cmd, reply: deniedMessage, delivered: deliverTest });
+        }
       return new Response('ok', { headers: corsHeaders });
     }
   }
@@ -763,7 +773,7 @@ Deno.serve(async (req) => {
       const errorMsg = e instanceof Error ? e.message : 'unknown_error';
       await sendAndAudit(admin, {
         phone: phoneNorm,
-        message: `⚠️ Command *${displayCommand}* gagal diproses. ${errorMsg}`,
+        message: `⚠️ Command *${cmd}* gagal diproses. ${errorMsg}`,
         inboxId,
         testMode,
         deliverTest,
