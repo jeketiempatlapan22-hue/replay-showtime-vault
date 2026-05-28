@@ -13,7 +13,7 @@ const corsHeaders = {
 const X_TOKEN_ID = '114e0e89-f8b4-44ee-9354-bb06805cc02f';
 const X_SEC_KEY = '49c647f3-c84b-4b93-9b84-9d1ad158428e';
 const PARTNER_SECRET = Deno.env.get('HANABIRA_PARTNER_SECRET') || 'Hanabirastream2026';
-const PLAYBACK_URL = 'https://idn.mediastream48.workers.dev/api/proxy/playback';
+const PLAYBACK_URL = 'https://proxy.mediastream48.workers.dev/api/proxy/playback';
 
 function b64url(bytes: Uint8Array): string {
   let bin = '';
@@ -36,7 +36,7 @@ async function generateApiToken(showId: string): Promise<string> {
   // Step B: Payload
   const now = Math.floor(Date.now() / 1000);
   const header = { alg: 'HS256', typ: 'JWT' };
-  const payload = { sid: showId, tid: X_TOKEN_ID, exp: now + 90 };
+  const payload = { sid: showId, tid: X_TOKEN_ID, exp: now + 7200 };
   const signingInput = `${b64urlStr(JSON.stringify(header))}.${b64urlStr(JSON.stringify(payload))}`;
 
   // Step C: HMAC-SHA256
@@ -72,7 +72,7 @@ Deno.serve(async (req) => {
       xSecKey: X_SEC_KEY,
       xApiToken,
       playbackUrl: PLAYBACK_URL,
-      expiresIn: 90,
+      expiresIn: 7200,
     }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   } catch (e) {
     return new Response(JSON.stringify({ error: (e as Error).message }), {
