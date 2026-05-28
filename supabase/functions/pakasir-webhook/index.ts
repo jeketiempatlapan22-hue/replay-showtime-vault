@@ -153,17 +153,37 @@ Deno.serve(async (req) => {
       .replace(/\{replay_info\}/g, tok.replay_info || '')
       .replace(/\{replay_info_block\}/g, tok.replay_info ? `🎬 *Info Replay:*\n${tok.replay_info}\n\n` : '')
       .replace(/\{site\}/g, origin.replace(/^https?:\/\//, ''));
+    // Idempotency guard: only one worker dispatches WA per membership order.
+    const claimAt = new Date().toISOString();
+    const { data: claimed } = await admin.from('membership_orders')
+      .update({ wa_last_attempt_at: claimAt })
+      .eq('id', mOrder.id).is('wa_sent_at', null).select('id');
+    if (!claimed || claimed.length === 0) {
+      return new Response(JSON.stringify({ ok: true, membership: true, already_sent: true }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
     const sent = await sendFonnte(mOrder.phone, msg);
+    const nowIso = new Date().toISOString();
+    await admin.from('membership_orders').update({
+      wa_attempts: (Number(mOrder.wa_attempts) || 0) + 1,
+      wa_last_attempt_at: nowIso,
+      wa_last_error: sent.ok ? null : JSON.stringify(sent.data).slice(0, 500),
+      wa_sent_at: sent.ok ? nowIso : null,
+    }).eq('id', mOrder.id);
     await admin.from('wa_outbox').insert({
       phone: mOrder.phone, message: msg, status: sent.ok ? 'sent' : 'failed',
       error: sent.ok ? null : JSON.stringify(sent.data),
+      related_order_id: mOrder.id,
       fonnte_response: sent.data as Record<string, unknown>,
     });
-    await admin.from('token_deliveries').insert({
-      phone: mOrder.phone, replay_id: null, replay_title: `Membership • ${tok.package_name}`,
-      order_id: null, access_token: tok.token, link,
-      source: 'pakasir', requested_by: 'pakasir-webhook-membership',
-    });
+    if (sent.ok) {
+      await admin.from('token_deliveries').insert({
+        phone: mOrder.phone, replay_id: null, replay_title: `Membership • ${tok.package_name}`,
+        order_id: null, access_token: tok.token, link,
+        source: 'pakasir', requested_by: 'pakasir-webhook-membership',
+      });
+    }
     return new Response(JSON.stringify({ ok: true, membership: true, sent: sent.ok }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

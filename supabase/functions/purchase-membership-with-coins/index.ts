@@ -136,16 +136,26 @@ Deno.serve(async (req) => {
     });
 
     const sent = await sendFonnte(phone, message);
+    const nowIso = new Date().toISOString();
+    await admin.from('membership_orders').update({
+      wa_attempts: 1,
+      wa_last_attempt_at: nowIso,
+      wa_last_error: sent.ok ? null : JSON.stringify(sent.data).slice(0, 500),
+      wa_sent_at: sent.ok ? nowIso : null,
+    }).eq('id', row.order_id);
     await admin.from('wa_outbox').insert({
       phone, message, status: sent.ok ? 'sent' : 'failed',
       error: sent.ok ? null : JSON.stringify(sent.data),
+      related_order_id: row.order_id,
       fonnte_response: sent.data,
     });
-    await admin.from('token_deliveries').insert({
-      phone, replay_id: null, replay_title: `Membership • ${tok.package_name}`,
-      order_id: null, access_token: tok.token, link,
-      source: 'coins', requested_by: 'purchase-membership-with-coins',
-    });
+    if (sent.ok) {
+      await admin.from('token_deliveries').insert({
+        phone, replay_id: null, replay_title: `Membership • ${tok.package_name}`,
+        order_id: null, access_token: tok.token, link,
+        source: 'coins', requested_by: 'purchase-membership-with-coins',
+      });
+    }
 
     return new Response(JSON.stringify({
       ok: true, balance: newBalance, link,
