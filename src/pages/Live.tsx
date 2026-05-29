@@ -35,7 +35,11 @@ type SourceLike = Partial<Record<keyof PrivateSource, unknown>>;
 
 const SS_KEY_BASE = 'replaytime-live-unlocked';
 const SS_SRC_KEY = 'replaytime-live-source-idx';
-const IDN_TOKEN_REFRESH_MS = 60 * 1000;
+// Token IDN berlaku ~2 jam. Refresh header tiap 25 menit sudah aman dan
+// menghindari tear-down player yang sering. Master playlist (blob URL)
+// hanya di-set sekali — refresh berikutnya HANYA memperbarui headers
+// supaya segmen .ts/.m3u8 ke worker tetap terotorisasi tanpa restart player.
+const IDN_TOKEN_REFRESH_MS = 25 * 60 * 1000;
 
 const typeLabel = (t: string) => t === 'youtube' ? 'YouTube' : t === 'cloudflare' ? 'Cloudflare' : 'M3U8 / HLS';
 
