@@ -444,6 +444,24 @@ export default function Live() {
     setFailedSourceKeys([]);
   }, [unlocked?.url, unlocked?.sources]);
 
+  // CORS guard: the IDN/hanabira worker only whitelists `realtime48stream.my.id`
+  // (tanpa www, tanpa preview, tanpa replaytime.lovable.app). Saat player IDN
+  // aktif dan user membuka via origin lain, browser memblokir preflight →
+  // player terjebak di memuat. Redirect ke domain canonical agar playback jalan.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const src = allSources[Math.min(sourceIdx, Math.max(0, allSources.length - 1))];
+    if (!src?.url?.startsWith('idn://')) return;
+    const host = window.location.hostname;
+    const CANONICAL = 'realtime48stream.my.id';
+    if (host === CANONICAL) return;
+    // Biarkan dev lokal apa adanya (tidak akan playback IDN, tapi jangan loop redirect).
+    if (host === 'localhost' || host === '127.0.0.1' || host.endsWith('.local')) return;
+    const target = `https://${CANONICAL}${window.location.pathname}${window.location.search}${window.location.hash}`;
+    window.location.replace(target);
+  }, [allSources, sourceIdx]);
+
+
   const safeIdx = Math.min(sourceIdx, Math.max(0, allSources.length - 1));
   const activeSource = allSources[safeIdx];
   const sourceKey = (source: PrivateSource, index: number) => `${index}:${source.type}:${source.url}`;
