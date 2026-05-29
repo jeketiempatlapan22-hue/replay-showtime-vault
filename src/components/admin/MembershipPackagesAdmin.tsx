@@ -58,7 +58,7 @@ export default function MembershipPackagesAdmin() {
 
   const load = async () => {
     setLoading(true);
-    const { data } = await supabase.from('membership_packages').select('*').order('sort_order').order('created_at');
+    const { data } = await (supabase as any).rpc('admin_get_membership_packages');
     setRows((data || []) as Pkg[]);
     setLoading(false);
   };
