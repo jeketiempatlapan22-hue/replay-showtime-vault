@@ -484,6 +484,7 @@ export default function Live() {
     let refreshTimer: number | null = null;
     setIdnError('');
     if (idnResolved?.key !== key) setIdnResolved(null);
+    let lastBlobUrl: string | null = null;
     const refreshIdnToken = async (initial = false) => {
       try {
         const { data, error } = await supabase.functions.invoke('idn-stream-token', {
@@ -500,11 +501,13 @@ export default function Live() {
         if (!xApiToken || !xSecKey || !xTokenId || !playbackUrl) {
           throw new Error('Respon token IDN tidak lengkap');
         }
-        if (cancelled) return;
-        setIdnError('');
-        setIdnResolved({
-          key,
-          url: playbackUrl,
+        // Worker /api/proxy/playback wajib menerima header x-api-token/x-sec-key/x-showid/x-token-id.
+        // Karena hls.js xhrSetup tidak konsisten (terutama iOS Safari pakai native HLS yg tak
+        // mendukung custom header), kita fetch master playlist sendiri di sini lalu serahkan
+        // sebagai blob URL ke player. URL rendition di dalam master sudah signed sehingga
+        // request berikutnya tidak butuh header tambahan.
+        const res = await fetch(playbackUrl, {
+          method: 'GET',
           headers: {
             'x-api-token': xApiToken,
             'x-sec-key': xSecKey,
@@ -512,13 +515,30 @@ export default function Live() {
             'x-token-id': xTokenId,
           },
         });
+        if (!res.ok) throw new Error(`Worker playback menolak (${res.status})`);
+        const m3u8Text = await res.text();
+        if (cancelled) return;
+        const blob = new Blob([m3u8Text], { type: 'application/vnd.apple.mpegurl' });
+        const blobUrl = URL.createObjectURL(blob);
+        const prevBlob = lastBlobUrl;
+        lastBlobUrl = blobUrl;
+        setIdnError('');
+        setIdnResolved({ key, url: blobUrl, headers: {} });
+        if (prevBlob) {
+          // Bebaskan blob lama setelah player sempat berpindah.
+          setTimeout(() => { try { URL.revokeObjectURL(prevBlob); } catch { /* ignore */ } }, 5000);
+        }
       } catch (e: any) {
-        if (!cancelled && initial) setIdnError(e?.message || 'Gagal mengambil token IDN. Pastikan kamu sudah login.');
+        if (!cancelled && initial) setIdnError(e?.message || 'Gagal mengambil token IDN. Pastikan domain ini di-whitelist worker.');
       }
     };
     void refreshIdnToken(true);
     refreshTimer = window.setInterval(() => { void refreshIdnToken(false); }, IDN_TOKEN_REFRESH_MS);
-    return () => { cancelled = true; if (refreshTimer) window.clearInterval(refreshTimer); };
+    return () => {
+      cancelled = true;
+      if (refreshTimer) window.clearInterval(refreshTimer);
+      if (lastBlobUrl) { try { URL.revokeObjectURL(lastBlobUrl); } catch { /* ignore */ } }
+    };
   }, [activeSource?.url, idnRetryNonce]);
 
   const selectSource = (i: number) => {
