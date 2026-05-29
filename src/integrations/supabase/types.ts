@@ -1431,6 +1431,35 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      admin_get_membership_packages: {
+        Args: never
+        Returns: {
+          created_at: string
+          description: string
+          duration_days: number
+          id: string
+          includes_replays: boolean
+          max_devices: number
+          name: string
+          pakasir_amount: number
+          pause_message: string
+          paused: boolean
+          price_coins: number
+          price_idr: number
+          quota_reserved: number
+          quota_total: number
+          replay_info: string
+          sort_order: number
+          status: string
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "membership_packages"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       admin_get_replays: {
         Args: never
         Returns: {
