@@ -35,7 +35,11 @@ type SourceLike = Partial<Record<keyof PrivateSource, unknown>>;
 
 const SS_KEY_BASE = 'replaytime-live-unlocked';
 const SS_SRC_KEY = 'replaytime-live-source-idx';
-const IDN_TOKEN_REFRESH_MS = 60 * 1000;
+// Token IDN berlaku ~2 jam. Refresh header tiap 25 menit sudah aman dan
+// menghindari tear-down player yang sering. Master playlist (blob URL)
+// hanya di-set sekali — refresh berikutnya HANYA memperbarui headers
+// supaya segmen .ts/.m3u8 ke worker tetap terotorisasi tanpa restart player.
+const IDN_TOKEN_REFRESH_MS = 25 * 60 * 1000;
 
 const typeLabel = (t: string) => t === 'youtube' ? 'YouTube' : t === 'cloudflare' ? 'Cloudflare' : 'M3U8 / HLS';
 
@@ -484,7 +488,7 @@ export default function Live() {
     let refreshTimer: number | null = null;
     setIdnError('');
     if (idnResolved?.key !== key) setIdnResolved(null);
-    let lastBlobUrl: string | null = null;
+    let masterBlobUrl: string | null = null;
     const refreshIdnToken = async (initial = false) => {
       try {
         const { data, error } = await supabase.functions.invoke('idn-stream-token', {
@@ -501,42 +505,32 @@ export default function Live() {
         if (!xApiToken || !xSecKey || !xTokenId || !playbackUrl) {
           throw new Error('Respon token IDN tidak lengkap');
         }
-        // Worker /api/proxy/playback wajib menerima header x-api-token/x-sec-key/x-showid/x-token-id.
-        // Karena hls.js xhrSetup tidak konsisten (terutama iOS Safari pakai native HLS yg tak
-        // mendukung custom header), kita fetch master playlist sendiri di sini lalu serahkan
-        // sebagai blob URL ke player. URL rendition di dalam master sudah signed sehingga
-        // request berikutnya tidak butuh header tambahan.
-        const res = await fetch(playbackUrl, {
-          method: 'GET',
-          headers: {
-            'x-api-token': xApiToken,
-            'x-sec-key': xSecKey,
-            'x-showid': xShowId,
-            'x-token-id': xTokenId,
-          },
-        });
-        if (!res.ok) throw new Error(`Worker playback menolak (${res.status})`);
-        const m3u8Text = await res.text();
-        if (cancelled) return;
-        const blob = new Blob([m3u8Text], { type: 'application/vnd.apple.mpegurl' });
-        const blobUrl = URL.createObjectURL(blob);
-        const prevBlob = lastBlobUrl;
-        lastBlobUrl = blobUrl;
-        setIdnError('');
-        // Header wajib juga diteruskan ke hls.js xhrSetup agar request rendition
-        // .m3u8 dan segmen .ts ke worker tetap diterima (bukan hanya master playlist).
-        setIdnResolved({
-          key,
-          url: blobUrl,
-          headers: {
-            'x-api-token': xApiToken,
-            'x-sec-key': xSecKey,
-            'x-showid': xShowId,
-            'x-token-id': xTokenId,
-          },
-        });
-        if (prevBlob) {
-          setTimeout(() => { try { URL.revokeObjectURL(prevBlob); } catch { /* ignore */ } }, 5000);
+        const nextHeaders = {
+          'x-api-token': xApiToken,
+          'x-sec-key': xSecKey,
+          'x-showid': xShowId,
+          'x-token-id': xTokenId,
+        } as Record<string, string>;
+
+        // Master playlist HANYA di-fetch sekali per stream. Refresh berikutnya
+        // cukup mengganti headers — jangan ganti blob URL karena itu akan
+        // menyebabkan HlsPlayer destroy & re-init instance HLS (player kelihatan
+        // refresh / putus-putus setiap interval).
+        if (initial || !masterBlobUrl) {
+          const res = await fetch(playbackUrl, { method: 'GET', headers: nextHeaders });
+          if (!res.ok) throw new Error(`Worker playback menolak (${res.status})`);
+          const m3u8Text = await res.text();
+          if (cancelled) return;
+          const blob = new Blob([m3u8Text], { type: 'application/vnd.apple.mpegurl' });
+          masterBlobUrl = URL.createObjectURL(blob);
+          setIdnError('');
+          setIdnResolved({ key, url: masterBlobUrl, headers: nextHeaders });
+        } else {
+          if (cancelled) return;
+          // Pertahankan blob URL yang sama → src HlsPlayer tidak berubah →
+          // tidak ada tear-down. Hanya headers yang diperbarui supaya request
+          // segmen .ts berikutnya tetap diterima worker.
+          setIdnResolved((prev) => prev ? { ...prev, headers: nextHeaders } : prev);
         }
       } catch (e: any) {
         if (!cancelled && initial) setIdnError(e?.message || 'Gagal mengambil token IDN. Pastikan domain ini di-whitelist worker.');
@@ -547,7 +541,7 @@ export default function Live() {
     return () => {
       cancelled = true;
       if (refreshTimer) window.clearInterval(refreshTimer);
-      if (lastBlobUrl) { try { URL.revokeObjectURL(lastBlobUrl); } catch { /* ignore */ } }
+      if (masterBlobUrl) { try { URL.revokeObjectURL(masterBlobUrl); } catch { /* ignore */ } }
     };
   }, [activeSource?.url, idnRetryNonce]);
 
