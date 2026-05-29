@@ -237,14 +237,24 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
         : { back: 90, max: 90, maxMax: 600, size: 150 * 1000 * 1000 };
 
     if (Hls.isSupported()) {
+      const attachRequestHeaders = (target: { setRequestHeader?: (key: string, value: string) => void; set?: (key: string, value: string) => void }) => {
+        const hdrs = headersRef.current;
+        if (!hdrs || Object.keys(hdrs).length === 0) return;
+        Object.entries(hdrs).forEach(([key, value]) => {
+          if (value == null || String(value).length === 0) return;
+          if (typeof target.setRequestHeader === 'function') target.setRequestHeader(key, String(value));
+          else if (typeof target.set === 'function') target.set(key, String(value));
+        });
+      };
       hls = new Hls({
         xhrSetup: (xhr, url) => {
-          const hdrs = headersRef.current;
-          if (!hdrs || Object.keys(hdrs).length === 0) return;
           if (xhr.readyState === 0) xhr.open('GET', url, true);
-          Object.entries(hdrs).forEach(([k, v]) => {
-            if (v != null && String(v).length > 0) xhr.setRequestHeader(k, String(v));
-          });
+          attachRequestHeaders(xhr);
+        },
+        fetchSetup: (context, initParams) => {
+          const nextInit = { ...initParams, headers: new Headers(initParams?.headers || {}) };
+          attachRequestHeaders(nextInit.headers);
+          return new Request(context.url, nextInit);
         },
         enableWorker: true,
         lowLatencyMode: false,
