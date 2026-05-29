@@ -523,9 +523,19 @@ export default function Live() {
         const prevBlob = lastBlobUrl;
         lastBlobUrl = blobUrl;
         setIdnError('');
-        setIdnResolved({ key, url: blobUrl, headers: {} });
+        // Header wajib juga diteruskan ke hls.js xhrSetup agar request rendition
+        // .m3u8 dan segmen .ts ke worker tetap diterima (bukan hanya master playlist).
+        setIdnResolved({
+          key,
+          url: blobUrl,
+          headers: {
+            'x-api-token': xApiToken,
+            'x-sec-key': xSecKey,
+            'x-showid': xShowId,
+            'x-token-id': xTokenId,
+          },
+        });
         if (prevBlob) {
-          // Bebaskan blob lama setelah player sempat berpindah.
           setTimeout(() => { try { URL.revokeObjectURL(prevBlob); } catch { /* ignore */ } }, 5000);
         }
       } catch (e: any) {
