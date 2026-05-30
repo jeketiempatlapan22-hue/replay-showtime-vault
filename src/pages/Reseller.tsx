@@ -159,9 +159,15 @@ function MembershipPanel({ session, onCreated }: { session: Session; onCreated: 
       const { data, error } = await supabase.functions.invoke('reseller-create-membership', {
         body: { phone: session.phone, pin: session.pin, package_id: pkg.id, days },
       });
-      if (error) throw error;
-      const d = data as any;
-      if (!d?.ok) throw new Error(d?.error || d?.detail || 'gagal');
+      let d: any = data;
+      if (error) {
+        try {
+          const ctx: any = (error as any).context;
+          if (ctx && typeof ctx.json === 'function') d = await ctx.json();
+          else if (ctx && typeof ctx.text === 'function') d = JSON.parse(await ctx.text());
+        } catch { /* ignore */ }
+      }
+      if (!d?.ok) throw new Error(d?.detail || d?.error || (error?.message ?? 'gagal'));
       try { await navigator.clipboard.writeText(d.message); } catch { /* ignore */ }
       onCreated({
         link: d.link, message: d.message, title: d.title || pkg.name,
