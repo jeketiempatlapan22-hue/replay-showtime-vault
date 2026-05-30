@@ -1103,6 +1103,7 @@ export type Database = {
       replay_personal_tokens: {
         Row: {
           created_at: string
+          expires_at: string | null
           id: string
           label: string
           max_devices: number
@@ -1112,6 +1113,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          expires_at?: string | null
           id?: string
           label?: string
           max_devices?: number
@@ -1121,6 +1123,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          expires_at?: string | null
           id?: string
           label?: string
           max_devices?: number
@@ -1225,6 +1228,48 @@ export type Database = {
           updated_at?: string
           view_count?: number
           youtube_id?: string
+        }
+        Relationships: []
+      }
+      reseller_audit_log: {
+        Row: {
+          created_at: string
+          duration_days: number | null
+          expires_at: string | null
+          id: string
+          kind: string
+          meta: Json
+          reseller_label: string
+          reseller_phone: string
+          target_id: string | null
+          target_title: string
+          token: string
+        }
+        Insert: {
+          created_at?: string
+          duration_days?: number | null
+          expires_at?: string | null
+          id?: string
+          kind: string
+          meta?: Json
+          reseller_label?: string
+          reseller_phone: string
+          target_id?: string | null
+          target_title?: string
+          token?: string
+        }
+        Update: {
+          created_at?: string
+          duration_days?: number | null
+          expires_at?: string | null
+          id?: string
+          kind?: string
+          meta?: Json
+          reseller_label?: string
+          reseller_phone?: string
+          target_id?: string | null
+          target_title?: string
+          token?: string
         }
         Relationships: []
       }
