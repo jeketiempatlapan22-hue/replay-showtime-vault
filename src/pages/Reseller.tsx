@@ -31,17 +31,32 @@ function LoginCard({ onLogin }: { onLogin: (s: Session) => void }) {
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!phone || !pin) return;
+    const phoneT = phone.trim();
+    const pinT = pin.trim();
+    if (!phoneT || !pinT) return;
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('reseller-auth', { body: { phone, pin } });
-      if (error) throw error;
-      const d = data as any;
+      const { data, error } = await supabase.functions.invoke('reseller-auth', { body: { phone: phoneT, pin: pinT } });
+      let d: any = data;
+      if (error) {
+        // Read actual JSON body from the non-2xx response (invoke wraps it as FunctionsHttpError)
+        try {
+          const ctx: any = (error as any).context;
+          if (ctx && typeof ctx.json === 'function') d = await ctx.json();
+          else if (ctx && typeof ctx.text === 'function') d = JSON.parse(await ctx.text());
+        } catch { /* ignore */ }
+      }
       if (!d?.ok) {
-        toast({ title: 'Login gagal', description: d?.error === 'locked' ? `Terkunci, coba lagi dalam ${d.seconds_remaining}s` : 'Nomor / PIN salah', variant: 'destructive' });
+        const reason = d?.error;
+        const desc =
+          reason === 'locked' ? `Terlalu banyak percobaan. Coba lagi dalam ${d.seconds_remaining}s.`
+          : reason === 'missing_fields' ? 'Nomor HP & PIN wajib diisi.'
+          : reason === 'invalid_credentials' ? 'Nomor HP atau PIN salah. PIN bersifat case-sensitive (huruf besar/kecil berpengaruh).'
+          : (reason || 'Gagal masuk.');
+        toast({ title: 'Login gagal', description: desc, variant: 'destructive' });
         return;
       }
-      const s: Session = { phone: d.phone, pin, label: d.label || '' };
+      const s: Session = { phone: d.phone, pin: pinT, label: d.label || '' };
       setSession(s);
       onLogin(s);
       toast({ title: 'Berhasil masuk', description: s.label || s.phone });
