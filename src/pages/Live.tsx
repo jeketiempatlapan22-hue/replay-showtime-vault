@@ -473,6 +473,7 @@ export default function Live() {
 
   const safeIdx = Math.min(sourceIdx, Math.max(0, allSources.length - 1));
   const activeSource = allSources[safeIdx];
+  const activeSourceUrl = activeSource?.url || '';
   const sourceKey = (source: PrivateSource, index: number) => `${index}:${source.type}:${source.url}`;
 
   // Resolve IDN stream: frontend langsung fetch token ke hanabira48, lalu jadikan HEADER
@@ -481,8 +482,8 @@ export default function Live() {
   const [idnError, setIdnError] = useState<string>('');
   const [idnRetryNonce, setIdnRetryNonce] = useState(0);
   useEffect(() => {
-    if (!activeSource || !activeSource.url.startsWith('idn://')) { setIdnError(''); return; }
-    const idnId = activeSource.url.slice('idn://'.length);
+    if (!activeSourceUrl.startsWith('idn://')) { setIdnError(''); return; }
+    const idnId = activeSourceUrl.slice('idn://'.length);
     if (!idnId) {
       setIdnResolved(null);
       setIdnError('IDN Show ID belum diatur admin. Hubungi admin untuk mengaktifkan stream IDN.');
@@ -539,7 +540,7 @@ export default function Live() {
       cancelled = true;
       if (refreshTimer) window.clearInterval(refreshTimer);
     };
-  }, [activeSource?.url, idnRetryNonce]);
+  }, [activeSourceUrl, idnRetryNonce]);
 
   const selectSource = (i: number) => {
     setSourceIdx(i);
