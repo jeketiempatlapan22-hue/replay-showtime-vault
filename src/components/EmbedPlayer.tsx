@@ -334,6 +334,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
   useEffect(() => {
     if (type !== 'youtube' || !ready) return;
     let liveProbeHits = 0;
+    let lastSec = -1;
     const id = setInterval(() => {
       const p = ytPlayerRef.current;
       if (!p) return;
@@ -350,12 +351,39 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
         }
         if (liveActive) return; // skip duration/seek state untuk live
         if (seeking) return;
-        if (d && d !== duration) setDuration(d);
-        setCurrentTime(t);
+        if (d && Math.abs(d - duration) >= 0.5) setDuration(d);
+        // Hanya update saat detik integer berubah → kurangi re-render dari 1Hz ke saat perlu saja
+        const sec = Math.floor(t);
+        if (sec !== lastSec) {
+          lastSec = sec;
+          setCurrentTime(t);
+        }
       } catch { /* ignore */ }
     }, 1000);
     return () => clearInterval(id);
   }, [ready, type, seeking, duration, isLive, detectedLive, liveActive]);
+
+  // Preconnect ke domain YouTube/Cloudflare untuk mempercepat handshake awal & kurangi buffering
+  useEffect(() => {
+    const hosts = type === 'youtube'
+      ? ['https://www.youtube-nocookie.com', 'https://www.youtube.com', 'https://i.ytimg.com', 'https://s.ytimg.com', 'https://www.google.com', 'https://googleads.g.doubleclick.net', 'https://static.doubleclick.net', 'https://yt3.ggpht.com', 'https://r3---sn-i3belnez.googlevideo.com', 'https://r1---sn-i3belnez.googlevideo.com']
+      : ['https://iframe.videodelivery.net', 'https://videodelivery.net', 'https://customer-.cloudflarestream.com'];
+    const links: HTMLLinkElement[] = [];
+    hosts.forEach(href => {
+      const l = document.createElement('link');
+      l.rel = 'preconnect';
+      l.href = href;
+      l.crossOrigin = 'anonymous';
+      document.head.appendChild(l);
+      links.push(l);
+      const d = document.createElement('link');
+      d.rel = 'dns-prefetch';
+      d.href = href;
+      document.head.appendChild(d);
+      links.push(d);
+    });
+    return () => { links.forEach(l => { try { document.head.removeChild(l); } catch { /* ignore */ } }); };
+  }, [type]);
 
   // Saat YouTube live berakhir (state=0/ENDED): jangan restart, cukup tandai sebagai berakhir.
   useEffect(() => {
@@ -433,7 +461,9 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
             allowFullScreen
             loading="eager"
             referrerPolicy="strict-origin-when-cross-origin"
-            style={{ border: 0 }}
+            // @ts-expect-error - fetchpriority valid HTML attr
+            fetchpriority="high"
+            style={{ border: 0, willChange: 'transform' }}
           />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center bg-black text-white/80 text-sm px-4 text-center">
@@ -452,7 +482,9 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
             allowFullScreen
             loading="eager"
             referrerPolicy="strict-origin-when-cross-origin"
-            style={{ border: 0 }}
+            // @ts-expect-error - fetchpriority valid HTML attr
+            fetchpriority="high"
+            style={{ border: 0, willChange: 'transform' }}
           />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center bg-black text-white/80 text-sm px-4 text-center">
