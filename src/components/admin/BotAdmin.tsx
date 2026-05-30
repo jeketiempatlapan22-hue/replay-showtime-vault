@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { toast } from '@/hooks/use-toast';
-import { Plus, Save, Trash2, Send, Copy, Check, Bot } from 'lucide-react';
+import { Plus, Save, Trash2, Send, Copy, Check, Bot, Eye, EyeOff, KeyRound } from 'lucide-react';
 
 type BotCommand = {
   id: string;
@@ -18,7 +18,7 @@ type BotCommand = {
   sort_order: number;
 };
 
-type BotAdminRow = { id: string; phone: string; label: string; enabled: boolean };
+type BotAdminRow = { id: string; phone: string; label: string; enabled: boolean; pin: string };
 
 function normalizePhone(raw: string) {
   const d = raw.replace(/\D/g, '');
@@ -76,6 +76,12 @@ export default function BotAdmin() {
     if (!confirm('Hapus admin bot ini?')) return;
     await supabase.from('bot_admins').delete().eq('id', id);
     load();
+  };
+
+  const savePin = async (id: string, pin: string) => {
+    const { error } = await supabase.from('bot_admins').update({ pin: pin.trim() }).eq('id', id);
+    if (error) toast({ title: 'Gagal simpan PIN', description: error.message, variant: 'destructive' });
+    else toast({ title: 'PIN tersimpan' });
   };
 
   const save = async (c: BotCommand) => {
