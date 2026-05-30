@@ -307,6 +307,10 @@ Deno.serve(async (req) => {
   if (order.show_id && !order.replay_id) {
     // SHOW purchase: pakai template editable dari admin (wa_show_template).
     message = fillTpl(showTpl, showDate || dateStr, link, link);
+    const extras: string[] = [];
+    if (replayInfo) extras.push('', '🎞️ *Info Replay*', replayInfo);
+    if (groupLink) extras.push('', '👥 *Link Grup*', groupLink);
+    if (extras.length) message = message + '\n' + extras.join('\n');
   } else if (isReplayOnlyPurchase) {
     // REPLAY purchase: selalu kirim link token langsung.
     message = [
