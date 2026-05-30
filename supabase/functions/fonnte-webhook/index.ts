@@ -327,10 +327,23 @@ Deno.serve(async (req) => {
 
   if (!phone || !text) return debug('missing_phone_or_text');
 
-  const phoneNorm = normalizePhone(phone);
+  let phoneNorm = normalizePhone(phone);
   const participantNorm = normalizePhone(participant);
   const deviceNorm = normalizePhone(device);
   const commandPreview = text.toLowerCase().split(/\s+/)[0] || '';
+
+  // Group chat detection: WhatsApp group JIDs are very long numeric strings (e.g. 120363...)
+  // or end with "@g.us". When a message comes from a group, Fonnte cannot send a reply to
+  // the group ID — we must reply to the actual participant (admin/reseller) who sent the
+  // command. Authorization still works because participantNorm is included in candidatePhones.
+  const rawPhoneStr = String(phone || '');
+  const isGroup = !!participantNorm && (
+    rawPhoneStr.includes('@g.us') ||
+    phoneNorm.length > 15 ||
+    (participantNorm !== phoneNorm && participantNorm.startsWith('62'))
+  );
+  const groupId = isGroup ? phoneNorm : '';
+  if (isGroup) phoneNorm = participantNorm;
 
   await logBotEvent(admin, {
     phone: phoneNorm,
@@ -340,7 +353,7 @@ Deno.serve(async (req) => {
     inboxId,
     fromMe,
     eventName: 'received',
-    detail: participantNorm ? { participant: participantNorm } : {},
+    detail: participantNorm ? { participant: participantNorm, group_id: groupId || undefined } : {},
   });
 
   // Only process commands starting with '/' — silently ignore other chatter
