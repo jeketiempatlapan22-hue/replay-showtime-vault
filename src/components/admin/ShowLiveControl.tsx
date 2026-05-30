@@ -36,6 +36,8 @@ export default function ShowLiveControl({ showId, showTitle }: Props) {
   const [replayM3u8, setReplayM3u8] = useState('');
   const [replayYt, setReplayYt] = useState('');
   const [idnShowId, setIdnShowId] = useState('');
+  const [groupLink, setGroupLink] = useState('');
+  const [replayInfo, setReplayInfo] = useState('');
 
   const [newLabel, setNewLabel] = useState('');
   const [newType, setNewType] = useState<SrcType>('m3u8');
