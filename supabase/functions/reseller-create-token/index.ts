@@ -63,11 +63,19 @@ Deno.serve(async (req) => {
   const token = newToken();
   const label = `reseller:${phone}`;
 
+  const { data: ba } = await admin.from('bot_admins').select('label').eq('phone', phone).maybeSingle();
+  const resellerLabel = (ba?.label || '').trim();
+
+  const fmtId = (d: Date) => d.toLocaleString('id-ID', {
+    day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta',
+  });
+
   if (kind === 'replay') {
     const { data: r } = await admin.from('replays').select('id,title,date,password').eq('id', targetId).maybeSingle();
     if (!r) return json({ error: 'replay_not_found' }, 404);
+    const expiresAt = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
     const { error } = await admin.from('replay_personal_tokens').insert({
-      replay_id: r.id, token, label, max_devices: 1,
+      replay_id: r.id, token, label, max_devices: 1, expires_at: expiresAt.toISOString(),
     });
     if (error) return json({ error: 'create_failed', detail: error.message }, 500);
 
@@ -75,21 +83,32 @@ Deno.serve(async (req) => {
     const date = r.date ? new Date(r.date).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' }) : '';
     const password = r.password ? String(r.password) : '';
     const message = renderWaTemplate(tpl, { title: r.title, link, date, password, site: siteOnly })
+      + `\n⏳ Berlaku sampai: *${fmtId(expiresAt)}*`
       + `\n\n👤 *1 device saja* — token akan terkunci ke perangkat pertama yang membuka.`;
 
     await admin.from('token_deliveries').insert({
       phone, replay_id: r.id, replay_title: r.title, access_token: token, link,
       source: 'bot', requested_by: phone,
     });
-    return json({ ok: true, token, link, message, title: r.title });
+    await admin.from('reseller_audit_log').insert({
+      reseller_phone: phone, reseller_label: resellerLabel,
+      kind: 'replay', target_id: r.id, target_title: r.title,
+      token, expires_at: expiresAt.toISOString(),
+    });
+    return json({ ok: true, token, link, message, title: r.title, expires_at: expiresAt.toISOString() });
   }
 
   // kind === 'show'
   const { data: s } = await admin.from('active_shows')
     .select('id,title,show_date,show_time,live_password').eq('id', targetId).maybeSingle();
   if (!s) return json({ error: 'show_not_found' }, 404);
+
+  // expires_at = jadwal show + 8 jam (akhir window auto-schedule live, WIB +07:00)
+  const showStart = new Date(`${s.show_date}T${String(s.show_time).slice(0, 8)}+07:00`);
+  const expiresAt = new Date(showStart.getTime() + 8 * 60 * 60 * 1000);
+
   const { error } = await admin.from('active_show_tokens').insert({
-    show_id: s.id, token, kind: 'personal', max_devices: 1, label,
+    show_id: s.id, token, kind: 'personal', max_devices: 1, label, expires_at: expiresAt.toISOString(),
   });
   if (error) return json({ error: 'create_failed', detail: error.message }, 500);
 
@@ -100,6 +119,7 @@ Deno.serve(async (req) => {
     '',
     `🎤 *${s.title}*`,
     `📅 ${s.show_date} ${String(s.show_time).slice(0, 5)}`,
+    `⏳ Berlaku sampai: *${fmtId(expiresAt)}*`,
     '',
     '🔗 *Link Live:*',
     link,
@@ -108,7 +128,7 @@ Deno.serve(async (req) => {
     siteOnly,
     livePwd ? `🗝️ Sandi: *${livePwd}*` : null,
     '',
-    '👤 Hanya untuk *1 perangkat pertama*.',
+    '👤 Hanya untuk *1 perangkat pertama* & hanya untuk show ini.',
     '',
     '— *ReplayTime* 💖',
   ].filter((l) => l !== null).join('\n');
@@ -117,5 +137,10 @@ Deno.serve(async (req) => {
     phone, replay_id: null, replay_title: s.title, access_token: token, link,
     source: 'bot', requested_by: phone,
   });
-  return json({ ok: true, token, link, message, title: s.title });
+  await admin.from('reseller_audit_log').insert({
+    reseller_phone: phone, reseller_label: resellerLabel,
+    kind: 'show', target_id: s.id, target_title: s.title,
+    token, expires_at: expiresAt.toISOString(),
+  });
+  return json({ ok: true, token, link, message, title: s.title, expires_at: expiresAt.toISOString() });
 });
