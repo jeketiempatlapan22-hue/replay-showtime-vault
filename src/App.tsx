@@ -22,6 +22,7 @@ import Membership from "./pages/Membership";
 import Profil from "./pages/Profil";
 import ResetPassword from "./pages/ResetPassword";
 import BottomNav from "./components/BottomNav";
+import Reseller from "./pages/Reseller";
 
 const queryClient = new QueryClient();
 
@@ -78,6 +79,7 @@ const App = () => (
               <Route path="/membership" element={<Membership />} />
               <Route path="/profil" element={<Profil />} />
               <Route path="/adpan" element={<Admin />} />
+              <Route path="/reseller" element={<Reseller />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
             <BottomNav />

@@ -1,0 +1,121 @@
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+const json = (b: unknown, s = 200) =>
+  new Response(JSON.stringify(b), { status: s, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+
+function normalizePhone(raw: string) {
+  const d = String(raw || '').replace(/\D/g, '');
+  if (!d) return '';
+  if (d.startsWith('0')) return '62' + d.slice(1);
+  if (d.startsWith('8')) return '62' + d;
+  return d;
+}
+
+function newToken(len = 40) {
+  const a = crypto.randomUUID().replace(/-/g, '');
+  const b = crypto.randomUUID().replace(/-/g, '');
+  return (a + b).slice(0, len);
+}
+
+const DEFAULT_WA_TPL =
+  '🎬 *ReplayTime*\n━━━━━━━━━━━━━━\n\n🎤 *{title}*\n{date_line}🔗 *Link Akses*\n{link}\n{password_line}━━━━━━━━━━━━━━\n✨ Selamat menonton! 💖';
+
+function renderWaTemplate(tpl: string, v: { title: string; link: string; date?: string; password?: string; site?: string }) {
+  return (tpl || DEFAULT_WA_TPL)
+    .replace(/\{date_line\}/g, v.date ? `📅 ${v.date}\n\n` : '')
+    .replace(/\{password_line\}/g, v.password ? `🔐 Sandi: *${v.password}*\n\n` : '')
+    .replace(/\{live_link_block\}/g, '')
+    .replace(/\{title\}/g, v.title || '')
+    .replace(/\{link\}/g, v.link || '')
+    .replace(/\{date\}/g, v.date || '')
+    .replace(/\{password\}/g, v.password || '')
+    .replace(/\{site\}/g, v.site || '');
+}
+
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+  if (req.method !== 'POST') return json({ error: 'method_not_allowed' }, 405);
+
+  const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+  let body: any = {};
+  try { body = await req.json(); } catch { return json({ error: 'bad_json' }, 400); }
+
+  const phone = normalizePhone(body.phone || '');
+  const pin = String(body.pin || '').trim();
+  const kind = body.kind === 'show' ? 'show' : body.kind === 'replay' ? 'replay' : null;
+  const targetId = String(body.target_id || '');
+  if (!phone || !pin || !kind || !targetId) return json({ error: 'missing_fields' }, 400);
+
+  // Verifikasi reseller setiap request
+  const { data: vrows } = await admin.rpc('reseller_verify', { _phone: phone, _pin: pin });
+  if (vrows !== true) return json({ error: 'unauthorized' }, 401);
+
+  const { data: settings } = await admin.from('site_settings').select('key,value');
+  const map = new Map((settings ?? []).map((s: any) => [s.key, s.value]));
+  const origin = ((map.get('site_origin') as string) || 'https://replaytime.lovable.app').replace(/\/+$/, '');
+  const siteOnly = origin.replace(/^https?:\/\//, '');
+  const tpl = (map.get('wa_message_template') as string) || DEFAULT_WA_TPL;
+
+  const token = newToken();
+  const label = `reseller:${phone}`;
+
+  if (kind === 'replay') {
+    const { data: r } = await admin.from('replays').select('id,title,date,password').eq('id', targetId).maybeSingle();
+    if (!r) return json({ error: 'replay_not_found' }, 404);
+    const { error } = await admin.from('replay_personal_tokens').insert({
+      replay_id: r.id, token, label, max_devices: 1,
+    });
+    if (error) return json({ error: 'create_failed', detail: error.message }, 500);
+
+    const link = `${origin}/akses?token=${token}&replay=${r.id}`;
+    const date = r.date ? new Date(r.date).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' }) : '';
+    const password = r.password ? String(r.password) : '';
+    const message = renderWaTemplate(tpl, { title: r.title, link, date, password, site: siteOnly })
+      + `\n\n👤 *1 device saja* — token akan terkunci ke perangkat pertama yang membuka.`;
+
+    await admin.from('token_deliveries').insert({
+      phone, replay_id: r.id, replay_title: r.title, access_token: token, link,
+      source: 'bot', requested_by: phone,
+    });
+    return json({ ok: true, token, link, message, title: r.title });
+  }
+
+  // kind === 'show'
+  const { data: s } = await admin.from('active_shows')
+    .select('id,title,show_date,show_time,live_password').eq('id', targetId).maybeSingle();
+  if (!s) return json({ error: 'show_not_found' }, 404);
+  const { error } = await admin.from('active_show_tokens').insert({
+    show_id: s.id, token, kind: 'personal', max_devices: 1, label,
+  });
+  if (error) return json({ error: 'create_failed', detail: error.message }, 500);
+
+  const link = `${origin}/live?show=${s.id}&t=${token}`;
+  const livePwd = s.live_password ? String(s.live_password) : '';
+  const message = [
+    '🔐 *TOKEN LIVE SATUAN*',
+    '',
+    `🎤 *${s.title}*`,
+    `📅 ${s.show_date} ${String(s.show_time).slice(0, 5)}`,
+    '',
+    '🔗 *Link Live:*',
+    link,
+    '',
+    '🎬 *Link Replay:*',
+    siteOnly,
+    livePwd ? `🗝️ Sandi: *${livePwd}*` : null,
+    '',
+    '👤 Hanya untuk *1 perangkat pertama*.',
+    '',
+    '— *ReplayTime* 💖',
+  ].filter((l) => l !== null).join('\n');
+
+  await admin.from('token_deliveries').insert({
+    phone, replay_id: null, replay_title: s.title, access_token: token, link,
+    source: 'bot', requested_by: phone,
+  });
+  return json({ ok: true, token, link, message, title: s.title });
+});
