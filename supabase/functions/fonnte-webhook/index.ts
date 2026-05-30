@@ -732,8 +732,11 @@ Deno.serve(async (req) => {
             // Auto-disable any other show currently live to keep a single active LIVE.
             await admin.from('active_shows').update({ is_live: false }).neq('id', s.id).eq('is_live', true);
           }
+          // When turning live ON, also ensure show is active so it appears on home page.
+          const updatePayload: Record<string, unknown> = { is_live: turnOn };
+          if (turnOn) updatePayload.is_active = true;
           const { error } = await admin.from('active_shows')
-            .update({ is_live: turnOn }).eq('id', s.id);
+            .update(updatePayload).eq('id', s.id);
           if (error) {
             reply = `❌ Gagal mengubah status. ${error.message}`;
           } else {
