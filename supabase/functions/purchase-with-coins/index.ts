@@ -159,6 +159,10 @@ Deno.serve(async (req) => {
     if (resolvedShowId && !resolvedReplayId) {
       // SHOW purchase: pakai template editable (wa_show_template).
       message = fillTpl(showTpl, showDate || dateStr, link, link);
+      const extras: string[] = [];
+      if (replayInfo) extras.push('', '🎞️ *Info Replay*', replayInfo);
+      if (groupLink) extras.push('', '👥 *Link Grup*', groupLink);
+      if (extras.length) message = message + '\n' + extras.join('\n');
     } else if (isReplayOnlyPurchase) {
       message = [
         '🎬 *RealTime48*',
