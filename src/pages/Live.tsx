@@ -33,6 +33,8 @@ interface LiveStatus { enabled: boolean; title: string; type: string; require_pa
 interface UnlockedConfig { title: string; type: SrcType; url: string; sources: PrivateSource[]; watermark: string; enabled: boolean; idn_show_id?: string }
 type SourceLike = Partial<Record<keyof PrivateSource, unknown>>;
 interface IdnTokenResponse { error?: string; xApiToken?: string; xSecKey?: string; xTokenId?: string; xShowId?: string; playbackUrl?: string }
+type PiPDocument = Document & { pictureInPictureEnabled?: boolean; pictureInPictureElement?: Element | null; exitPictureInPicture?: () => Promise<void> };
+type PiPVideo = HTMLVideoElement & { requestPictureInPicture?: () => Promise<unknown>; disablePictureInPicture?: boolean };
 
 const SS_KEY_BASE = 'replaytime-live-unlocked';
 const SS_SRC_KEY = 'replaytime-live-source-idx';
@@ -152,18 +154,19 @@ export default function Live() {
             setStatusLoading(false);
             return null;
           }
-          const enabled = !!data.is_live;
+          const row = data as typeof data & { idn_show_id?: string | null };
+          const enabled = !!row.is_live;
           let wasOff = false;
           setStatus(prev => {
             wasOff = !prev?.enabled;
             return {
-              enabled, title: data.title || 'Live', type: data.live_type || 'm3u8',
-              require_password: data.live_require_password !== false,
+              enabled, title: row.title || 'Live', type: row.live_type || 'm3u8',
+              require_password: row.live_require_password !== false,
               sources: [],
-              lineup: Array.isArray(data.lineup) ? data.lineup : [],
-              show_date: data.show_date, show_time: data.show_time,
-              image_url: data.image_url || '',
-              idn_show_id: (data as any).idn_show_id || '',
+              lineup: Array.isArray(row.lineup) ? row.lineup : [],
+              show_date: row.show_date, show_time: row.show_time,
+              image_url: row.image_url || '',
+              idn_show_id: row.idn_show_id || '',
             };
           });
           // Stream URLs are no longer readable from the public table — only the
