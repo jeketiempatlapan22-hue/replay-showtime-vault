@@ -224,34 +224,23 @@ export default function BotAdmin() {
         )}
       </div>
 
-      {/* Bot Admins whitelist */}
+      {/* Bot Admins / Reseller whitelist */}
       <div className="bg-card border border-border rounded-xl p-4 space-y-3">
-        <h3 className="font-semibold">Admin Bot WhatsApp</h3>
+        <h3 className="font-semibold">Admin Bot & Reseller WhatsApp</h3>
         <p className="text-xs text-muted-foreground">
-          Hanya nomor di daftar ini yang dapat menjalankan command admin seperti <code>/buattoken</code>.
+          Nomor di daftar ini bisa menjalankan command admin di bot (mis. <code>/buattoken</code>) DAN masuk ke{' '}
+          <a href="/reseller" target="_blank" rel="noreferrer" className="underline">/reseller</a> menggunakan PIN yang Anda set di bawah.
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
           <Input placeholder="08xxxx atau 628xxxx" value={newPhone} onChange={(e) => setNewPhone(e.target.value)} />
           <Input placeholder="Label (opsional)" value={newLabel} onChange={(e) => setNewLabel(e.target.value)} />
-          <Button onClick={addAdmin}><Plus className="w-4 h-4 mr-1" />Tambah Admin</Button>
+          <Button onClick={addAdmin}><Plus className="w-4 h-4 mr-1" />Tambah</Button>
         </div>
         <div className="space-y-2">
           {admins.length === 0 ? (
             <p className="text-xs text-muted-foreground italic">Belum ada admin bot.</p>
           ) : admins.map((a) => (
-            <div key={a.id} className="flex items-center gap-2 border border-border rounded-lg p-2 bg-secondary/30">
-              <div className="flex-1 min-w-0">
-                <p className="font-mono text-sm">+{a.phone}</p>
-                {a.label && <p className="text-xs text-muted-foreground">{a.label}</p>}
-              </div>
-              <label className="flex items-center gap-2 text-xs">
-                <Switch checked={a.enabled} onCheckedChange={() => toggleAdmin(a)} />
-                Aktif
-              </label>
-              <Button size="icon" variant="outline" onClick={() => removeAdmin(a.id)}>
-                <Trash2 className="w-4 h-4" />
-              </Button>
-            </div>
+            <AdminRowItem key={a.id} row={a} onToggle={() => toggleAdmin(a)} onRemove={() => removeAdmin(a.id)} onSavePin={(pin) => savePin(a.id, pin)} />
           ))}
         </div>
       </div>
