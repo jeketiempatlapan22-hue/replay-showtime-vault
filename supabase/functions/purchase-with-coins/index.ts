@@ -132,9 +132,13 @@ Deno.serve(async (req) => {
       : `${origin}/akses?token=${accessToken}${resolvedReplayId ? `&replay=${resolvedReplayId}` : ''}`;
     let password = '';
     let showDate = '';
+    let groupLink = '';
+    let replayInfo = '';
     if (resolvedShowId && !resolvedReplayId) {
-      const { data: showRow } = await admin.from('active_shows').select('live_password,show_date,show_time').eq('id', resolvedShowId).maybeSingle();
+      const { data: showRow } = await admin.from('active_shows').select('live_password,show_date,show_time,group_link,replay_info').eq('id', resolvedShowId).maybeSingle();
       password = String(showRow?.live_password || '').trim();
+      groupLink = String((showRow as any)?.group_link || '').trim();
+      replayInfo = String((showRow as any)?.replay_info || '').trim();
       if (showRow?.show_date) {
         const d = String(showRow.show_date);
         const t = String(showRow.show_time || '').slice(0, 5);
