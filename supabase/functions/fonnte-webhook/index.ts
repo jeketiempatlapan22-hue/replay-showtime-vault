@@ -339,8 +339,9 @@ Deno.serve(async (req) => {
   const rawPhoneStr = String(phone || '');
   const isGroup = !!participantNorm && (
     rawPhoneStr.includes('@g.us') ||
-    phoneNorm.length > 15 ||
-    (participantNorm !== phoneNorm && participantNorm.startsWith('62'))
+    rawPhoneStr.includes('-') ||           // Some Fonnte payloads use 12345-67890@g.us
+    phoneNorm.length > 15 ||                // Group JIDs are ~18 digits
+    participantNorm !== phoneNorm           // Participant differs from chat target → group
   );
   const groupId = isGroup ? phoneNorm : '';
   if (isGroup) phoneNorm = participantNorm;
