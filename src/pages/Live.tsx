@@ -132,6 +132,7 @@ export default function Live() {
   const [, setSubmitting] = useState(false);
   const [failedSourceKeys, setFailedSourceKeys] = useState<string[]>([]);
   const [tokenInfo, setTokenInfo] = useState<{ kind: string; max_devices: number } | null>(null);
+  const [chatReady, setChatReady] = useState(false);
   const navVisible = useAutoHideOnInteraction(!!unlocked, 3000);
   const [sourceIdx, setSourceIdx] = useState<number>(() => {
     try { return Math.max(0, Number(sessionStorage.getItem(SS_SRC_KEY) || '0')); } catch { return 0; }
@@ -373,14 +374,14 @@ export default function Live() {
       if (document.visibilityState !== 'visible') return;
       if (tParam) void doUnlock({ token: tParam }, true);
       else if (mtParam) void doUnlock({ mtoken: mtParam, mpassword: search.get('mp') || search.get('mpassword') || '' }, true);
-    }, 60000);
+    }, 120000);
 
     // Polling fallback agar perubahan admin (mis. mengisi IDN Show ID) cepat terdeteksi
     // tanpa harus menunggu event realtime atau reload manual.
     const statusPoll = window.setInterval(() => {
       if (document.visibilityState !== 'visible') return;
       void fetchStatus();
-    }, 10000);
+    }, 30000);
 
     return () => {
       window.clearInterval(revalidate);
@@ -552,6 +553,12 @@ export default function Live() {
   // status.enabled & unlocked.enabled keduanya bersumber dari kolom is_live.
   const liveActive = !!(status?.enabled || unlocked?.enabled);
 
+  useEffect(() => {
+    if (!liveActive) { setChatReady(false); return; }
+    const delay = window.setTimeout(() => setChatReady(true), 2500);
+    return () => window.clearTimeout(delay);
+  }, [liveActive]);
+
   // ============ VIEWER COUNTER (presence) — count unique browser_id ============
   const showKey = search.get('show') || 'global';
   const [viewerCount, setViewerCount] = useState<number>(0);
@@ -586,12 +593,12 @@ export default function Live() {
           tracked = true;
           try { await channel.track({ at: Date.now() }); } catch { /* ignore */ }
           recount();
-          // Heartbeat: re-track every 25s so phantom presences expire & counter stays accurate
+          // Heartbeat ringan: cukup re-track berkala tanpa membebani player/network utama.
           heartbeat = window.setInterval(() => {
             if (document.visibilityState === 'visible') {
               channel.track({ at: Date.now() }).catch(() => {});
             }
-          }, 25000);
+          }, 45000);
         }
       });
     return () => {
@@ -774,9 +781,11 @@ export default function Live() {
             </div>
 
             {/* LIVE CHAT */}
-            <Suspense fallback={<ChatFallback />}>
-              <LiveChat />
-            </Suspense>
+            {chatReady ? (
+              <Suspense fallback={<ChatFallback />}>
+                <LiveChat />
+              </Suspense>
+            ) : <ChatFallback />}
           </>
         )}
       </div>
