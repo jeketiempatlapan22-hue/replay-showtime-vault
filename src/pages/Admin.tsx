@@ -646,6 +646,7 @@ export default function Admin() {
                 { v: 'members', label: 'Member', Icon: Users },
                 { v: 'bot', label: 'Bot WhatsApp', Icon: Bot },
                 { v: 'history', label: 'Riwayat Token', Icon: History },
+                { v: 'reseller_audit', label: 'Audit Reseller', Icon: ClipboardList },
                 { v: 'membership', label: 'Membership Token', Icon: Users },
                 { v: 'mb_packages', label: 'Paket Membership', Icon: Sparkles },
                 { v: 'pakasir', label: 'Pakasir Webhook', Icon: Settings },
