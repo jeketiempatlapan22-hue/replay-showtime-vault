@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { toast } from '@/hooks/use-toast';
-import { Plus, Save, Trash2, Send, Copy, Check, Bot } from 'lucide-react';
+import { Plus, Save, Trash2, Send, Copy, Check, Bot, Eye, EyeOff, KeyRound } from 'lucide-react';
 
 type BotCommand = {
   id: string;
@@ -18,7 +18,7 @@ type BotCommand = {
   sort_order: number;
 };
 
-type BotAdminRow = { id: string; phone: string; label: string; enabled: boolean };
+type BotAdminRow = { id: string; phone: string; label: string; enabled: boolean; pin: string };
 
 function normalizePhone(raw: string) {
   const d = raw.replace(/\D/g, '');
@@ -76,6 +76,12 @@ export default function BotAdmin() {
     if (!confirm('Hapus admin bot ini?')) return;
     await supabase.from('bot_admins').delete().eq('id', id);
     load();
+  };
+
+  const savePin = async (id: string, pin: string) => {
+    const { error } = await supabase.from('bot_admins').update({ pin: pin.trim() }).eq('id', id);
+    if (error) toast({ title: 'Gagal simpan PIN', description: error.message, variant: 'destructive' });
+    else toast({ title: 'PIN tersimpan' });
   };
 
   const save = async (c: BotCommand) => {
@@ -218,34 +224,23 @@ export default function BotAdmin() {
         )}
       </div>
 
-      {/* Bot Admins whitelist */}
+      {/* Bot Admins / Reseller whitelist */}
       <div className="bg-card border border-border rounded-xl p-4 space-y-3">
-        <h3 className="font-semibold">Admin Bot WhatsApp</h3>
+        <h3 className="font-semibold">Admin Bot & Reseller WhatsApp</h3>
         <p className="text-xs text-muted-foreground">
-          Hanya nomor di daftar ini yang dapat menjalankan command admin seperti <code>/buattoken</code>.
+          Nomor di daftar ini bisa menjalankan command admin di bot (mis. <code>/buattoken</code>) DAN masuk ke{' '}
+          <a href="/reseller" target="_blank" rel="noreferrer" className="underline">/reseller</a> menggunakan PIN yang Anda set di bawah.
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
           <Input placeholder="08xxxx atau 628xxxx" value={newPhone} onChange={(e) => setNewPhone(e.target.value)} />
           <Input placeholder="Label (opsional)" value={newLabel} onChange={(e) => setNewLabel(e.target.value)} />
-          <Button onClick={addAdmin}><Plus className="w-4 h-4 mr-1" />Tambah Admin</Button>
+          <Button onClick={addAdmin}><Plus className="w-4 h-4 mr-1" />Tambah</Button>
         </div>
         <div className="space-y-2">
           {admins.length === 0 ? (
             <p className="text-xs text-muted-foreground italic">Belum ada admin bot.</p>
           ) : admins.map((a) => (
-            <div key={a.id} className="flex items-center gap-2 border border-border rounded-lg p-2 bg-secondary/30">
-              <div className="flex-1 min-w-0">
-                <p className="font-mono text-sm">+{a.phone}</p>
-                {a.label && <p className="text-xs text-muted-foreground">{a.label}</p>}
-              </div>
-              <label className="flex items-center gap-2 text-xs">
-                <Switch checked={a.enabled} onCheckedChange={() => toggleAdmin(a)} />
-                Aktif
-              </label>
-              <Button size="icon" variant="outline" onClick={() => removeAdmin(a.id)}>
-                <Trash2 className="w-4 h-4" />
-              </Button>
-            </div>
+            <AdminRowItem key={a.id} row={a} onToggle={() => toggleAdmin(a)} onRemove={() => removeAdmin(a.id)} onSavePin={(pin) => savePin(a.id, pin)} />
           ))}
         </div>
       </div>
@@ -307,6 +302,47 @@ export default function BotAdmin() {
             ))}
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+function AdminRowItem({ row, onToggle, onRemove, onSavePin }: {
+  row: BotAdminRow; onToggle: () => void; onRemove: () => void; onSavePin: (pin: string) => void;
+}) {
+  const [pin, setPin] = useState(row.pin || '');
+  const [show, setShow] = useState(false);
+  useEffect(() => { setPin(row.pin || ''); }, [row.pin]);
+  return (
+    <div className="border border-border rounded-lg p-2 bg-secondary/30 space-y-2">
+      <div className="flex items-center gap-2">
+        <div className="flex-1 min-w-0">
+          <p className="font-mono text-sm">+{row.phone}</p>
+          {row.label && <p className="text-xs text-muted-foreground truncate">{row.label}</p>}
+        </div>
+        <label className="flex items-center gap-2 text-xs">
+          <Switch checked={row.enabled} onCheckedChange={onToggle} />
+          Aktif
+        </label>
+        <Button size="icon" variant="outline" onClick={onRemove}>
+          <Trash2 className="w-4 h-4" />
+        </Button>
+      </div>
+      <div className="flex items-center gap-1">
+        <KeyRound className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+        <Input
+          type={show ? 'text' : 'password'}
+          placeholder="PIN reseller (kosong = nonaktif)"
+          value={pin}
+          onChange={(e) => setPin(e.target.value)}
+          className="h-8 text-xs font-mono"
+        />
+        <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setShow((v) => !v)}>
+          {show ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+        </Button>
+        <Button size="sm" className="h-8" onClick={() => onSavePin(pin)}>
+          <Save className="w-3.5 h-3.5 mr-1" />PIN
+        </Button>
       </div>
     </div>
   );
