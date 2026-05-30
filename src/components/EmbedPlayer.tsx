@@ -149,7 +149,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
     setCurrentTime(0);
     if (ytFallbackTimerRef.current) clearTimeout(ytFallbackTimerRef.current);
     if (type !== 'youtube') {
-      const id = setTimeout(() => { markReady(true); setIsPlaying(true); }, 1200);
+      const id = setTimeout(() => { markReady(true); setIsPlaying(true); }, 400);
       return () => clearTimeout(id);
     }
     if (!ytId) {
@@ -164,7 +164,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
       if (cancelled || readyRef.current) return;
       markReady(true);
       setIsPlaying(true);
-    }, 1500);
+    }, 700);
 
     const init = () => {
       if (cancelled || !iframeRef.current) return;
