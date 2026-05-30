@@ -745,7 +745,7 @@ export default function Live() {
                   {unlocked?.title || status?.title || 'Live'}
                 </h2>
                 {(() => {
-                  const d = typeof document !== 'undefined' ? (document as any) : null;
+                  const d = typeof document !== 'undefined' ? (document as PiPDocument) : null;
                   const supported = !!d && 'pictureInPictureEnabled' in d && !!d.pictureInPictureEnabled;
                   if (!supported) return null;
                   return (
@@ -755,11 +755,11 @@ export default function Live() {
                       title="Picture in Picture"
                       onClick={async () => {
                         try {
-                          const doc = document as any;
+                          const doc = document as PiPDocument;
                           if (doc.pictureInPictureElement) { await doc.exitPictureInPicture?.(); return; }
-                          const v = document.querySelector('video') as HTMLVideoElement | null;
-                          if (v && typeof (v as any).requestPictureInPicture === 'function' && !(v as any).disablePictureInPicture) {
-                            await (v as any).requestPictureInPicture();
+                          const v = document.querySelector('video') as PiPVideo | null;
+                          if (v && typeof v.requestPictureInPicture === 'function' && !v.disablePictureInPicture) {
+                            await v.requestPictureInPicture();
                           }
                         } catch { /* ignore */ }
                       }}
