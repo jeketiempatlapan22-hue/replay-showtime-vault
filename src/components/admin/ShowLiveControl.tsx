@@ -200,6 +200,26 @@ export default function ShowLiveControl({ showId, showTitle }: Props) {
         <p className="text-[11px] text-muted-foreground mt-1">Saat diisi, sumber "IDN" akan otomatis tampil di playlist player Live. Token stream diambil otomatis dari server.</p>
       </div>
 
+      {/* Show Spesial: link grup & info replay */}
+      <div className="p-3 rounded bg-card border border-border space-y-2">
+        <Label className="text-xs flex items-center gap-1">👥 Link Grup (Show Spesial)</Label>
+        <Input
+          value={groupLink}
+          onChange={e => setGroupLink(e.target.value)}
+          placeholder="https://chat.whatsapp.com/... (opsional). Otomatis dikirim ke WA pembeli show."
+        />
+        <Label className="text-xs flex items-center gap-1 pt-1">🎞️ Info Replay (Show Spesial)</Label>
+        <textarea
+          value={replayInfo}
+          onChange={e => setReplayInfo(e.target.value)}
+          rows={2}
+          placeholder="Info replay yang dikirim ke pembeli (mis. 'Replay tersedia 7 hari setelah show')."
+          className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+        />
+        <p className="text-[11px] text-muted-foreground">Dikirim otomatis di pesan WhatsApp saat user membeli show (QRIS / koin).</p>
+      </div>
+
+
       {/* Sumber video */}
       <div className="space-y-2">
         <Label className="text-xs flex items-center gap-1">📋 Sumber Video Tambahan</Label>
