@@ -414,7 +414,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
         if (data.details === Hls.ErrorDetails.MANIFEST_LOAD_ERROR && data.response?.code && data.response.code >= 400) {
           setError('Sumber video tidak dapat diakses. Mencoba player lain…');
           setLoading(false);
-          setBuffering(false);
+          setBufferingState(false);
           onFatalErrorRef.current?.();
           return;
         }
@@ -454,7 +454,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
         }
         setError('Gagal memuat video.');
         setLoading(false);
-        setBuffering(false);
+        setBufferingState(false);
         onFatalErrorRef.current?.();
       });
       startStallWatchdog();
@@ -493,7 +493,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
       // Reset native source to prevent leaked playback when switching providers
       try { video.removeAttribute('src'); video.load(); } catch { /* ignore */ }
     };
-  }, [src]);
+  }, [src, setBufferingState]);
 
   const selectQuality = (levelIndex: number) => {
     if (!hlsRef.current) return;
@@ -546,15 +546,15 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
     };
     const onWaiting = () => {
       // mid-play stall (not initial)
-      if (!loadingRef.current) setBuffering(true);
+      if (!loadingRef.current && bufferedAhead() < 1) setBufferingState(true);
     };
     const onPlaying = () => {
       setLoading(false);
-      setBuffering(false);
+      setBufferingState(false);
       // Reset recovery counter on successful playback so future hiccups can recover too
       recoveryAttemptsRef.current = 0;
     };
-    const onCanPlay = () => { setLoading(false); setBuffering(false); };
+    const onCanPlay = () => { setLoading(false); setBufferingState(false); };
     const onLoadedMetadata = () => onDurationChange();
     const onProgress = () => {
       lastProgressRef.current = { time: video.currentTime, checkedAt: Date.now(), recoveries: 0 };
