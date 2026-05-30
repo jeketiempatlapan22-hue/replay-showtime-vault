@@ -267,7 +267,9 @@ export type Database = {
           enabled: boolean
           id: string
           label: string
+          last_login_at: string | null
           phone: string
+          pin: string
           updated_at: string
         }
         Insert: {
@@ -275,7 +277,9 @@ export type Database = {
           enabled?: boolean
           id?: string
           label?: string
+          last_login_at?: string | null
           phone: string
+          pin?: string
           updated_at?: string
         }
         Update: {
@@ -283,7 +287,9 @@ export type Database = {
           enabled?: boolean
           id?: string
           label?: string
+          last_login_at?: string | null
           phone?: string
+          pin?: string
           updated_at?: string
         }
         Relationships: []
@@ -1615,6 +1621,47 @@ export type Database = {
       }
       release_membership_slot: {
         Args: { _order_id: string; _reason: string }
+        Returns: boolean
+      }
+      reseller_list_replays: {
+        Args: {
+          _limit: number
+          _offset: number
+          _phone: string
+          _pin: string
+          _q: string
+        }
+        Returns: {
+          date: string
+          id: string
+          image_url: string
+          show_name: string
+          title: string
+        }[]
+      }
+      reseller_list_shows: {
+        Args: { _phone: string; _pin: string }
+        Returns: {
+          category: string
+          id: string
+          image_url: string
+          is_active: boolean
+          is_live: boolean
+          show_date: string
+          show_time: string
+          title: string
+        }[]
+      }
+      reseller_login: {
+        Args: { _phone: string; _pin: string }
+        Returns: {
+          label: string
+          ok: boolean
+          phone: string
+        }[]
+      }
+      reseller_verify: {
+        Args: { _phone: string; _pin: string }
         Returns: boolean
       }
       reserve_membership_slot: {
