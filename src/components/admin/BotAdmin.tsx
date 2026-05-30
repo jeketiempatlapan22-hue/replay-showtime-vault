@@ -306,3 +306,44 @@ export default function BotAdmin() {
     </div>
   );
 }
+
+function AdminRowItem({ row, onToggle, onRemove, onSavePin }: {
+  row: BotAdminRow; onToggle: () => void; onRemove: () => void; onSavePin: (pin: string) => void;
+}) {
+  const [pin, setPin] = useState(row.pin || '');
+  const [show, setShow] = useState(false);
+  useEffect(() => { setPin(row.pin || ''); }, [row.pin]);
+  return (
+    <div className="border border-border rounded-lg p-2 bg-secondary/30 space-y-2">
+      <div className="flex items-center gap-2">
+        <div className="flex-1 min-w-0">
+          <p className="font-mono text-sm">+{row.phone}</p>
+          {row.label && <p className="text-xs text-muted-foreground truncate">{row.label}</p>}
+        </div>
+        <label className="flex items-center gap-2 text-xs">
+          <Switch checked={row.enabled} onCheckedChange={onToggle} />
+          Aktif
+        </label>
+        <Button size="icon" variant="outline" onClick={onRemove}>
+          <Trash2 className="w-4 h-4" />
+        </Button>
+      </div>
+      <div className="flex items-center gap-1">
+        <KeyRound className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+        <Input
+          type={show ? 'text' : 'password'}
+          placeholder="PIN reseller (kosong = nonaktif)"
+          value={pin}
+          onChange={(e) => setPin(e.target.value)}
+          className="h-8 text-xs font-mono"
+        />
+        <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setShow((v) => !v)}>
+          {show ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+        </Button>
+        <Button size="sm" className="h-8" onClick={() => onSavePin(pin)}>
+          <Save className="w-3.5 h-3.5 mr-1" />PIN
+        </Button>
+      </div>
+    </div>
+  );
+}
