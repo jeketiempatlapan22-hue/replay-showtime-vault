@@ -155,6 +155,8 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
     video.volume = initialVolumeRef.current;
     video.muted = initialMutedRef.current;
     video.setAttribute('playsinline', 'true');
+    // Cegah tombol AirPlay/Cast browser memicu pause/interupsi yang tidak diinginkan
+    try { (video as HTMLVideoElement & { disableRemotePlayback?: boolean }).disableRemotePlayback = true; } catch { /* ignore */ }
 
     const safePlay = () => {
       try {
@@ -497,7 +499,16 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
 
     const onPlay = () => setIsPlaying(true);
     const onPause = () => setIsPlaying(false);
-    const onTimeUpdate = () => setCurrentTime(video.currentTime);
+    // Throttle: hanya update saat detik bulat berubah → kurangi re-render dari ~4Hz ke 1Hz
+    let lastSec = -1;
+    const onTimeUpdate = () => {
+      const t = video.currentTime;
+      const sec = Math.floor(t);
+      if (sec !== lastSec) {
+        lastSec = sec;
+        setCurrentTime(t);
+      }
+    };
     const onDurationChange = () => {
       const nextDuration = video.duration;
       if (!Number.isFinite(nextDuration) || nextDuration <= 0) {
