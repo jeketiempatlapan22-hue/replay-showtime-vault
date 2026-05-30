@@ -36,6 +36,8 @@ export default function ShowLiveControl({ showId, showTitle }: Props) {
   const [replayM3u8, setReplayM3u8] = useState('');
   const [replayYt, setReplayYt] = useState('');
   const [idnShowId, setIdnShowId] = useState('');
+  const [groupLink, setGroupLink] = useState('');
+  const [replayInfo, setReplayInfo] = useState('');
 
   const [newLabel, setNewLabel] = useState('');
   const [newType, setNewType] = useState<SrcType>('m3u8');
@@ -58,6 +60,8 @@ export default function ShowLiveControl({ showId, showTitle }: Props) {
         setReplayM3u8(row.replay_m3u8_url || '');
         setReplayYt(row.replay_youtube_url || '');
         setIdnShowId((row as any).idn_show_id || '');
+        setGroupLink((row as any).group_link || '');
+        setReplayInfo((row as any).replay_info || '');
       }
       setLoading(false);
     });
@@ -123,6 +127,8 @@ export default function ShowLiveControl({ showId, showTitle }: Props) {
         replay_m3u8_url: replayM3u8.trim(),
         replay_youtube_url: normalizedReplayYt,
         idn_show_id: idnShowId.trim(),
+        group_link: groupLink.trim(),
+        replay_info: replayInfo.trim(),
       } as any).eq('id', showId);
       if (error) throw error;
       setLiveUrl(normalizedLiveUrl);
@@ -193,6 +199,26 @@ export default function ShowLiveControl({ showId, showTitle }: Props) {
         />
         <p className="text-[11px] text-muted-foreground mt-1">Saat diisi, sumber "IDN" akan otomatis tampil di playlist player Live. Token stream diambil otomatis dari server.</p>
       </div>
+
+      {/* Show Spesial: link grup & info replay */}
+      <div className="p-3 rounded bg-card border border-border space-y-2">
+        <Label className="text-xs flex items-center gap-1">👥 Link Grup (Show Spesial)</Label>
+        <Input
+          value={groupLink}
+          onChange={e => setGroupLink(e.target.value)}
+          placeholder="https://chat.whatsapp.com/... (opsional). Otomatis dikirim ke WA pembeli show."
+        />
+        <Label className="text-xs flex items-center gap-1 pt-1">🎞️ Info Replay (Show Spesial)</Label>
+        <textarea
+          value={replayInfo}
+          onChange={e => setReplayInfo(e.target.value)}
+          rows={2}
+          placeholder="Info replay yang dikirim ke pembeli (mis. 'Replay tersedia 7 hari setelah show')."
+          className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+        />
+        <p className="text-[11px] text-muted-foreground">Dikirim otomatis di pesan WhatsApp saat user membeli show (QRIS / koin).</p>
+      </div>
+
 
       {/* Sumber video */}
       <div className="space-y-2">

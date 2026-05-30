@@ -102,6 +102,7 @@ export type Database = {
           category: string
           created_at: string
           description: string
+          group_link: string
           id: string
           idn_show_id: string
           image_url: string
@@ -121,6 +122,7 @@ export type Database = {
           price_show_coins: number
           replay_enabled: boolean
           replay_id: string | null
+          replay_info: string
           replay_m3u8_url: string
           replay_mode: boolean
           replay_youtube_url: string
@@ -135,6 +137,7 @@ export type Database = {
           category?: string
           created_at?: string
           description?: string
+          group_link?: string
           id?: string
           idn_show_id?: string
           image_url?: string
@@ -154,6 +157,7 @@ export type Database = {
           price_show_coins?: number
           replay_enabled?: boolean
           replay_id?: string | null
+          replay_info?: string
           replay_m3u8_url?: string
           replay_mode?: boolean
           replay_youtube_url?: string
@@ -168,6 +172,7 @@ export type Database = {
           category?: string
           created_at?: string
           description?: string
+          group_link?: string
           id?: string
           idn_show_id?: string
           image_url?: string
@@ -187,6 +192,7 @@ export type Database = {
           price_show_coins?: number
           replay_enabled?: boolean
           replay_id?: string | null
+          replay_info?: string
           replay_m3u8_url?: string
           replay_mode?: boolean
           replay_youtube_url?: string
@@ -1405,6 +1411,7 @@ export type Database = {
           category: string
           created_at: string
           description: string
+          group_link: string
           id: string
           idn_show_id: string
           image_url: string
@@ -1424,6 +1431,7 @@ export type Database = {
           price_show_coins: number
           replay_enabled: boolean
           replay_id: string | null
+          replay_info: string
           replay_m3u8_url: string
           replay_mode: boolean
           replay_youtube_url: string
@@ -1447,6 +1455,7 @@ export type Database = {
           category: string
           created_at: string
           description: string
+          group_link: string
           id: string
           idn_show_id: string
           image_url: string
@@ -1466,6 +1475,7 @@ export type Database = {
           price_show_coins: number
           replay_enabled: boolean
           replay_id: string | null
+          replay_info: string
           replay_m3u8_url: string
           replay_mode: boolean
           replay_youtube_url: string
