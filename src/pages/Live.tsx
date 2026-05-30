@@ -32,6 +32,7 @@ interface MembershipInfo { expires_at?: string; resets_used: number; resets_max:
 interface LiveStatus { enabled: boolean; title: string; type: string; require_password: boolean; sources: PublicSource[]; lineup: string[]; show_date?: string; show_time?: string; image_url?: string; idn_show_id?: string }
 interface UnlockedConfig { title: string; type: SrcType; url: string; sources: PrivateSource[]; watermark: string; enabled: boolean; idn_show_id?: string }
 type SourceLike = Partial<Record<keyof PrivateSource, unknown>>;
+interface IdnTokenResponse { error?: string; xApiToken?: string; xSecKey?: string; xTokenId?: string; xShowId?: string; playbackUrl?: string }
 
 const SS_KEY_BASE = 'replaytime-live-unlocked';
 const SS_SRC_KEY = 'replaytime-live-source-idx';
@@ -488,14 +489,14 @@ export default function Live() {
     let cancelled = false;
     let refreshTimer: number | null = null;
     setIdnError('');
-    if (idnResolved?.key !== key) setIdnResolved(null);
+    setIdnResolved(prev => prev?.key === key ? prev : null);
     const refreshIdnToken = async (initial = false) => {
       try {
         const { data, error } = await supabase.functions.invoke('idn-stream-token', {
           body: { showId: idnId },
         });
         if (error) throw new Error(error.message || 'Gagal memanggil server token');
-        const j: any = data || {};
+        const j = (data || {}) as IdnTokenResponse;
         if (j?.error) throw new Error(j.error);
         const xApiToken = String(j.xApiToken || '');
         const xSecKey = String(j.xSecKey || '');
@@ -524,8 +525,9 @@ export default function Live() {
           }
           return { ...prev, headers: nextHeaders };
         });
-      } catch (e: any) {
-        if (!cancelled && initial) setIdnError(e?.message || 'Gagal mengambil token IDN. Pastikan domain ini di-whitelist worker.');
+      } catch (e: unknown) {
+        const message = e instanceof Error ? e.message : '';
+        if (!cancelled && initial) setIdnError(message || 'Gagal mengambil token IDN. Pastikan domain ini di-whitelist worker.');
       }
     };
     void refreshIdnToken(true);
