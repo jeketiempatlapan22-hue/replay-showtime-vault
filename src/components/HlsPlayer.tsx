@@ -45,6 +45,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
   const isLiveRef = useRef(false);
   const stallWatchdogRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastProgressRef = useRef({ time: 0, checkedAt: Date.now(), recoveries: 0 });
+  const lastBufferingStateRef = useRef(false);
   const onFatalErrorRef = useRef(onFatalError);
   const initialLiveEdgeSyncRef = useRef(false);
   const headersRef = useRef<Record<string, string> | undefined>(headers);
@@ -129,13 +130,19 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
     loadingRef.current = loading;
   }, [loading]);
 
+  const setBufferingState = useCallback((next: boolean) => {
+    if (lastBufferingStateRef.current === next) return;
+    lastBufferingStateRef.current = next;
+    setBuffering(next);
+  }, []);
+
   // Setup HLS with optimized config
   useEffect(() => {
     const video = videoRef.current;
     if (!video || !src) return;
 
     setLoading(true);
-    setBuffering(false);
+    setBufferingState(false);
     setError(null);
     setQualities([]);
     setCurrentQuality(-1);
@@ -207,15 +214,23 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
         // Only act after 12s of true stall to avoid interrupting normal playback
         if (now - last.checkedAt < 12000) return;
 
-        setBuffering(true);
+        setBufferingState(true);
         lastProgressRef.current = { time: current, checkedAt: now, recoveries: last.recoveries + 1 };
 
         const hlsInstance = hlsRef.current;
         if (hlsInstance) {
-          // JANGAN melakukan seek paksa ke live edge — itu menyebabkan video "loncat-loncat".
-          // Cukup minta hls.js melanjutkan loading dari posisi saat ini (-1 = lanjut natural,
-          // untuk live akan otomatis menyesuaikan ke edge tanpa hard seek yang terlihat user).
-          try { hlsInstance.startLoad(-1); } catch { /* ignore */ }
+          try {
+            if (isLiveRef.current) {
+              const edge = video.seekable.length ? video.seekable.end(video.seekable.length - 1) : NaN;
+              const latency = Number.isFinite(edge) ? edge - current : 0;
+              // Kalau benar-benar jauh tertinggal, lompat lembut mendekati live edge.
+              // Kalau tidak, cukup lanjutkan loading supaya tidak terlihat refresh.
+              if (latency > 45) video.currentTime = Math.max(0, edge - 12);
+              hlsInstance.startLoad(-1);
+            } else {
+              hlsInstance.startLoad(resumePosition());
+            }
+          } catch { /* ignore */ }
         }
         safePlay();
       }, 4000);
@@ -233,10 +248,10 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
     const deviceMem = (navigator as Navigator & { deviceMemory?: number }).deviceMemory || 4;
     const lowMem = deviceMem <= 2;
     const bufferProfile = isWeak || lowMem
-      ? { back: 30, max: 30, maxMax: 60, size: 40 * 1000 * 1000 }
+      ? { back: 20, max: 45, maxMax: 90, size: 50 * 1000 * 1000 }
       : isMobile
-        ? { back: 60, max: 60, maxMax: 180, size: 80 * 1000 * 1000 }
-        : { back: 90, max: 90, maxMax: 600, size: 150 * 1000 * 1000 };
+        ? { back: 30, max: 90, maxMax: 240, size: 100 * 1000 * 1000 }
+        : { back: 45, max: 120, maxMax: 360, size: 180 * 1000 * 1000 };
 
     if (Hls.isSupported()) {
       const attachRequestHeaders = (target: { setRequestHeader?: (key: string, value: string) => void; set?: (key: string, value: string) => void }) => {
@@ -249,8 +264,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
         });
       };
       hls = new Hls({
-        xhrSetup: (xhr, url) => {
-          if (xhr.readyState === 0) xhr.open('GET', url, true);
+        xhrSetup: (xhr) => {
           attachRequestHeaders(xhr);
         },
         fetchSetup: (context, initParams) => {
@@ -267,7 +281,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
         maxBufferLength: bufferProfile.max,
         maxMaxBufferLength: bufferProfile.maxMax,
         maxBufferSize: bufferProfile.size,
-        maxBufferHole: 0.5,
+        maxBufferHole: 0.75,
         highBufferWatchdogPeriod: 2,
         nudgeOffset: 0.1,
         nudgeMaxRetry: 8,
@@ -279,8 +293,8 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
         abrEwmaSlowLive: 9.0,
         abrEwmaFastVoD: 3.0,
         abrEwmaSlowVoD: 9.0,
-        abrBandWidthFactor: 0.85,
-        abrBandWidthUpFactor: 0.7,
+        abrBandWidthFactor: 0.75,
+        abrBandWidthUpFactor: 0.55,
         abrMaxWithRealBitrate: true,
         testBandwidth: true,
         capLevelToPlayerSize: true,
@@ -303,8 +317,8 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
         appendErrorMaxRetry: 5,
         startPosition: -1,
         liveDurationInfinity: true,
-        liveSyncDurationCount: 4,
-        liveMaxLatencyDurationCount: 12,
+        liveSyncDurationCount: 8,
+        liveMaxLatencyDurationCount: 20,
         progressive: true,
       });
       hlsRef.current = hls;
@@ -389,7 +403,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
         if (data.details === Hls.ErrorDetails.MANIFEST_LOAD_ERROR && data.response?.code && data.response.code >= 400) {
           setError('Sumber video tidak dapat diakses. Mencoba player lain…');
           setLoading(false);
-          setBuffering(false);
+          setBufferingState(false);
           onFatalErrorRef.current?.();
           return;
         }
@@ -429,7 +443,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
         }
         setError('Gagal memuat video.');
         setLoading(false);
-        setBuffering(false);
+        setBufferingState(false);
         onFatalErrorRef.current?.();
       });
       startStallWatchdog();
@@ -468,7 +482,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
       // Reset native source to prevent leaked playback when switching providers
       try { video.removeAttribute('src'); video.load(); } catch { /* ignore */ }
     };
-  }, [src]);
+  }, [src, setBufferingState]);
 
   const selectQuality = (levelIndex: number) => {
     if (!hlsRef.current) return;
@@ -519,17 +533,27 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
       setDuration(nextDuration);
       if (!isLiveRef.current) setIsLiveStream(false);
     };
+    const getBufferedAhead = () => {
+      try {
+        const t = video.currentTime;
+        const ranges = video.buffered;
+        for (let i = 0; i < ranges.length; i += 1) {
+          if (ranges.start(i) <= t && ranges.end(i) >= t) return Math.max(0, ranges.end(i) - t);
+        }
+      } catch { /* ignore */ }
+      return 0;
+    };
     const onWaiting = () => {
       // mid-play stall (not initial)
-      if (!loadingRef.current) setBuffering(true);
+      if (!loadingRef.current && getBufferedAhead() < 1) setBufferingState(true);
     };
     const onPlaying = () => {
       setLoading(false);
-      setBuffering(false);
+      setBufferingState(false);
       // Reset recovery counter on successful playback so future hiccups can recover too
       recoveryAttemptsRef.current = 0;
     };
-    const onCanPlay = () => { setLoading(false); setBuffering(false); };
+    const onCanPlay = () => { setLoading(false); setBufferingState(false); };
     const onLoadedMetadata = () => onDurationChange();
     const onProgress = () => {
       lastProgressRef.current = { time: video.currentTime, checkedAt: Date.now(), recoveries: 0 };
@@ -562,7 +586,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
       video.removeEventListener('progress', onProgress);
       video.removeEventListener('volumechange', onVolumeChange);
     };
-  }, []);
+  }, [setBufferingState]);
 
   // Fullscreen tracking (cross-browser)
   useEffect(() => {

@@ -32,13 +32,16 @@ interface MembershipInfo { expires_at?: string; resets_used: number; resets_max:
 interface LiveStatus { enabled: boolean; title: string; type: string; require_password: boolean; sources: PublicSource[]; lineup: string[]; show_date?: string; show_time?: string; image_url?: string; idn_show_id?: string }
 interface UnlockedConfig { title: string; type: SrcType; url: string; sources: PrivateSource[]; watermark: string; enabled: boolean; idn_show_id?: string }
 type SourceLike = Partial<Record<keyof PrivateSource, unknown>>;
+interface IdnTokenResponse { error?: string; xApiToken?: string; xSecKey?: string; xTokenId?: string; xShowId?: string; playbackUrl?: string }
+type PiPDocument = Document & { pictureInPictureEnabled?: boolean; pictureInPictureElement?: Element | null; exitPictureInPicture?: () => Promise<void> };
+type PiPVideo = HTMLVideoElement & { requestPictureInPicture?: () => Promise<unknown>; disablePictureInPicture?: boolean };
 
 const SS_KEY_BASE = 'replaytime-live-unlocked';
 const SS_SRC_KEY = 'replaytime-live-source-idx';
-// Token IDN berlaku ~2 jam. Refresh header tiap 25 menit sudah aman dan
-// menghindari tear-down player yang sering. Master playlist (blob URL)
-// hanya di-set sekali — refresh berikutnya HANYA memperbarui headers
-// supaya segmen .ts/.m3u8 ke worker tetap terotorisasi tanpa restart player.
+  // Token IDN berlaku ~2 jam. Refresh header tiap 25 menit sudah aman dan
+  // menghindari tear-down player. URL playback worker dibuat stabil; refresh
+  // berikutnya HANYA memperbarui headers supaya manifest live dan potongan .ts
+  // tetap terotorisasi tanpa restart player.
 const IDN_TOKEN_REFRESH_MS = 25 * 60 * 1000;
 
 const typeLabel = (t: string) => t === 'youtube' ? 'YouTube' : t === 'cloudflare' ? 'Cloudflare' : 'M3U8 / HLS';
@@ -132,6 +135,7 @@ export default function Live() {
   const [, setSubmitting] = useState(false);
   const [failedSourceKeys, setFailedSourceKeys] = useState<string[]>([]);
   const [tokenInfo, setTokenInfo] = useState<{ kind: string; max_devices: number } | null>(null);
+  const [chatReady, setChatReady] = useState(false);
   const navVisible = useAutoHideOnInteraction(!!unlocked, 3000);
   const [sourceIdx, setSourceIdx] = useState<number>(() => {
     try { return Math.max(0, Number(sessionStorage.getItem(SS_SRC_KEY) || '0')); } catch { return 0; }
@@ -150,18 +154,19 @@ export default function Live() {
             setStatusLoading(false);
             return null;
           }
-          const enabled = !!data.is_live;
+          const row = data as typeof data & { idn_show_id?: string | null };
+          const enabled = !!row.is_live;
           let wasOff = false;
           setStatus(prev => {
             wasOff = !prev?.enabled;
             return {
-              enabled, title: data.title || 'Live', type: data.live_type || 'm3u8',
-              require_password: data.live_require_password !== false,
+              enabled, title: row.title || 'Live', type: row.live_type || 'm3u8',
+              require_password: row.live_require_password !== false,
               sources: [],
-              lineup: Array.isArray(data.lineup) ? data.lineup : [],
-              show_date: data.show_date, show_time: data.show_time,
-              image_url: data.image_url || '',
-              idn_show_id: (data as any).idn_show_id || '',
+              lineup: Array.isArray(row.lineup) ? row.lineup : [],
+              show_date: row.show_date, show_time: row.show_time,
+              image_url: row.image_url || '',
+              idn_show_id: row.idn_show_id || '',
             };
           });
           // Stream URLs are no longer readable from the public table — only the
@@ -373,14 +378,14 @@ export default function Live() {
       if (document.visibilityState !== 'visible') return;
       if (tParam) void doUnlock({ token: tParam }, true);
       else if (mtParam) void doUnlock({ mtoken: mtParam, mpassword: search.get('mp') || search.get('mpassword') || '' }, true);
-    }, 60000);
+    }, 120000);
 
     // Polling fallback agar perubahan admin (mis. mengisi IDN Show ID) cepat terdeteksi
     // tanpa harus menunggu event realtime atau reload manual.
     const statusPoll = window.setInterval(() => {
       if (document.visibilityState !== 'visible') return;
       void fetchStatus();
-    }, 10000);
+    }, 30000);
 
     return () => {
       window.clearInterval(revalidate);
@@ -468,6 +473,7 @@ export default function Live() {
 
   const safeIdx = Math.min(sourceIdx, Math.max(0, allSources.length - 1));
   const activeSource = allSources[safeIdx];
+  const activeSourceUrl = activeSource?.url || '';
   const sourceKey = (source: PrivateSource, index: number) => `${index}:${source.type}:${source.url}`;
 
   // Resolve IDN stream: frontend langsung fetch token ke hanabira48, lalu jadikan HEADER
@@ -476,8 +482,8 @@ export default function Live() {
   const [idnError, setIdnError] = useState<string>('');
   const [idnRetryNonce, setIdnRetryNonce] = useState(0);
   useEffect(() => {
-    if (!activeSource || !activeSource.url.startsWith('idn://')) { setIdnError(''); return; }
-    const idnId = activeSource.url.slice('idn://'.length);
+    if (!activeSourceUrl.startsWith('idn://')) { setIdnError(''); return; }
+    const idnId = activeSourceUrl.slice('idn://'.length);
     if (!idnId) {
       setIdnResolved(null);
       setIdnError('IDN Show ID belum diatur admin. Hubungi admin untuk mengaktifkan stream IDN.');
@@ -487,15 +493,14 @@ export default function Live() {
     let cancelled = false;
     let refreshTimer: number | null = null;
     setIdnError('');
-    if (idnResolved?.key !== key) setIdnResolved(null);
-    let masterBlobUrl: string | null = null;
+    setIdnResolved(prev => prev?.key === key ? prev : null);
     const refreshIdnToken = async (initial = false) => {
       try {
         const { data, error } = await supabase.functions.invoke('idn-stream-token', {
           body: { showId: idnId },
         });
         if (error) throw new Error(error.message || 'Gagal memanggil server token');
-        const j: any = data || {};
+        const j = (data || {}) as IdnTokenResponse;
         if (j?.error) throw new Error(j.error);
         const xApiToken = String(j.xApiToken || '');
         const xSecKey = String(j.xSecKey || '');
@@ -512,28 +517,21 @@ export default function Live() {
           'x-token-id': xTokenId,
         } as Record<string, string>;
 
-        // Master playlist HANYA di-fetch sekali per stream. Refresh berikutnya
-        // cukup mengganti headers — jangan ganti blob URL karena itu akan
-        // menyebabkan HlsPlayer destroy & re-init instance HLS (player kelihatan
-        // refresh / putus-putus setiap interval).
-        if (initial || !masterBlobUrl) {
-          const res = await fetch(playbackUrl, { method: 'GET', headers: nextHeaders });
-          if (!res.ok) throw new Error(`Worker playback menolak (${res.status})`);
-          const m3u8Text = await res.text();
-          if (cancelled) return;
-          const blob = new Blob([m3u8Text], { type: 'application/vnd.apple.mpegurl' });
-          masterBlobUrl = URL.createObjectURL(blob);
-          setIdnError('');
-          setIdnResolved({ key, url: masterBlobUrl, headers: nextHeaders });
-        } else {
-          if (cancelled) return;
-          // Pertahankan blob URL yang sama → src HlsPlayer tidak berubah →
-          // tidak ada tear-down. Hanya headers yang diperbarui supaya request
-          // segmen .ts berikutnya tetap diterima worker.
-          setIdnResolved((prev) => prev ? { ...prev, headers: nextHeaders } : prev);
-        }
-      } catch (e: any) {
-        if (!cancelled && initial) setIdnError(e?.message || 'Gagal mengambil token IDN. Pastikan domain ini di-whitelist worker.');
+        if (cancelled) return;
+        // Jangan jadikan manifest live sebagai Blob statis: playlist IDN harus
+        // di-refresh terus oleh hls.js lewat worker. Src tetap playbackUrl yang
+        // sama, sedangkan headers diganti di ref HlsPlayer sehingga segmen baru
+        // memakai token terbaru tanpa remount/restart.
+        setIdnError('');
+        setIdnResolved((prev) => {
+          if (!prev || initial || prev.key !== key || prev.url !== playbackUrl) {
+            return { key, url: playbackUrl, headers: nextHeaders };
+          }
+          return { ...prev, headers: nextHeaders };
+        });
+      } catch (e: unknown) {
+        const message = e instanceof Error ? e.message : '';
+        if (!cancelled && initial) setIdnError(message || 'Gagal mengambil token IDN. Pastikan domain ini di-whitelist worker.');
       }
     };
     void refreshIdnToken(true);
@@ -541,9 +539,8 @@ export default function Live() {
     return () => {
       cancelled = true;
       if (refreshTimer) window.clearInterval(refreshTimer);
-      if (masterBlobUrl) { try { URL.revokeObjectURL(masterBlobUrl); } catch { /* ignore */ } }
     };
-  }, [activeSource?.url, idnRetryNonce]);
+  }, [activeSourceUrl, idnRetryNonce]);
 
   const selectSource = (i: number) => {
     setSourceIdx(i);
@@ -561,6 +558,12 @@ export default function Live() {
   // ON AIR hanya saat admin manual mengaktifkan toggle is_live di admin panel.
   // status.enabled & unlocked.enabled keduanya bersumber dari kolom is_live.
   const liveActive = !!(status?.enabled || unlocked?.enabled);
+
+  useEffect(() => {
+    if (!liveActive) { setChatReady(false); return; }
+    const delay = window.setTimeout(() => setChatReady(true), 2500);
+    return () => window.clearTimeout(delay);
+  }, [liveActive]);
 
   // ============ VIEWER COUNTER (presence) — count unique browser_id ============
   const showKey = search.get('show') || 'global';
@@ -596,12 +599,12 @@ export default function Live() {
           tracked = true;
           try { await channel.track({ at: Date.now() }); } catch { /* ignore */ }
           recount();
-          // Heartbeat: re-track every 25s so phantom presences expire & counter stays accurate
+          // Heartbeat ringan: cukup re-track berkala tanpa membebani player/network utama.
           heartbeat = window.setInterval(() => {
             if (document.visibilityState === 'visible') {
               channel.track({ at: Date.now() }).catch(() => {});
             }
-          }, 25000);
+          }, 45000);
         }
       });
     return () => {
@@ -743,7 +746,7 @@ export default function Live() {
                   {unlocked?.title || status?.title || 'Live'}
                 </h2>
                 {(() => {
-                  const d = typeof document !== 'undefined' ? (document as any) : null;
+                  const d = typeof document !== 'undefined' ? (document as PiPDocument) : null;
                   const supported = !!d && 'pictureInPictureEnabled' in d && !!d.pictureInPictureEnabled;
                   if (!supported) return null;
                   return (
@@ -753,11 +756,11 @@ export default function Live() {
                       title="Picture in Picture"
                       onClick={async () => {
                         try {
-                          const doc = document as any;
+                          const doc = document as PiPDocument;
                           if (doc.pictureInPictureElement) { await doc.exitPictureInPicture?.(); return; }
-                          const v = document.querySelector('video') as HTMLVideoElement | null;
-                          if (v && typeof (v as any).requestPictureInPicture === 'function' && !(v as any).disablePictureInPicture) {
-                            await (v as any).requestPictureInPicture();
+                          const v = document.querySelector('video') as PiPVideo | null;
+                          if (v && typeof v.requestPictureInPicture === 'function' && !v.disablePictureInPicture) {
+                            await v.requestPictureInPicture();
                           }
                         } catch { /* ignore */ }
                       }}
@@ -784,9 +787,11 @@ export default function Live() {
             </div>
 
             {/* LIVE CHAT */}
-            <Suspense fallback={<ChatFallback />}>
-              <LiveChat />
-            </Suspense>
+            {chatReady ? (
+              <Suspense fallback={<ChatFallback />}>
+                <LiveChat />
+              </Suspense>
+            ) : <ChatFallback />}
           </>
         )}
       </div>
