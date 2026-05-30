@@ -60,6 +60,8 @@ export default function ShowLiveControl({ showId, showTitle }: Props) {
         setReplayM3u8(row.replay_m3u8_url || '');
         setReplayYt(row.replay_youtube_url || '');
         setIdnShowId((row as any).idn_show_id || '');
+        setGroupLink((row as any).group_link || '');
+        setReplayInfo((row as any).replay_info || '');
       }
       setLoading(false);
     });
