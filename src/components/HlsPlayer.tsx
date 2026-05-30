@@ -134,7 +134,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
     if (lastBufferingStateRef.current === next) return;
     lastBufferingStateRef.current = next;
     setBuffering(next);
-  }, []);
+  }, [setBufferingState]);
 
   // Setup HLS with optimized config
   useEffect(() => {
