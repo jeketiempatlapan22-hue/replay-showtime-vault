@@ -544,9 +544,19 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
       setDuration(nextDuration);
       if (!isLiveRef.current) setIsLiveStream(false);
     };
+    const getBufferedAhead = () => {
+      try {
+        const t = video.currentTime;
+        const ranges = video.buffered;
+        for (let i = 0; i < ranges.length; i += 1) {
+          if (ranges.start(i) <= t && ranges.end(i) >= t) return Math.max(0, ranges.end(i) - t);
+        }
+      } catch { /* ignore */ }
+      return 0;
+    };
     const onWaiting = () => {
       // mid-play stall (not initial)
-      if (!loadingRef.current && bufferedAhead() < 1) setBufferingState(true);
+      if (!loadingRef.current && getBufferedAhead() < 1) setBufferingState(true);
     };
     const onPlaying = () => {
       setLoading(false);
