@@ -155,6 +155,8 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
     video.volume = initialVolumeRef.current;
     video.muted = initialMutedRef.current;
     video.setAttribute('playsinline', 'true');
+    // Cegah tombol AirPlay/Cast browser memicu pause/interupsi yang tidak diinginkan
+    try { (video as HTMLVideoElement & { disableRemotePlayback?: boolean }).disableRemotePlayback = true; } catch { /* ignore */ }
 
     const safePlay = () => {
       try {
