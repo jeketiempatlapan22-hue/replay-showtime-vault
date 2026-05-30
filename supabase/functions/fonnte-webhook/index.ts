@@ -339,8 +339,9 @@ Deno.serve(async (req) => {
   const rawPhoneStr = String(phone || '');
   const isGroup = !!participantNorm && (
     rawPhoneStr.includes('@g.us') ||
-    phoneNorm.length > 15 ||
-    (participantNorm !== phoneNorm && participantNorm.startsWith('62'))
+    rawPhoneStr.includes('-') ||           // Some Fonnte payloads use 12345-67890@g.us
+    phoneNorm.length > 15 ||                // Group JIDs are ~18 digits
+    participantNorm !== phoneNorm           // Participant differs from chat target → group
   );
   const groupId = isGroup ? phoneNorm : '';
   if (isGroup) phoneNorm = participantNorm;
@@ -731,8 +732,11 @@ Deno.serve(async (req) => {
             // Auto-disable any other show currently live to keep a single active LIVE.
             await admin.from('active_shows').update({ is_live: false }).neq('id', s.id).eq('is_live', true);
           }
+          // When turning live ON, also ensure show is active so it appears on home page.
+          const updatePayload: Record<string, unknown> = { is_live: turnOn };
+          if (turnOn) updatePayload.is_active = true;
           const { error } = await admin.from('active_shows')
-            .update({ is_live: turnOn }).eq('id', s.id);
+            .update(updatePayload).eq('id', s.id);
           if (error) {
             reply = `❌ Gagal mengubah status. ${error.message}`;
           } else {
@@ -743,12 +747,12 @@ Deno.serve(async (req) => {
         }
       }
     } else if (cmd === '/test') {
-      const fromGroup = !!participantNorm && participantNorm !== phoneNorm;
+      const fromGroup = isGroup;
       const testLines = [
         '🧪 *MODE TEST — WEBHOOK OK*',
         '',
         `📱 Nomor: +${phoneNorm}`,
-        fromGroup ? `👥 Grup: +${participantNorm}` : null,
+        fromGroup ? `👥 Grup: ${groupId}` : null,
         `🔧 Device: ${deviceNorm || '-'}`,
         `📨 Command: *${text}*`,
         `⏰ Waktu: ${new Date().toLocaleString('id-ID')}`,
