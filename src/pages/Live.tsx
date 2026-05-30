@@ -35,10 +35,10 @@ type SourceLike = Partial<Record<keyof PrivateSource, unknown>>;
 
 const SS_KEY_BASE = 'replaytime-live-unlocked';
 const SS_SRC_KEY = 'replaytime-live-source-idx';
-// Token IDN berlaku ~2 jam. Refresh header tiap 25 menit sudah aman dan
-// menghindari tear-down player yang sering. Master playlist (blob URL)
-// hanya di-set sekali — refresh berikutnya HANYA memperbarui headers
-// supaya segmen .ts/.m3u8 ke worker tetap terotorisasi tanpa restart player.
+  // Token IDN berlaku ~2 jam. Refresh header tiap 25 menit sudah aman dan
+  // menghindari tear-down player. URL playback worker dibuat stabil; refresh
+  // berikutnya HANYA memperbarui headers supaya manifest live dan potongan .ts
+  // tetap terotorisasi tanpa restart player.
 const IDN_TOKEN_REFRESH_MS = 25 * 60 * 1000;
 
 const typeLabel = (t: string) => t === 'youtube' ? 'YouTube' : t === 'cloudflare' ? 'Cloudflare' : 'M3U8 / HLS';
@@ -488,7 +488,6 @@ export default function Live() {
     let refreshTimer: number | null = null;
     setIdnError('');
     if (idnResolved?.key !== key) setIdnResolved(null);
-    let masterBlobUrl: string | null = null;
     const refreshIdnToken = async (initial = false) => {
       try {
         const { data, error } = await supabase.functions.invoke('idn-stream-token', {
@@ -512,26 +511,18 @@ export default function Live() {
           'x-token-id': xTokenId,
         } as Record<string, string>;
 
-        // Master playlist HANYA di-fetch sekali per stream. Refresh berikutnya
-        // cukup mengganti headers — jangan ganti blob URL karena itu akan
-        // menyebabkan HlsPlayer destroy & re-init instance HLS (player kelihatan
-        // refresh / putus-putus setiap interval).
-        if (initial || !masterBlobUrl) {
-          const res = await fetch(playbackUrl, { method: 'GET', headers: nextHeaders });
-          if (!res.ok) throw new Error(`Worker playback menolak (${res.status})`);
-          const m3u8Text = await res.text();
-          if (cancelled) return;
-          const blob = new Blob([m3u8Text], { type: 'application/vnd.apple.mpegurl' });
-          masterBlobUrl = URL.createObjectURL(blob);
-          setIdnError('');
-          setIdnResolved({ key, url: masterBlobUrl, headers: nextHeaders });
-        } else {
-          if (cancelled) return;
-          // Pertahankan blob URL yang sama → src HlsPlayer tidak berubah →
-          // tidak ada tear-down. Hanya headers yang diperbarui supaya request
-          // segmen .ts berikutnya tetap diterima worker.
-          setIdnResolved((prev) => prev ? { ...prev, headers: nextHeaders } : prev);
-        }
+        if (cancelled) return;
+        // Jangan jadikan manifest live sebagai Blob statis: playlist IDN harus
+        // di-refresh terus oleh hls.js lewat worker. Src tetap playbackUrl yang
+        // sama, sedangkan headers diganti di ref HlsPlayer sehingga segmen baru
+        // memakai token terbaru tanpa remount/restart.
+        setIdnError('');
+        setIdnResolved((prev) => {
+          if (!prev || initial || prev.key !== key || prev.url !== playbackUrl) {
+            return { key, url: playbackUrl, headers: nextHeaders };
+          }
+          return { ...prev, headers: nextHeaders };
+        });
       } catch (e: any) {
         if (!cancelled && initial) setIdnError(e?.message || 'Gagal mengambil token IDN. Pastikan domain ini di-whitelist worker.');
       }
@@ -541,7 +532,6 @@ export default function Live() {
     return () => {
       cancelled = true;
       if (refreshTimer) window.clearInterval(refreshTimer);
-      if (masterBlobUrl) { try { URL.revokeObjectURL(masterBlobUrl); } catch { /* ignore */ } }
     };
   }, [activeSource?.url, idnRetryNonce]);
 
