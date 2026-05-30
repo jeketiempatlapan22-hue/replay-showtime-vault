@@ -187,17 +187,6 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
       return Number.isFinite(current) && current > 0 ? current : -1;
     };
 
-    const bufferedAhead = () => {
-      try {
-        const t = video.currentTime;
-        const ranges = video.buffered;
-        for (let i = 0; i < ranges.length; i += 1) {
-          if (ranges.start(i) <= t && ranges.end(i) >= t) return Math.max(0, ranges.end(i) - t);
-        }
-      } catch { /* ignore */ }
-      return 0;
-    };
-
     const seekToLiveEdgeOnce = (syncPosition?: number | null) => {
       if (initialLiveEdgeSyncRef.current) return;
       const seekable = video.seekable;
