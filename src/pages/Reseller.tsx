@@ -7,11 +7,12 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from '@/hooks/use-toast';
-import { Copy, LogOut, RefreshCw, Search, Loader2, Radio, Film, Link2 } from 'lucide-react';
+import { Copy, LogOut, RefreshCw, Search, Loader2, Radio, Film, Link2, Crown } from 'lucide-react';
 
 type Session = { phone: string; pin: string; label: string };
 type ShowRow = { id: string; title: string; show_date: string; show_time: string; image_url: string; category: string; is_live: boolean; is_active: boolean };
 type ReplayRow = { id: string; title: string; show_name: string; date: string; image_url: string };
+type PackageRow = { id: string; name: string; description: string; replay_info: string; max_devices: number; includes_replays: boolean; status: string; paused: boolean };
 
 const SESSION_KEY = 'reseller_session';
 
@@ -80,8 +81,8 @@ function LoginCard({ onLogin }: { onLogin: (s: Session) => void }) {
 }
 
 function TokenResultDialog({
-  open, onOpenChange, link, message, title,
-}: { open: boolean; onOpenChange: (v: boolean) => void; link: string; message: string; title: string }) {
+  open, onOpenChange, link, message, title, extra,
+}: { open: boolean; onOpenChange: (v: boolean) => void; link: string; message: string; title: string; extra?: string }) {
   const copy = async (text: string, label: string) => {
     try { await navigator.clipboard.writeText(text); toast({ title: `${label} tersalin` }); } catch {
       toast({ title: 'Gagal menyalin', variant: 'destructive' });
@@ -94,8 +95,9 @@ function TokenResultDialog({
           <DialogTitle className="truncate">Link Baru: {title}</DialogTitle>
         </DialogHeader>
         <div className="space-y-3">
+          {extra && <p className="text-xs text-muted-foreground">{extra}</p>}
           <div className="space-y-1">
-            <Label className="text-xs">Link Akses (1 device)</Label>
+            <Label className="text-xs">Link Akses</Label>
             <div className="flex gap-1">
               <Input readOnly value={link} className="font-mono text-xs" />
               <Button size="icon" variant="outline" onClick={() => copy(link, 'Link')}><Copy className="w-4 h-4" /></Button>
@@ -107,7 +109,7 @@ function TokenResultDialog({
             <Button onClick={() => copy(message, 'Pesan')} className="w-full"><Copy className="w-4 h-4 mr-2" />Salin Pesan</Button>
           </div>
           <p className="text-[11px] text-muted-foreground italic">
-            ⚠️ Token ini hanya bisa dipakai 1 perangkat. Untuk pembeli berikutnya, buat link baru lagi.
+            ⚠️ Token hanya berlaku selama masa berlaku & hanya untuk target yang dipilih.
           </p>
         </div>
       </DialogContent>
@@ -115,8 +117,100 @@ function TokenResultDialog({
   );
 }
 
+function MembershipPanel({ session, onCreated }: { session: Session; onCreated: (r: { link: string; message: string; title: string; extra: string }) => void }) {
+  const [pkgs, setPkgs] = useState<PackageRow[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [daysMap, setDaysMap] = useState<Record<string, number>>({});
+  const [creatingId, setCreatingId] = useState<string | null>(null);
+
+  const load = async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from('membership_packages')
+      .select('id,name,description,replay_info,max_devices,includes_replays,status,paused')
+      .order('sort_order', { ascending: true });
+    if (error) toast({ title: 'Gagal memuat paket', description: error.message, variant: 'destructive' });
+    else setPkgs((data ?? []) as PackageRow[]);
+    setLoading(false);
+  };
+  useEffect(() => { load(); }, []);
+
+  const setDays = (id: string, v: number) => setDaysMap((m) => ({ ...m, [id]: v }));
+
+  const create = async (pkg: PackageRow) => {
+    const days = Math.max(2, Math.min(40, Number(daysMap[pkg.id] || 30)));
+    setCreatingId(pkg.id);
+    try {
+      const { data, error } = await supabase.functions.invoke('reseller-create-membership', {
+        body: { phone: session.phone, pin: session.pin, package_id: pkg.id, days },
+      });
+      if (error) throw error;
+      const d = data as any;
+      if (!d?.ok) throw new Error(d?.error || d?.detail || 'gagal');
+      try { await navigator.clipboard.writeText(d.message); } catch { /* ignore */ }
+      onCreated({
+        link: d.link, message: d.message, title: d.title || pkg.name,
+        extra: `Membership ${days} hari · ${pkg.max_devices} device · Sandi: ${d.password}`,
+      });
+      toast({ title: 'Link membership dibuat & disalin', description: `${days} hari, ${pkg.max_devices} device` });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'gagal';
+      toast({ title: 'Gagal membuat link', description: msg, variant: 'destructive' });
+    } finally {
+      setCreatingId(null);
+    }
+  };
+
+  return (
+    <div className="space-y-3 mt-4">
+      <div className="flex justify-end">
+        <Button size="sm" variant="outline" onClick={load} disabled={loading}>
+          <RefreshCw className={`w-4 h-4 mr-1 ${loading ? 'animate-spin' : ''}`} />Muat ulang
+        </Button>
+      </div>
+      {loading ? (
+        <p className="text-sm text-muted-foreground">Memuat…</p>
+      ) : pkgs.length === 0 ? (
+        <p className="text-sm text-muted-foreground italic">Belum ada paket membership.</p>
+      ) : pkgs.map((p) => {
+        const days = daysMap[p.id] ?? 30;
+        return (
+          <div key={p.id} className="border border-border rounded-xl bg-card p-3 space-y-2">
+            <div className="flex items-start gap-2">
+              <Crown className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-sm">{p.name}</p>
+                <p className="text-[11px] text-muted-foreground">
+                  👤 {p.max_devices} device{p.includes_replays ? ' · 🎬 termasuk replay' : ''}
+                </p>
+                {p.replay_info && <p className="text-[11px] text-muted-foreground mt-1 line-clamp-2">{p.replay_info}</p>}
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Label className="text-xs whitespace-nowrap">Durasi:</Label>
+              <Input
+                type="number" min={2} max={40} value={days}
+                onChange={(e) => setDays(p.id, Number(e.target.value) || 0)}
+                className="h-8 w-20 text-sm"
+              />
+              <span className="text-xs text-muted-foreground">hari (2–40)</span>
+            </div>
+            <Button size="sm" className="w-full" disabled={creatingId === p.id || days < 2 || days > 40} onClick={() => create(p)}>
+              {creatingId === p.id ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Link2 className="w-4 h-4 mr-1" />}
+              Buat & Salin Link Membership
+            </Button>
+          </div>
+        );
+      })}
+      <p className="text-[11px] text-muted-foreground italic pt-2">
+        ℹ️ Pesan WA otomatis menyertakan info replay dari paket sesuai pengaturan admin.
+      </p>
+    </div>
+  );
+}
+
 function Dashboard({ session, onLogout }: { session: Session; onLogout: () => void }) {
-  const [tab, setTab] = useState<'shows' | 'replays'>('shows');
+  const [tab, setTab] = useState<'shows' | 'replays' | 'membership'>('shows');
   const [shows, setShows] = useState<ShowRow[]>([]);
   const [replays, setReplays] = useState<ReplayRow[]>([]);
   const [loadingS, setLoadingS] = useState(false);
@@ -125,7 +219,7 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
   const [page, setPage] = useState(0);
   const PAGE = 20;
   const [creatingId, setCreatingId] = useState<string | null>(null);
-  const [result, setResult] = useState<{ link: string; message: string; title: string } | null>(null);
+  const [result, setResult] = useState<{ link: string; message: string; title: string; extra?: string } | null>(null);
 
   const loadShows = async () => {
     setLoadingS(true);
@@ -157,10 +251,13 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
       if (error) throw error;
       const d = data as any;
       if (!d?.ok) throw new Error(d?.error || 'gagal');
-      // auto copy message
       try { await navigator.clipboard.writeText(d.message); } catch { /* ignore */ }
-      setResult({ link: d.link, message: d.message, title: d.title || title });
-      toast({ title: 'Link baru dibuat & pesan tersalin', description: 'Hanya untuk 1 perangkat' });
+      const expStr = d.expires_at ? new Date(d.expires_at).toLocaleString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+      setResult({
+        link: d.link, message: d.message, title: d.title || title,
+        extra: kind === 'show' ? `Hanya untuk show ini · 1 device · Berlaku s/d ${expStr}` : `1 device · Berlaku s/d ${expStr}`,
+      });
+      toast({ title: 'Link baru dibuat & pesan tersalin' });
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'gagal';
       toast({ title: 'Gagal membuat link', description: msg, variant: 'destructive' });
@@ -184,10 +281,11 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
       </header>
 
       <main className="max-w-3xl mx-auto px-4 py-4 pb-24">
-        <Tabs value={tab} onValueChange={(v) => setTab(v as 'shows' | 'replays')}>
-          <TabsList className="grid grid-cols-2 w-full">
-            <TabsTrigger value="shows"><Radio className="w-4 h-4 mr-1" />Show Aktif</TabsTrigger>
+        <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)}>
+          <TabsList className="grid grid-cols-3 w-full">
+            <TabsTrigger value="shows"><Radio className="w-4 h-4 mr-1" />Show</TabsTrigger>
             <TabsTrigger value="replays"><Film className="w-4 h-4 mr-1" />Replay</TabsTrigger>
+            <TabsTrigger value="membership"><Crown className="w-4 h-4 mr-1" />Member</TabsTrigger>
           </TabsList>
 
           <TabsContent value="shows" className="space-y-3 mt-4">
@@ -196,6 +294,9 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
                 <RefreshCw className={`w-4 h-4 mr-1 ${loadingS ? 'animate-spin' : ''}`} />Muat ulang
               </Button>
             </div>
+            <p className="text-[11px] text-muted-foreground italic">
+              ⏳ Token show berlaku sampai akhir jadwal show (jadwal + 8 jam) & terkunci ke show tersebut.
+            </p>
             {loadingS ? (
               <p className="text-sm text-muted-foreground">Memuat…</p>
             ) : shows.length === 0 ? (
@@ -230,6 +331,9 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
               </div>
               <Button size="sm" onClick={() => { setPage(0); loadReplays(); }} disabled={loadingR}>Cari</Button>
             </div>
+            <p className="text-[11px] text-muted-foreground italic">
+              ⏳ Token replay berlaku 1 tahun · 1 device.
+            </p>
             {loadingR ? (
               <p className="text-sm text-muted-foreground">Memuat…</p>
             ) : replays.length === 0 ? (
@@ -258,6 +362,10 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
               <Button size="sm" variant="outline" disabled={loadingR || replays.length < PAGE} onClick={() => setPage((p) => p + 1)}>Berikutnya</Button>
             </div>
           </TabsContent>
+
+          <TabsContent value="membership">
+            <MembershipPanel session={session} onCreated={setResult} />
+          </TabsContent>
         </Tabs>
       </main>
 
@@ -265,7 +373,7 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
         <TokenResultDialog
           open={!!result}
           onOpenChange={(v) => { if (!v) setResult(null); }}
-          link={result.link} message={result.message} title={result.title}
+          link={result.link} message={result.message} title={result.title} extra={result.extra}
         />
       )}
     </div>
