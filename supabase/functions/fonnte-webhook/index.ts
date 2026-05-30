@@ -747,12 +747,12 @@ Deno.serve(async (req) => {
         }
       }
     } else if (cmd === '/test') {
-      const fromGroup = !!participantNorm && participantNorm !== phoneNorm;
+      const fromGroup = isGroup;
       const testLines = [
         '🧪 *MODE TEST — WEBHOOK OK*',
         '',
         `📱 Nomor: +${phoneNorm}`,
-        fromGroup ? `👥 Grup: +${participantNorm}` : null,
+        fromGroup ? `👥 Grup: ${groupId}` : null,
         `🔧 Device: ${deviceNorm || '-'}`,
         `📨 Command: *${text}*`,
         `⏰ Waktu: ${new Date().toLocaleString('id-ID')}`,
