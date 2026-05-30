@@ -482,7 +482,9 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
             allowFullScreen
             loading="eager"
             referrerPolicy="strict-origin-when-cross-origin"
-            style={{ border: 0 }}
+            // @ts-expect-error - fetchpriority valid HTML attr
+            fetchpriority="high"
+            style={{ border: 0, willChange: 'transform' }}
           />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center bg-black text-white/80 text-sm px-4 text-center">
