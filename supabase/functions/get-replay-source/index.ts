@@ -49,9 +49,12 @@ Deno.serve(async (req) => {
         // 2) personal device-locked token
         const { data: pt } = await supabase
           .from("replay_personal_tokens")
-          .select("id, replay_id, max_devices, revoked")
+          .select("id, replay_id, max_devices, revoked, expires_at")
           .eq("token", access_token)
           .maybeSingle();
+        if (pt && pt.expires_at && new Date(pt.expires_at).getTime() < Date.now()) {
+          return json({ valid: false, reason: "expired" }, 403);
+        }
         if (pt && !pt.revoked && pt.replay_id === replay_id) {
           if (!browser_id) return json({ valid: false, reason: "no_device" }, 403);
           const { data: existing } = await supabase
