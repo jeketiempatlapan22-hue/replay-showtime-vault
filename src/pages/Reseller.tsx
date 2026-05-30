@@ -269,9 +269,15 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
       const { data, error } = await supabase.functions.invoke('reseller-create-token', {
         body: { phone: session.phone, pin: session.pin, kind, target_id: id },
       });
-      if (error) throw error;
-      const d = data as any;
-      if (!d?.ok) throw new Error(d?.error || 'gagal');
+      let d: any = data;
+      if (error) {
+        try {
+          const ctx: any = (error as any).context;
+          if (ctx && typeof ctx.json === 'function') d = await ctx.json();
+          else if (ctx && typeof ctx.text === 'function') d = JSON.parse(await ctx.text());
+        } catch { /* ignore */ }
+      }
+      if (!d?.ok) throw new Error(d?.detail || d?.error || (error?.message ?? 'gagal'));
       try { await navigator.clipboard.writeText(d.message); } catch { /* ignore */ }
       const expStr = d.expires_at ? new Date(d.expires_at).toLocaleString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
       setResult({
