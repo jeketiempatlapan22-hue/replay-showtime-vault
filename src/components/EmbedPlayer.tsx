@@ -45,6 +45,72 @@ function extractCloudflareUid(raw: string): string {
 const VOL_KEY = 'replaytime-volume';
 const MUTED_KEY = 'replaytime-muted';
 
+// Preconnect ke domain media — dipasang SEKALI per tipe player, idempotent,
+// agar tidak ada churn DOM saat player re-mount (mempercepat handshake awal).
+const PRECONNECT_HOSTS: Record<'youtube' | 'cloudflare', string[]> = {
+  youtube: [
+    'https://www.youtube-nocookie.com',
+    'https://www.youtube.com',
+    'https://i.ytimg.com',
+    'https://s.ytimg.com',
+    'https://yt3.ggpht.com',
+    'https://www.google.com',
+  ],
+  cloudflare: [
+    'https://iframe.videodelivery.net',
+    'https://videodelivery.net',
+    'https://cloudflarestream.com',
+  ],
+};
+const installedPreconnects = new Set<string>();
+function ensurePreconnect(kind: 'youtube' | 'cloudflare') {
+  if (typeof document === 'undefined') return;
+  if (installedPreconnects.has(kind)) return;
+  installedPreconnects.add(kind);
+  const head = document.head;
+  PRECONNECT_HOSTS[kind].forEach(href => {
+    if (document.querySelector(`link[data-rt-preconnect="${href}"]`)) return;
+    const l = document.createElement('link');
+    l.rel = 'preconnect';
+    l.href = href;
+    l.crossOrigin = 'anonymous';
+    l.setAttribute('data-rt-preconnect', href);
+    head.appendChild(l);
+    const d = document.createElement('link');
+    d.rel = 'dns-prefetch';
+    d.href = href;
+    d.setAttribute('data-rt-preconnect', href + '#dns');
+    head.appendChild(d);
+  });
+}
+
+// Loader YT IFrame API singleton — pastikan script hanya dimuat sekali.
+let ytApiLoadingPromise: Promise<void> | null = null;
+function loadYouTubeApi(): Promise<void> {
+  if (typeof window === 'undefined') return Promise.resolve();
+  const w = window as YoutubeWindow;
+  if (w.YT?.Player) return Promise.resolve();
+  if (ytApiLoadingPromise) return ytApiLoadingPromise;
+  ytApiLoadingPromise = new Promise<void>((resolve) => {
+    const done = () => resolve();
+    const prev = w.onYouTubeIframeAPIReady;
+    w.onYouTubeIframeAPIReady = () => { try { prev?.(); } catch { /* ignore */ } done(); };
+    if (!document.querySelector('script[src="https://www.youtube.com/iframe_api"]')) {
+      const tag = document.createElement('script');
+      tag.src = 'https://www.youtube.com/iframe_api';
+      tag.async = true;
+      document.head.appendChild(tag);
+    }
+    // Safety poll dalam kasus event tidak terpanggil
+    const start = Date.now();
+    const poll = setInterval(() => {
+      if (w.YT?.Player) { clearInterval(poll); done(); }
+      else if (Date.now() - start > 10000) { clearInterval(poll); done(); }
+    }, 150);
+  });
+  return ytApiLoadingPromise;
+}
+
 export default function EmbedPlayer({ type, source, title, watermark, hideSeekButtons = false, isLive = false }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
