@@ -45,6 +45,72 @@ function extractCloudflareUid(raw: string): string {
 const VOL_KEY = 'replaytime-volume';
 const MUTED_KEY = 'replaytime-muted';
 
+// Preconnect ke domain media — dipasang SEKALI per tipe player, idempotent,
+// agar tidak ada churn DOM saat player re-mount (mempercepat handshake awal).
+const PRECONNECT_HOSTS: Record<'youtube' | 'cloudflare', string[]> = {
+  youtube: [
+    'https://www.youtube-nocookie.com',
+    'https://www.youtube.com',
+    'https://i.ytimg.com',
+    'https://s.ytimg.com',
+    'https://yt3.ggpht.com',
+    'https://www.google.com',
+  ],
+  cloudflare: [
+    'https://iframe.videodelivery.net',
+    'https://videodelivery.net',
+    'https://cloudflarestream.com',
+  ],
+};
+const installedPreconnects = new Set<string>();
+function ensurePreconnect(kind: 'youtube' | 'cloudflare') {
+  if (typeof document === 'undefined') return;
+  if (installedPreconnects.has(kind)) return;
+  installedPreconnects.add(kind);
+  const head = document.head;
+  PRECONNECT_HOSTS[kind].forEach(href => {
+    if (document.querySelector(`link[data-rt-preconnect="${href}"]`)) return;
+    const l = document.createElement('link');
+    l.rel = 'preconnect';
+    l.href = href;
+    l.crossOrigin = 'anonymous';
+    l.setAttribute('data-rt-preconnect', href);
+    head.appendChild(l);
+    const d = document.createElement('link');
+    d.rel = 'dns-prefetch';
+    d.href = href;
+    d.setAttribute('data-rt-preconnect', href + '#dns');
+    head.appendChild(d);
+  });
+}
+
+// Loader YT IFrame API singleton — pastikan script hanya dimuat sekali.
+let ytApiLoadingPromise: Promise<void> | null = null;
+function loadYouTubeApi(): Promise<void> {
+  if (typeof window === 'undefined') return Promise.resolve();
+  const w = window as YoutubeWindow;
+  if (w.YT?.Player) return Promise.resolve();
+  if (ytApiLoadingPromise) return ytApiLoadingPromise;
+  ytApiLoadingPromise = new Promise<void>((resolve) => {
+    const done = () => resolve();
+    const prev = w.onYouTubeIframeAPIReady;
+    w.onYouTubeIframeAPIReady = () => { try { prev?.(); } catch { /* ignore */ } done(); };
+    if (!document.querySelector('script[src="https://www.youtube.com/iframe_api"]')) {
+      const tag = document.createElement('script');
+      tag.src = 'https://www.youtube.com/iframe_api';
+      tag.async = true;
+      document.head.appendChild(tag);
+    }
+    // Safety poll dalam kasus event tidak terpanggil
+    const start = Date.now();
+    const poll = setInterval(() => {
+      if (w.YT?.Player) { clearInterval(poll); done(); }
+      else if (Date.now() - start > 10000) { clearInterval(poll); done(); }
+    }, 150);
+  });
+  return ytApiLoadingPromise;
+}
+
 export default function EmbedPlayer({ type, source, title, watermark, hideSeekButtons = false, isLive = false }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -224,22 +290,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
       });
     };
 
-    if (!(window as YoutubeWindow).YT) {
-      const existing = document.querySelector('script[src="https://www.youtube.com/iframe_api"]');
-      if (!existing) {
-        const tag = document.createElement('script');
-        tag.src = 'https://www.youtube.com/iframe_api';
-        document.head.appendChild(tag);
-      }
-      const ytWindow = window as YoutubeWindow;
-      const prev = ytWindow.onYouTubeIframeAPIReady;
-      ytWindow.onYouTubeIframeAPIReady = () => { try { prev?.(); } catch { /* ignore */ } init(); };
-      // Also poll in case API was already loading
-      const poll = setInterval(() => { if ((window as YoutubeWindow).YT?.Player) { clearInterval(poll); init(); } }, 200);
-      setTimeout(() => clearInterval(poll), 10000);
-    } else {
-      init();
-    }
+    void loadYouTubeApi().then(() => { if (!cancelled) init(); });
     return () => {
       cancelled = true;
       if (ytFallbackTimerRef.current) clearTimeout(ytFallbackTimerRef.current);
@@ -329,13 +380,14 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
     return onFullscreenChange(onChange);
   }, []);
 
-  // Poll YT time/duration. Untuk live: hanya pakai untuk DETEKSI (duration=0/Infinity sambil currentTime maju),
-  // tidak menulis state seek/duration agar tidak memicu UI scrub & tidak menyebabkan reload/restart.
+  // Poll YT time/duration — auto-pause saat tab hidden untuk hemat CPU & cegah throttling browser
+  // membuat polling tertimbun antrian ketika tab kembali aktif.
   useEffect(() => {
     if (type !== 'youtube' || !ready) return;
     let liveProbeHits = 0;
     let lastSec = -1;
-    const id = setInterval(() => {
+    let id: ReturnType<typeof setInterval> | null = null;
+    const tick = () => {
       const p = ytPlayerRef.current;
       if (!p) return;
       try {
@@ -349,58 +401,48 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
           liveProbeHits = 0;
           if (detectedLive && !isLive) setDetectedLive(false);
         }
-        if (liveActive) return; // skip duration/seek state untuk live
+        if (liveActive) return;
         if (seeking) return;
         if (d && Math.abs(d - duration) >= 0.5) setDuration(d);
-        // Hanya update saat detik integer berubah → kurangi re-render dari 1Hz ke saat perlu saja
         const sec = Math.floor(t);
         if (sec !== lastSec) {
           lastSec = sec;
           setCurrentTime(t);
         }
       } catch { /* ignore */ }
-    }, 1000);
-    return () => clearInterval(id);
+    };
+    const start = () => { if (!id) id = setInterval(tick, 1000); };
+    const stop = () => { if (id) { clearInterval(id); id = null; } };
+    const onVis = () => { if (document.hidden) stop(); else start(); };
+    if (!document.hidden) start();
+    document.addEventListener('visibilitychange', onVis);
+    return () => { stop(); document.removeEventListener('visibilitychange', onVis); };
   }, [ready, type, seeking, duration, isLive, detectedLive, liveActive]);
 
-  // Preconnect ke domain YouTube/Cloudflare untuk mempercepat handshake awal & kurangi buffering
-  useEffect(() => {
-    const hosts = type === 'youtube'
-      ? ['https://www.youtube-nocookie.com', 'https://www.youtube.com', 'https://i.ytimg.com', 'https://s.ytimg.com', 'https://www.google.com', 'https://googleads.g.doubleclick.net', 'https://static.doubleclick.net', 'https://yt3.ggpht.com', 'https://r3---sn-i3belnez.googlevideo.com', 'https://r1---sn-i3belnez.googlevideo.com']
-      : ['https://iframe.videodelivery.net', 'https://videodelivery.net', 'https://customer-.cloudflarestream.com'];
-    const links: HTMLLinkElement[] = [];
-    hosts.forEach(href => {
-      const l = document.createElement('link');
-      l.rel = 'preconnect';
-      l.href = href;
-      l.crossOrigin = 'anonymous';
-      document.head.appendChild(l);
-      links.push(l);
-      const d = document.createElement('link');
-      d.rel = 'dns-prefetch';
-      d.href = href;
-      document.head.appendChild(d);
-      links.push(d);
-    });
-    return () => { links.forEach(l => { try { document.head.removeChild(l); } catch { /* ignore */ } }); };
-  }, [type]);
+  // Preconnect ke domain media (singleton, dipasang sekali per tipe player).
+  useEffect(() => { ensurePreconnect(type); }, [type]);
 
   // Saat YouTube live berakhir (state=0/ENDED): jangan restart, cukup tandai sebagai berakhir.
   useEffect(() => {
     if (type !== 'youtube' || !liveActive) return;
-    const interval = setInterval(() => {
+    let interval: ReturnType<typeof setInterval> | null = null;
+    const tick = () => {
       const p = ytPlayerRef.current;
       if (!p) return;
       try {
         const state = p.getPlayerState?.();
-        // 0 = ENDED. Untuk YT live, state ENDED berarti broadcaster mengakhiri siaran.
         if (state === 0 && !liveEndedRef.current) {
           liveEndedRef.current = true;
           setIsPlaying(false);
         }
       } catch { /* ignore */ }
-    }, 3000);
-    return () => clearInterval(interval);
+    };
+    const start = () => { if (!interval) interval = setInterval(tick, 3000); };
+    const stop = () => { if (interval) { clearInterval(interval); interval = null; } };
+    const onVis = () => { if (document.hidden) stop(); else start(); };
+    if (!document.hidden) start();
+    document.addEventListener('visibilitychange', onVis);
+    return () => { stop(); document.removeEventListener('visibilitychange', onVis); };
   }, [type, liveActive]);
 
   const seekTo = (t: number) => {
