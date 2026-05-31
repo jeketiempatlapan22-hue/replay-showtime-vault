@@ -176,23 +176,36 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Build link + message via admin-editable template
+    // Build link + message via admin-editable template (selaras dgn pakasir-webhook)
     const { data: settings } = await admin
-      .from('site_settings').select('key,value').in('key', ['site_origin', 'wa_message_template']);
+      .from('site_settings').select('key,value').in('key', ['site_origin', 'wa_message_template', 'wa_show_template']);
     const sm = new Map((settings ?? []).map((s) => [s.key, s.value]));
     const origin = (sm.get('site_origin') || 'https://replaytime.lovable.app').replace(/\/+$/, '');
     const tpl = sm.get('wa_message_template') ||
       '🎬 *{title}*\n{date_line}\n🔗 Link Akses:\n{link}\n{password_line}{live_link_block}\n— *ReplayTime* 💖';
-    const replayPart = order.replay_id ? `&replay=${order.replay_id}` : '';
-    const link = `${origin}/akses?token=${accessToken}${replayPart}`;
+    const showTpl = sm.get('wa_show_template') ||
+      '🔐 *TOKEN LIVE SATUAN*\n\n🎤 *{title}*\n\n📅 {date}\n\n🔗 *Link Live:*\n{live_link}\n\n🎬 *Link Replay:* {site}\n\n{password_line}👤 Hanya untuk *1 perangkat pertama*.\n\n— *ReplayTime* 💖';
+
+    const isShowPurchase = !!order.show_id && !order.replay_id;
+    const link = isShowPurchase
+      ? `${origin}/live?show=${order.show_id}&t=${accessToken}`
+      : `${origin}/akses?token=${accessToken}${order.replay_id ? `&replay=${order.replay_id}` : ''}`;
 
     let password = '';
-    let liveLink = '';
+    let showDate = '';
+    let groupLink = '';
+    let replayInfo = '';
     if (order.show_id) {
       const { data: showRow } = await admin
-        .from('active_shows').select('live_password').eq('id', order.show_id).maybeSingle();
+        .from('active_shows').select('live_password,show_date,show_time,group_link,replay_info').eq('id', order.show_id).maybeSingle();
       password = String(showRow?.live_password || '').trim();
-      if (!order.replay_id) liveLink = `${origin}/live?show=${order.show_id}&t=${accessToken}`;
+      groupLink = String((showRow as any)?.group_link || '').trim();
+      replayInfo = String((showRow as any)?.replay_info || '').trim();
+      if (showRow?.show_date) {
+        const d = String(showRow.show_date);
+        const t = String(showRow.show_time || '').slice(0, 5);
+        showDate = t ? `${d} ${t}` : d;
+      }
     }
     if (!password && order.replay_id && !order.show_id) {
       const { data: rep } = await admin
@@ -201,17 +214,29 @@ Deno.serve(async (req) => {
     }
 
     const dateStr = new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
-    const message = tpl
-      .replace(/\{date_line\}\n?/g, dateStr ? `📅 ${dateStr}\n` : '')
-      .replace(/\{password_line\}\n?/g, password ? `🔐 Sandi: *${password}*\n` : '')
-      .replace(/\{live_link_block\}\n?/g, liveLink ? `\n📺 Link Live:\n${liveLink}\n` : '')
+    const plainSite = origin.replace(/^https?:\/\//, '').replace(/\/+$/, '');
+    const fillTpl = (t: string, dateValue: string, linkValue: string, liveLinkValue: string) => t
+      .replace(/\{date_line\}/g, dateValue ? `📅 ${dateValue}\n\n` : '')
+      .replace(/\{password_line\}/g, password ? `🗝️ Sandi: *${password}*\n\n` : '')
+      .replace(/\{live_link_block\}/g, liveLinkValue ? `📺 *Link Live*\n${liveLinkValue}\n\n` : '')
       .replace(/\{title\}/g, order.item_title || '')
-      .replace(/\{link\}/g, link)
-      .replace(/\{live_link\}/g, liveLink)
+      .replace(/\{link\}/g, linkValue)
+      .replace(/\{live_link\}/g, liveLinkValue)
       .replace(/\{password\}/g, password)
-      .replace(/\{date\}/g, dateStr)
+      .replace(/\{date\}/g, dateValue)
       .replace(/\{order_id\}/g, order.pakasir_order_id || '')
-      .replace(/\{site\}/g, origin);
+      .replace(/\{site\}/g, plainSite);
+
+    let message: string;
+    if (isShowPurchase) {
+      message = fillTpl(showTpl, showDate || dateStr, link, link);
+      const extras: string[] = [];
+      if (replayInfo) extras.push('', '🎞️ *Info Replay*', replayInfo);
+      if (groupLink) extras.push('', '👥 *Link Grup*', groupLink);
+      if (extras.length) message = message + '\n' + extras.join('\n');
+    } else {
+      message = fillTpl(tpl, dateStr, link, '');
+    }
 
     // Atomic claim: only the first caller flips token_sent_at NULL -> now().
     const claimedAt = new Date().toISOString();
