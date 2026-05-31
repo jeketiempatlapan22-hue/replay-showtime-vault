@@ -380,13 +380,14 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
     return onFullscreenChange(onChange);
   }, []);
 
-  // Poll YT time/duration. Untuk live: hanya pakai untuk DETEKSI (duration=0/Infinity sambil currentTime maju),
-  // tidak menulis state seek/duration agar tidak memicu UI scrub & tidak menyebabkan reload/restart.
+  // Poll YT time/duration — auto-pause saat tab hidden untuk hemat CPU & cegah throttling browser
+  // membuat polling tertimbun antrian ketika tab kembali aktif.
   useEffect(() => {
     if (type !== 'youtube' || !ready) return;
     let liveProbeHits = 0;
     let lastSec = -1;
-    const id = setInterval(() => {
+    let id: ReturnType<typeof setInterval> | null = null;
+    const tick = () => {
       const p = ytPlayerRef.current;
       if (!p) return;
       try {
@@ -400,41 +401,26 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
           liveProbeHits = 0;
           if (detectedLive && !isLive) setDetectedLive(false);
         }
-        if (liveActive) return; // skip duration/seek state untuk live
+        if (liveActive) return;
         if (seeking) return;
         if (d && Math.abs(d - duration) >= 0.5) setDuration(d);
-        // Hanya update saat detik integer berubah → kurangi re-render dari 1Hz ke saat perlu saja
         const sec = Math.floor(t);
         if (sec !== lastSec) {
           lastSec = sec;
           setCurrentTime(t);
         }
       } catch { /* ignore */ }
-    }, 1000);
-    return () => clearInterval(id);
+    };
+    const start = () => { if (!id) id = setInterval(tick, 1000); };
+    const stop = () => { if (id) { clearInterval(id); id = null; } };
+    const onVis = () => { if (document.hidden) stop(); else start(); };
+    if (!document.hidden) start();
+    document.addEventListener('visibilitychange', onVis);
+    return () => { stop(); document.removeEventListener('visibilitychange', onVis); };
   }, [ready, type, seeking, duration, isLive, detectedLive, liveActive]);
 
-  // Preconnect ke domain YouTube/Cloudflare untuk mempercepat handshake awal & kurangi buffering
-  useEffect(() => {
-    const hosts = type === 'youtube'
-      ? ['https://www.youtube-nocookie.com', 'https://www.youtube.com', 'https://i.ytimg.com', 'https://s.ytimg.com', 'https://www.google.com', 'https://googleads.g.doubleclick.net', 'https://static.doubleclick.net', 'https://yt3.ggpht.com', 'https://r3---sn-i3belnez.googlevideo.com', 'https://r1---sn-i3belnez.googlevideo.com']
-      : ['https://iframe.videodelivery.net', 'https://videodelivery.net', 'https://customer-.cloudflarestream.com'];
-    const links: HTMLLinkElement[] = [];
-    hosts.forEach(href => {
-      const l = document.createElement('link');
-      l.rel = 'preconnect';
-      l.href = href;
-      l.crossOrigin = 'anonymous';
-      document.head.appendChild(l);
-      links.push(l);
-      const d = document.createElement('link');
-      d.rel = 'dns-prefetch';
-      d.href = href;
-      document.head.appendChild(d);
-      links.push(d);
-    });
-    return () => { links.forEach(l => { try { document.head.removeChild(l); } catch { /* ignore */ } }); };
-  }, [type]);
+  // Preconnect ke domain media (singleton, dipasang sekali per tipe player).
+  useEffect(() => { ensurePreconnect(type); }, [type]);
 
   // Saat YouTube live berakhir (state=0/ENDED): jangan restart, cukup tandai sebagai berakhir.
   useEffect(() => {
