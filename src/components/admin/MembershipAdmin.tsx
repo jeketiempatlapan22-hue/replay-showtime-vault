@@ -155,7 +155,13 @@ export default function MembershipAdmin() {
         <CardContent className="grid sm:grid-cols-2 gap-3">
           <div><Label className="text-xs">Nama / Label</Label><Input value={form.label} onChange={e => setForm({ ...form, label: e.target.value })} placeholder="cth: Budi - Premium" /></div>
           <div><Label className="text-xs">Nomor WA *</Label><Input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} placeholder="62xxx" /></div>
-          <div><Label className="text-xs">Durasi (hari)</Label><Input type="number" value={form.duration_days} onChange={e => setForm({ ...form, duration_days: Number(e.target.value) || 30 })} /></div>
+          <div>
+            <Label className="text-xs">Durasi (hari)</Label>
+            <Input type="number" value={form.duration_days} onChange={e => setForm({ ...form, duration_days: Number(e.target.value) || 30 })} />
+            <p className="text-[11px] text-muted-foreground mt-1">
+              Berakhir: <span className="font-medium text-foreground">{new Date(Date.now() + (Number(form.duration_days) || 0) * 86400000).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })}</span>
+            </p>
+          </div>
           <div><Label className="text-xs">Max Device</Label><Input type="number" min={1} value={form.max_devices} onChange={e => setForm({ ...form, max_devices: Number(e.target.value) || 1 })} placeholder="cth: 1" /></div>
           <div className="sm:col-span-2">
             <Label className="text-xs">Info Replay (opsional)</Label>
