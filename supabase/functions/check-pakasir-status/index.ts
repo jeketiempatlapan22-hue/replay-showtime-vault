@@ -106,6 +106,120 @@ Deno.serve(async (req) => {
 
     const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 
+    // ===== MEMBERSHIP ORDER branch =====
+    // Frontend polls with membership_orders.id; resolve there first.
+    const { data: mOrder } = await admin
+      .from('membership_orders').select('*').eq('id', orderUuid).maybeSingle();
+    if (mOrder) {
+      // Already finalized + WA sent → return as-is
+      if (mOrder.status === 'paid' && mOrder.membership_token_id && mOrder.wa_sent_at) {
+        return new Response(JSON.stringify({ ok: true, status: 'paid', already: true, membership: true }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      let paid = mOrder.status === 'paid';
+      if (!paid) {
+        if (!mOrder.pakasir_order_id) {
+          return new Response(JSON.stringify({ ok: true, status: 'pending', membership: true }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        const purl = `https://app.pakasir.com/api/transactiondetail?project=${encodeURIComponent(slug)}&amount=${mOrder.amount}&order_id=${encodeURIComponent(mOrder.pakasir_order_id)}&api_key=${encodeURIComponent(apiKey)}`;
+        const pres = await fetch(purl, { method: 'GET' });
+        const pjson: any = await pres.json().catch(() => ({}));
+        const tx = pjson?.transaction || pjson?.payment || {};
+        const ps = String(tx.status || pjson?.status || '').toLowerCase();
+        paid = ps === 'completed' || ps === 'paid' || ps === 'success';
+        if (!paid) {
+          return new Response(JSON.stringify({ ok: true, status: ps || 'pending', membership: true }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+      }
+
+      // Finalize (issue token) if not yet
+      let tok: any = null;
+      if (!mOrder.membership_token_id) {
+        const { data: fin, error: ferr } = await admin.rpc('finalize_membership_order', { _order_id: mOrder.id });
+        if (ferr) {
+          await admin.from('membership_orders').update({
+            wa_attempts: (Number(mOrder.wa_attempts) || 0) + 1,
+            wa_last_attempt_at: new Date().toISOString(),
+            wa_last_error: 'finalize_failed:' + ferr.message,
+          }).eq('id', mOrder.id);
+          return new Response(JSON.stringify({ error: 'finalize_failed', detail: ferr.message }), { status: 500, headers: corsHeaders });
+        }
+        tok = Array.isArray(fin) ? fin[0] : fin;
+      } else {
+        const { data: t } = await admin.from('membership_tokens')
+          .select('token,password,expires_at,max_devices,includes_replays,duration_days,package_id')
+          .eq('id', mOrder.membership_token_id).maybeSingle();
+        const { data: pkg } = await admin.from('membership_packages')
+          .select('name,replay_info,duration_days').eq('id', mOrder.package_id).maybeSingle();
+        if (!t || !pkg) return new Response(JSON.stringify({ error: 'token_or_pkg_missing' }), { status: 500, headers: corsHeaders });
+        tok = {
+          token: t.token, password: t.password, expires_at: t.expires_at,
+          max_devices: t.max_devices, includes_replays: t.includes_replays,
+          duration_days: t.duration_days || pkg.duration_days,
+          replay_info: pkg.replay_info || '', package_name: pkg.name,
+        };
+      }
+
+      // Atomic claim WA delivery
+      const claimAt = new Date().toISOString();
+      const { data: claimed } = await admin.from('membership_orders')
+        .update({ wa_last_attempt_at: claimAt })
+        .eq('id', mOrder.id).is('wa_sent_at', null).select('id');
+      if (!claimed || claimed.length === 0) {
+        return new Response(JSON.stringify({ ok: true, status: 'paid', membership: true, already_sent: true }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      const { data: msettings } = await admin
+        .from('site_settings').select('key,value').in('key', ['site_origin','wa_membership_template']);
+      const msm = new Map((msettings ?? []).map((s) => [s.key, s.value]));
+      const morigin = (msm.get('site_origin') || 'https://replaytime.lovable.app').replace(/\/+$/, '');
+      const mtpl = msm.get('wa_membership_template') ||
+        '👑 *MEMBERSHIP AKTIF*\n\n📦 *{package_name}*\n📅 Berlaku hingga: {expires_at}\n\n🔗 *Link Akses:*\n{link}\n\n🗝️ Sandi: *{password}*\n\n{replay_info_block}👤 Berlaku untuk *{max_devices} perangkat*.\n\n— *ReplayTime* 💖';
+      const mlink = `${morigin}/live?mtoken=${encodeURIComponent(tok.token)}&mp=${encodeURIComponent(tok.password)}`;
+      const expiresStr = new Date(tok.expires_at).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
+      const mmsg = mtpl
+        .replace(/\{package_name\}/g, tok.package_name || '')
+        .replace(/\{link\}/g, mlink)
+        .replace(/\{password\}/g, tok.password || '')
+        .replace(/\{expires_at\}/g, expiresStr)
+        .replace(/\{duration_days\}/g, String(tok.duration_days || ''))
+        .replace(/\{max_devices\}/g, String(tok.max_devices || 1))
+        .replace(/\{replay_info\}/g, tok.replay_info || '')
+        .replace(/\{replay_info_block\}/g, tok.replay_info ? `🎬 *Info Replay:*\n${tok.replay_info}\n\n` : '')
+        .replace(/\{site\}/g, morigin.replace(/^https?:\/\//, ''));
+
+      const sentM = await sendFonnte(mOrder.phone, mmsg);
+      const nowIso = new Date().toISOString();
+      await admin.from('membership_orders').update({
+        wa_attempts: (Number(mOrder.wa_attempts) || 0) + 1,
+        wa_last_attempt_at: nowIso,
+        wa_last_error: sentM.ok ? null : JSON.stringify(sentM.data).slice(0, 500),
+        wa_sent_at: sentM.ok ? nowIso : null,
+      }).eq('id', mOrder.id);
+      await admin.from('wa_outbox').insert({
+        phone: mOrder.phone, message: mmsg, status: sentM.ok ? 'sent' : 'failed',
+        error: sentM.ok ? null : JSON.stringify(sentM.data),
+        related_order_id: mOrder.id, fonnte_response: sentM.data as Record<string, unknown>,
+      });
+      if (sentM.ok) {
+        await admin.from('token_deliveries').insert({
+          phone: mOrder.phone, replay_id: null, replay_title: `Membership • ${tok.package_name}`,
+          order_id: null, access_token: tok.token, link: mlink,
+          source: 'pakasir', requested_by: 'check-pakasir-status-membership',
+        });
+      }
+      return new Response(JSON.stringify({ ok: true, status: 'paid', membership: true, sent: sentM.ok }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     const { data: order } = await admin
       .from('orders').select('*').eq('id', orderUuid).maybeSingle();
     if (!order) return new Response(JSON.stringify({ error: 'order not found' }), { status: 404, headers: corsHeaders });
@@ -130,6 +244,7 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+
 
     // === COIN TOP-UP branch ===
     if (order.kind === 'coin_topup') {
