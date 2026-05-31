@@ -290,22 +290,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
       });
     };
 
-    if (!(window as YoutubeWindow).YT) {
-      const existing = document.querySelector('script[src="https://www.youtube.com/iframe_api"]');
-      if (!existing) {
-        const tag = document.createElement('script');
-        tag.src = 'https://www.youtube.com/iframe_api';
-        document.head.appendChild(tag);
-      }
-      const ytWindow = window as YoutubeWindow;
-      const prev = ytWindow.onYouTubeIframeAPIReady;
-      ytWindow.onYouTubeIframeAPIReady = () => { try { prev?.(); } catch { /* ignore */ } init(); };
-      // Also poll in case API was already loading
-      const poll = setInterval(() => { if ((window as YoutubeWindow).YT?.Player) { clearInterval(poll); init(); } }, 200);
-      setTimeout(() => clearInterval(poll), 10000);
-    } else {
-      init();
-    }
+    void loadYouTubeApi().then(() => { if (!cancelled) init(); });
     return () => {
       cancelled = true;
       if (ytFallbackTimerRef.current) clearTimeout(ytFallbackTimerRef.current);
