@@ -425,19 +425,24 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
   // Saat YouTube live berakhir (state=0/ENDED): jangan restart, cukup tandai sebagai berakhir.
   useEffect(() => {
     if (type !== 'youtube' || !liveActive) return;
-    const interval = setInterval(() => {
+    let interval: ReturnType<typeof setInterval> | null = null;
+    const tick = () => {
       const p = ytPlayerRef.current;
       if (!p) return;
       try {
         const state = p.getPlayerState?.();
-        // 0 = ENDED. Untuk YT live, state ENDED berarti broadcaster mengakhiri siaran.
         if (state === 0 && !liveEndedRef.current) {
           liveEndedRef.current = true;
           setIsPlaying(false);
         }
       } catch { /* ignore */ }
-    }, 3000);
-    return () => clearInterval(interval);
+    };
+    const start = () => { if (!interval) interval = setInterval(tick, 3000); };
+    const stop = () => { if (interval) { clearInterval(interval); interval = null; } };
+    const onVis = () => { if (document.hidden) stop(); else start(); };
+    if (!document.hidden) start();
+    document.addEventListener('visibilitychange', onVis);
+    return () => { stop(); document.removeEventListener('visibilitychange', onVis); };
   }, [type, liveActive]);
 
   const seekTo = (t: number) => {
