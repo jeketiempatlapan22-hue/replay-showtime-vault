@@ -327,6 +327,7 @@ export default function ShowLiveControl({ showId, showTitle }: Props) {
         </Button>
       </div>
       <ShowLiveTokensDialog open={tokensOpen} onOpenChange={setTokensOpen} showId={showId} showTitle={showTitle} />
+      <ShowOrdersResendDialog open={resendOpen} onOpenChange={setResendOpen} showId={showId} showTitle={showTitle} />
     </div>
   );
 }
