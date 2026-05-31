@@ -24,6 +24,7 @@ export default function ShowLiveControl({ showId, showTitle }: Props) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [tokensOpen, setTokensOpen] = useState(false);
+  const [resendOpen, setResendOpen] = useState(false);
 
   const [isLive, setIsLive] = useState(false);
   const [autoSchedule, setAutoSchedule] = useState(false);
