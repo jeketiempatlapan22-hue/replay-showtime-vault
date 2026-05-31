@@ -302,6 +302,9 @@ export default function ShowLiveControl({ showId, showTitle }: Props) {
         <Button type="button" variant="outline" onClick={() => setTokensOpen(true)} className="w-full sm:w-auto">
           <KeyRound className="w-4 h-4 mr-2" />Token & Riwayat Akses
         </Button>
+        <Button type="button" variant="outline" onClick={() => setResendOpen(true)} className="w-full sm:w-auto">
+          <Send className="w-4 h-4 mr-2" />Resend WA Pembelian
+        </Button>
         <Button
           type="button"
           variant="secondary"
