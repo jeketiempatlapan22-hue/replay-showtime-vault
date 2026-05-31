@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Plus, Trash2, Radio, Film, Save, Loader2, KeyRound, ArrowRightLeft } from 'lucide-react';
+import { Plus, Trash2, Radio, Film, Save, Loader2, KeyRound, ArrowRightLeft, Send } from 'lucide-react';
 import ShowLiveTokensDialog from './ShowLiveTokensDialog';
+import ShowOrdersResendDialog from './ShowOrdersResendDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -23,6 +24,7 @@ export default function ShowLiveControl({ showId, showTitle }: Props) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [tokensOpen, setTokensOpen] = useState(false);
+  const [resendOpen, setResendOpen] = useState(false);
 
   const [isLive, setIsLive] = useState(false);
   const [autoSchedule, setAutoSchedule] = useState(false);
@@ -300,6 +302,9 @@ export default function ShowLiveControl({ showId, showTitle }: Props) {
         <Button type="button" variant="outline" onClick={() => setTokensOpen(true)} className="w-full sm:w-auto">
           <KeyRound className="w-4 h-4 mr-2" />Token & Riwayat Akses
         </Button>
+        <Button type="button" variant="outline" onClick={() => setResendOpen(true)} className="w-full sm:w-auto">
+          <Send className="w-4 h-4 mr-2" />Resend WA Pembelian
+        </Button>
         <Button
           type="button"
           variant="secondary"
@@ -322,6 +327,7 @@ export default function ShowLiveControl({ showId, showTitle }: Props) {
         </Button>
       </div>
       <ShowLiveTokensDialog open={tokensOpen} onOpenChange={setTokensOpen} showId={showId} showTitle={showTitle} />
+      <ShowOrdersResendDialog open={resendOpen} onOpenChange={setResendOpen} showId={showId} showTitle={showTitle} />
     </div>
   );
 }
