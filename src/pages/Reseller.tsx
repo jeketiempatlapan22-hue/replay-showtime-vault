@@ -275,7 +275,17 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
   const [page, setPage] = useState(0);
   const PAGE = 20;
   const [creatingId, setCreatingId] = useState<string | null>(null);
-  const [result, setResult] = useState<{ link: string; message: string; title: string; extra?: string } | null>(null);
+  const [result, setResult] = useState<{ link: string; message: string; title: string; extra?: string; kind: 'show' | 'replay' | 'membership'; targetId: string; targetTitle: string } | null>(null);
+  const [statsMap, setStatsMap] = useState<Map<string, number>>(new Map());
+
+  const loadStats = async () => {
+    const { data } = await supabase.rpc('reseller_copy_stats', { _phone: session.phone, _pin: session.pin });
+    const m = new Map<string, number>();
+    for (const r of (data ?? []) as CopyStat[]) {
+      if (r.target_id) m.set(`${r.kind}:${r.target_id}`, Number(r.copies) || 0);
+    }
+    setStatsMap(m);
+  };
 
   const loadShows = async () => {
     setLoadingS(true);
@@ -295,8 +305,19 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
     setLoadingR(false);
   };
 
-  useEffect(() => { loadShows(); /* eslint-disable-next-line */ }, []);
+  useEffect(() => { loadShows(); loadStats(); /* eslint-disable-next-line */ }, []);
   useEffect(() => { loadReplays(); /* eslint-disable-next-line */ }, [page]);
+
+  // Optimistically bump counter, lalu sync server.
+  const bumpStats = async (kind: 'show' | 'replay' | 'membership', targetId: string, targetTitle: string) => {
+    const key = `${kind}:${targetId}`;
+    setStatsMap((prev) => {
+      const m = new Map(prev);
+      m.set(key, (m.get(key) ?? 0) + 1);
+      return m;
+    });
+    await logCopy(session, kind, targetId, targetTitle);
+  };
 
   const create = async (kind: 'show' | 'replay', id: string, title: string) => {
     setCreatingId(id);
@@ -315,11 +336,13 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
       if (!d?.ok) throw new Error(d?.detail || d?.error || (error?.message ?? 'gagal'));
       try { await navigator.clipboard.writeText(d.message); } catch { /* ignore */ }
       const expStr = d.expires_at ? new Date(d.expires_at).toLocaleString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+      const finalTitle = d.title || title;
+      await bumpStats(kind, id, finalTitle);
       setResult({
-        link: d.link, message: d.message, title: d.title || title,
+        link: d.link, message: d.message, title: finalTitle,
         extra: kind === 'show' ? `Hanya untuk show ini · 1 device · Berlaku s/d ${expStr}` : `1 device · Berlaku s/d ${expStr}`,
+        kind, targetId: id, targetTitle: finalTitle,
       });
-      toast({ title: 'Link baru dibuat & pesan tersalin' });
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'gagal';
       toast({ title: 'Gagal membuat link', description: msg, variant: 'destructive' });
@@ -327,6 +350,8 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
       setCreatingId(null);
     }
   };
+
+  const currentCount = result ? (statsMap.get(`${result.kind}:${result.targetId}`) ?? 0) : 0;
 
   return (
     <div className="min-h-screen bg-background">
@@ -352,7 +377,7 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
 
           <TabsContent value="shows" className="space-y-3 mt-4">
             <div className="flex justify-end">
-              <Button size="sm" variant="outline" onClick={loadShows} disabled={loadingS}>
+              <Button size="sm" variant="outline" onClick={() => { loadShows(); loadStats(); }} disabled={loadingS}>
                 <RefreshCw className={`w-4 h-4 mr-1 ${loadingS ? 'animate-spin' : ''}`} />Muat ulang
               </Button>
             </div>
@@ -363,26 +388,30 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
               <p className="text-sm text-muted-foreground">Memuat…</p>
             ) : shows.length === 0 ? (
               <p className="text-sm text-muted-foreground italic">Belum ada show aktif.</p>
-            ) : shows.map((s) => (
-              <div key={s.id} className="border border-border rounded-xl bg-card p-3 flex gap-3">
-                {s.image_url ? (
-                  <img src={s.image_url} alt={s.title} className="w-16 h-16 rounded-lg object-cover flex-shrink-0" loading="lazy" />
-                ) : (
-                  <div className="w-16 h-16 rounded-lg bg-secondary flex-shrink-0" />
-                )}
-                <div className="flex-1 min-w-0 space-y-1">
-                  <div className="flex items-start gap-2">
-                    <p className="font-semibold text-sm truncate flex-1">{s.title}</p>
-                    {s.is_live && <Badge variant="destructive" className="text-[10px]">LIVE</Badge>}
+            ) : shows.map((s) => {
+              const count = statsMap.get(`show:${s.id}`) ?? 0;
+              return (
+                <div key={s.id} className="border border-border rounded-xl bg-card p-3 flex gap-3">
+                  {s.image_url ? (
+                    <img src={s.image_url} alt={s.title} className="w-16 h-16 rounded-lg object-cover flex-shrink-0" loading="lazy" />
+                  ) : (
+                    <div className="w-16 h-16 rounded-lg bg-secondary flex-shrink-0" />
+                  )}
+                  <div className="flex-1 min-w-0 space-y-1">
+                    <div className="flex items-start gap-2">
+                      <p className="font-semibold text-sm truncate flex-1">{s.title}</p>
+                      {s.is_live && <Badge variant="destructive" className="text-[10px]">LIVE</Badge>}
+                      {count > 0 && <Badge variant="secondary" className="text-[10px]">{count}x salin</Badge>}
+                    </div>
+                    <p className="text-xs text-muted-foreground">📅 {s.show_date} · {String(s.show_time).slice(0, 5)}</p>
+                    <Button size="sm" className="w-full mt-1" disabled={creatingId === s.id} onClick={() => create('show', s.id, s.title)}>
+                      {creatingId === s.id ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Link2 className="w-4 h-4 mr-1" />}
+                      Buat & Salin Link
+                    </Button>
                   </div>
-                  <p className="text-xs text-muted-foreground">📅 {s.show_date} · {String(s.show_time).slice(0, 5)}</p>
-                  <Button size="sm" className="w-full mt-1" disabled={creatingId === s.id} onClick={() => create('show', s.id, s.title)}>
-                    {creatingId === s.id ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Link2 className="w-4 h-4 mr-1" />}
-                    Buat & Salin Link
-                  </Button>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </TabsContent>
 
           <TabsContent value="replays" className="space-y-3 mt-4">
@@ -400,24 +429,30 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
               <p className="text-sm text-muted-foreground">Memuat…</p>
             ) : replays.length === 0 ? (
               <p className="text-sm text-muted-foreground italic">Tidak ada replay.</p>
-            ) : replays.map((r) => (
-              <div key={r.id} className="border border-border rounded-xl bg-card p-3 flex gap-3">
-                {r.image_url ? (
-                  <img src={r.image_url} alt={r.title} className="w-16 h-16 rounded-lg object-cover flex-shrink-0" loading="lazy" />
-                ) : (
-                  <div className="w-16 h-16 rounded-lg bg-secondary flex-shrink-0" />
-                )}
-                <div className="flex-1 min-w-0 space-y-1">
-                  <p className="font-semibold text-sm truncate">{r.title}</p>
-                  {r.show_name && <p className="text-xs text-muted-foreground truncate">{r.show_name}</p>}
-                  <p className="text-xs text-muted-foreground">📅 {r.date}</p>
-                  <Button size="sm" className="w-full mt-1" disabled={creatingId === r.id} onClick={() => create('replay', r.id, r.title)}>
-                    {creatingId === r.id ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Link2 className="w-4 h-4 mr-1" />}
-                    Buat & Salin Link
-                  </Button>
+            ) : replays.map((r) => {
+              const count = statsMap.get(`replay:${r.id}`) ?? 0;
+              return (
+                <div key={r.id} className="border border-border rounded-xl bg-card p-3 flex gap-3">
+                  {r.image_url ? (
+                    <img src={r.image_url} alt={r.title} className="w-16 h-16 rounded-lg object-cover flex-shrink-0" loading="lazy" />
+                  ) : (
+                    <div className="w-16 h-16 rounded-lg bg-secondary flex-shrink-0" />
+                  )}
+                  <div className="flex-1 min-w-0 space-y-1">
+                    <div className="flex items-start gap-2">
+                      <p className="font-semibold text-sm truncate flex-1">{r.title}</p>
+                      {count > 0 && <Badge variant="secondary" className="text-[10px]">{count}x salin</Badge>}
+                    </div>
+                    {r.show_name && <p className="text-xs text-muted-foreground truncate">{r.show_name}</p>}
+                    <p className="text-xs text-muted-foreground">📅 {r.date}</p>
+                    <Button size="sm" className="w-full mt-1" disabled={creatingId === r.id} onClick={() => create('replay', r.id, r.title)}>
+                      {creatingId === r.id ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Link2 className="w-4 h-4 mr-1" />}
+                      Buat & Salin Link
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
             <div className="flex items-center justify-between gap-2 pt-2">
               <Button size="sm" variant="outline" disabled={page === 0 || loadingR} onClick={() => setPage((p) => Math.max(0, p - 1))}>Sebelumnya</Button>
               <span className="text-xs text-muted-foreground">Halaman {page + 1}</span>
@@ -426,7 +461,14 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
           </TabsContent>
 
           <TabsContent value="membership">
-            <MembershipPanel session={session} onCreated={setResult} />
+            <MembershipPanel
+              session={session}
+              statsMap={statsMap}
+              onCreated={async (r) => {
+                await bumpStats(r.kind, r.targetId, r.targetTitle);
+                setResult(r);
+              }}
+            />
           </TabsContent>
         </Tabs>
       </main>
@@ -436,6 +478,8 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
           open={!!result}
           onOpenChange={(v) => { if (!v) setResult(null); }}
           link={result.link} message={result.message} title={result.title} extra={result.extra}
+          copyCount={currentCount}
+          onCopied={() => { if (result) void bumpStats(result.kind, result.targetId, result.targetTitle); }}
         />
       )}
     </div>
