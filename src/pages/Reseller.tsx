@@ -501,10 +501,11 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
 
       <main className="max-w-3xl mx-auto px-4 py-4 pb-24">
         <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)}>
-          <TabsList className="grid grid-cols-3 w-full">
+          <TabsList className="grid grid-cols-4 w-full">
             <TabsTrigger value="shows"><Radio className="w-4 h-4 mr-1" />Show</TabsTrigger>
             <TabsTrigger value="replays"><Film className="w-4 h-4 mr-1" />Replay</TabsTrigger>
             <TabsTrigger value="membership"><Crown className="w-4 h-4 mr-1" />Member</TabsTrigger>
+            <TabsTrigger value="billing"><Wallet className="w-4 h-4 mr-1" />Tagihan</TabsTrigger>
           </TabsList>
 
           <TabsContent value="shows" className="space-y-3 mt-4">
