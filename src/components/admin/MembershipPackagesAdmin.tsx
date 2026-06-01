@@ -337,6 +337,9 @@ export default function MembershipPackagesAdmin() {
                           {p.duration_days} hari · Rp {p.price_idr.toLocaleString('id-ID')} · {p.price_coins} koin · {p.max_devices} perangkat
                           {p.includes_replays ? ' · termasuk replay' : ''}
                         </div>
+                        {fmtDateRange(p) && (
+                          <div className="text-[11px] text-primary mt-1">📅 Periode tetap: {fmtDateRange(p)}</div>
+                        )}
                         {p.paused && p.pause_message && (
                           <div className="text-[11px] text-orange-600 dark:text-orange-400 mt-1 whitespace-pre-line border-l-2 border-orange-500/40 pl-2">
                             “{p.pause_message}”
