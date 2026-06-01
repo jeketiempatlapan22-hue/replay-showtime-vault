@@ -828,6 +828,8 @@ export type Database = {
           created_at: string
           description: string
           duration_days: number
+          fixed_expires_at: string | null
+          fixed_starts_at: string | null
           id: string
           includes_replays: boolean
           max_devices: number
@@ -848,6 +850,8 @@ export type Database = {
           created_at?: string
           description?: string
           duration_days?: number
+          fixed_expires_at?: string | null
+          fixed_starts_at?: string | null
           id?: string
           includes_replays?: boolean
           max_devices?: number
@@ -868,6 +872,8 @@ export type Database = {
           created_at?: string
           description?: string
           duration_days?: number
+          fixed_expires_at?: string | null
+          fixed_starts_at?: string | null
           id?: string
           includes_replays?: boolean
           max_devices?: number
@@ -1599,6 +1605,8 @@ export type Database = {
           created_at: string
           description: string
           duration_days: number
+          fixed_expires_at: string | null
+          fixed_starts_at: string | null
           id: string
           includes_replays: boolean
           max_devices: number
