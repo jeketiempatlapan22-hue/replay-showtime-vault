@@ -52,17 +52,27 @@ const emptyForm = {
   fixed_expires_at: '',
 };
 
-// Convert ISO timestamp <-> <input type="datetime-local"> value in local time.
-function isoToLocalInput(iso: string | null | undefined) {
+// Convert ISO timestamp <-> <input type="date"> value (YYYY-MM-DD) in local time.
+function isoToDateInput(iso: string | null | undefined) {
   if (!iso) return '';
   const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
   const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
-function localInputToIso(s: string) {
+function dateInputToIso(s: string, endOfDay = false) {
   if (!s) return null;
-  const d = new Date(s);
-  return isNaN(d.getTime()) ? null : d.toISOString();
+  const [y, m, d] = s.split('-').map(Number);
+  if (!y || !m || !d) return null;
+  const date = endOfDay ? new Date(y, m - 1, d, 23, 59, 59, 999) : new Date(y, m - 1, d, 0, 0, 0, 0);
+  return date.toISOString();
+}
+function daysBetweenInputs(startStr: string, endStr: string) {
+  if (!startStr || !endStr) return 0;
+  const a = new Date(startStr + 'T00:00:00').getTime();
+  const b = new Date(endStr + 'T23:59:59').getTime();
+  if (isNaN(a) || isNaN(b) || b <= a) return 0;
+  return Math.max(1, Math.ceil((b - a) / 86400000));
 }
 function fmtDateRange(p: Pkg) {
   if (!p.fixed_expires_at) return null;
@@ -120,8 +130,8 @@ export default function MembershipPackagesAdmin() {
       includes_replays: form.includes_replays,
       status: form.status,
       sort_order: Number(form.sort_order) || 0,
-      fixed_starts_at: localInputToIso(form.fixed_starts_at),
-      fixed_expires_at: localInputToIso(form.fixed_expires_at),
+      fixed_starts_at: dateInputToIso(form.fixed_starts_at, false),
+      fixed_expires_at: dateInputToIso(form.fixed_expires_at, true),
     };
     const { error } = form.id
       ? await supabase.from('membership_packages').update(payload).eq('id', form.id)
@@ -148,8 +158,8 @@ export default function MembershipPackagesAdmin() {
       includes_replays: p.includes_replays,
       status: p.status,
       sort_order: p.sort_order,
-      fixed_starts_at: isoToLocalInput(p.fixed_starts_at),
-      fixed_expires_at: isoToLocalInput(p.fixed_expires_at),
+      fixed_starts_at: isoToDateInput(p.fixed_starts_at),
+      fixed_expires_at: isoToDateInput(p.fixed_expires_at),
     });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -243,18 +253,53 @@ export default function MembershipPackagesAdmin() {
               {form.status === 'open' ? 'Dibuka' : 'Ditutup'}
             </label>
           </div>
-          <div className="sm:col-span-2 grid sm:grid-cols-2 gap-3 border-t border-border pt-3">
-            <div className="sm:col-span-2 text-[11px] text-muted-foreground">
-              <strong>Periode tetap (opsional)</strong> — isi tanggal mulai & berakhir agar semua user yang membeli paket ini punya masa aktif yang sama. Kosongkan untuk pakai durasi hari di atas.
+          <div className="sm:col-span-2 grid sm:grid-cols-2 gap-3 border-2 border-primary/30 bg-primary/5 rounded-lg p-3">
+            <div className="sm:col-span-2 text-xs">
+              <strong className="text-primary">📅 Periode Tetap Membership (opsional)</strong>
+              <p className="text-muted-foreground mt-1">Atur tanggal mulai & berakhir agar SEMUA user yang membeli paket ini punya tanggal berakhir yang sama (mis. 1 Jan – 28 Feb 2026). Kosongkan untuk pakai durasi hari di atas.</p>
             </div>
             <div>
-              <Label className="text-xs">Mulai berlaku</Label>
-              <Input type="datetime-local" value={form.fixed_starts_at} onChange={(e) => setForm({ ...form, fixed_starts_at: e.target.value })} />
+              <Label className="text-xs">Tanggal Mulai</Label>
+              <Input
+                type="date"
+                value={form.fixed_starts_at}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  const next = { ...form, fixed_starts_at: v };
+                  const d = daysBetweenInputs(v, form.fixed_expires_at);
+                  if (d > 0) next.duration_days = d;
+                  setForm(next);
+                }}
+              />
             </div>
             <div>
-              <Label className="text-xs">Berakhir</Label>
-              <Input type="datetime-local" value={form.fixed_expires_at} onChange={(e) => setForm({ ...form, fixed_expires_at: e.target.value })} />
+              <Label className="text-xs">Tanggal Berakhir</Label>
+              <Input
+                type="date"
+                value={form.fixed_expires_at}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  const next = { ...form, fixed_expires_at: v };
+                  const d = daysBetweenInputs(form.fixed_starts_at, v);
+                  if (d > 0) next.duration_days = d;
+                  setForm(next);
+                }}
+              />
             </div>
+            {form.fixed_starts_at && form.fixed_expires_at && (
+              <div className="sm:col-span-2 text-xs text-primary font-medium">
+                ✓ Berlaku {new Date(form.fixed_starts_at).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })} – {new Date(form.fixed_expires_at).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })} ({daysBetweenInputs(form.fixed_starts_at, form.fixed_expires_at)} hari)
+              </div>
+            )}
+            {(form.fixed_starts_at || form.fixed_expires_at) && (
+              <button
+                type="button"
+                onClick={() => setForm({ ...form, fixed_starts_at: '', fixed_expires_at: '' })}
+                className="sm:col-span-2 text-xs text-destructive hover:underline text-left"
+              >
+                ✕ Kosongkan periode tetap (gunakan durasi hari)
+              </button>
+            )}
           </div>
           <div className="sm:col-span-2">
             <Label className="text-xs">Deskripsi Keuntungan (terlihat di kartu paket publik)</Label>
