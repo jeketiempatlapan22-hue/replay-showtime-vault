@@ -401,8 +401,147 @@ function BillingPanel({ session }: { session: Session }) {
   );
 }
 
+type TokenRow = {
+  audit_id: string; kind: 'show' | 'replay'; target_id: string | null; target_title: string;
+  token: string; created_at: string; expires_at: string | null; revoked: boolean; device_count: number;
+};
+
+function TokensPanel({ session }: { session: Session }) {
+  const [rows, setRows] = useState<TokenRow[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [q, setQ] = useState('');
+  const [debouncedQ, setDebouncedQ] = useState('');
+  const [confirm, setConfirm] = useState<{ kind: 'revoke' | 'block'; row: TokenRow } | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQ(q.trim()), 300);
+    return () => clearTimeout(t);
+  }, [q]);
+
+  const load = async () => {
+    setLoading(true);
+    const { data, error } = await (supabase.rpc as any)('reseller_list_tokens', {
+      _phone: session.phone, _pin: session.pin, _q: debouncedQ, _limit: 100, _offset: 0,
+    });
+    if (error) toast({ title: 'Gagal memuat', description: error.message, variant: 'destructive' });
+    else setRows((data ?? []) as TokenRow[]);
+    setLoading(false);
+  };
+  useEffect(() => { void load(); /* eslint-disable-next-line */ }, [debouncedQ]);
+
+  const doAction = async () => {
+    if (!confirm || busyId) return;
+    const { kind, row } = confirm;
+    setBusyId(row.audit_id);
+    try {
+      if (kind === 'revoke') {
+        const { data, error } = await (supabase.rpc as any)('reseller_revoke_token', {
+          _phone: session.phone, _pin: session.pin, _audit_id: row.audit_id,
+        });
+        if (error) throw error;
+        if (!data) throw new Error('Link tidak ditemukan');
+        toast({ title: '✅ Link direset', description: 'Link sudah tidak bisa dipakai.' });
+      } else {
+        const { data, error } = await (supabase.rpc as any)('reseller_block_token', {
+          _phone: session.phone, _pin: session.pin, _audit_id: row.audit_id,
+        });
+        if (error) throw error;
+        toast({ title: '🚫 Perangkat diblokir', description: `${data ?? 0} perangkat diblokir & link direset.` });
+      }
+      setConfirm(null);
+      await load();
+    } catch (err: any) {
+      toast({ title: 'Gagal', description: err?.message || 'gagal', variant: 'destructive' });
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const fmt = (s: string | null) => s ? new Date(s).toLocaleString('id-ID', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—';
+
+  return (
+    <div className="space-y-3 mt-4">
+      <div className="flex gap-2">
+        <div className="relative flex-1">
+          <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cari judul / token…" className="pl-8" />
+        </div>
+        <Button size="sm" variant="outline" onClick={load} disabled={loading}>
+          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+        </Button>
+      </div>
+      <p className="text-[11px] text-muted-foreground italic">
+        🔧 Reset = link tidak bisa dipakai lagi. Blokir = perangkat yang sudah pakai link diblokir total dari website.
+      </p>
+
+      {loading ? (
+        <p className="text-sm text-muted-foreground">Memuat…</p>
+      ) : rows.length === 0 ? (
+        <p className="text-sm text-muted-foreground italic">Belum ada link yang dibuat.</p>
+      ) : rows.map((r) => (
+        <div key={r.audit_id} className="border border-border rounded-xl bg-card p-3 space-y-2">
+          <div className="flex items-start gap-2">
+            <KeyRound className="w-4 h-4 mt-0.5 text-primary shrink-0" />
+            <div className="flex-1 min-w-0">
+              <div className="flex items-start justify-between gap-2 flex-wrap">
+                <p className="font-semibold text-sm truncate flex-1">{r.target_title || '—'}</p>
+                <div className="flex gap-1 shrink-0">
+                  <Badge variant="outline" className="text-[10px]">{r.kind === 'show' ? '📺 Show' : '🎬 Replay'}</Badge>
+                  {r.revoked
+                    ? <Badge variant="destructive" className="text-[10px]">Direset</Badge>
+                    : <Badge className="text-[10px] bg-emerald-500/15 text-emerald-600 border-emerald-500/30" variant="outline">Aktif</Badge>}
+                </div>
+              </div>
+              <p className="text-[11px] text-muted-foreground mt-0.5">
+                Dibuat {fmt(r.created_at)} · Exp {fmt(r.expires_at)} · {r.device_count} perangkat
+              </p>
+              <p className="text-[10px] text-muted-foreground font-mono truncate">{r.token.slice(0, 16)}…</p>
+            </div>
+          </div>
+          <div className="flex gap-1">
+            <Button size="sm" variant="outline" className="flex-1" disabled={r.revoked || busyId === r.audit_id}
+              onClick={() => setConfirm({ kind: 'revoke', row: r })}>
+              <ShieldOff className="w-3.5 h-3.5 mr-1" />Reset link
+            </Button>
+            <Button size="sm" variant="destructive" className="flex-1" disabled={r.device_count === 0 || busyId === r.audit_id}
+              onClick={() => setConfirm({ kind: 'block', row: r })}>
+              <Ban className="w-3.5 h-3.5 mr-1" />Blokir perangkat
+            </Button>
+          </div>
+        </div>
+      ))}
+
+      <AlertDialog open={!!confirm} onOpenChange={(v) => { if (!v && !busyId) setConfirm(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {confirm?.kind === 'block' ? 'Blokir perangkat?' : 'Reset link?'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirm?.kind === 'block'
+                ? <>Semua perangkat yang sudah membuka link <strong>{confirm.row.target_title}</strong> akan diblokir total dari website, dan link akan direset.</>
+                : <>Link <strong>{confirm?.row.target_title}</strong> tidak akan bisa dipakai lagi. Tindakan tidak bisa dibatalkan.</>}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={!!busyId}>Batal</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); void doAction(); }}
+              disabled={!!busyId}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {busyId ? 'Memproses…' : 'Ya, lanjutkan'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
+
 function Dashboard({ session, onLogout }: { session: Session; onLogout: () => void }) {
-  const [tab, setTab] = useState<'shows' | 'replays' | 'membership' | 'billing'>('shows');
+  const [tab, setTab] = useState<'shows' | 'replays' | 'membership' | 'tokens' | 'billing'>('shows');
   const [shows, setShows] = useState<ShowRow[]>([]);
   const [replays, setReplays] = useState<ReplayRow[]>([]);
   const [loadingS, setLoadingS] = useState(false);
