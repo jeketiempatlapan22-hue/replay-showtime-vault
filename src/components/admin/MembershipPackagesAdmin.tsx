@@ -52,17 +52,27 @@ const emptyForm = {
   fixed_expires_at: '',
 };
 
-// Convert ISO timestamp <-> <input type="datetime-local"> value in local time.
-function isoToLocalInput(iso: string | null | undefined) {
+// Convert ISO timestamp <-> <input type="date"> value (YYYY-MM-DD) in local time.
+function isoToDateInput(iso: string | null | undefined) {
   if (!iso) return '';
   const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
   const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
-function localInputToIso(s: string) {
+function dateInputToIso(s: string, endOfDay = false) {
   if (!s) return null;
-  const d = new Date(s);
-  return isNaN(d.getTime()) ? null : d.toISOString();
+  const [y, m, d] = s.split('-').map(Number);
+  if (!y || !m || !d) return null;
+  const date = endOfDay ? new Date(y, m - 1, d, 23, 59, 59, 999) : new Date(y, m - 1, d, 0, 0, 0, 0);
+  return date.toISOString();
+}
+function daysBetweenInputs(startStr: string, endStr: string) {
+  if (!startStr || !endStr) return 0;
+  const a = new Date(startStr + 'T00:00:00').getTime();
+  const b = new Date(endStr + 'T23:59:59').getTime();
+  if (isNaN(a) || isNaN(b) || b <= a) return 0;
+  return Math.max(1, Math.ceil((b - a) / 86400000));
 }
 function fmtDateRange(p: Pkg) {
   if (!p.fixed_expires_at) return null;
