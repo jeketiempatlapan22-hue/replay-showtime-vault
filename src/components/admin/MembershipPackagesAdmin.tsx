@@ -29,6 +29,8 @@ interface Pkg {
   sort_order: number;
   paused: boolean;
   pause_message: string;
+  fixed_starts_at: string | null;
+  fixed_expires_at: string | null;
 }
 
 
@@ -46,7 +48,29 @@ const emptyForm = {
   includes_replays: true,
   status: 'open' as 'open' | 'closed',
   sort_order: 0,
+  fixed_starts_at: '',
+  fixed_expires_at: '',
 };
+
+// Convert ISO timestamp <-> <input type="datetime-local"> value in local time.
+function isoToLocalInput(iso: string | null | undefined) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+function localInputToIso(s: string) {
+  if (!s) return null;
+  const d = new Date(s);
+  return isNaN(d.getTime()) ? null : d.toISOString();
+}
+function fmtDateRange(p: Pkg) {
+  if (!p.fixed_expires_at) return null;
+  const opts: Intl.DateTimeFormatOptions = { day: '2-digit', month: 'short', year: 'numeric' };
+  const start = p.fixed_starts_at ? new Date(p.fixed_starts_at).toLocaleDateString('id-ID', opts) : '—';
+  const end = new Date(p.fixed_expires_at).toLocaleDateString('id-ID', opts);
+  return `${start} → ${end}`;
+}
 
 export default function MembershipPackagesAdmin() {
   const [rows, setRows] = useState<Pkg[]>([]);
