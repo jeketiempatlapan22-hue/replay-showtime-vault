@@ -64,7 +64,6 @@ Deno.serve(async (req) => {
   const { data: pkg } = await admin.from('membership_packages')
     .select('id,name,status,paused,max_devices,includes_replays,replay_info').eq('id', packageId).maybeSingle();
   if (!pkg) return json({ error: 'package_not_found' }, 404);
-  if (pkg.status !== 'open') return json({ error: 'package_closed' }, 400);
   if (pkg.paused === true) return json({ error: 'package_paused' }, 400);
 
   const { data: settings } = await admin.from('site_settings').select('key,value')
