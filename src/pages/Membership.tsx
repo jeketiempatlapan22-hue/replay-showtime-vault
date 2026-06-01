@@ -26,6 +26,19 @@ interface Pkg {
   max_devices: number;
   status: 'open' | 'closed';
   sort_order: number;
+  fixed_starts_at: string | null;
+  fixed_expires_at: string | null;
+}
+
+function fmtDate(iso: string) {
+  return new Date(iso).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+function pkgPeriodLabel(p: Pick<Pkg, 'fixed_starts_at' | 'fixed_expires_at' | 'duration_days'>) {
+  if (p.fixed_expires_at) {
+    const start = p.fixed_starts_at ? fmtDate(p.fixed_starts_at) : fmtDate(new Date().toISOString());
+    return `Berlaku ${start} – ${fmtDate(p.fixed_expires_at)}`;
+  }
+  return `Aktif ${p.duration_days} hari`;
 }
 
 function normalizePhone(raw: string) {
