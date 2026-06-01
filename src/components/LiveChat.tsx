@@ -81,7 +81,10 @@ export default function LiveChat() {
     const [{ data: pins }, { data: list }, { data: blocks }] = await Promise.all([
       supabase.from('live_messages').select('*').eq('pinned', true).order('created_at', { ascending: false }),
       supabase.from('live_messages').select('*').eq('pinned', false).order('created_at', { ascending: false }).limit(50),
-      supabase.from('chat_blocks').select('browser_id'),
+      // Admin perlu daftar lengkap block untuk badge moderasi; viewer biasa cukup cek dirinya sendiri.
+      isAdmin
+        ? supabase.from('chat_blocks').select('browser_id')
+        : supabase.from('chat_blocks').select('browser_id').eq('browser_id', myBrowserId),
     ]);
     setPinned((pins || []) as Msg[]);
     setMessages(((list || []) as Msg[]).slice().reverse());
@@ -117,13 +120,22 @@ export default function LiveChat() {
         setMessages(prev => prev.filter(x => x.id !== id));
         setPinned(prev => prev.filter(x => x.id !== id));
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_blocks' }, async () => {
-        const { data } = await supabase.from('chat_blocks').select('browser_id');
-        setBlockedSet(new Set(((data || []) as { browser_id: string }[]).map(b => b.browser_id)));
-      })
+      .on(
+        'postgres_changes',
+        isAdmin
+          ? { event: '*', schema: 'public', table: 'chat_blocks' }
+          : { event: '*', schema: 'public', table: 'chat_blocks', filter: `browser_id=eq.${myBrowserId}` },
+        async () => {
+          const q = isAdmin
+            ? supabase.from('chat_blocks').select('browser_id')
+            : supabase.from('chat_blocks').select('browser_id').eq('browser_id', myBrowserId);
+          const { data } = await q;
+          setBlockedSet(new Set(((data || []) as { browser_id: string }[]).map(b => b.browser_id)));
+        }
+      )
       .subscribe();
     return () => { supabase.removeChannel(ch); };
-  }, []);
+  }, [isAdmin]);
 
   const handleScroll = () => {
     const el = listRef.current;
