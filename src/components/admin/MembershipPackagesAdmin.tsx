@@ -253,18 +253,53 @@ export default function MembershipPackagesAdmin() {
               {form.status === 'open' ? 'Dibuka' : 'Ditutup'}
             </label>
           </div>
-          <div className="sm:col-span-2 grid sm:grid-cols-2 gap-3 border-t border-border pt-3">
-            <div className="sm:col-span-2 text-[11px] text-muted-foreground">
-              <strong>Periode tetap (opsional)</strong> — isi tanggal mulai & berakhir agar semua user yang membeli paket ini punya masa aktif yang sama. Kosongkan untuk pakai durasi hari di atas.
+          <div className="sm:col-span-2 grid sm:grid-cols-2 gap-3 border-2 border-primary/30 bg-primary/5 rounded-lg p-3">
+            <div className="sm:col-span-2 text-xs">
+              <strong className="text-primary">📅 Periode Tetap Membership (opsional)</strong>
+              <p className="text-muted-foreground mt-1">Atur tanggal mulai & berakhir agar SEMUA user yang membeli paket ini punya tanggal berakhir yang sama (mis. 1 Jan – 28 Feb 2026). Kosongkan untuk pakai durasi hari di atas.</p>
             </div>
             <div>
-              <Label className="text-xs">Mulai berlaku</Label>
-              <Input type="datetime-local" value={form.fixed_starts_at} onChange={(e) => setForm({ ...form, fixed_starts_at: e.target.value })} />
+              <Label className="text-xs">Tanggal Mulai</Label>
+              <Input
+                type="date"
+                value={form.fixed_starts_at}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  const next = { ...form, fixed_starts_at: v };
+                  const d = daysBetweenInputs(v, form.fixed_expires_at);
+                  if (d > 0) next.duration_days = d;
+                  setForm(next);
+                }}
+              />
             </div>
             <div>
-              <Label className="text-xs">Berakhir</Label>
-              <Input type="datetime-local" value={form.fixed_expires_at} onChange={(e) => setForm({ ...form, fixed_expires_at: e.target.value })} />
+              <Label className="text-xs">Tanggal Berakhir</Label>
+              <Input
+                type="date"
+                value={form.fixed_expires_at}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  const next = { ...form, fixed_expires_at: v };
+                  const d = daysBetweenInputs(form.fixed_starts_at, v);
+                  if (d > 0) next.duration_days = d;
+                  setForm(next);
+                }}
+              />
             </div>
+            {form.fixed_starts_at && form.fixed_expires_at && (
+              <div className="sm:col-span-2 text-xs text-primary font-medium">
+                ✓ Berlaku {new Date(form.fixed_starts_at).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })} – {new Date(form.fixed_expires_at).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })} ({daysBetweenInputs(form.fixed_starts_at, form.fixed_expires_at)} hari)
+              </div>
+            )}
+            {(form.fixed_starts_at || form.fixed_expires_at) && (
+              <button
+                type="button"
+                onClick={() => setForm({ ...form, fixed_starts_at: '', fixed_expires_at: '' })}
+                className="sm:col-span-2 text-xs text-destructive hover:underline text-left"
+              >
+                ✕ Kosongkan periode tetap (gunakan durasi hari)
+              </button>
+            )}
           </div>
           <div className="sm:col-span-2">
             <Label className="text-xs">Deskripsi Keuntungan (terlihat di kartu paket publik)</Label>
