@@ -692,6 +692,8 @@ export default function Admin() {
           <TabsContent value="bot"><BotAdmin /></TabsContent>
           <TabsContent value="history"><TokenHistoryAdmin /></TabsContent>
           <TabsContent value="reseller_audit"><ResellerAuditAdmin /></TabsContent>
+          <TabsContent value="reseller_billing"><ResellerBillingAdmin /></TabsContent>
+          <TabsContent value="reseller_pricing"><ResellerPricingAdmin /></TabsContent>
           <TabsContent value="membership"><MembershipAdmin /></TabsContent>
           <TabsContent value="mb_packages"><MembershipPackagesAdmin /></TabsContent>
           <TabsContent value="pakasir"><PakasirAdmin /></TabsContent>
