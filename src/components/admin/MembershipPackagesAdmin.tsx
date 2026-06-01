@@ -29,6 +29,8 @@ interface Pkg {
   sort_order: number;
   paused: boolean;
   pause_message: string;
+  fixed_starts_at: string | null;
+  fixed_expires_at: string | null;
 }
 
 
@@ -46,7 +48,29 @@ const emptyForm = {
   includes_replays: true,
   status: 'open' as 'open' | 'closed',
   sort_order: 0,
+  fixed_starts_at: '',
+  fixed_expires_at: '',
 };
+
+// Convert ISO timestamp <-> <input type="datetime-local"> value in local time.
+function isoToLocalInput(iso: string | null | undefined) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+function localInputToIso(s: string) {
+  if (!s) return null;
+  const d = new Date(s);
+  return isNaN(d.getTime()) ? null : d.toISOString();
+}
+function fmtDateRange(p: Pkg) {
+  if (!p.fixed_expires_at) return null;
+  const opts: Intl.DateTimeFormatOptions = { day: '2-digit', month: 'short', year: 'numeric' };
+  const start = p.fixed_starts_at ? new Date(p.fixed_starts_at).toLocaleDateString('id-ID', opts) : '—';
+  const end = new Date(p.fixed_expires_at).toLocaleDateString('id-ID', opts);
+  return `${start} → ${end}`;
+}
 
 export default function MembershipPackagesAdmin() {
   const [rows, setRows] = useState<Pkg[]>([]);
@@ -96,6 +120,8 @@ export default function MembershipPackagesAdmin() {
       includes_replays: form.includes_replays,
       status: form.status,
       sort_order: Number(form.sort_order) || 0,
+      fixed_starts_at: localInputToIso(form.fixed_starts_at),
+      fixed_expires_at: localInputToIso(form.fixed_expires_at),
     };
     const { error } = form.id
       ? await supabase.from('membership_packages').update(payload).eq('id', form.id)
@@ -122,6 +148,8 @@ export default function MembershipPackagesAdmin() {
       includes_replays: p.includes_replays,
       status: p.status,
       sort_order: p.sort_order,
+      fixed_starts_at: isoToLocalInput(p.fixed_starts_at),
+      fixed_expires_at: isoToLocalInput(p.fixed_expires_at),
     });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -215,6 +243,19 @@ export default function MembershipPackagesAdmin() {
               {form.status === 'open' ? 'Dibuka' : 'Ditutup'}
             </label>
           </div>
+          <div className="sm:col-span-2 grid sm:grid-cols-2 gap-3 border-t border-border pt-3">
+            <div className="sm:col-span-2 text-[11px] text-muted-foreground">
+              <strong>Periode tetap (opsional)</strong> — isi tanggal mulai & berakhir agar semua user yang membeli paket ini punya masa aktif yang sama. Kosongkan untuk pakai durasi hari di atas.
+            </div>
+            <div>
+              <Label className="text-xs">Mulai berlaku</Label>
+              <Input type="datetime-local" value={form.fixed_starts_at} onChange={(e) => setForm({ ...form, fixed_starts_at: e.target.value })} />
+            </div>
+            <div>
+              <Label className="text-xs">Berakhir</Label>
+              <Input type="datetime-local" value={form.fixed_expires_at} onChange={(e) => setForm({ ...form, fixed_expires_at: e.target.value })} />
+            </div>
+          </div>
           <div className="sm:col-span-2">
             <Label className="text-xs">Deskripsi Keuntungan (terlihat di kartu paket publik)</Label>
             <Textarea
@@ -296,6 +337,9 @@ export default function MembershipPackagesAdmin() {
                           {p.duration_days} hari · Rp {p.price_idr.toLocaleString('id-ID')} · {p.price_coins} koin · {p.max_devices} perangkat
                           {p.includes_replays ? ' · termasuk replay' : ''}
                         </div>
+                        {fmtDateRange(p) && (
+                          <div className="text-[11px] text-primary mt-1">📅 Periode tetap: {fmtDateRange(p)}</div>
+                        )}
                         {p.paused && p.pause_message && (
                           <div className="text-[11px] text-orange-600 dark:text-orange-400 mt-1 whitespace-pre-line border-l-2 border-orange-500/40 pl-2">
                             “{p.pause_message}”

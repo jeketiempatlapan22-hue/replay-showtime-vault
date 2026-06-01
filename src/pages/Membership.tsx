@@ -26,6 +26,19 @@ interface Pkg {
   max_devices: number;
   status: 'open' | 'closed';
   sort_order: number;
+  fixed_starts_at: string | null;
+  fixed_expires_at: string | null;
+}
+
+function fmtDate(iso: string) {
+  return new Date(iso).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+function pkgPeriodLabel(p: Pick<Pkg, 'fixed_starts_at' | 'fixed_expires_at' | 'duration_days'>) {
+  if (p.fixed_expires_at) {
+    const start = p.fixed_starts_at ? fmtDate(p.fixed_starts_at) : fmtDate(new Date().toISOString());
+    return `Berlaku ${start} – ${fmtDate(p.fixed_expires_at)}`;
+  }
+  return `Aktif ${p.duration_days} hari`;
 }
 
 function normalizePhone(raw: string) {
@@ -69,7 +82,7 @@ export default function Membership() {
       setPkgsLoading(true);
       const { data } = await supabase
         .from('membership_packages')
-        .select('id,name,description,duration_days,price_idr,price_coins,pakasir_amount,quota_total,quota_reserved,max_devices,status,sort_order')
+        .select('id,name,description,duration_days,price_idr,price_coins,pakasir_amount,quota_total,quota_reserved,max_devices,status,sort_order,fixed_starts_at,fixed_expires_at')
         .order('sort_order')
         .order('created_at');
       setPkgs((data || []) as Pkg[]);
@@ -236,7 +249,7 @@ export default function Membership() {
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
                         <div className="font-bold text-base leading-tight">{p.name}</div>
-                        <div className="text-xs text-muted-foreground">Aktif {p.duration_days} hari · {p.max_devices} perangkat</div>
+                        <div className="text-xs text-muted-foreground">{pkgPeriodLabel(p)} · {p.max_devices} perangkat</div>
                       </div>
                       {closed ? (
                         <Badge variant="secondary" className="shrink-0">DITUTUP</Badge>
@@ -292,7 +305,7 @@ export default function Membership() {
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle>Konfirmasi Pembelian</DialogTitle>
-            <DialogDescription className="text-xs">{picked?.name} · {picked?.duration_days} hari</DialogDescription>
+            <DialogDescription className="text-xs">{picked?.name} · {picked ? pkgPeriodLabel(picked) : ''}</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1">
