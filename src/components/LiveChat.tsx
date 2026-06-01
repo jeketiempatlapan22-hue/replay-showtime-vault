@@ -117,8 +117,10 @@ export default function LiveChat() {
         setMessages(prev => prev.filter(x => x.id !== id));
         setPinned(prev => prev.filter(x => x.id !== id));
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_blocks' }, async () => {
-        const { data } = await supabase.from('chat_blocks').select('browser_id');
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_blocks', filter: `browser_id=eq.${myBrowserId}` }, async () => {
+        // Hanya re-fetch saat status block milik browser ini berubah — bukan saat
+        // admin block/unblock user lain. Penting di skala 1000+ viewer.
+        const { data } = await supabase.from('chat_blocks').select('browser_id').eq('browser_id', myBrowserId);
         setBlockedSet(new Set(((data || []) as { browser_id: string }[]).map(b => b.browser_id)));
       })
       .subscribe();
