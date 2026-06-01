@@ -35,6 +35,15 @@ const randStr = (n = 10) => {
   return s;
 };
 
+async function createFreshMembershipToken(length: number) {
+  for (let i = 0; i < 8; i++) {
+    const token = randStr(length);
+    const { data } = await supabase.from('membership_tokens').select('id').eq('token', token).maybeSingle();
+    if (!data) return token;
+  }
+  return `${randStr(length)}${Date.now().toString(36).toUpperCase()}`;
+}
+
 export default function MembershipAdmin() {
   const [rows, setRows] = useState<MembershipToken[]>([]);
   const [devices, setDevices] = useState<Record<string, DeviceRow[]>>({});
@@ -75,8 +84,8 @@ export default function MembershipAdmin() {
     if (!form.phone.trim()) { toast.error('Nomor WA wajib diisi'); return; }
     setCreating(true);
     // Selalu generate token & sandi BARU — tidak menyalin token yang sudah ada.
-    const token = randStr(12);
-    const password = randStr(8);
+    const token = await createFreshMembershipToken(12);
+    const password = await createFreshMembershipToken(8);
     const starts_at = new Date().toISOString();
     const expires_at = new Date(Date.now() + form.duration_days * 86400000).toISOString();
     const { error } = await supabase.from('membership_tokens').insert({
