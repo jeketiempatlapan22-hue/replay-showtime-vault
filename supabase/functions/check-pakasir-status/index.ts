@@ -181,7 +181,7 @@ Deno.serve(async (req) => {
       const msm = new Map((msettings ?? []).map((s) => [s.key, s.value]));
       const morigin = (msm.get('site_origin') || 'https://replaytime.lovable.app').replace(/\/+$/, '');
       const mtpl = msm.get('wa_membership_template') ||
-        '👑 *MEMBERSHIP AKTIF*\n\n📦 *{package_name}*\n📅 Berlaku hingga: {expires_at}\n\n🔗 *Link Akses:*\n{link}\n\n🗝️ Sandi: *{password}*\n\n{replay_info_block}👤 Berlaku untuk *{max_devices} perangkat*.\n\n— *ReplayTime* 💖';
+        '👑 *MEMBERSHIP AKTIF*\n\n📦 *{package_name}*\n📅 Berlaku hingga: {expires_at}\n\n🔗 *Link Akses:*\n{link}\n\n{replay_info_block}👤 Berlaku untuk *{max_devices} perangkat*.\n\n— *ReplayTime* 💖';
       const mlink = `${morigin}/live?mtoken=${encodeURIComponent(tok.token)}&mp=${encodeURIComponent(tok.password)}`;
       const expiresStr = new Date(tok.expires_at).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
       const mmsg = mtpl
