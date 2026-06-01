@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from '@/hooks/use-toast';
-import { Copy, LogOut, RefreshCw, Search, Loader2, Radio, Film, Link2, Crown } from 'lucide-react';
+import { Copy, LogOut, RefreshCw, Search, Loader2, Radio, Film, Link2, Crown, Wallet, QrCode } from 'lucide-react';
 
 type Session = { phone: string; pin: string; label: string };
 type ShowRow = { id: string; title: string; show_date: string; show_time: string; image_url: string; category: string; is_live: boolean; is_active: boolean };
@@ -265,8 +265,140 @@ function MembershipPanel({
   );
 }
 
+function BillingPanel({ session }: { session: Session }) {
+  const [breakdown, setBreakdown] = useState<{ target_id: string; target_title: string; kind: string; copies: number; price_per_link: number; subtotal: number; total: number }[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [bill, setBill] = useState<any>(null);
+  const [creating, setCreating] = useState(false);
+  const [polling, setPolling] = useState(false);
+
+  const fmtRp = (n: number) => 'Rp ' + new Intl.NumberFormat('id-ID').format(Math.max(0, Number(n) || 0));
+
+  const load = async () => {
+    setLoading(true);
+    const [{ data: bd }, { data: bl }] = await Promise.all([
+      (supabase.rpc as any)('reseller_compute_bill', { _phone: session.phone, _pin: session.pin }),
+      (supabase.rpc as any)('reseller_get_active_bill', { _phone: session.phone, _pin: session.pin }),
+    ]);
+    const rows = (bd ?? []) as any[];
+    setBreakdown(rows);
+    setTotal(rows.length ? Number(rows[0].total) || 0 : 0);
+    setBill(Array.isArray(bl) ? bl[0] : bl);
+    setLoading(false);
+  };
+  useEffect(() => { void load(); /* eslint-disable-next-line */ }, []);
+
+  const createBill = async () => {
+    setCreating(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('reseller-create-bill', { body: { phone: session.phone, pin: session.pin } });
+      let d: any = data;
+      if (error) {
+        try { const ctx: any = (error as any).context; if (ctx?.json) d = await ctx.json(); } catch { /* ignore */ }
+      }
+      if (!d?.ok) throw new Error(d?.error || (error?.message ?? 'gagal'));
+      toast({ title: 'QRIS tagihan dibuat', description: fmtRp(d.amount) });
+      await load();
+    } catch (err) {
+      toast({ title: 'Gagal', description: err instanceof Error ? err.message : 'gagal', variant: 'destructive' });
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  // Poll status setiap 4 detik saat ada bill pending
+  useEffect(() => {
+    if (!bill?.id || bill.status === 'paid') return;
+    setPolling(true);
+    const iv = setInterval(async () => {
+      try {
+        const { data } = await supabase.functions.invoke('reseller-check-bill', {
+          body: { bill_id: bill.id, phone: session.phone, pin: session.pin },
+        });
+        const d: any = data;
+        if (d?.status === 'paid') {
+          toast({ title: '✅ Pembayaran diterima', description: 'Log salin telah dibersihkan.' });
+          setBill(null); setBreakdown([]); setTotal(0);
+          clearInterval(iv); setPolling(false);
+          await load();
+        }
+      } catch { /* ignore */ }
+    }, 4000);
+    return () => { clearInterval(iv); setPolling(false); };
+  }, [bill?.id, bill?.status, session.phone, session.pin]);
+
+  return (
+    <div className="space-y-3 mt-4">
+      <div className="flex justify-end">
+        <Button size="sm" variant="outline" onClick={load} disabled={loading}>
+          <RefreshCw className={`w-4 h-4 mr-1 ${loading ? 'animate-spin' : ''}`} />Muat ulang
+        </Button>
+      </div>
+
+      {loading ? (
+        <p className="text-sm text-muted-foreground">Memuat…</p>
+      ) : total === 0 && !bill ? (
+        <div className="border border-border rounded-xl bg-card p-6 text-center">
+          <p className="text-sm text-muted-foreground">🎉 Tidak ada tagihan saat ini.</p>
+          <p className="text-[11px] text-muted-foreground mt-1">Setiap link yang Anda salin akan masuk ke tagihan berikutnya.</p>
+        </div>
+      ) : (
+        <>
+          {breakdown.length > 0 && (
+            <div className="border border-border rounded-xl bg-card p-3 space-y-2">
+              <p className="text-xs font-semibold">Rincian salin link</p>
+              {breakdown.map((b) => (
+                <div key={b.target_id} className="flex items-center justify-between gap-2 text-sm">
+                  <span className="truncate flex-1">{b.target_title || '—'}</span>
+                  <span className="text-xs text-muted-foreground shrink-0">{b.copies} × {fmtRp(b.price_per_link)}</span>
+                  <span className="font-semibold shrink-0 min-w-[80px] text-right">{fmtRp(b.subtotal)}</span>
+                </div>
+              ))}
+              <div className="flex items-center justify-between pt-2 border-t border-border">
+                <span className="font-semibold">Total otomatis</span>
+                <span className="font-bold text-primary">{fmtRp(total)}</span>
+              </div>
+            </div>
+          )}
+
+          {bill ? (
+            <div className="border border-primary/40 bg-primary/5 rounded-xl p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-semibold flex items-center gap-1"><Wallet className="w-4 h-4" />Tagihan QRIS</span>
+                <Badge>{bill.status === 'paid' ? 'Lunas' : 'Menunggu pembayaran'}</Badge>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-muted-foreground">Jumlah ditagih</span>
+                <span className="text-lg font-bold text-primary">{fmtRp(bill.amount)}</span>
+              </div>
+              {Number(bill.amount) !== Number(bill.computed_amount) && (
+                <p className="text-[11px] text-amber-600">⚠️ Jumlah diatur ulang oleh admin (otomatis: {fmtRp(bill.computed_amount)}).</p>
+              )}
+              {bill.pakasir_qr_url && (
+                <Button asChild className="w-full" variant="default">
+                  <a href={bill.pakasir_qr_url} target="_blank" rel="noopener noreferrer">
+                    <QrCode className="w-4 h-4 mr-1" />Buka QRIS untuk bayar
+                  </a>
+                </Button>
+              )}
+              {polling && <p className="text-[11px] text-muted-foreground text-center">⏳ Memeriksa status pembayaran otomatis…</p>}
+              <p className="text-[11px] text-muted-foreground italic">Setelah pembayaran berhasil, riwayat salin link Anda akan dihapus otomatis.</p>
+            </div>
+          ) : (
+            <Button className="w-full" disabled={creating || total === 0} onClick={createBill}>
+              {creating ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <QrCode className="w-4 h-4 mr-1" />}
+              Bayar via QRIS {fmtRp(total)}
+            </Button>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 function Dashboard({ session, onLogout }: { session: Session; onLogout: () => void }) {
-  const [tab, setTab] = useState<'shows' | 'replays' | 'membership'>('shows');
+  const [tab, setTab] = useState<'shows' | 'replays' | 'membership' | 'billing'>('shows');
   const [shows, setShows] = useState<ShowRow[]>([]);
   const [replays, setReplays] = useState<ReplayRow[]>([]);
   const [loadingS, setLoadingS] = useState(false);
@@ -369,10 +501,11 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
 
       <main className="max-w-3xl mx-auto px-4 py-4 pb-24">
         <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)}>
-          <TabsList className="grid grid-cols-3 w-full">
+          <TabsList className="grid grid-cols-4 w-full">
             <TabsTrigger value="shows"><Radio className="w-4 h-4 mr-1" />Show</TabsTrigger>
             <TabsTrigger value="replays"><Film className="w-4 h-4 mr-1" />Replay</TabsTrigger>
             <TabsTrigger value="membership"><Crown className="w-4 h-4 mr-1" />Member</TabsTrigger>
+            <TabsTrigger value="billing"><Wallet className="w-4 h-4 mr-1" />Tagihan</TabsTrigger>
           </TabsList>
 
           <TabsContent value="shows" className="space-y-3 mt-4">
@@ -469,6 +602,10 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
                 setResult(r);
               }}
             />
+          </TabsContent>
+
+          <TabsContent value="billing">
+            <BillingPanel session={session} />
           </TabsContent>
         </Tabs>
       </main>
