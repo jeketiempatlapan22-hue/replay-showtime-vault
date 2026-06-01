@@ -311,7 +311,7 @@ Deno.serve(async (req) => {
   try {
     const memTpl = (await admin.from('site_settings').select('value').eq('key', 'wa_membership_template').maybeSingle())
       .data?.value ||
-      '👑 *MEMBERSHIP AKTIF*\n\n📦 *{package_name}*\n📅 Berlaku hingga: {expires_at}\n\n🔗 *Link Akses:*\n{link}\n\n🗝️ Sandi: *{password}*\n\n{replay_info_block}👤 Berlaku untuk *{max_devices} perangkat*.\n\n— *ReplayTime* 💖';
+      '👑 *MEMBERSHIP AKTIF*\n\n📦 *{package_name}*\n📅 Berlaku hingga: {expires_at}\n\n🔗 *Link Akses:*\n{link}\n\n{replay_info_block}👤 Berlaku untuk *{max_devices} perangkat*.\n\n— *ReplayTime* 💖';
     const { data: mOrders } = await admin
       .from('membership_orders').select('*')
       .in('status', ['reserved', 'paid'])
