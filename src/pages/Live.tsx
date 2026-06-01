@@ -567,6 +567,9 @@ export default function Live() {
   }, [liveActive]);
 
   // ============ VIEWER COUNTER (presence) — count unique browser_id ============
+  // Heavily throttled to stay light at 1000+ concurrent viewers. Each sync/join/leave
+  // event at scale fans out O(N) updates; we coalesce them into a single recount
+  // every 5 seconds and only when the tab is visible.
   const showKey = search.get('show') || 'global';
   const [viewerCount, setViewerCount] = useState<number>(0);
   useEffect(() => {
@@ -576,18 +579,20 @@ export default function Live() {
       config: { presence: { key: bid } },
     });
     let pending: number | null = null;
+    let lastCount = 0;
     const recount = () => {
-      if (pending) return;
+      if (pending || document.visibilityState !== 'visible') return;
       pending = window.setTimeout(() => {
         pending = null;
         try {
           const state = channel.presenceState() as Record<string, unknown[]>;
-          // Each unique presence key (browser_id) counts once even with multiple tabs
-          const unique = new Set<string>();
-          for (const k of Object.keys(state)) if (k && Array.isArray(state[k]) && state[k].length > 0) unique.add(k);
-          setViewerCount(unique.size);
+          let unique = 0;
+          for (const k of Object.keys(state)) {
+            if (k && Array.isArray(state[k]) && state[k].length > 0) unique++;
+          }
+          if (unique !== lastCount) { lastCount = unique; setViewerCount(unique); }
         } catch { /* ignore */ }
-      }, 600);
+      }, 5000);
     };
     let tracked = false;
     let heartbeat: number | null = null;
@@ -600,12 +605,13 @@ export default function Live() {
           tracked = true;
           try { await channel.track({ at: Date.now() }); } catch { /* ignore */ }
           recount();
-          // Heartbeat ringan: cukup re-track berkala tanpa membebani player/network utama.
+          // Heartbeat 2 menit cukup — presence punya auto-timeout sendiri dan ini
+          // memangkas trafik websocket signifikan saat 1000+ viewer.
           heartbeat = window.setInterval(() => {
             if (document.visibilityState === 'visible') {
               channel.track({ at: Date.now() }).catch(() => {});
             }
-          }, 45000);
+          }, 120000);
         }
       });
     return () => {
