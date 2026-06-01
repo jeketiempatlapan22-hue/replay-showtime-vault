@@ -562,7 +562,9 @@ export default function Live() {
 
   useEffect(() => {
     if (!liveActive) { setChatReady(false); return; }
-    const delay = window.setTimeout(() => setChatReady(true), 2500);
+    // Delay chat mount lebih lama (5s) supaya player live mendapat bandwidth & CPU dulu
+    // saat 1000+ user terhubung bersamaan. Mengurangi lonjakan websocket awal.
+    const delay = window.setTimeout(() => setChatReady(true), 5000);
     return () => window.clearTimeout(delay);
   }, [liveActive]);
 
