@@ -113,10 +113,14 @@ function LoginCard({ onLogin }: { onLogin: (s: Session) => void }) {
 }
 
 function TokenResultDialog({
-  open, onOpenChange, link, message, title, extra,
-}: { open: boolean; onOpenChange: (v: boolean) => void; link: string; message: string; title: string; extra?: string }) {
+  open, onOpenChange, link, message, title, extra, copyCount, onCopied,
+}: { open: boolean; onOpenChange: (v: boolean) => void; link: string; message: string; title: string; extra?: string; copyCount: number; onCopied: () => void }) {
   const copy = async (text: string, label: string) => {
-    try { await navigator.clipboard.writeText(text); toast({ title: `${label} tersalin` }); } catch {
+    try {
+      await navigator.clipboard.writeText(text);
+      onCopied();
+      toast({ title: `✅ ${label} tersalin`, description: `Total salin untuk ini: ${copyCount + 1}x` });
+    } catch {
       toast({ title: 'Gagal menyalin', variant: 'destructive' });
     }
   };
@@ -127,6 +131,10 @@ function TokenResultDialog({
           <DialogTitle className="truncate">Link Baru: {title}</DialogTitle>
         </DialogHeader>
         <div className="space-y-3">
+          <div className="rounded-lg border border-primary/40 bg-primary/10 px-3 py-2 flex items-center justify-between gap-2">
+            <span className="text-xs font-semibold text-primary">✅ Link tersalin ke clipboard</span>
+            <Badge className="text-[11px]">{copyCount}x salin</Badge>
+          </div>
           {extra && <p className="text-xs text-muted-foreground">{extra}</p>}
           <div className="space-y-1">
             <Label className="text-xs">Link Akses</Label>
