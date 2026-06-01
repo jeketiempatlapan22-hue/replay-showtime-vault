@@ -1279,6 +1279,51 @@ export type Database = {
         }
         Relationships: []
       }
+      reseller_bills: {
+        Row: {
+          amount: number
+          breakdown: Json
+          computed_amount: number
+          created_at: string
+          id: string
+          paid_at: string | null
+          pakasir_order_id: string | null
+          pakasir_qr_url: string
+          reseller_label: string
+          reseller_phone: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          amount?: number
+          breakdown?: Json
+          computed_amount?: number
+          created_at?: string
+          id?: string
+          paid_at?: string | null
+          pakasir_order_id?: string | null
+          pakasir_qr_url?: string
+          reseller_label?: string
+          reseller_phone: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          breakdown?: Json
+          computed_amount?: number
+          created_at?: string
+          id?: string
+          paid_at?: string | null
+          pakasir_order_id?: string | null
+          pakasir_qr_url?: string
+          reseller_label?: string
+          reseller_phone?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       reseller_copy_log: {
         Row: {
           created_at: string
@@ -1306,6 +1351,24 @@ export type Database = {
           reseller_phone?: string
           target_id?: string | null
           target_title?: string
+        }
+        Relationships: []
+      }
+      reseller_show_prices: {
+        Row: {
+          price_per_link: number
+          show_id: string
+          updated_at: string
+        }
+        Insert: {
+          price_per_link?: number
+          show_id: string
+          updated_at?: string
+        }
+        Update: {
+          price_per_link?: number
+          show_id?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -1586,6 +1649,22 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      admin_override_reseller_bill: {
+        Args: { _amount: number; _bill_id: string }
+        Returns: undefined
+      }
+      admin_reseller_billing_summary: {
+        Args: never
+        Returns: {
+          has_pending: boolean
+          pending_amount: number
+          pending_bill_id: string
+          reseller_label: string
+          reseller_phone: string
+          total_amount: number
+          total_links: number
+        }[]
+      }
       admin_reseller_copy_stats: {
         Args: never
         Returns: {
@@ -1711,6 +1790,10 @@ export type Database = {
         Returns: boolean
       }
       increment_view_count: { Args: { _replay_id: string }; Returns: number }
+      mark_reseller_bill_paid: {
+        Args: { _bill_id: string }
+        Returns: undefined
+      }
       phone_exists: { Args: { _phone: string }; Returns: boolean }
       rate_replay: {
         Args: { _browser_id: string; _rating: number; _replay_id: string }
@@ -1724,6 +1807,18 @@ export type Database = {
         Args: { _order_id: string; _reason: string }
         Returns: boolean
       }
+      reseller_compute_bill: {
+        Args: { _phone: string; _pin: string }
+        Returns: {
+          copies: number
+          kind: string
+          price_per_link: number
+          subtotal: number
+          target_id: string
+          target_title: string
+          total: number
+        }[]
+      }
       reseller_copy_stats: {
         Args: { _phone: string; _pin: string }
         Returns: {
@@ -1732,6 +1827,28 @@ export type Database = {
           last_copied: string
           target_id: string
           target_title: string
+        }[]
+      }
+      reseller_create_bill_intent: {
+        Args: { _phone: string; _pin: string }
+        Returns: {
+          amount: number
+          bill_id: string
+          breakdown: Json
+        }[]
+      }
+      reseller_get_active_bill: {
+        Args: { _phone: string; _pin: string }
+        Returns: {
+          amount: number
+          breakdown: Json
+          computed_amount: number
+          created_at: string
+          id: string
+          paid_at: string
+          pakasir_order_id: string
+          pakasir_qr_url: string
+          status: string
         }[]
       }
       reseller_list_replays: {
