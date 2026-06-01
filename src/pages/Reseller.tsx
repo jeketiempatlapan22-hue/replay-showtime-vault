@@ -16,7 +16,7 @@ import { Copy, LogOut, RefreshCw, Search, Loader2, Radio, Film, Link2, Crown, Wa
 type Session = { phone: string; pin: string; label: string };
 type ShowRow = { id: string; title: string; show_date: string; show_time: string; image_url: string; category: string; is_live: boolean; is_active: boolean };
 type ReplayRow = { id: string; title: string; show_name: string; date: string; image_url: string };
-type PackageRow = { id: string; name: string; description: string; replay_info: string; max_devices: number; includes_replays: boolean; status: string; paused: boolean };
+type PackageRow = { id: string; name: string; description: string; replay_info: string; duration_days: number; max_devices: number; includes_replays: boolean; status: string; paused: boolean };
 
 const SESSION_KEY = 'reseller_session';
 
@@ -175,10 +175,10 @@ function MembershipPanel({
 
   const load = async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('membership_packages')
-      .select('id,name,description,replay_info,max_devices,includes_replays,status,paused')
-      .order('sort_order', { ascending: true });
+    const { data, error } = await (supabase.rpc as any)('reseller_list_membership_packages', {
+      _phone: session.phone,
+      _pin: session.pin,
+    });
     if (error) toast({ title: 'Gagal memuat paket', description: error.message, variant: 'destructive' });
     else setPkgs((data ?? []) as PackageRow[]);
     setLoading(false);
@@ -241,7 +241,7 @@ function MembershipPanel({
                   {count > 0 && <Badge variant="secondary" className="text-[10px] shrink-0">{count}x salin</Badge>}
                 </div>
                 <p className="text-[11px] text-muted-foreground">
-                  👤 {p.max_devices} device{p.includes_replays ? ' · 🎬 termasuk replay' : ''}
+                  ⏱️ Admin: {p.duration_days || 30} hari · 👤 {p.max_devices} device{p.includes_replays ? ' · 🎬 termasuk replay' : ''}
                 </p>
                 {p.replay_info && <p className="text-[11px] text-muted-foreground mt-1 line-clamp-2">{p.replay_info}</p>}
               </div>
@@ -263,7 +263,7 @@ function MembershipPanel({
         );
       })}
       <p className="text-[11px] text-muted-foreground italic pt-2">
-        ℹ️ Pesan WA otomatis menyertakan info replay dari paket sesuai pengaturan admin.
+        ℹ️ Pesan WA otomatis menyertakan info replay membership sesuai pengaturan admin.
       </p>
     </div>
   );

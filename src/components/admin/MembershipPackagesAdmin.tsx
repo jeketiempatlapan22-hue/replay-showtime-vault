@@ -54,12 +54,18 @@ export default function MembershipPackagesAdmin() {
   const [form, setForm] = useState({ ...emptyForm });
   const [saving, setSaving] = useState(false);
   const [ordersFor, setOrdersFor] = useState<Pkg | null>(null);
+  const [resellerReplayInfo, setResellerReplayInfo] = useState('');
+  const [savingResellerInfo, setSavingResellerInfo] = useState(false);
 
 
   const load = async () => {
     setLoading(true);
-    const { data } = await (supabase as any).rpc('admin_get_membership_packages');
+    const [{ data }, { data: setting }] = await Promise.all([
+      (supabase as any).rpc('admin_get_membership_packages'),
+      supabase.from('site_settings').select('value').eq('key', 'reseller_membership_replay_info').maybeSingle(),
+    ]);
     setRows((data || []) as Pkg[]);
+    setResellerReplayInfo(setting?.value || '');
     setLoading(false);
   };
   useEffect(() => {
@@ -150,6 +156,15 @@ export default function MembershipPackagesAdmin() {
     toast.success('Paket dihapus');
   };
 
+  const saveResellerReplayInfo = async () => {
+    setSavingResellerInfo(true);
+    const { error } = await supabase.from('site_settings')
+      .upsert({ key: 'reseller_membership_replay_info', value: resellerReplayInfo }, { onConflict: 'key' });
+    setSavingResellerInfo(false);
+    if (error) { toast.error(error.message); return; }
+    toast.success('Info replay reseller tersimpan');
+  };
+
   return (
     <div className="space-y-4">
       <Card>
@@ -227,6 +242,27 @@ export default function MembershipPackagesAdmin() {
               <Button variant="outline" onClick={() => setForm({ ...emptyForm })}>Batal</Button>
             )}
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Crown className="w-4 h-4 text-primary" /> Info Replay Membership Reseller
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <Label className="text-xs">Info replay khusus link yang dibuat reseller</Label>
+          <Textarea
+            rows={4}
+            value={resellerReplayInfo}
+            onChange={(e) => setResellerReplayInfo(e.target.value)}
+            placeholder="Kosongkan agar reseller memakai Info Replay dari paket membership di atas."
+          />
+          <p className="text-[10px] text-muted-foreground">Jika diisi, teks ini akan masuk ke template pesan reseller menggantikan Info Replay paket.</p>
+          <Button onClick={saveResellerReplayInfo} disabled={savingResellerInfo}>
+            {savingResellerInfo ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Save className="w-4 h-4 mr-1" />Simpan Info Reseller</>}
+          </Button>
         </CardContent>
       </Card>
 

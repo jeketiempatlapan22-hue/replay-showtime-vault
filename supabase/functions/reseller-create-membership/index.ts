@@ -18,6 +18,14 @@ function rnd(len: number) {
   return Array.from(crypto.getRandomValues(new Uint8Array(len)))
     .map((b) => 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'[b % 36]).join('');
 }
+async function freshToken(admin: any, len: number) {
+  for (let i = 0; i < 8; i++) {
+    const token = rnd(len);
+    const { data } = await admin.from('membership_tokens').select('id').eq('token', token).maybeSingle();
+    if (!data) return token;
+  }
+  return `${rnd(len)}${Date.now().toString(36).toUpperCase()}`;
+}
 
 const DEFAULT_TPL =
   '👑 *MEMBERSHIP AKTIF*\n\n📦 *{package_name}*\n📅 Berlaku hingga: {expires_at}\n\n🔗 *Link Akses:*\n{link}\n\n🗝️ Sandi: *{password}*\n\n{replay_info_block}👤 Berlaku untuk *{max_devices} perangkat*.\n\n— *ReplayTime* 💖';
@@ -54,17 +62,19 @@ Deno.serve(async (req) => {
   if (verified !== true) return json({ error: 'unauthorized' }, 401);
 
   const { data: pkg } = await admin.from('membership_packages')
-    .select('id,name,max_devices,includes_replays,replay_info').eq('id', packageId).maybeSingle();
+    .select('id,name,status,paused,max_devices,includes_replays,replay_info').eq('id', packageId).maybeSingle();
   if (!pkg) return json({ error: 'package_not_found' }, 404);
+  if (pkg.paused === true) return json({ error: 'package_paused' }, 400);
 
   const { data: settings } = await admin.from('site_settings').select('key,value')
-    .in('key', ['site_origin', 'wa_membership_template']);
+    .in('key', ['site_origin', 'wa_membership_template', 'reseller_membership_replay_info']);
   const sm = new Map((settings ?? []).map((x: any) => [x.key, x.value]));
   const origin = ((sm.get('site_origin') as string) || 'https://replaytime.lovable.app').replace(/\/+$/, '');
   const tpl = (sm.get('wa_membership_template') as string) || DEFAULT_TPL;
+  const replayInfo = String(sm.get('reseller_membership_replay_info') || '').trim() || (pkg.replay_info || '');
 
-  const token = rnd(12);
-  const password = rnd(8);
+  const token = await freshToken(admin, 12);
+  const password = await freshToken(admin, 8);
   const expiresAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
 
   const { data: ba } = await admin.from('bot_admins').select('label').eq('phone', phone).maybeSingle();
@@ -78,7 +88,7 @@ Deno.serve(async (req) => {
     expires_at: expiresAt.toISOString(),
     max_devices: pkg.max_devices || 1,
     includes_replays: pkg.includes_replays !== false,
-    replay_info: pkg.replay_info || '',
+    replay_info: replayInfo,
     package_id: pkg.id,
     created_by: `reseller:${phone}`,
   }).select('id').maybeSingle();
@@ -92,7 +102,7 @@ Deno.serve(async (req) => {
     expires_at: expStr,
     duration_days: String(days),
     max_devices: String(pkg.max_devices || 1),
-    replay_info: pkg.replay_info || '',
+    replay_info: replayInfo,
     site: origin.replace(/^https?:\/\//, ''),
   }) + `\n\n📝 Dibuat oleh reseller (${days} hari).`;
 
@@ -104,7 +114,7 @@ Deno.serve(async (req) => {
     reseller_phone: phone, reseller_label: resellerLabel,
     kind: 'membership', target_id: pkg.id, target_title: pkg.name,
     token, expires_at: expiresAt.toISOString(), duration_days: days,
-    meta: { max_devices: pkg.max_devices || 1, includes_replays: pkg.includes_replays !== false },
+    meta: { max_devices: pkg.max_devices || 1, includes_replays: pkg.includes_replays !== false, replay_info_source: replayInfo === (pkg.replay_info || '') ? 'package' : 'reseller_setting' },
   });
 
   return json({
