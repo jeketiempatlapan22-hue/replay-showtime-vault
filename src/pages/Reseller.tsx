@@ -748,6 +748,10 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
             />
           </TabsContent>
 
+          <TabsContent value="tokens">
+            <TokensPanel session={session} />
+          </TabsContent>
+
           <TabsContent value="billing">
             <BillingPanel session={session} />
           </TabsContent>
