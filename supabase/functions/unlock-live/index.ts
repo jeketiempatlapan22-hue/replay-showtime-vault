@@ -80,6 +80,57 @@ Deno.serve(async (req) => {
       if (blk) return json({ valid: false, reason: "blocked" });
     }
 
+    // ===== Priority: Membership token verification (works regardless of whether a live show is currently running) =====
+    // This ensures every membership link (admin/reseller/QRIS/coin) is accepted as long as the token itself is valid.
+    if (mtoken) {
+      const r = await verifyMembership(supabase, mtoken, mpassword || "", browser_id || "", isSilent);
+      if (!r.ok) {
+        return json({ valid: false, reason: r.reason, pause_message: (r as any).pause_message, package_name: (r as any).package_name });
+      }
+      // Try to enrich with the currently-live show; otherwise fall back to nearest upcoming/active show; otherwise legacy live_config_private.
+      let payload: any = null;
+      const { data: liveShow } = await supabase
+        .from("active_shows")
+        .select("id,title,is_live,live_url,live_type,live_sources,show_date,show_time,idn_show_id")
+        .eq("is_active", true).eq("is_live", true)
+        .order("show_date", { ascending: false }).order("show_time", { ascending: false })
+        .limit(1).maybeSingle();
+      if (liveShow) {
+        payload = {
+          valid: true, enabled: true, title: liveShow.title, type: liveShow.live_type || "m3u8",
+          url: liveShow.live_url || "",
+          sources: Array.isArray(liveShow.live_sources) ? liveShow.live_sources : [],
+          show_date: liveShow.show_date, show_time: liveShow.show_time,
+          idn_show_id: liveShow.idn_show_id || "",
+        };
+      } else {
+        const { data: upcoming } = await supabase
+          .from("active_shows")
+          .select("id,title,live_type,live_sources,show_date,show_time,idn_show_id")
+          .eq("is_active", true)
+          .order("show_date", { ascending: false }).order("show_time", { ascending: false })
+          .limit(1).maybeSingle();
+        if (upcoming) {
+          payload = {
+            valid: true, enabled: false, title: upcoming.title, type: upcoming.live_type || "m3u8",
+            url: "", sources: Array.isArray(upcoming.live_sources) ? upcoming.live_sources : [],
+            show_date: upcoming.show_date, show_time: upcoming.show_time,
+            idn_show_id: upcoming.idn_show_id || "",
+          };
+        } else {
+          const { data: cfg } = await supabase.from("live_config_private").select("*").limit(1).maybeSingle();
+          payload = {
+            valid: true, enabled: !!cfg?.enabled,
+            title: cfg?.title || "Membership", type: cfg?.type || "m3u8",
+            url: cfg?.url || "",
+            sources: Array.isArray(cfg?.sources) ? cfg!.sources : [],
+          };
+        }
+      }
+      return json({ ...payload, watermark: `MB-${String(mtoken).slice(-4).toUpperCase()}`, membership: membershipInfo(r.token), soft: r.soft });
+    }
+
+
     // ===== Branch A: per-show live (active_shows) =====
     // If no show_id provided, auto-resolve to the currently-live active show
     // so master/per-show passwords still work from the generic /kunci page.
