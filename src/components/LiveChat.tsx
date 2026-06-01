@@ -81,8 +81,10 @@ export default function LiveChat() {
     const [{ data: pins }, { data: list }, { data: blocks }] = await Promise.all([
       supabase.from('live_messages').select('*').eq('pinned', true).order('created_at', { ascending: false }),
       supabase.from('live_messages').select('*').eq('pinned', false).order('created_at', { ascending: false }).limit(50),
-      // Hanya cek block untuk browser ini sendiri — hemat bandwidth & query di skala besar.
-      supabase.from('chat_blocks').select('browser_id').eq('browser_id', myBrowserId),
+      // Admin perlu daftar lengkap block untuk badge moderasi; viewer biasa cukup cek dirinya sendiri.
+      isAdmin
+        ? supabase.from('chat_blocks').select('browser_id')
+        : supabase.from('chat_blocks').select('browser_id').eq('browser_id', myBrowserId),
     ]);
     setPinned((pins || []) as Msg[]);
     setMessages(((list || []) as Msg[]).slice().reverse());
