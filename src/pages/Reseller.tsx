@@ -157,7 +157,13 @@ function TokenResultDialog({
   );
 }
 
-function MembershipPanel({ session, onCreated }: { session: Session; onCreated: (r: { link: string; message: string; title: string; extra: string }) => void }) {
+function MembershipPanel({
+  session, onCreated, statsMap,
+}: {
+  session: Session;
+  onCreated: (r: { link: string; message: string; title: string; extra: string; kind: 'membership'; targetId: string; targetTitle: string }) => void;
+  statsMap: Map<string, number>;
+}) {
   const [pkgs, setPkgs] = useState<PackageRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [daysMap, setDaysMap] = useState<Record<string, number>>({});
@@ -197,8 +203,8 @@ function MembershipPanel({ session, onCreated }: { session: Session; onCreated: 
       onCreated({
         link: d.link, message: d.message, title: d.title || pkg.name,
         extra: `Membership ${days} hari · ${pkg.max_devices} device · Sandi: ${d.password}`,
+        kind: 'membership', targetId: pkg.id, targetTitle: pkg.name,
       });
-      toast({ title: 'Link membership dibuat & disalin', description: `${days} hari, ${pkg.max_devices} device` });
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'gagal';
       toast({ title: 'Gagal membuat link', description: msg, variant: 'destructive' });
@@ -220,12 +226,16 @@ function MembershipPanel({ session, onCreated }: { session: Session; onCreated: 
         <p className="text-sm text-muted-foreground italic">Belum ada paket membership.</p>
       ) : pkgs.map((p) => {
         const days = daysMap[p.id] ?? 30;
+        const count = statsMap.get(`membership:${p.id}`) ?? 0;
         return (
           <div key={p.id} className="border border-border rounded-xl bg-card p-3 space-y-2">
             <div className="flex items-start gap-2">
               <Crown className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
               <div className="flex-1 min-w-0">
-                <p className="font-semibold text-sm">{p.name}</p>
+                <div className="flex items-start justify-between gap-2">
+                  <p className="font-semibold text-sm">{p.name}</p>
+                  {count > 0 && <Badge variant="secondary" className="text-[10px] shrink-0">{count}x salin</Badge>}
+                </div>
                 <p className="text-[11px] text-muted-foreground">
                   👤 {p.max_devices} device{p.includes_replays ? ' · 🎬 termasuk replay' : ''}
                 </p>
