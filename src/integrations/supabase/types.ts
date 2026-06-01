@@ -1849,6 +1849,10 @@ export type Database = {
           breakdown: Json
         }[]
       }
+      reseller_delete_token: {
+        Args: { _audit_id: string; _phone: string; _pin: string }
+        Returns: boolean
+      }
       reseller_get_active_bill: {
         Args: { _phone: string; _pin: string }
         Returns: {
