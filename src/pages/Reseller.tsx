@@ -17,12 +17,29 @@ type PackageRow = { id: string; name: string; description: string; replay_info: 
 const SESSION_KEY = 'reseller_session';
 
 function getSession(): Session | null {
-  try { const v = sessionStorage.getItem(SESSION_KEY); return v ? JSON.parse(v) : null; } catch { return null; }
+  // Cek localStorage (persistent across browser sessions) dulu, lalu sessionStorage (kompat lama)
+  try {
+    const v = localStorage.getItem(SESSION_KEY) || sessionStorage.getItem(SESSION_KEY);
+    return v ? JSON.parse(v) : null;
+  } catch { return null; }
 }
 function setSession(s: Session | null) {
-  if (s) sessionStorage.setItem(SESSION_KEY, JSON.stringify(s));
-  else sessionStorage.removeItem(SESSION_KEY);
+  try { sessionStorage.removeItem(SESSION_KEY); } catch { /* ignore */ }
+  if (s) localStorage.setItem(SESSION_KEY, JSON.stringify(s));
+  else localStorage.removeItem(SESSION_KEY);
 }
+
+// Catat aktivitas salin link reseller (server-side aggregate).
+async function logCopy(session: Session, kind: 'show' | 'replay' | 'membership', targetId: string, targetTitle: string) {
+  try {
+    await supabase.rpc('reseller_log_copy', {
+      _phone: session.phone, _pin: session.pin,
+      _kind: kind, _target_id: targetId, _target_title: targetTitle,
+    });
+  } catch { /* ignore — counter cuma tambahan UX */ }
+}
+
+type CopyStat = { kind: 'show' | 'replay' | 'membership'; target_id: string | null; target_title: string; copies: number; last_copied: string };
 
 function LoginCard({ onLogin }: { onLogin: (s: Session) => void }) {
   const [phone, setPhone] = useState('');
