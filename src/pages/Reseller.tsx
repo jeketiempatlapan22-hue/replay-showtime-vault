@@ -6,8 +6,12 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { toast } from '@/hooks/use-toast';
-import { Copy, LogOut, RefreshCw, Search, Loader2, Radio, Film, Link2, Crown, Wallet, QrCode } from 'lucide-react';
+import { Copy, LogOut, RefreshCw, Search, Loader2, Radio, Film, Link2, Crown, Wallet, QrCode, KeyRound, Ban, ShieldOff } from 'lucide-react';
 
 type Session = { phone: string; pin: string; label: string };
 type ShowRow = { id: string; title: string; show_date: string; show_time: string; image_url: string; category: string; is_live: boolean; is_active: boolean };
