@@ -158,8 +158,8 @@ export default function MembershipPackagesAdmin() {
       includes_replays: p.includes_replays,
       status: p.status,
       sort_order: p.sort_order,
-      fixed_starts_at: isoToLocalInput(p.fixed_starts_at),
-      fixed_expires_at: isoToLocalInput(p.fixed_expires_at),
+      fixed_starts_at: isoToDateInput(p.fixed_starts_at),
+      fixed_expires_at: isoToDateInput(p.fixed_expires_at),
     });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
