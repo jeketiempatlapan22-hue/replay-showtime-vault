@@ -1863,6 +1863,20 @@ export type Database = {
           status: string
         }[]
       }
+      reseller_list_membership_packages: {
+        Args: { _phone: string; _pin: string }
+        Returns: {
+          description: string
+          duration_days: number
+          id: string
+          includes_replays: boolean
+          max_devices: number
+          name: string
+          paused: boolean
+          replay_info: string
+          status: string
+        }[]
+      }
       reseller_list_replays: {
         Args: {
           _limit: number
