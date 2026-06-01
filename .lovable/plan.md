@@ -1,82 +1,88 @@
-# Penyempurnaan Reseller: TTL, Audit, Membership
+# Sistem Tagihan Reseller (per-Link)
 
-## 1. TTL link reseller (otomatis expired)
-- **Show** → `expires_at = (show_date + show_time)::timestamptz + interval '8 hours'` (akhir window jadwal show, sama seperti window auto-schedule live yang sudah ada).
-- **Replay** → `expires_at = now() + interval '1 year'`.
-- **Membership** → `expires_at = now() + interval '{days} days'` (2–40).
+## Ringkasan
+- Tombol **Reset** & **Hapus semua** hanya untuk admin (di Reseller panel dihapus).
+- Admin set **harga per link** untuk tiap Show (default + override per show).
+- Tagihan reseller dihitung otomatis: `jumlah_salin × harga_per_link`.
+- Reseller bisa **bayar via QRIS dinamis**. Setelah lunas → log salin reseller itu **terhapus otomatis**.
+- Admin dapat **override jumlah tagihan** per reseller (mis. 20k → 10k) sebelum/saat order aktif.
 
-Penegakan:
-- Show: `unlock-live` **sudah** memvalidasi `expires_at` & `wrong_show` (line 134–137). **Tidak ada perubahan pada halaman Live atau player.** Cukup mengisi kolom saat token dibuat.
-- Replay: tambah cek `expires_at` di `get-replay-source` saat verifikasi `replay_personal_tokens`.
-- Membership: sudah ada via `expires_at` di `membership_tokens` (alur existing menolak token expired).
+---
 
-Migrasi DB:
-- `ALTER TABLE replay_personal_tokens ADD COLUMN expires_at timestamptz` (nullable; lama = abadi, baru = +1 tahun).
+## 1. Reseller Panel (`src/pages/Reseller.tsx`)
+- Hapus akses tombol reset / hapus log (reseller hanya melihat, tidak menghapus).
+- Tambah panel **Tagihan Saya**:
+  - Tampilkan rincian: Show A — 10 link × Rp2.000 = Rp20.000
+  - Total tagihan + tombol **Bayar QRIS**.
+  - Saat klik bayar → buat order via edge function `reseller-create-bill` (Pakasir), tampilkan QR code & countdown.
+  - Polling status (re-use pola `check-pakasir-status`).
+  - Jika lunas → toast sukses, log lokal & server dibersihkan, panel tagihan kosong.
 
-## 2. Scope per-show (sudah aman)
-`unlock-live` line 134: `if (t.show_id !== resolvedShowId) → wrong_show`. Token show A **tidak bisa** dipakai untuk show B. Tidak ada perubahan diperlukan. Plan ini hanya mencatat sebagai verifikasi.
+## 2. Admin Panel
+### a. `ResellerAuditAdmin.tsx`
+- Tampilkan kolom **Harga/link** & **Subtotal** untuk tiap baris show.
+- Tombol Reset / Hapus semua tetap (admin-only — sudah aman via RLS).
+- Untuk tiap reseller: tampilkan **Total tagihan**, status order aktif (jika ada), tombol **Override harga** (input manual Rp).
 
-## 3. Reseller buat link Membership (2–40 hari)
-UI tab baru **"Membership"** di `src/pages/Reseller.tsx`:
-- List paket dari `membership_packages` (nama, max_devices, includes_replays, replay_info).
-- Input **Durasi (hari)** per kartu (default 30, validasi client 2–40).
-- Tombol **"Buat & Salin Link Membership"** → hit edge function → copy pesan WA → dialog ringkasan.
+### b. `MembershipAdmin.tsx` / komponen pricing baru `ResellerPricingAdmin.tsx`
+- Set **harga default per link** (site_settings key `reseller_price_per_link`).
+- Per-show override (tabel baru `reseller_show_prices`).
+- List semua show + input harga.
 
-Edge function baru `supabase/functions/reseller-create-membership/index.ts`:
-- Verifikasi `phone+pin` via `reseller_verify`.
-- Validasi `package_id` ada; `days` integer 2..40.
-- Generate token 12 char + password 8 char (pola sama `finalize_membership_order`).
-- Insert `membership_tokens`:
-  - `token`, `password`, `phone` (reseller), `label='reseller:'+phone+' / '+pkg.name`,
-  - `duration_days=days`, `starts_at=now()`, `expires_at=now()+days*1day`,
-  - `max_devices=pkg.max_devices`, `includes_replays=pkg.includes_replays`,
-  - `replay_info=pkg.replay_info`, `package_id=pkg.id`, `created_by='reseller:'+phone`.
-- **Tidak** menyentuh `membership_orders` / `quota_reserved`.
-- Render pesan WA (re-use format dari `send-membership-token-wa`): nama paket, token, sandi, max_devices, durasi, expired (format Indonesia), `replay_info` dari paket, link site.
-- Insert audit log (lihat §4).
-- Output: `{ ok, token, password, expires_at, message }`.
+## 3. Database (migrasi)
+```sql
+-- harga per-show (override)
+CREATE TABLE public.reseller_show_prices (
+  show_id uuid PRIMARY KEY,
+  price_per_link integer NOT NULL DEFAULT 0,
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+-- + GRANT + RLS admin-only + SELECT untuk semua (untuk reseller lihat tagihan)
 
-## 4. Halaman Audit Reseller (Admin)
-Migrasi tabel baru `reseller_audit_log`:
+-- order tagihan reseller
+CREATE TABLE public.reseller_bills (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  reseller_phone text NOT NULL,
+  amount integer NOT NULL,                   -- bisa di-override admin
+  computed_amount integer NOT NULL,          -- hasil hitung otomatis
+  status text NOT NULL DEFAULT 'pending',    -- pending|paid|expired|cancelled
+  pakasir_order_id text,
+  pakasir_qr_url text DEFAULT '',
+  breakdown jsonb NOT NULL DEFAULT '[]',     -- snapshot {show_id,title,qty,price}
+  created_at timestamptz NOT NULL DEFAULT now(),
+  paid_at timestamptz,
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+-- + GRANT + RLS admin-only
 ```
-id uuid pk default gen_random_uuid(),
-created_at timestamptz default now(),
-reseller_phone text not null,
-reseller_label text default '',
-kind text not null check (kind in ('show','replay','membership')),
-target_id uuid,
-target_title text default '',
-token text default '',
-expires_at timestamptz,
-duration_days int,
-meta jsonb default '{}'::jsonb
+
+### RPC baru
+- `reseller_compute_bill(_phone, _pin)` → return breakdown + total (harga per-show, fallback ke default).
+- `reseller_create_bill(_phone, _pin)` → buat row `reseller_bills` status pending, return id + amount + breakdown.
+- `reseller_get_active_bill(_phone, _pin)` → ambil bill pending terbaru.
+- `admin_override_reseller_bill(_bill_id, _amount)` → ubah `amount`.
+- `mark_reseller_bill_paid(_bill_id)` (SECURITY DEFINER, dipanggil edge function) → set paid, hapus `reseller_copy_log` untuk phone tsb.
+- `admin_set_show_price(_show_id, _price)` & default via `site_settings`.
+
+## 4. Edge Functions
+- **`reseller-create-bill`**: validasi phone+pin → panggil `reseller_create_bill` → buat invoice Pakasir → simpan `pakasir_order_id` & `pakasir_qr_url`.
+- **`reseller-check-bill`**: cek status Pakasir; jika `completed` → `mark_reseller_bill_paid` (hapus log salin reseller).
+- Re-use webhook pakasir yang ada bila perlu, atau polling dari frontend.
+
+## 5. Flow
 ```
-GRANT: `service_role` ALL; `authenticated` SELECT; tanpa anon. RLS: `has_role(auth.uid(),'admin')` untuk SELECT (insert via service role).
+Reseller salin link → reseller_copy_log bertambah
+Reseller buka tab Tagihan → compute_bill → tampilkan rincian + total
+Klik Bayar → create_bill (QRIS dinamis Pakasir)
+Bayar → webhook/polling → mark_paid → DELETE FROM reseller_copy_log WHERE phone=...
+Panel reseller refresh → tagihan 0, log bersih
+```
 
-Edge functions `reseller-create-token` & `reseller-create-membership` insert satu baris audit setelah berhasil membuat token.
+## 6. Admin override harga
+- Di kartu reseller (admin panel): tombol "Ubah tagihan" → dialog input Rp baru → `admin_override_reseller_bill`.
+- Jika belum ada bill pending, admin bisa buatkan manual juga.
 
-UI Admin — tab baru **"Audit Reseller"** di `src/pages/Admin.tsx`. Komponen baru `src/components/admin/ResellerAuditAdmin.tsx`:
-- Filter: search nomor/label reseller, dropdown jenis (Semua/Show/Replay/Membership), Refresh.
-- List card/baris: waktu, +nomor (label), badge jenis, judul target, durasi (membership), expired, token (mask + tombol salin).
-- Default 200 terakhir, sort `created_at DESC`. Paging client-side.
-
-## 5. Update `reseller-create-token`
-- Saat `kind='show'`: ambil `show_date,show_time` lalu set `expires_at = (date+time) + 8h`.
-- Saat `kind='replay'`: set `expires_at = now()+1 year`.
-- Insert kolom `expires_at` ke row token.
-- Pesan WA tambah baris "⏳ Berlaku sampai: {tanggal/jam Indonesia}".
-- Insert audit log.
-
-## File yang dibuat/diubah
-- Migrasi: `replay_personal_tokens.expires_at` + tabel `reseller_audit_log` (+ GRANT + RLS).
-- `supabase/functions/reseller-create-token/index.ts` — set `expires_at` + audit log + baris expired di pesan WA.
-- `supabase/functions/reseller-create-membership/index.ts` — **baru**.
-- `supabase/functions/get-replay-source/index.ts` — tambah cek `expires_at` (select kolomnya, tolak jika lewat).
-- `src/pages/Reseller.tsx` — tab Membership + label TTL di tombol.
-- `src/pages/Admin.tsx` — daftar tab "Audit Reseller".
-- `src/components/admin/ResellerAuditAdmin.tsx` — **baru**.
-
-## Yang TIDAK diubah (sesuai instruksi)
-- `src/pages/Live.tsx` dan seluruh komponen player (HlsPlayer, EmbedPlayer, YouTubePlayer).
-- `supabase/functions/unlock-live/index.ts` — tidak diubah (sudah memvalidasi expires_at & wrong_show).
-- Aturan/kuota paket membership user reguler (`membership_orders`, `reserve_membership_slot`).
+## Catatan
+- Tidak menyentuh halaman Live, player, atau playlist.
+- Pakasir secrets sudah tersedia (`PAKASIR_API_KEY`, `PAKASIR_PROJECT_SLUG`).
+- Setelah migrasi disetujui, kode frontend & edge function akan dibuat.
