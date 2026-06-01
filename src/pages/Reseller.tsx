@@ -603,6 +603,10 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
               }}
             />
           </TabsContent>
+
+          <TabsContent value="billing">
+            <BillingPanel session={session} />
+          </TabsContent>
         </Tabs>
       </main>
 
