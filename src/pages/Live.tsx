@@ -373,19 +373,20 @@ export default function Live() {
       })
       .subscribe();
 
-    // Lightweight token revalidation: poll every 60s instead of subscribing to entire token tables.
+    // Token revalidation: 5 minutes is plenty — realtime channel already kicks revoked/blocked users instantly.
+    // Lower frequency dramatically reduces edge-function load at 1000+ concurrent viewers.
     const revalidate = window.setInterval(() => {
       if (document.visibilityState !== 'visible') return;
       if (tParam) void doUnlock({ token: tParam }, true);
       else if (mtParam) void doUnlock({ mtoken: mtParam, mpassword: search.get('mp') || search.get('mpassword') || '' }, true);
-    }, 120000);
+    }, 300000);
 
-    // Polling fallback agar perubahan admin (mis. mengisi IDN Show ID) cepat terdeteksi
-    // tanpa harus menunggu event realtime atau reload manual.
+    // Status fallback: realtime UPDATE channel already covers admin changes instantly.
+    // Polling kept as a slow safety net (3 minutes) for users with flaky websockets.
     const statusPoll = window.setInterval(() => {
       if (document.visibilityState !== 'visible') return;
       void fetchStatus();
-    }, 30000);
+    }, 180000);
 
     return () => {
       window.clearInterval(revalidate);
