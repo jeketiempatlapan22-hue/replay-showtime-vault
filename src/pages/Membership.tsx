@@ -305,7 +305,7 @@ export default function Membership() {
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle>Konfirmasi Pembelian</DialogTitle>
-            <DialogDescription className="text-xs">{picked?.name} · {picked?.duration_days} hari</DialogDescription>
+            <DialogDescription className="text-xs">{picked?.name} · {picked ? pkgPeriodLabel(picked) : ''}</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1">
