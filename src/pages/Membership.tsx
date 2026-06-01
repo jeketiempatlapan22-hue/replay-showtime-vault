@@ -249,7 +249,7 @@ export default function Membership() {
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
                         <div className="font-bold text-base leading-tight">{p.name}</div>
-                        <div className="text-xs text-muted-foreground">Aktif {p.duration_days} hari · {p.max_devices} perangkat</div>
+                        <div className="text-xs text-muted-foreground">{pkgPeriodLabel(p)} · {p.max_devices} perangkat</div>
                       </div>
                       {closed ? (
                         <Badge variant="secondary" className="shrink-0">DITUTUP</Badge>
