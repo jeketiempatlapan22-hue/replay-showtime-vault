@@ -243,6 +243,19 @@ export default function MembershipPackagesAdmin() {
               {form.status === 'open' ? 'Dibuka' : 'Ditutup'}
             </label>
           </div>
+          <div className="sm:col-span-2 grid sm:grid-cols-2 gap-3 border-t border-border pt-3">
+            <div className="sm:col-span-2 text-[11px] text-muted-foreground">
+              <strong>Periode tetap (opsional)</strong> — isi tanggal mulai & berakhir agar semua user yang membeli paket ini punya masa aktif yang sama. Kosongkan untuk pakai durasi hari di atas.
+            </div>
+            <div>
+              <Label className="text-xs">Mulai berlaku</Label>
+              <Input type="datetime-local" value={form.fixed_starts_at} onChange={(e) => setForm({ ...form, fixed_starts_at: e.target.value })} />
+            </div>
+            <div>
+              <Label className="text-xs">Berakhir</Label>
+              <Input type="datetime-local" value={form.fixed_expires_at} onChange={(e) => setForm({ ...form, fixed_expires_at: e.target.value })} />
+            </div>
+          </div>
           <div className="sm:col-span-2">
             <Label className="text-xs">Deskripsi Keuntungan (terlihat di kartu paket publik)</Label>
             <Textarea
