@@ -4,6 +4,8 @@ import { ArrowLeft, Plus, Trash2, Edit2, Key, Save, Palette, MessageCircle, LogO
 import BotAdmin from '@/components/admin/BotAdmin';
 import TokenHistoryAdmin from '@/components/admin/TokenHistoryAdmin';
 import ResellerAuditAdmin from '@/components/admin/ResellerAuditAdmin';
+import ResellerBillingAdmin from '@/components/admin/ResellerBillingAdmin';
+import ResellerPricingAdmin from '@/components/admin/ResellerPricingAdmin';
 import MembershipAdmin from '@/components/admin/MembershipAdmin';
 import MembershipPackagesAdmin from '@/components/admin/MembershipPackagesAdmin';
 import PakasirAdmin from '@/components/admin/PakasirAdmin';
