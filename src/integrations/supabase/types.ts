@@ -1501,6 +1501,10 @@ export type Database = {
         Args: { _phone?: string }
         Returns: number
       }
+      admin_exhaust_reseller_tokens: {
+        Args: { _phone: string }
+        Returns: number
+      }
       admin_get_active_show: {
         Args: { _id: string }
         Returns: {
@@ -1677,6 +1681,10 @@ export type Database = {
           target_title: string
         }[]
       }
+      admin_revoke_reseller_token: {
+        Args: { _audit_id: string }
+        Returns: boolean
+      }
       check_login_lock: {
         Args: { _identifier: string }
         Returns: {
@@ -1807,6 +1815,10 @@ export type Database = {
         Args: { _order_id: string; _reason: string }
         Returns: boolean
       }
+      reseller_block_token: {
+        Args: { _audit_id: string; _phone: string; _pin: string }
+        Returns: number
+      }
       reseller_compute_bill: {
         Args: { _phone: string; _pin: string }
         Returns: {
@@ -1880,6 +1892,26 @@ export type Database = {
           title: string
         }[]
       }
+      reseller_list_tokens: {
+        Args: {
+          _limit?: number
+          _offset?: number
+          _phone: string
+          _pin: string
+          _q?: string
+        }
+        Returns: {
+          audit_id: string
+          created_at: string
+          device_count: number
+          expires_at: string
+          kind: string
+          revoked: boolean
+          target_id: string
+          target_title: string
+          token: string
+        }[]
+      }
       reseller_log_copy: {
         Args: {
           _kind: string
@@ -1897,6 +1929,10 @@ export type Database = {
           ok: boolean
           phone: string
         }[]
+      }
+      reseller_revoke_token: {
+        Args: { _audit_id: string; _phone: string; _pin: string }
+        Returns: boolean
       }
       reseller_verify: {
         Args: { _phone: string; _pin: string }
