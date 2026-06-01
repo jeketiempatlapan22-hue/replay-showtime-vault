@@ -1,0 +1,1 @@
+GRANT SELECT ON public.membership_packages TO anon;
