@@ -1,9 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ClipboardList, RefreshCw, Search, Trash2 } from 'lucide-react';
+import { ClipboardList, RefreshCw, Search, Trash2, ShieldOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
@@ -17,6 +21,10 @@ type StatRow = {
   last_copied: string;
 };
 
+type PendingAction =
+  | { type: 'reset'; phone?: string; label?: string }
+  | { type: 'exhaust'; phone: string; label?: string };
+
 const kindBadge: Record<string, { label: string; cls: string }> = {
   show: { label: '📺 Show', cls: 'bg-red-500/15 text-red-500 border-red-500/30' },
   replay: { label: '🎬 Replay', cls: 'bg-blue-500/15 text-blue-500 border-blue-500/30' },
@@ -27,6 +35,8 @@ export default function ResellerAuditAdmin() {
   const [rows, setRows] = useState<StatRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [q, setQ] = useState('');
+  const [pending, setPending] = useState<PendingAction | null>(null);
+  const [busy, setBusy] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -54,79 +64,131 @@ export default function ResellerAuditAdmin() {
     return Array.from(map.values()).sort((a, b) => b.total - a.total);
   }, [rows, q]);
 
-  const reset = async (phone?: string) => {
-    const label = phone ? `untuk +${phone}` : 'SELURUH reseller';
-    if (!confirm(`Hapus semua riwayat salin link ${label}? Tindakan tidak bisa dibatalkan.`)) return;
-    const { data, error } = await supabase.rpc('admin_clear_reseller_copy_log', { _phone: phone ?? null });
-    if (error) { toast({ title: 'Gagal menghapus', description: error.message, variant: 'destructive' }); return; }
-    toast({ title: `Terhapus ${data ?? 0} catatan` });
-    await load();
+  const confirmAction = async () => {
+    if (!pending || busy) return;
+    setBusy(true);
+    try {
+      if (pending.type === 'reset') {
+        const { data, error } = await supabase.rpc('admin_clear_reseller_copy_log', { _phone: pending.phone ?? null });
+        if (error) throw error;
+        toast({ title: `Terhapus ${data ?? 0} catatan` });
+      } else {
+        const { data, error } = await supabase.rpc('admin_exhaust_reseller_tokens', { _phone: pending.phone });
+        if (error) throw error;
+        toast({ title: `${data ?? 0} token reseller dihabiskan (revoked)` });
+      }
+      setPending(null);
+      await load();
+    } catch (err: any) {
+      toast({ title: 'Gagal', description: err?.message || 'gagal', variant: 'destructive' });
+    } finally {
+      setBusy(false);
+    }
   };
 
   const fmtDate = (s: string) =>
     new Date(s).toLocaleString('id-ID', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
 
-  return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between gap-2">
-        <CardTitle className="text-base sm:text-lg flex items-center gap-2">
-          <ClipboardList className="w-4 h-4" /> Riwayat Salin Link Reseller
-        </CardTitle>
-        <div className="flex gap-1">
-          <Button size="sm" variant="outline" onClick={load} disabled={loading}>
-            <RefreshCw className={`w-4 h-4 mr-1 ${loading ? 'animate-spin' : ''}`} />Muat ulang
-          </Button>
-          <Button size="sm" variant="destructive" onClick={() => reset()} disabled={loading || rows.length === 0}>
-            <Trash2 className="w-4 h-4 mr-1" />Hapus semua
-          </Button>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <div className="relative">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <Input placeholder="Cari nomor / label / judul…" className="pl-9" value={q} onChange={(e) => setQ(e.target.value)} />
-        </div>
+  const target = pending
+    ? (pending.type === 'reset'
+        ? (pending.phone ? `riwayat salin link +${pending.phone}` : 'SELURUH riwayat salin link reseller')
+        : `SEMUA link token aktif +${pending.phone} (link akan tidak bisa dipakai lagi)`)
+    : '';
 
-        {loading ? (
-          <p className="text-center text-muted-foreground py-8 text-sm">Memuat…</p>
-        ) : grouped.length === 0 ? (
-          <p className="text-center text-muted-foreground py-8 text-sm">Belum ada aktivitas salin link.</p>
-        ) : (
-          <div className="space-y-3">
-            {grouped.map((g) => (
-              <div key={g.phone} className="border border-border rounded-lg bg-card/50 overflow-hidden">
-                <div className="flex items-center justify-between gap-2 p-3 bg-secondary/30 border-b border-border flex-wrap">
-                  <div className="flex items-center gap-2 flex-wrap min-w-0">
-                    <span className="font-mono text-sm font-semibold">+{g.phone}</span>
-                    {g.label && <span className="text-xs text-muted-foreground">({g.label})</span>}
-                    <Badge variant="secondary" className="text-[10px]">{g.total} link total</Badge>
-                  </div>
-                  <Button size="sm" variant="ghost" className="h-7 text-destructive hover:text-destructive" onClick={() => reset(g.phone)}>
-                    <Trash2 className="w-3.5 h-3.5 mr-1" />Reset
-                  </Button>
-                </div>
-                <div className="p-2 space-y-1">
-                  {g.items.map((it, i) => {
-                    const kb = kindBadge[it.kind];
-                    return (
-                      <div key={`${it.kind}-${it.target_id}-${i}`} className="flex items-center justify-between gap-2 px-2 py-1.5 rounded hover:bg-secondary/40">
-                        <div className="flex items-center gap-2 min-w-0 flex-1">
-                          <Badge variant="outline" className={`text-[10px] shrink-0 ${kb.cls}`}>{kb.label}</Badge>
-                          <span className="text-sm truncate">{it.target_title || '—'}</span>
-                        </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          <span className="text-[10px] text-muted-foreground">{fmtDate(it.last_copied)}</span>
-                          <Badge className="text-[11px] font-semibold">{it.copies} link</Badge>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
+  return (
+    <>
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between gap-2">
+          <CardTitle className="text-base sm:text-lg flex items-center gap-2">
+            <ClipboardList className="w-4 h-4" /> Riwayat Salin Link Reseller
+          </CardTitle>
+          <div className="flex gap-1">
+            <Button size="sm" variant="outline" onClick={load} disabled={loading}>
+              <RefreshCw className={`w-4 h-4 mr-1 ${loading ? 'animate-spin' : ''}`} />Muat ulang
+            </Button>
+            <Button size="sm" variant="destructive" onClick={() => setPending({ type: 'reset' })} disabled={loading || rows.length === 0}>
+              <Trash2 className="w-4 h-4 mr-1" />Hapus semua
+            </Button>
           </div>
-        )}
-      </CardContent>
-    </Card>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="relative">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Input placeholder="Cari nomor / label / judul…" className="pl-9" value={q} onChange={(e) => setQ(e.target.value)} />
+          </div>
+
+          {loading ? (
+            <p className="text-center text-muted-foreground py-8 text-sm">Memuat…</p>
+          ) : grouped.length === 0 ? (
+            <p className="text-center text-muted-foreground py-8 text-sm">Belum ada aktivitas salin link.</p>
+          ) : (
+            <div className="space-y-3">
+              {grouped.map((g) => (
+                <div key={g.phone} className="border border-border rounded-lg bg-card/50 overflow-hidden">
+                  <div className="flex items-center justify-between gap-2 p-3 bg-secondary/30 border-b border-border flex-wrap">
+                    <div className="flex items-center gap-2 flex-wrap min-w-0">
+                      <span className="font-mono text-sm font-semibold">+{g.phone}</span>
+                      {g.label && <span className="text-xs text-muted-foreground">({g.label})</span>}
+                      <Badge variant="secondary" className="text-[10px]">{g.total} link total</Badge>
+                    </div>
+                    <div className="flex gap-1">
+                      <Button size="sm" variant="ghost" className="h-7 text-amber-600 hover:text-amber-600"
+                        onClick={() => setPending({ type: 'exhaust', phone: g.phone, label: g.label })}>
+                        <ShieldOff className="w-3.5 h-3.5 mr-1" />Habiskan link
+                      </Button>
+                      <Button size="sm" variant="ghost" className="h-7 text-destructive hover:text-destructive"
+                        onClick={() => setPending({ type: 'reset', phone: g.phone, label: g.label })}>
+                        <Trash2 className="w-3.5 h-3.5 mr-1" />Reset
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="p-2 space-y-1">
+                    {g.items.map((it, i) => {
+                      const kb = kindBadge[it.kind];
+                      return (
+                        <div key={`${it.kind}-${it.target_id}-${i}`} className="flex items-center justify-between gap-2 px-2 py-1.5 rounded hover:bg-secondary/40">
+                          <div className="flex items-center gap-2 min-w-0 flex-1">
+                            <Badge variant="outline" className={`text-[10px] shrink-0 ${kb.cls}`}>{kb.label}</Badge>
+                            <span className="text-sm truncate">{it.target_title || '—'}</span>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className="text-[10px] text-muted-foreground">{fmtDate(it.last_copied)}</span>
+                            <Badge className="text-[11px] font-semibold">{it.copies} link</Badge>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <AlertDialog open={!!pending} onOpenChange={(v) => { if (!v && !busy) setPending(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {pending?.type === 'exhaust' ? 'Habiskan link token reseller?' : 'Konfirmasi hapus riwayat'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Anda akan {pending?.type === 'exhaust' ? 'menghabiskan (revoke)' : 'menghapus'} {target}.
+              Tindakan ini <strong>tidak bisa dibatalkan</strong>.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busy}>Batal</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); void confirmAction(); }}
+              disabled={busy}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {busy ? 'Memproses…' : 'Ya, lanjutkan'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
