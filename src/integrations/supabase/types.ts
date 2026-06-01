@@ -1279,6 +1279,36 @@ export type Database = {
         }
         Relationships: []
       }
+      reseller_copy_log: {
+        Row: {
+          created_at: string
+          id: string
+          kind: string
+          reseller_label: string
+          reseller_phone: string
+          target_id: string | null
+          target_title: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          kind: string
+          reseller_label?: string
+          reseller_phone: string
+          target_id?: string | null
+          target_title?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          kind?: string
+          reseller_label?: string
+          reseller_phone?: string
+          target_id?: string | null
+          target_title?: string
+        }
+        Relationships: []
+      }
       site_settings: {
         Row: {
           id: string
@@ -1404,6 +1434,10 @@ export type Database = {
     }
     Functions: {
       admin_clear_live_messages: { Args: never; Returns: number }
+      admin_clear_reseller_copy_log: {
+        Args: { _phone?: string }
+        Returns: number
+      }
       admin_get_active_show: {
         Args: { _id: string }
         Returns: {
@@ -1552,6 +1586,18 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      admin_reseller_copy_stats: {
+        Args: never
+        Returns: {
+          copies: number
+          kind: string
+          last_copied: string
+          reseller_label: string
+          reseller_phone: string
+          target_id: string
+          target_title: string
+        }[]
+      }
       check_login_lock: {
         Args: { _identifier: string }
         Returns: {
@@ -1678,6 +1724,16 @@ export type Database = {
         Args: { _order_id: string; _reason: string }
         Returns: boolean
       }
+      reseller_copy_stats: {
+        Args: { _phone: string; _pin: string }
+        Returns: {
+          copies: number
+          kind: string
+          last_copied: string
+          target_id: string
+          target_title: string
+        }[]
+      }
       reseller_list_replays: {
         Args: {
           _limit: number
@@ -1706,6 +1762,16 @@ export type Database = {
           show_time: string
           title: string
         }[]
+      }
+      reseller_log_copy: {
+        Args: {
+          _kind: string
+          _phone: string
+          _pin: string
+          _target_id: string
+          _target_title: string
+        }
+        Returns: undefined
       }
       reseller_login: {
         Args: { _phone: string; _pin: string }
