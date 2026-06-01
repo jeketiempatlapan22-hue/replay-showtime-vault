@@ -120,6 +120,8 @@ export default function MembershipPackagesAdmin() {
       includes_replays: form.includes_replays,
       status: form.status,
       sort_order: Number(form.sort_order) || 0,
+      fixed_starts_at: localInputToIso(form.fixed_starts_at),
+      fixed_expires_at: localInputToIso(form.fixed_expires_at),
     };
     const { error } = form.id
       ? await supabase.from('membership_packages').update(payload).eq('id', form.id)
