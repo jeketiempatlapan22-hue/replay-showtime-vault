@@ -11,8 +11,8 @@ import { toast } from '@/hooks/use-toast';
 
 interface ParsedShow {
   title: string;
-  show_date: string; // YYYY-MM-DD
-  show_time: string; // HH:MM:SS
+  show_date: string;
+  show_time: string;
   lineup: string[];
   admin_alias: string;
   live_password: string;
@@ -21,6 +21,8 @@ interface ParsedShow {
   price_show_coins: number;
   price_replay_coins: number;
   category: string;
+  idn_show_id: string;
+  description: string;
 }
 
 const MONTHS_ID: Record<string, string> = {
@@ -30,8 +32,13 @@ const MONTHS_ID: Record<string, string> = {
   sep: '09', okt: '10', nov: '11', des: '12',
 };
 
+// Strip emoji / pictographs / variation selectors / ZWJ.
+const EMOJI_RE = /[\u{1F1E6}-\u{1F1FF}\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{2300}-\u{23FF}\u{2B00}-\u{2BFF}\u{FE0F}\u{200D}]/gu;
+function stripEmoji(s: string): string {
+  return s.replace(EMOJI_RE, '').replace(/\s{2,}/g, ' ').trim();
+}
+
 function parseDate(line: string): string {
-  // e.g. "Kamis, 14 Mei 2026" or "14 Mei 2026"
   const m = line.match(/(\d{1,2})\s+([A-Za-zÀ-ÿ]+)\s+(\d{4})/);
   if (!m) return '';
   const day = m[1].padStart(2, '0');
@@ -47,53 +54,122 @@ function parseTime(line: string): string {
   return `${m[1].padStart(2, '0')}:${m[2]}:00`;
 }
 
+function parseIdnCode(line: string): string {
+  const m = line.match(/[?&]code=([A-Za-z0-9_-]+)/i);
+  return m ? m[1] : '';
+}
+
 function slugAlias(title: string, date: string, time: string): string {
   const base = title.toLowerCase().replace(/[^a-z0-9]+/g, '').slice(0, 6);
-  const d = date.replace(/-/g, '').slice(4); // MMDD
-  const t = time.replace(/[:.]/g, '').slice(0, 4); // HHMM
+  const d = date.replace(/-/g, '').slice(4);
+  const t = time.replace(/[:.]/g, '').slice(0, 4);
   return `${base}${d}${t}`.slice(0, 20);
 }
 
+const STATUS_PATTERNS: { re: RegExp; label: string }[] = [
+  { re: /\b(sts|setengah\s*tahun)\b/i, label: 'STS' },
+  { re: /\b(ultah|ulang\s*tahun|birthday|bday)\b/i, label: 'Ulang Tahun' },
+  { re: /\b(graduation|kelulusan|grad)\b/i, label: 'Graduation' },
+  { re: /\b(last\s*show|show\s*terakhir|farewell)\b/i, label: 'Last Show' },
+];
+
+function extractStatuses(raw: string): { name: string; statuses: string[] } {
+  let name = raw;
+  const statuses: string[] = [];
+  for (const { re, label } of STATUS_PATTERNS) {
+    if (re.test(name)) {
+      if (!statuses.includes(label)) statuses.push(label);
+      name = name.replace(re, '');
+    }
+  }
+  name = name.replace(/[()\[\]{}]/g, ' ').replace(/\s{2,}/g, ' ').trim();
+  return { name, statuses };
+}
+
+function isTitleLine(line: string): boolean {
+  // Wrapped in backticks, or non-empty line that isn't a date/time/lineup/detail marker
+  if (/^`.*`?$/.test(line)) return true;
+  if (/🗓️|🕒|🕗|👥|📢|code=|^\d{1,2}[.:]\d{2}/i.test(line)) return false;
+  if (/^[A-Za-z]+,?\s*\d{1,2}\s+[A-Za-z]+\s+\d{4}/.test(line)) return false;
+  return line.length > 0;
+}
+
 function parseBulkText(text: string): ParsedShow[] {
-  // Split into "blocks" separated by lines containing 🗓️/Date marker.
-  // Strategy: walk lines; each show block = title line, then 🗓️ date, then 🕒 time, then 👥 lineup.
   const lines = text.split(/\r?\n/).map(l => l.trim());
   const shows: ParsedShow[] = [];
   let i = 0;
   while (i < lines.length) {
-    const line = lines[i];
-    if (!line) { i++; continue; }
-    // Skip lead-in narration
-    if (/^berikut|^pertunjukan|^member yang/i.test(line)) { i++; continue; }
-    // Look ahead for date marker within next 6 lines
+    const raw = lines[i];
+    if (!raw) { i++; continue; }
+    if (/^berikut|^pertunjukan|^member yang/i.test(raw)) { i++; continue; }
+    if (!isTitleLine(raw)) { i++; continue; }
+
     let dateIdx = -1;
-    for (let j = i + 1; j < Math.min(lines.length, i + 8); j++) {
-      if (/🗓️|tanggal|^[A-Za-z]+,\s*\d{1,2}\s+[A-Za-z]+\s+\d{4}/i.test(lines[j])) { dateIdx = j; break; }
-      if (/🕒|🕗|^\d{1,2}[.:]\d{2}/i.test(lines[j])) break; // bad order
+    for (let j = i + 1; j < Math.min(lines.length, i + 10); j++) {
+      if (/🗓️|tanggal|^[A-Za-z]+,?\s*\d{1,2}\s+[A-Za-z]+\s+\d{4}/i.test(lines[j])) { dateIdx = j; break; }
     }
     if (dateIdx === -1) { i++; continue; }
-    const title = line.replace(/^[•\-*]\s*/, '').trim();
+
+    // Clean title: strip backticks, bullets, ALL emoji
+    let title = raw.replace(/^[`"'•\-*\s]+|[`"'\s]+$/g, '');
+    title = stripEmoji(title).trim();
     const date = parseDate(lines[dateIdx]);
     if (!date) { i++; continue; }
+
     let time = '19:00:00';
     let lineup: string[] = [];
+    const detectedStatuses: string[] = [];
+    let idn = '';
     let endIdx = dateIdx;
-    for (let j = dateIdx + 1; j < Math.min(lines.length, dateIdx + 6); j++) {
+
+    for (let j = dateIdx + 1; j < Math.min(lines.length, dateIdx + 12); j++) {
       const ln = lines[j];
       if (!ln) continue;
-      if (/🕒|🕗|^\d{1,2}[.:]\d{2}/.test(ln)) { time = parseTime(ln); endIdx = j; }
-      else if (/👥|^member|^lineup/i.test(ln) || /,/.test(ln)) {
-        const cleaned = ln.replace(/^👥\s*/, '').replace(/[.。]$/, '');
-        lineup = cleaned.split(/[,،]/).map(s => s.trim()).filter(Boolean);
+      // Start of next show
+      if (/^`/.test(ln) && lineup.length > 0) break;
+
+      if (/code=/i.test(ln)) {
+        idn = parseIdnCode(ln) || idn;
         endIdx = j;
-        break;
+        continue;
+      }
+      if (/🕒|🕗|^\d{1,2}[.:]\d{2}\b/i.test(ln) || /\b\d{1,2}[.:]\d{2}\s*(wib|wit|wita)\b/i.test(ln)) {
+        time = parseTime(ln);
+        endIdx = j;
+        continue;
+      }
+      if (/👥|^member|^lineup/i.test(ln) || (/,/.test(ln) && !/🗓️/.test(ln))) {
+        const cleaned = stripEmoji(
+          ln.replace(/^member[:\s]*/i, '').replace(/^lineup[:\s]*/i, '')
+        ).replace(/[.。]$/, '').replace(/^[:\s]+/, '');
+        const parts = cleaned.split(/[,،]/).map(s => s.trim()).filter(Boolean);
+        const names: string[] = [];
+        for (const p of parts) {
+          const { name, statuses } = extractStatuses(p);
+          if (name) names.push(name);
+          for (const s of statuses) {
+            const tagged = `${name || p}: ${s}`;
+            if (!detectedStatuses.includes(tagged)) detectedStatuses.push(tagged);
+          }
+        }
+        if (names.length > 0) lineup = names;
+        endIdx = j;
+        continue;
       }
     }
+
     shows.push({
-      title, show_date: date, show_time: time, lineup,
+      title,
+      show_date: date,
+      show_time: time,
+      lineup,
       admin_alias: slugAlias(title, date, time),
-      live_password: '', price_show: 0, price_replay: 0,
-      price_show_coins: 0, price_replay_coins: 0, category: 'reguler',
+      live_password: '',
+      price_show: 0, price_replay: 0,
+      price_show_coins: 0, price_replay_coins: 0,
+      category: 'reguler',
+      idn_show_id: idn,
+      description: detectedStatuses.join(' • '),
     });
     i = endIdx + 1;
   }
