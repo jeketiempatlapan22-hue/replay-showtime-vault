@@ -189,15 +189,30 @@ export default function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWa
           )}
 
           <div className="flex items-start gap-2 text-sm text-muted-foreground">
-            <Users className="w-4 h-4 text-primary mt-1.5 shrink-0" />
-            <div className="flex-1 min-w-0 overflow-x-auto scrollbar-thin -mx-1 px-1">
-              <div className="flex gap-2 w-max py-1">
+            <Users className="w-4 h-4 text-primary mt-1.5 shrink-0" aria-hidden="true" />
+            <div
+              role="region"
+              aria-label={`Line up ${replay.lineup.length} member, geser untuk melihat semua`}
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+                  e.preventDefault();
+                  e.currentTarget.scrollBy({ left: e.key === 'ArrowRight' ? 80 : -80, behavior: 'smooth' });
+                }
+              }}
+              className="flex-1 min-w-0 overflow-x-auto overscroll-x-contain scrollbar-thin -mx-1 px-1 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background snap-x snap-mandatory"
+              style={{ WebkitOverflowScrolling: 'touch' }}
+            >
+              <ul className="flex gap-2 w-max py-1 list-none m-0 p-0">
                 {replay.lineup.map((member, i) => (
-                  <MemberAvatar key={i} name={member} size={40} />
+                  <li key={i} className="snap-start">
+                    <MemberAvatar name={member} size={40} />
+                  </li>
                 ))}
-              </div>
+              </ul>
             </div>
           </div>
+
 
           {isPurchased ? (
             <div className="space-y-2 mt-2">
