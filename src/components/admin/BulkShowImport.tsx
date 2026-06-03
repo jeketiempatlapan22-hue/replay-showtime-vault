@@ -110,9 +110,11 @@ function parseBulkText(text: string): ParsedShow[] {
     }
     if (dateIdx === -1) { i++; continue; }
 
-    // Clean title: strip backticks, bullets, ALL emoji
-    let title = raw.replace(/^[`"'•\-*\s]+|[`"'\s]+$/g, '');
-    title = stripEmoji(title).trim();
+    // Clean title: strip backticks/bullets; remove emoji EXCEPT for whitelisted shows.
+    const rawTitle = raw.replace(/^[`"'•\-*\s]+|[`"'\s]+$/g, '');
+    const probe = stripEmoji(rawTitle).toLowerCase().replace(/\s+/g, '');
+    const keepEmoji = /itadaki.*love/.test(probe);
+    let title = keepEmoji ? rawTitle.trim() : stripEmoji(rawTitle).trim();
     const date = parseDate(lines[dateIdx]);
     if (!date) { i++; continue; }
 
