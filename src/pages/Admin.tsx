@@ -121,8 +121,8 @@ export default function Admin() {
 
   // Active shows state
   const [activeShows, setActiveShows] = useState<ActiveShow[]>([]);
-  const [showForm, setShowForm] = useState<{ id?: string; title: string; show_date: string; show_time: string; lineup: string; category: string; description: string; image_url: string; sort_order: number; is_active: boolean; price_show: number; price_replay: number; price_show_coins: number; price_replay_coins: number; pakasir_amount: number; replay_id: string; replay_enabled: boolean; admin_alias: string }>({
-    title: '', show_date: '', show_time: '19:00', lineup: '', category: 'reguler', description: '', image_url: '', sort_order: 0, is_active: true,
+  const [showForm, setShowForm] = useState<{ id?: string; title: string; show_date: string; show_time: string; lineup: string; category: string; description: string; image_url: string; sort_order: number; is_active: boolean; is_special: boolean; price_show: number; price_replay: number; price_show_coins: number; price_replay_coins: number; pakasir_amount: number; replay_id: string; replay_enabled: boolean; admin_alias: string }>({
+    title: '', show_date: '', show_time: '19:00', lineup: '', category: 'reguler', description: '', image_url: '', sort_order: 0, is_active: true, is_special: false,
     price_show: 0, price_replay: 0, price_show_coins: 0, price_replay_coins: 0, pakasir_amount: 0, replay_id: '', replay_enabled: false, admin_alias: '',
   });
   const [showEditing, setShowEditing] = useState(false);
