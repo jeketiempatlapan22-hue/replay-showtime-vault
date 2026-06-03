@@ -57,7 +57,7 @@ export default function Shows() {
         </div>
       </header>
 
-      <main className="container mx-auto px-3 sm:px-4 py-6">
+      <main className="container mx-auto px-3 sm:px-4 py-6 pb-28 sm:pb-10">
         <div className="text-center mb-8 space-y-2">
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/10 border border-primary/20 text-primary text-xs font-semibold">
             <Sparkles className="w-3.5 h-3.5" /> Pilih Show Anda
