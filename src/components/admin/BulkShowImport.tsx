@@ -110,9 +110,11 @@ function parseBulkText(text: string): ParsedShow[] {
     }
     if (dateIdx === -1) { i++; continue; }
 
-    // Clean title: strip backticks, bullets, ALL emoji
-    let title = raw.replace(/^[`"'•\-*\s]+|[`"'\s]+$/g, '');
-    title = stripEmoji(title).trim();
+    // Clean title: strip backticks/bullets; remove emoji EXCEPT for whitelisted shows.
+    const rawTitle = raw.replace(/^[`"'•\-*\s]+|[`"'\s]+$/g, '');
+    const probe = stripEmoji(rawTitle).toLowerCase().replace(/\s+/g, '');
+    const keepEmoji = /itadaki.*love/.test(probe);
+    let title = keepEmoji ? rawTitle.trim() : stripEmoji(rawTitle).trim();
     const date = parseDate(lines[dateIdx]);
     if (!date) { i++; continue; }
 
@@ -221,6 +223,15 @@ export default function BulkShowImport({ onImported }: Props) {
   const removeRow = (idx: number) => setParsed(prev => prev.filter((_, i) => i !== idx));
 
   const handleSave = async () => {
+    const missing = preview.filter(s => !s.live_password.trim());
+    if (missing.length > 0) {
+      toast({
+        title: 'Sandi Replay wajib diisi',
+        description: `${missing.length} show belum punya sandi. Isi "Sandi Default" atau per-baris.`,
+        variant: 'destructive',
+      });
+      return;
+    }
     setSaving(true);
     let ok = 0, fail = 0;
     for (const s of preview) {
