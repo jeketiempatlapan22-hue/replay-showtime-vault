@@ -350,6 +350,16 @@ export default function BulkShowImport({ onImported }: Props) {
                       <Input type="number" min={0} className="h-8 text-xs" value={s.price_replay_coins}
                         onChange={e => updateRow(idx, { price_replay_coins: Number(e.target.value) })} />
                     </div>
+                    <div>
+                      <Label className="text-[10px]">ID Hanabira (idn code)</Label>
+                      <Input className="h-8 text-xs" placeholder="SHC980" value={s.idn_show_id}
+                        onChange={e => updateRow(idx, { idn_show_id: e.target.value.trim() })} />
+                    </div>
+                    <div className="col-span-2">
+                      <Label className="text-[10px]">Catatan (STS / Ultah / Graduation / Last Show)</Label>
+                      <Input className="h-8 text-xs" value={s.description}
+                        onChange={e => updateRow(idx, { description: e.target.value })} />
+                    </div>
                   </div>
                   {s.lineup.length > 0 && (
                     <div className="flex flex-wrap gap-1 pt-1">
