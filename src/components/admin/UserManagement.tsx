@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { Search, Coins, Plus, Minus, KeyRound, RefreshCw, User as UserIcon, Mail, Phone } from 'lucide-react';
+import { Search, Coins, Plus, Minus, KeyRound, RefreshCw, User as UserIcon, Mail, Phone, Save } from 'lucide-react';
 
 interface UserRow {
   user_id: string;
@@ -15,13 +15,19 @@ interface UserRow {
   phone: string | null;
   username: string | null;
   balance: number;
+  created_at?: string;
+  last_sign_in_at?: string | null;
+  has_profile?: boolean;
 }
 
 export default function UserManagement() {
   const [search, setSearch] = useState('');
   const [users, setUsers] = useState<UserRow[]>([]);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [grant, setGrant] = useState<Record<string, { amount: string; reason: string }>>({});
+  const [edits, setEdits] = useState<Record<string, { username: string; phone: string }>>({});
+  const [savingId, setSavingId] = useState<string>('');
   const [pwUser, setPwUser] = useState<UserRow | null>(null);
   const [newPw, setNewPw] = useState('');
   const [pwSaving, setPwSaving] = useState(false);
@@ -29,18 +35,20 @@ export default function UserManagement() {
   const load = async () => {
     setLoading(true);
     try {
-      const q = search.trim();
-      let query = supabase.from('profiles').select('user_id,email,phone,username').limit(100);
-      if (q) query = query.or(`email.ilike.%${q}%,phone.ilike.%${q}%,username.ilike.%${q}%`);
-      else query = query.order('created_at', { ascending: false });
-      const { data: profs, error } = await query;
-      if (error) { toast.error(error.message); return; }
-      const ids = (profs || []).map((p: any) => p.user_id);
-      const { data: bals } = ids.length
-        ? await supabase.from('coin_balances').select('user_id,balance').in('user_id', ids)
-        : { data: [] as any[] };
-      const bmap = Object.fromEntries((bals || []).map((b: any) => [b.user_id, b.balance]));
-      setUsers((profs || []).map((p: any) => ({ ...p, balance: bmap[p.user_id] || 0 })));
+      const { data, error } = await supabase.functions.invoke('admin-list-users', {
+        body: { search: search.trim() },
+      });
+      if (error || (data as any)?.error) {
+        toast.error((data as any)?.error || error?.message || 'Gagal memuat user');
+        return;
+      }
+      const list = ((data as any)?.users || []) as UserRow[];
+      setUsers(list);
+      setTotal((data as any)?.total || list.length);
+      // Seed edit drafts
+      const draft: Record<string, { username: string; phone: string }> = {};
+      list.forEach(u => { draft[u.user_id] = { username: u.username || '', phone: u.phone || '' }; });
+      setEdits(draft);
     } finally { setLoading(false); }
   };
   useEffect(() => { load(); }, []);
@@ -58,6 +66,25 @@ export default function UserManagement() {
     toast.success(`Saldo ${delta > 0 ? '+' : ''}${delta} koin untuk ${u.email}`);
     setGrant(g => ({ ...g, [u.user_id]: { amount: '', reason: '' } }));
     setUsers(us => us.map(x => x.user_id === u.user_id ? { ...x, balance: x.balance + delta } : x));
+  };
+
+  const saveProfile = async (u: UserRow) => {
+    const e = edits[u.user_id];
+    if (!e) return;
+    setSavingId(u.user_id);
+    try {
+      const { data, error } = await supabase.functions.invoke('admin-update-user-profile', {
+        body: { user_id: u.user_id, username: e.username, phone: e.phone },
+      });
+      if (error || (data as any)?.error) {
+        toast.error((data as any)?.error || error?.message || 'Gagal menyimpan');
+        return;
+      }
+      toast.success(`Profil ${u.email} tersimpan`);
+      setUsers(us => us.map(x => x.user_id === u.user_id
+        ? { ...x, username: e.username || null, phone: e.phone || null, has_profile: true }
+        : x));
+    } finally { setSavingId(''); }
   };
 
   const submitNewPw = async () => {
@@ -82,17 +109,21 @@ export default function UserManagement() {
     <div className="space-y-4">
       <Card>
         <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2"><UserIcon className="w-4 h-4" />Manajemen User</CardTitle>
+          <CardTitle className="text-base flex items-center gap-2">
+            <UserIcon className="w-4 h-4" />Manajemen User
+            <Badge variant="secondary" className="ml-2">{total} total</Badge>
+          </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="flex gap-2">
             <Input
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder="Cari username, email, atau nomor HP…"
+              placeholder="Cari username, email, nomor HP, atau user_id…"
               onKeyDown={e => e.key === 'Enter' && load()}
+              aria-label="Cari user"
             />
-            <Button onClick={load} disabled={loading}>
+            <Button onClick={load} disabled={loading} aria-label="Cari">
               {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
             </Button>
           </div>
@@ -100,21 +131,19 @@ export default function UserManagement() {
           <div className="space-y-2">
             {users.map(u => {
               const g = grant[u.user_id] || { amount: '', reason: '' };
+              const e = edits[u.user_id] || { username: u.username || '', phone: u.phone || '' };
               const amt = Number(g.amount || 0);
+              const dirty = (e.username !== (u.username || '')) || (e.phone !== (u.phone || ''));
               return (
                 <div key={u.user_id} className="border border-border rounded-lg p-3 bg-card/50 space-y-2">
                   <div className="flex flex-wrap items-start gap-2">
                     <div className="flex-1 min-w-[200px] space-y-0.5">
-                      <div className="flex items-center gap-1.5 font-medium text-sm">
-                        <UserIcon className="w-3.5 h-3.5 text-muted-foreground" />
-                        {u.username || <span className="italic text-muted-foreground">Tanpa username</span>}
-                      </div>
                       <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                        <Mail className="w-3 h-3" />{u.email}
+                        <Mail className="w-3 h-3" />{u.email || <span className="italic">tanpa email</span>}
                       </div>
-                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                        <Phone className="w-3 h-3" />{u.phone || '—'}
-                      </div>
+                      {!u.has_profile && (
+                        <Badge variant="outline" className="text-[10px]">Belum punya profil</Badge>
+                      )}
                     </div>
                     <Badge variant="secondary" className="font-mono">
                       <Coins className="w-3 h-3 mr-1 text-primary" />{u.balance}
@@ -123,19 +152,51 @@ export default function UserManagement() {
                       <KeyRound className="w-3.5 h-3.5 mr-1" />Sandi
                     </Button>
                   </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div>
+                      <Label className="text-[10px] flex items-center gap-1"><UserIcon className="w-3 h-3" />Username</Label>
+                      <Input
+                        className="h-8 text-xs"
+                        value={e.username}
+                        placeholder="username"
+                        onChange={ev => setEdits(s => ({ ...s, [u.user_id]: { ...e, username: ev.target.value } }))}
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-[10px] flex items-center gap-1"><Phone className="w-3 h-3" />Nomor HP</Label>
+                      <Input
+                        className="h-8 text-xs"
+                        value={e.phone}
+                        placeholder="0812xxxxxxxx"
+                        onChange={ev => setEdits(s => ({ ...s, [u.user_id]: { ...e, phone: ev.target.value } }))}
+                      />
+                    </div>
+                  </div>
+                  {dirty && (
+                    <Button size="sm" className="w-full" disabled={savingId === u.user_id} onClick={() => saveProfile(u)}>
+                      {savingId === u.user_id
+                        ? <RefreshCw className="w-3.5 h-3.5 mr-1 animate-spin" />
+                        : <Save className="w-3.5 h-3.5 mr-1" />}
+                      Simpan Profil
+                    </Button>
+                  )}
+
                   <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-border/50">
                     <Input
                       className="w-24"
                       type="number"
                       placeholder="Jumlah"
                       value={g.amount}
-                      onChange={e => setGrant(s => ({ ...s, [u.user_id]: { ...g, amount: e.target.value } }))}
+                      onChange={ev => setGrant(s => ({ ...s, [u.user_id]: { ...g, amount: ev.target.value } }))}
+                      aria-label="Jumlah koin"
                     />
                     <Input
                       className="flex-1 min-w-[120px]"
                       placeholder="Catatan (opsional)"
                       value={g.reason}
-                      onChange={e => setGrant(s => ({ ...s, [u.user_id]: { ...g, reason: e.target.value } }))}
+                      onChange={ev => setGrant(s => ({ ...s, [u.user_id]: { ...g, reason: ev.target.value } }))}
+                      aria-label="Catatan transaksi koin"
                     />
                     <Button size="sm" disabled={!amt} onClick={() => grantCoins(u, Math.abs(amt), g.reason)}>
                       <Plus className="w-3.5 h-3.5 mr-1" />Tambah
