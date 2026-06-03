@@ -19,6 +19,7 @@ export interface ActiveShow {
   replay_id: string | null;
   replay_enabled: boolean;
   admin_alias?: string | null;
+  is_special?: boolean;
   // LIVE controls
   is_live?: boolean;
   live_auto_schedule?: boolean;
