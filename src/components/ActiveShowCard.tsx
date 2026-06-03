@@ -176,9 +176,11 @@ export default function ActiveShowCard({ show, index = 0 }: { show: ActiveShow; 
 
         {show.lineup.length > 0 && (
           <div className="flex items-start gap-2 text-sm text-muted-foreground">
-            <Users className="w-4 h-4 text-primary mt-0.5 shrink-0" />
-            <div className="flex flex-wrap gap-2">
-              {show.lineup.map((m, i) => <MemberAvatar key={i} name={m} size={40} />)}
+            <Users className="w-4 h-4 text-primary mt-1.5 shrink-0" />
+            <div className="flex-1 min-w-0 overflow-x-auto scrollbar-thin -mx-1 px-1">
+              <div className="flex gap-2 w-max py-1">
+                {show.lineup.map((m, i) => <MemberAvatar key={i} name={m} size={40} />)}
+              </div>
             </div>
           </div>
         )}
