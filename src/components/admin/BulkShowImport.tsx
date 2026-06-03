@@ -223,6 +223,15 @@ export default function BulkShowImport({ onImported }: Props) {
   const removeRow = (idx: number) => setParsed(prev => prev.filter((_, i) => i !== idx));
 
   const handleSave = async () => {
+    const missing = preview.filter(s => !s.live_password.trim());
+    if (missing.length > 0) {
+      toast({
+        title: 'Sandi Replay wajib diisi',
+        description: `${missing.length} show belum punya sandi. Isi "Sandi Default" atau per-baris.`,
+        variant: 'destructive',
+      });
+      return;
+    }
     setSaving(true);
     let ok = 0, fail = 0;
     for (const s of preview) {
