@@ -151,6 +151,7 @@ export default function Admin() {
         image_url: showForm.image_url.trim(),
         sort_order: Number(showForm.sort_order) || 0,
         is_active: showForm.is_active,
+        is_special: showForm.is_special,
         price_show: Number(showForm.price_show) || 0,
         price_replay: Number(showForm.price_replay) || 0,
         price_show_coins: Number(showForm.price_show_coins) || 0,
