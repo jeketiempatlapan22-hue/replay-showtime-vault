@@ -239,11 +239,12 @@ export default function BulkShowImport({ onImported }: Props) {
           category: s.category || 'reguler',
           is_active: true,
           sort_order: 0,
-          description: '',
+          description: s.description || '',
           image_url: '',
           pakasir_amount: 0,
           replay_id: null,
           replay_enabled: false,
+          idn_show_id: s.idn_show_id || '',
         } as any);
         ok++;
       } catch {
