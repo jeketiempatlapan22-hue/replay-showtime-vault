@@ -218,8 +218,14 @@ export default function Profil() {
 
             <div className="space-y-2">
               <Label className="flex items-center gap-1.5 text-xs"><Phone className="w-3.5 h-3.5" /> Nomor HP</Label>
-              <Input value={phone || '—'} disabled />
-              <p className="text-[11px] text-muted-foreground">Untuk mengubah nomor HP, hubungi admin.</p>
+              <Input
+                type="tel"
+                inputMode="numeric"
+                value={phone}
+                onChange={e => setPhone(e.target.value)}
+                placeholder="0812xxxxxxxx"
+              />
+              <p className="text-[11px] text-muted-foreground">Digunakan untuk pengiriman token via WhatsApp.</p>
             </div>
 
             <Button onClick={handleSave} disabled={busy} className="w-full">
