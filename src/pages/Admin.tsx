@@ -130,7 +130,7 @@ export default function Admin() {
   const refreshActiveShows = () => getActiveShows(true).then(setActiveShows);
 
   const resetShowForm = () => {
-    setShowForm({ title: '', show_date: '', show_time: '19:00', lineup: '', category: 'reguler', description: '', image_url: '', sort_order: 0, is_active: true, price_show: 0, price_replay: 0, price_show_coins: 0, price_replay_coins: 0, pakasir_amount: 0, replay_id: '', replay_enabled: false, admin_alias: '' });
+    setShowForm({ title: '', show_date: '', show_time: '19:00', lineup: '', category: 'reguler', description: '', image_url: '', sort_order: 0, is_active: true, is_special: false, price_show: 0, price_replay: 0, price_show_coins: 0, price_replay_coins: 0, pakasir_amount: 0, replay_id: '', replay_enabled: false, admin_alias: '' });
     setShowEditing(false);
   };
 
