@@ -299,7 +299,7 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{itemTitle}</DialogTitle>
           <DialogDescription className="line-clamp-2">{showTitle}</DialogDescription>
