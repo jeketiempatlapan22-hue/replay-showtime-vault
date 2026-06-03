@@ -125,6 +125,14 @@ export default function Profil() {
 
 
   const validUsername = (v: string) => /^[a-zA-Z0-9_.]{3,20}$/.test(v);
+  const normalizePhone = (raw: string) => {
+    const d = (raw || '').replace(/\D/g, '');
+    if (!d) return '';
+    if (d.startsWith('62')) return d;
+    if (d.startsWith('0')) return '62' + d.slice(1);
+    if (d.startsWith('8')) return '62' + d;
+    return d;
+  };
 
   const handleSave = async () => {
     if (!user) return;
@@ -133,9 +141,13 @@ export default function Profil() {
       toast.error('Username 3-20 karakter, hanya huruf, angka, titik, atau garis bawah.');
       return;
     }
+    const normPhone = normalizePhone(phone);
+    if (phone && !/^62\d{8,13}$/.test(normPhone)) {
+      toast.error('Nomor HP tidak valid. Contoh: 0812xxxxxxxx');
+      return;
+    }
     setBusy(true);
     try {
-      // Check uniqueness if changed
       if (trimmed && trimmed.toLowerCase() !== originalUsername.toLowerCase()) {
         const { data: exists } = await supabase
           .from('profiles')
@@ -149,9 +161,13 @@ export default function Profil() {
           return;
         }
       }
-      const { error } = await supabase.from('profiles').update({ username: trimmed || null }).eq('user_id', user.id);
+      const { error } = await supabase.from('profiles').update({
+        username: trimmed || null,
+        phone: normPhone || null,
+      }).eq('user_id', user.id);
       if (error) throw error;
       setOriginalUsername(trimmed);
+      if (normPhone) setPhone(normPhone);
       toast.success('Profil tersimpan');
     } catch (e: any) {
       toast.error(e?.message || 'Gagal menyimpan');
