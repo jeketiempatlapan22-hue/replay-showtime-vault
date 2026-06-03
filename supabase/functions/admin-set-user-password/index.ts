@@ -33,6 +33,20 @@ Deno.serve(async (req) => {
     const { error } = await admin.auth.admin.updateUserById(user_id, { password, email_confirm: true });
     if (error) return new Response(JSON.stringify({ error: error.message }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
+    // Ensure a profile row exists so login lookups by email/phone/username work for
+    // legacy auth users that were created before the auto-profile trigger existed.
+    try {
+      const { data: targetUser } = await admin.auth.admin.getUserById(user_id);
+      const email = targetUser?.user?.email || null;
+      const phone = (targetUser?.user as any)?.user_metadata?.phone || null;
+      if (email || phone) {
+        await admin.from('profiles').upsert(
+          { user_id, email, phone: phone || null },
+          { onConflict: 'user_id', ignoreDuplicates: false },
+        );
+      }
+    } catch { /* non-fatal */ }
+
     return new Response(JSON.stringify({ ok: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   } catch (e) {
     return new Response(JSON.stringify({ error: String(e?.message || e) }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });

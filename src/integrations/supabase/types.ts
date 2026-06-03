@@ -108,6 +108,7 @@ export type Database = {
           image_url: string
           is_active: boolean
           is_live: boolean
+          is_special: boolean
           lineup: string[]
           live_auto_schedule: boolean
           live_password: string
@@ -143,6 +144,7 @@ export type Database = {
           image_url?: string
           is_active?: boolean
           is_live?: boolean
+          is_special?: boolean
           lineup?: string[]
           live_auto_schedule?: boolean
           live_password?: string
@@ -178,6 +180,7 @@ export type Database = {
           image_url?: string
           is_active?: boolean
           is_live?: boolean
+          is_special?: boolean
           lineup?: string[]
           live_auto_schedule?: boolean
           live_password?: string
@@ -1524,6 +1527,7 @@ export type Database = {
           image_url: string
           is_active: boolean
           is_live: boolean
+          is_special: boolean
           lineup: string[]
           live_auto_schedule: boolean
           live_password: string
@@ -1568,6 +1572,7 @@ export type Database = {
           image_url: string
           is_active: boolean
           is_live: boolean
+          is_special: boolean
           lineup: string[]
           live_auto_schedule: boolean
           live_password: string
