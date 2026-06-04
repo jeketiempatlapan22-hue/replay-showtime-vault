@@ -166,12 +166,41 @@ export default function ShowLiveTokensDialog({ open, onOpenChange, showId, showT
           <Button onClick={create} className="w-full"><Plus className="w-4 h-4 mr-1" />Buat Token</Button>
         </div>
 
+        <div className="relative">
+          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Cari token, label, atau ID perangkat…"
+            className="pl-9 pr-9 h-9 text-sm"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
+          {search && (
+            <button
+              type="button"
+              onClick={() => setSearch('')}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              aria-label="Bersihkan pencarian"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+
         <div className="space-y-2">
-          {loading ? (
-            <p className="text-sm text-muted-foreground">Memuat…</p>
-          ) : tokens.length === 0 ? (
-            <p className="text-sm text-muted-foreground italic">Belum ada token.</p>
-          ) : tokens.map(t => {
+          {(() => {
+            const q = search.trim().toLowerCase();
+            const filtered = q
+              ? tokens.filter(t => {
+                  if (t.token.toLowerCase().includes(q)) return true;
+                  if ((t.label || '').toLowerCase().includes(q)) return true;
+                  const devs = devices[t.id] || [];
+                  return devs.some(d => d.browser_id.toLowerCase().includes(q));
+                })
+              : tokens;
+            if (loading) return <p className="text-sm text-muted-foreground">Memuat…</p>;
+            if (tokens.length === 0) return <p className="text-sm text-muted-foreground italic">Belum ada token.</p>;
+            if (filtered.length === 0) return <p className="text-sm text-muted-foreground italic">Tidak ada token cocok dengan pencarian.</p>;
+            return filtered.map(t => {
             const devs = devices[t.id] || [];
             const isOpen = expanded === t.id;
             return (
