@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { Plus, Trash2, Search, Coins, ArrowUp, ArrowDown, History, Minus, RefreshCw } from 'lucide-react';
+import { upsertActiveShow } from '@/lib/activeShows';
 
 interface Pkg { id: string; label: string; coins: number; price_idr: number; sort_order: number; enabled: boolean; }
 interface ShowRow { id: string; title: string; price_show_coins: number; price_replay_coins: number; }
@@ -91,8 +92,11 @@ export default function CoinAdmin() {
 
   // -------- Pricing --------
   const updateShowCoins = async (id: string, patch: Partial<ShowRow>) => {
-    const { error } = await supabase.from('active_shows').update(patch).eq('id', id);
-    if (error) return toast.error(error.message);
+    try {
+      await upsertActiveShow({ id, ...patch } as any);
+    } catch (e: any) {
+      return toast.error(e.message);
+    }
     toast.success('Harga koin disimpan');
     loadAll();
   };

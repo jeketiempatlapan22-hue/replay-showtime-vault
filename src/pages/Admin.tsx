@@ -918,12 +918,13 @@ export default function Admin() {
                             <Switch
                               checked={!!s.is_live}
                               onCheckedChange={async (v) => {
-                                if (v) {
-                                  await supabase.from('active_shows').update({ is_live: false }).neq('id', s.id).eq('is_live', true);
+                                try {
+                                  await upsertActiveShow({ id: s.id, is_live: v } as any);
+                                  toast({ title: v ? `🔴 ${s.title} sedang LIVE` : 'Live dinonaktifkan' });
+                                  refreshActiveShows();
+                                } catch (e: any) {
+                                  toast({ title: 'Gagal', description: e.message, variant: 'destructive' });
                                 }
-                                const { error } = await supabase.from('active_shows').update({ is_live: v }).eq('id', s.id);
-                                if (error) toast({ title: 'Gagal', description: error.message, variant: 'destructive' });
-                                else { toast({ title: v ? `🔴 ${s.title} sedang LIVE` : 'Live dinonaktifkan' }); refreshActiveShows(); }
                               }}
                             />
                           </div>
