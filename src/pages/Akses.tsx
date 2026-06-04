@@ -36,7 +36,7 @@ export default function Akses() {
     (async () => {
       const { data, error } = await supabase
         .from('replays')
-        .select('id,title,date,show_name,image_url,lineup,criteria,access_token')
+        .select('id,title,date,show_name,image_url,lineup,criteria')
         .eq('id', replayId)
         .maybeSingle();
       if (error || !data) {

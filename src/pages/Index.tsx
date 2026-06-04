@@ -157,7 +157,7 @@ export default function Index() {
         // Abaikan UPDATE yang hanya menambah view_count agar tidak terjadi reload loop.
         const oldRow = (payload.old || {}) as Record<string, unknown>;
         const newRow = (payload.new || {}) as Record<string, unknown>;
-        const watched = ['sources', 'm3u8_url', 'youtube_id', 'source_type', 'title', 'criteria', 'date', 'show_time', 'image_url', 'lineup', 'access_token', 'password'];
+        const watched = ['source_type', 'title', 'criteria', 'date', 'show_time', 'image_url', 'lineup'];
         const changed = watched.some(k => JSON.stringify(oldRow[k]) !== JSON.stringify(newRow[k]));
         if (changed) refreshReplays();
       })
