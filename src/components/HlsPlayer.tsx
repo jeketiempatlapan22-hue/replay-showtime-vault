@@ -284,32 +284,32 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
           return new Request(context.url, nextInit);
         },
         enableWorker: true,
-        // Low-latency HLS aktif hanya jika browser & manifest mendukung. hls.js
-        // otomatis fallback ke mode normal jika manifest bukan LL-HLS, jadi aman.
-        lowLatencyMode: true,
+        // Weak networks need a steadier buffer more than ultra-low latency.
+        // Keep LL-HLS for good networks, but avoid chasing the live edge on bad ones.
+        lowLatencyMode: !isWeak,
         // Buffer tuning adaptif berdasarkan profil perangkat & jaringan.
         backBufferLength: bufferProfile.back,
         maxBufferLength: bufferProfile.max,
         maxMaxBufferLength: bufferProfile.maxMax,
         maxBufferSize: bufferProfile.size,
-        maxBufferHole: 0.5,
-        highBufferWatchdogPeriod: 2,
-        nudgeOffset: 0.1,
-        nudgeMaxRetry: 8,
-        maxFragLookUpTolerance: 0.2,
+        maxBufferHole: isWeak ? 1.2 : 0.5,
+        highBufferWatchdogPeriod: isWeak ? 3 : 2,
+        nudgeOffset: isWeak ? 0.2 : 0.1,
+        nudgeMaxRetry: isWeak ? 12 : 8,
+        maxFragLookUpTolerance: isWeak ? 0.5 : 0.2,
         // ABR: mulai dari kualitas terendah supaya cepat play, lalu naikkan halus.
         startLevel: -1,
         autoStartLoad: true,
         abrEwmaDefaultEstimate: initialBwEstimate,
         // Live: EWMA cepat agar reaktif, slow lebih panjang agar tidak osilasi.
-        abrEwmaFastLive: 4.0,
-        abrEwmaSlowLive: 12.0,
-        abrEwmaFastVoD: 3.0,
-        abrEwmaSlowVoD: 9.0,
+        abrEwmaFastLive: isWeak ? 8.0 : 4.0,
+        abrEwmaSlowLive: isWeak ? 24.0 : 12.0,
+        abrEwmaFastVoD: isWeak ? 6.0 : 3.0,
+        abrEwmaSlowVoD: isWeak ? 18.0 : 9.0,
         // Lebih konservatif saat naik level → kurangi switch-down setelah naik
         // (penyebab utama rebuffer saat level berpindah-pindah).
-        abrBandWidthFactor: 0.8,
-        abrBandWidthUpFactor: 0.5,
+        abrBandWidthFactor: isWeak ? 0.65 : 0.8,
+        abrBandWidthUpFactor: isWeak ? 0.35 : 0.5,
         abrMaxWithRealBitrate: true,
         testBandwidth: true,
         capLevelToPlayerSize: true,
@@ -324,21 +324,21 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
         levelLoadingMaxRetry: 8,
         levelLoadingRetryDelay: 400,
         levelLoadingMaxRetryTimeout: 6_000,
-        fragLoadingTimeOut: 25_000,
-        fragLoadingMaxRetry: 10,
-        fragLoadingRetryDelay: 500,
-        fragLoadingMaxRetryTimeout: 8_000,
+        fragLoadingTimeOut: isWeak ? 35_000 : 25_000,
+        fragLoadingMaxRetry: isWeak ? 14 : 10,
+        fragLoadingRetryDelay: isWeak ? 700 : 500,
+        fragLoadingMaxRetryTimeout: isWeak ? 12_000 : 8_000,
         // Stall detection — toleransi sedikit lebih longgar agar fluktuasi
         // jaringan tidak memicu nudge/recovery yang membuat video tersendat.
-        maxStarvationDelay: 6,
-        maxLoadingDelay: 6,
+        maxStarvationDelay: isWeak ? 10 : 6,
+        maxLoadingDelay: isWeak ? 10 : 6,
         appendErrorMaxRetry: 5,
         startPosition: -1,
         liveDurationInfinity: true,
-        // Sync ~3 segmen dari edge → latency rendah tapi tetap ada bantal buffer
-        // untuk menyerap jitter; max latency lebih besar untuk hindari snap.
-        liveSyncDurationCount: 3,
-        liveMaxLatencyDurationCount: 12,
+        // Stable live: weak networks intentionally stay farther behind edge to
+        // absorb jitter and avoid repeated rebuffer while switching fragments.
+        liveSyncDurationCount: liveSyncCount,
+        liveMaxLatencyDurationCount: liveMaxLatencyCount,
         progressive: true,
       });
       hlsRef.current = hls;
