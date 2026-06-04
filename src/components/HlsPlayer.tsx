@@ -390,12 +390,17 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
           const lvl = hls.levels[data.level];
           setAutoActiveLabel(lvl?.height ? `${lvl.height}p` : '');
         } else if (hls && userQualityRef.current) {
-          // Enforce user's manual quality if hls.js drifted
+          // Enforce user's manual quality if hls.js drifted. Only act when the
+          // current level's height truly differs AND a matching level exists,
+          // to avoid bouncing between renditions.
           const lvl = hls.levels[data.level];
           if (lvl?.height && lvl.height !== userQualityRef.current) {
             const target = hls.levels.findIndex(l => l.height === userQualityRef.current);
-            if (target >= 0 && target !== data.level) {
-              try { hls.currentLevel = target; } catch { /* ignore */ }
+            if (target >= 0 && target !== data.level && hls.currentLevel !== target) {
+              try {
+                hls.autoLevelCapping = target;
+                hls.currentLevel = target;
+              } catch { /* ignore */ }
             }
           }
         }
