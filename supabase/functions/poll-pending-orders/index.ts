@@ -103,7 +103,7 @@ function renderTemplate(tpl: string, vars: Record<string, string>) {
     .replace(/\{(\w+)\}/g, (_, k) => (vars as Record<string, string>)[k] ?? '');
 }
 
-async function processOrder(admin: ReturnType<typeof createClient>, order: any, apiKey: string, slug: string, origin: string, tpl: string) {
+async function processOrder(admin: ReturnType<typeof createClient>, order: any, apiKey: string, slug: string, origin: string, tpl: string, showTpl: string) {
   if (!order.pakasir_order_id) return { id: order.id, skipped: 'no_pakasir_id' };
 
   const url = `https://app.pakasir.com/api/transactiondetail?project=${encodeURIComponent(slug)}&amount=${order.amount}&order_id=${encodeURIComponent(order.pakasir_order_id)}&api_key=${encodeURIComponent(apiKey)}`;
