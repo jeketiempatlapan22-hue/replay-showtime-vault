@@ -35,6 +35,7 @@ export default function ShowLiveTokensDialog({ open, onOpenChange, showId, showT
   const [maxDevices, setMaxDevices] = useState(1);
   const [kind, setKind] = useState<'personal' | 'public'>('personal');
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
 
   const load = async () => {
     setLoading(true);
