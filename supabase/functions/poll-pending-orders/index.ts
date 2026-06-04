@@ -322,7 +322,7 @@ Deno.serve(async (req) => {
   const freshCutoff = Date.now() - 30 * 60_000; // 30 min
   for (const o of orders ?? []) {
     try {
-      const r = await processOrder(admin, o, apiKey, slug, origin, tpl);
+      const r = await processOrder(admin, o, apiKey, slug, origin, tpl, showTpl);
       results.push(r);
       // Track fresh-still-pending orders for fast-lane rescan within this same invocation.
       if (r?.status === 'pending' && new Date(o.created_at).getTime() >= freshCutoff) {
