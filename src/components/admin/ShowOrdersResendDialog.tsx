@@ -34,7 +34,9 @@ export default function ShowOrdersResendDialog({ open, onOpenChange, showId, sho
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState<Record<string, boolean>>({});
   const [bulkSending, setBulkSending] = useState(false);
-  const [filter, setFilter] = useState<'failed' | 'paid' | 'all'>('failed');
+  const [filter, setFilter] = useState<'failed' | 'paid' | 'pending' | 'all'>('failed');
+  const [manualPhone, setManualPhone] = useState('');
+  const [manualSending, setManualSending] = useState(false);
 
   const load = async () => {
     if (!showId) return;
