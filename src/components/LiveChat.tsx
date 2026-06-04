@@ -17,6 +17,10 @@ interface Msg {
   reply_to_id?: string | null;
 }
 
+interface LiveChatProps {
+  lite?: boolean;
+}
+
 // Palet warna nama (gaya YouTube/TikTok). Pakai token semantik.
 const NAME_COLORS = [
   'text-sky-400',
@@ -34,7 +38,7 @@ const colorForName = (name: string) => {
   return NAME_COLORS[h % NAME_COLORS.length];
 };
 
-export default function LiveChat() {
+export default function LiveChat({ lite = false }: LiveChatProps) {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [pinned, setPinned] = useState<Msg[]>([]);
   const [name, setName] = useState(() => localStorage.getItem('replaytime-name') || '');
@@ -55,6 +59,7 @@ export default function LiveChat() {
 
   const myBrowserId = getBrowserId();
   const iAmBlocked = blockedSet.has(myBrowserId) && !isAdmin;
+  const messageLimit = lite ? 25 : 50;
 
   const saveName = () => {
     const v = nameInput.trim();
@@ -80,7 +85,7 @@ export default function LiveChat() {
   const refresh = async () => {
     const [{ data: pins }, { data: list }, { data: blocks }] = await Promise.all([
       supabase.from('live_messages').select('*').eq('pinned', true).order('created_at', { ascending: false }),
-      supabase.from('live_messages').select('*').eq('pinned', false).order('created_at', { ascending: false }).limit(50),
+      supabase.from('live_messages').select('*').eq('pinned', false).order('created_at', { ascending: false }).limit(messageLimit),
       // Admin perlu daftar lengkap block untuk badge moderasi; viewer biasa cukup cek dirinya sendiri.
       isAdmin
         ? supabase.from('chat_blocks').select('browser_id')
@@ -100,7 +105,7 @@ export default function LiveChat() {
         if (m.pinned) setPinned(prev => [m, ...prev.filter(x => x.id !== m.id)]);
         else setMessages(prev => {
           const next = [...prev.filter(x => x.id !== m.id), m];
-          return next.length > 50 ? next.slice(next.length - 50) : next;
+          return next.length > messageLimit ? next.slice(next.length - messageLimit) : next;
         });
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'live_messages' }, (payload) => {
@@ -111,7 +116,7 @@ export default function LiveChat() {
           const exists = prev.some(x => x.id === m.id);
           if (exists) return prev.map(x => x.id === m.id ? m : x);
           const next = [...prev, m];
-          return next.length > 50 ? next.slice(next.length - 50) : next;
+          return next.length > messageLimit ? next.slice(next.length - messageLimit) : next;
         });
       })
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'live_messages' }, (payload) => {
@@ -135,7 +140,7 @@ export default function LiveChat() {
       )
       .subscribe();
     return () => { supabase.removeChannel(ch); };
-  }, [isAdmin]);
+  }, [isAdmin, lite]);
 
   const handleScroll = () => {
     const el = listRef.current;
