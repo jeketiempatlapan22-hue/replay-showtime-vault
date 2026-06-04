@@ -79,7 +79,10 @@ export default function ShowOrdersResendDialog({ open, onOpenChange, showId, sho
     return r.kind !== 'coin_topup'; // pending show/replay = bisa di-paksa
   });
 
-  const resendOne = async (id: string, force = false) => {
+  const resendOne = async (id: string, shiftForce = false) => {
+    const row = rows.find((r) => r.id === id);
+    // Pending/cancelled show order → always force (mint fresh token + mark paid + send).
+    const force = shiftForce || (row && row.status !== 'paid' && row.kind !== 'coin_topup');
     setSending((p) => ({ ...p, [id]: true }));
     const { data, error } = await supabase.functions.invoke('resend-show-wa', { body: { order_id: id, force } });
     setSending((p) => ({ ...p, [id]: false }));
@@ -87,6 +90,7 @@ export default function ShowOrdersResendDialog({ open, onOpenChange, showId, sho
     const r = (data as any)?.results?.[0];
     if (r?.sent) toast({ title: `WA terkirim ke ${r.phone || ''}` });
     else if (r?.skipped === 'already_sent') toast({ title: 'Sudah terkirim sebelumnya', description: 'Shift+klik untuk paksa kirim ulang.' });
+    else if (r?.skipped === 'topup_needs_payment') toast({ title: 'Top-up koin butuh pembayaran nyata', variant: 'destructive' });
     else if (r?.skipped) toast({ title: `Dilewati: ${r.skipped}`, variant: 'destructive' });
     else toast({ title: 'Gagal kirim', description: r?.error || 'unknown', variant: 'destructive' });
     void load();
