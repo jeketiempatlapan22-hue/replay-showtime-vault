@@ -273,31 +273,37 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
           return new Request(context.url, nextInit);
         },
         enableWorker: true,
-        lowLatencyMode: false,
+        // Low-latency HLS aktif hanya jika browser & manifest mendukung. hls.js
+        // otomatis fallback ke mode normal jika manifest bukan LL-HLS, jadi aman.
+        lowLatencyMode: true,
         // Buffer tuning adaptif berdasarkan profil perangkat & jaringan.
-        // Buffer lebih besar di desktop/wifi mengurangi lag akibat fluktuasi sesaat,
-        // buffer ringan di mobile/2G mencegah OOM dan stall pada CPU lemah.
         backBufferLength: bufferProfile.back,
         maxBufferLength: bufferProfile.max,
         maxMaxBufferLength: bufferProfile.maxMax,
         maxBufferSize: bufferProfile.size,
-        maxBufferHole: 0.75,
+        maxBufferHole: 0.5,
         highBufferWatchdogPeriod: 2,
         nudgeOffset: 0.1,
         nudgeMaxRetry: 8,
-        // ABR: mulai dari kualitas terendah supaya cepat play, lalu naikkan responsif
+        maxFragLookUpTolerance: 0.2,
+        // ABR: mulai dari kualitas terendah supaya cepat play, lalu naikkan halus.
         startLevel: -1,
         autoStartLoad: true,
         abrEwmaDefaultEstimate: initialBwEstimate,
-        abrEwmaFastLive: 3.0,
-        abrEwmaSlowLive: 9.0,
+        // Live: EWMA cepat agar reaktif, slow lebih panjang agar tidak osilasi.
+        abrEwmaFastLive: 4.0,
+        abrEwmaSlowLive: 12.0,
         abrEwmaFastVoD: 3.0,
         abrEwmaSlowVoD: 9.0,
-        abrBandWidthFactor: 0.75,
-        abrBandWidthUpFactor: 0.55,
+        // Lebih konservatif saat naik level → kurangi switch-down setelah naik
+        // (penyebab utama rebuffer saat level berpindah-pindah).
+        abrBandWidthFactor: 0.8,
+        abrBandWidthUpFactor: 0.5,
         abrMaxWithRealBitrate: true,
         testBandwidth: true,
         capLevelToPlayerSize: true,
+        capLevelOnFPSDrop: true,
+        // Prefetch fragmen pertama segera setelah manifest siap.
         startFragPrefetch: true,
         manifestLoadingTimeOut: 15_000,
         manifestLoadingMaxRetry: 8,
@@ -313,13 +319,15 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
         fragLoadingMaxRetryTimeout: 8_000,
         // Stall detection — toleransi sedikit lebih longgar agar fluktuasi
         // jaringan tidak memicu nudge/recovery yang membuat video tersendat.
-        maxStarvationDelay: 10,
-        maxLoadingDelay: 10,
+        maxStarvationDelay: 6,
+        maxLoadingDelay: 6,
         appendErrorMaxRetry: 5,
         startPosition: -1,
         liveDurationInfinity: true,
-        liveSyncDurationCount: 8,
-        liveMaxLatencyDurationCount: 20,
+        // Sync ~3 segmen dari edge → latency rendah tapi tetap ada bantal buffer
+        // untuk menyerap jitter; max latency lebih besar untuk hindari snap.
+        liveSyncDurationCount: 3,
+        liveMaxLatencyDurationCount: 12,
         progressive: true,
       });
       hlsRef.current = hls;
