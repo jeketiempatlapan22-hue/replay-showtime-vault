@@ -115,8 +115,11 @@ export default function ResellerAuditAdmin() {
             <Button size="sm" variant="outline" onClick={load} disabled={loading}>
               <RefreshCw className={`w-4 h-4 mr-1 ${loading ? 'animate-spin' : ''}`} />Muat ulang
             </Button>
-            <Button size="sm" variant="destructive" onClick={() => setPending({ type: 'reset' })} disabled={loading || rows.length === 0}>
-              <Trash2 className="w-4 h-4 mr-1" />Hapus semua
+            <Button size="sm" variant="outline" onClick={() => setPending({ type: 'reset_devices' })} disabled={loading || rows.length === 0} title="Lepaskan semua perangkat dari semua link reseller. Link tetap aktif.">
+              <RotateCcw className="w-4 h-4 mr-1" />Reset device semua
+            </Button>
+            <Button size="sm" variant="destructive" onClick={() => setPending({ type: 'clear_log' })} disabled={loading || rows.length === 0}>
+              <Trash2 className="w-4 h-4 mr-1" />Hapus riwayat
             </Button>
           </div>
         </CardHeader>
