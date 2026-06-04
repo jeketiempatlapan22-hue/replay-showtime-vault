@@ -70,11 +70,13 @@ export default function ShowOrdersResendDialog({ open, onOpenChange, showId, sho
   useEffect(() => { if (open) void load(); /* eslint-disable-next-line */ }, [open, showId]);
 
   const filtered = rows.filter((r) => {
-    if (r.status !== 'paid') return filter === 'all';
     const w = waStatus[r.id] || 'none';
-    if (filter === 'failed') return w !== 'sent';
-    if (filter === 'paid') return true;
-    return true;
+    if (filter === 'all') return true;
+    if (filter === 'pending') return r.status !== 'paid';
+    if (filter === 'paid') return r.status === 'paid';
+    // 'failed' = paid tapi WA gagal/belum, ATAU pending/cancelled (butuh paksa kirim)
+    if (r.status === 'paid') return w !== 'sent';
+    return r.kind !== 'coin_topup'; // pending show/replay = bisa di-paksa
   });
 
   const resendOne = async (id: string, force = false) => {
