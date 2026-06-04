@@ -561,12 +561,12 @@ export default function Live() {
   const liveActive = !!(status?.enabled || unlocked?.enabled);
 
   useEffect(() => {
-    if (!liveActive) { setChatReady(false); return; }
-    // Delay chat mount lebih lama (5s) supaya player live mendapat bandwidth & CPU dulu
-    // saat 1000+ user terhubung bersamaan. Mengurangi lonjakan websocket awal.
-    const delay = window.setTimeout(() => setChatReady(true), 5000);
+    // Mount chat segera setelah unlock berhasil (tidak perlu menunggu live aktif),
+    // dengan delay kecil agar player tetap mendapat prioritas resource saat ON AIR.
+    if (!unlocked) { setChatReady(false); return; }
+    const delay = window.setTimeout(() => setChatReady(true), liveActive ? 3000 : 600);
     return () => window.clearTimeout(delay);
-  }, [liveActive]);
+  }, [unlocked, liveActive]);
 
   // ============ VIEWER COUNTER (presence) — count unique browser_id ============
   // Heavily throttled to stay light at 1000+ concurrent viewers. Each sync/join/leave
