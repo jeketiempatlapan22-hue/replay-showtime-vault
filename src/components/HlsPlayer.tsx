@@ -367,11 +367,12 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
             setCurrentQuality(match.index);
           }
         } else if (isWeak && hls) {
-          // Weak network: cap ABR ceiling to lowest rendition <= 360p (fallback 270p) until network improves.
+          // Weak network: cap ABR ceiling low on the first automatic open.
           // User can still pick higher manually; this only sets the *cap*, not a hard lock.
+          const maxAutoHeight = isVeryWeak ? 270 : 360;
           const capCandidate = manifestLevels
             .map((lvl, i) => ({ i, h: lvl.height || 0 }))
-            .filter(x => x.h > 0 && x.h <= 360)
+            .filter(x => x.h > 0 && x.h <= maxAutoHeight)
             .sort((a, b) => b.h - a.h)[0];
           if (capCandidate) hls.autoLevelCapping = capCandidate.i;
         }
@@ -415,10 +416,11 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
           const lvl = hls.levels[data.level];
           if (lvl?.height && lvl.height !== userQualityRef.current) {
             const target = hls.levels.findIndex(l => l.height === userQualityRef.current);
-            if (target >= 0 && target !== data.level && hls.currentLevel !== target) {
+            if (target >= 0 && target !== data.level && hls.nextLevel !== target) {
               try {
                 hls.autoLevelCapping = target;
-                hls.currentLevel = target;
+                hls.loadLevel = target;
+                hls.nextLevel = target;
               } catch { /* ignore */ }
             }
           }
