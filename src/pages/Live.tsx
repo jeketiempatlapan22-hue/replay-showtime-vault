@@ -580,9 +580,9 @@ export default function Live() {
   // event at scale fans out O(N) updates; we coalesce them into a single recount
   // every 5 seconds and only when the tab is visible.
   const showKey = search.get('show') || 'global';
-  const [viewerCount, setViewerCount] = useState<number>(0);
+  const [viewerCount, setViewerCount] = useState<number | null>(null);
   useEffect(() => {
-    if (!liveActive) { setViewerCount(0); return; }
+    if (!liveActive || isWeakNetwork) { setViewerCount(null); return; }
     const bid = getBrowserId();
     const channel = supabase.channel(`live-viewers:${showKey}`, {
       config: { presence: { key: bid } },
@@ -629,7 +629,7 @@ export default function Live() {
       try { void channel.untrack(); } catch { /* ignore */ }
       supabase.removeChannel(channel);
     };
-  }, [liveActive, showKey]);
+  }, [liveActive, showKey, isWeakNetwork]);
 
   return (
     <div className="min-h-screen bg-background relative z-10">
@@ -699,10 +699,12 @@ export default function Live() {
                 </Suspense>
 
                 <div className="flex items-center justify-between flex-wrap gap-2 px-1">
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-500/10 border border-red-500/30 text-red-500 text-xs font-semibold">
-                    <Eye className="w-3.5 h-3.5" />
-                    {viewerCount.toLocaleString('id-ID')} menonton
-                  </span>
+                  {viewerCount !== null && (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-500/10 border border-red-500/30 text-red-500 text-xs font-semibold">
+                      <Eye className="w-3.5 h-3.5" />
+                      {viewerCount.toLocaleString('id-ID')} menonton
+                    </span>
+                  )}
                   {unlocked.watermark && (
                     <span className="text-[10px] font-mono text-muted-foreground">ID: {unlocked.watermark}</span>
                   )}
