@@ -143,6 +143,57 @@ Deno.serve(async (req) => {
     if (!isAdmin) return new Response(JSON.stringify({ error: 'forbidden' }), { status: 403, headers: corsHeaders });
 
     const body = await req.json().catch(() => ({}));
+
+    // ===== Manual send: admin enters a phone + show_id, we mint a brand-new
+    // single-device token for that show and send the WA link. No order is
+    // required — handy when admin needs to deliver a token outside the
+    // normal purchase flow.
+    if (body.manual_send === true || body.show_id) {
+      const phoneRaw = String(body.phone || '').trim();
+      const showId = String(body.show_id || '').trim();
+      const label = String(body.label || 'admin-kirim').slice(0, 120);
+      if (!phoneRaw || !showId) {
+        return new Response(JSON.stringify({ error: 'phone_and_show_id_required' }), { status: 400, headers: corsHeaders });
+      }
+      const phone = phoneRaw.replace(/\D/g, '').replace(/^0/, '62');
+      if (!/^62[0-9]{8,13}$/.test(phone)) {
+        return new Response(JSON.stringify({ error: 'invalid_phone' }), { status: 400, headers: corsHeaders });
+      }
+      const { data: show } = await admin.from('active_shows')
+        .select('id,title,show_date,show_time,live_password,group_link,replay_info').eq('id', showId).maybeSingle();
+      if (!show) return new Response(JSON.stringify({ error: 'show_not_found' }), { status: 404, headers: corsHeaders });
+      const newTok = crypto.randomUUID().replace(/-/g, '').slice(0, 24);
+      await admin.from('active_show_tokens').insert({
+        show_id: showId, token: newTok, label: `${label}:${phone}`.slice(0, 120),
+        kind: 'personal', max_devices: 1, revoked: false,
+      });
+      const pseudoOrder = {
+        id: null, show_id: showId, replay_id: null, kind: 'show',
+        user_phone: phone, item_title: show.title, access_token: newTok,
+      } as any;
+      const message = await buildMessage(admin, pseudoOrder);
+      const sent = await sendFonnte(phone, message);
+      await admin.from('wa_outbox').insert({
+        phone, message, status: sent.ok ? 'sent' : 'failed',
+        error: sent.ok ? null : JSON.stringify(sent.data),
+        related_order_id: null, fonnte_response: sent.data as Record<string, unknown>,
+      });
+      if (sent.ok) {
+        await admin.from('token_deliveries').insert({
+          phone, replay_id: null, replay_title: show.title, order_id: null,
+          access_token: newTok, link: '', source: 'admin-manual', requested_by: 'resend-show-wa',
+        });
+      }
+      await admin.from('admin_action_logs').insert({
+        actor_user_id: uid, actor_email: actorEmail,
+        action: 'show_manual_send', filter: { show_id: showId, phone },
+        order_ids: [], affected_count: 1, details: { sent: sent.ok, token: newTok },
+      });
+      return new Response(JSON.stringify({ ok: true, sent: sent.ok, phone, token: newTok, error: sent.ok ? null : JSON.stringify(sent.data).slice(0, 200) }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     const ids: string[] = Array.isArray(body.order_ids)
       ? body.order_ids.filter((x: unknown) => typeof x === 'string')
       : (body.order_id ? [String(body.order_id)] : []);
@@ -159,9 +210,39 @@ Deno.serve(async (req) => {
       try {
         const { data: order } = await admin.from('orders').select('*').eq('id', oid).maybeSingle();
         if (!order) { results.push({ id: oid, error: 'not_found' }); continue; }
+        // Non-paid orders: with `force`, treat the resend as an admin override —
+        // mint a fresh token, mark the order paid, and dispatch the WA. Skip
+        // coin top-ups (coin credit requires a real payment confirmation).
         if (order.status !== 'paid') {
-          results.push({ id: oid, skipped: `status_${order.status}` });
-          continue;
+          if (!force) {
+            results.push({ id: oid, skipped: `status_${order.status}` });
+            continue;
+          }
+          if (order.kind === 'coin_topup') {
+            results.push({ id: oid, skipped: 'topup_needs_payment' });
+            continue;
+          }
+          // Mint fresh token + persist to active_show_tokens / replay_personal_tokens.
+          const newTok = crypto.randomUUID().replace(/-/g, '').slice(0, 24);
+          if (order.show_id && !order.replay_id) {
+            await admin.from('active_show_tokens').insert({
+              show_id: order.show_id, token: newTok,
+              label: `force:${order.user_phone || ''}`.slice(0, 120),
+              kind: 'personal', max_devices: 1, revoked: false,
+            });
+          } else if (order.replay_id) {
+            await admin.from('replay_personal_tokens').insert({
+              replay_id: order.replay_id, token: newTok,
+              label: `force:${order.user_phone || ''}`.slice(0, 120),
+              max_devices: 1, revoked: false,
+            });
+          }
+          await admin.from('orders').update({
+            status: 'paid', paid_at: order.paid_at || new Date().toISOString(),
+            access_token: newTok,
+          }).eq('id', order.id);
+          order.status = 'paid';
+          order.access_token = newTok;
         }
         // Dedup: latest wa_outbox is 'sent' -> skip unless force.
         if (!force) {

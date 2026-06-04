@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, RefreshCw, Send, Copy } from 'lucide-react';
+import { Loader2, RefreshCw, Send, Copy, UserPlus } from 'lucide-react';
+import { Input } from '@/components/ui/input';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
@@ -33,7 +34,9 @@ export default function ShowOrdersResendDialog({ open, onOpenChange, showId, sho
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState<Record<string, boolean>>({});
   const [bulkSending, setBulkSending] = useState(false);
-  const [filter, setFilter] = useState<'failed' | 'paid' | 'all'>('failed');
+  const [filter, setFilter] = useState<'failed' | 'paid' | 'pending' | 'all'>('failed');
+  const [manualPhone, setManualPhone] = useState('');
+  const [manualSending, setManualSending] = useState(false);
 
   const load = async () => {
     if (!showId) return;
@@ -67,14 +70,19 @@ export default function ShowOrdersResendDialog({ open, onOpenChange, showId, sho
   useEffect(() => { if (open) void load(); /* eslint-disable-next-line */ }, [open, showId]);
 
   const filtered = rows.filter((r) => {
-    if (r.status !== 'paid') return filter === 'all';
     const w = waStatus[r.id] || 'none';
-    if (filter === 'failed') return w !== 'sent';
-    if (filter === 'paid') return true;
-    return true;
+    if (filter === 'all') return true;
+    if (filter === 'pending') return r.status !== 'paid';
+    if (filter === 'paid') return r.status === 'paid';
+    // 'failed' = paid tapi WA gagal/belum, ATAU pending/cancelled (butuh paksa kirim)
+    if (r.status === 'paid') return w !== 'sent';
+    return r.kind !== 'coin_topup'; // pending show/replay = bisa di-paksa
   });
 
-  const resendOne = async (id: string, force = false) => {
+  const resendOne = async (id: string, shiftForce = false) => {
+    const row = rows.find((r) => r.id === id);
+    // Pending/cancelled show order → always force (mint fresh token + mark paid + send).
+    const force = shiftForce || (row && row.status !== 'paid' && row.kind !== 'coin_topup');
     setSending((p) => ({ ...p, [id]: true }));
     const { data, error } = await supabase.functions.invoke('resend-show-wa', { body: { order_id: id, force } });
     setSending((p) => ({ ...p, [id]: false }));
@@ -82,6 +90,7 @@ export default function ShowOrdersResendDialog({ open, onOpenChange, showId, sho
     const r = (data as any)?.results?.[0];
     if (r?.sent) toast({ title: `WA terkirim ke ${r.phone || ''}` });
     else if (r?.skipped === 'already_sent') toast({ title: 'Sudah terkirim sebelumnya', description: 'Shift+klik untuk paksa kirim ulang.' });
+    else if (r?.skipped === 'topup_needs_payment') toast({ title: 'Top-up koin butuh pembayaran nyata', variant: 'destructive' });
     else if (r?.skipped) toast({ title: `Dilewati: ${r.skipped}`, variant: 'destructive' });
     else toast({ title: 'Gagal kirim', description: r?.error || 'unknown', variant: 'destructive' });
     void load();
@@ -105,11 +114,33 @@ export default function ShowOrdersResendDialog({ open, onOpenChange, showId, sho
   };
 
   const counts = rows.reduce((acc, r) => {
-    if (r.status !== 'paid') return acc;
+    if (r.status !== 'paid') { if (r.kind !== 'coin_topup') acc.pending++; return acc; }
     const w = waStatus[r.id] || 'none';
     if (w === 'sent') acc.sent++; else acc.failed++;
     return acc;
-  }, { sent: 0, failed: 0 });
+  }, { sent: 0, failed: 0, pending: 0 });
+
+  const sendManual = async () => {
+    const phoneDigits = manualPhone.replace(/\D/g, '').replace(/^0/, '62');
+    if (!/^62[0-9]{8,13}$/.test(phoneDigits)) {
+      toast({ title: 'Nomor tidak valid', description: 'Format: 628xxxxxxxxx', variant: 'destructive' });
+      return;
+    }
+    setManualSending(true);
+    const { data, error } = await supabase.functions.invoke('resend-show-wa', {
+      body: { manual_send: true, show_id: showId, phone: phoneDigits },
+    });
+    setManualSending(false);
+    if (error) { toast({ title: 'Gagal', description: error.message, variant: 'destructive' }); return; }
+    const d = data as any;
+    if (d?.sent) {
+      toast({ title: `Token baru terkirim ke ${d.phone}` });
+      setManualPhone('');
+      void load();
+    } else {
+      toast({ title: 'Gagal kirim', description: d?.error || 'unknown', variant: 'destructive' });
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -119,9 +150,33 @@ export default function ShowOrdersResendDialog({ open, onOpenChange, showId, sho
           <DialogDescription className="truncate">{showTitle}</DialogDescription>
         </DialogHeader>
 
+        <div className="rounded-md border border-border p-2 bg-muted/30 space-y-1.5">
+          <div className="text-[11px] font-semibold flex items-center gap-1">
+            <UserPlus className="w-3 h-3" /> Kirim token baru ke nomor (tanpa order)
+          </div>
+          <div className="flex gap-1.5">
+            <Input
+              value={manualPhone}
+              onChange={(e) => setManualPhone(e.target.value)}
+              placeholder="628xxxxxxxxx"
+              inputMode="tel"
+              className="h-8 text-xs flex-1"
+              disabled={manualSending}
+            />
+            <Button size="sm" className="h-8 text-xs" onClick={sendManual} disabled={manualSending || !manualPhone}>
+              {manualSending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3 mr-1" />}
+              Kirim
+            </Button>
+          </div>
+          <p className="text-[10px] text-muted-foreground">Token baru (1 perangkat) + info replay & sandi akan dikirim via WA.</p>
+        </div>
+
         <div className="flex flex-wrap items-center gap-2 text-xs">
           <Badge variant={filter === 'failed' ? 'default' : 'outline'} className="cursor-pointer" onClick={() => setFilter('failed')}>
-            Gagal/Belum: {counts.failed}
+            Gagal/Belum: {counts.failed + counts.pending}
+          </Badge>
+          <Badge variant={filter === 'pending' ? 'default' : 'outline'} className="cursor-pointer" onClick={() => setFilter('pending')}>
+            Pending/Batal: {counts.pending}
           </Badge>
           <Badge variant={filter === 'paid' ? 'default' : 'outline'} className="cursor-pointer" onClick={() => setFilter('paid')}>
             Paid: {counts.sent + counts.failed}
@@ -134,7 +189,7 @@ export default function ShowOrdersResendDialog({ open, onOpenChange, showId, sho
               {bulkSending ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Send className="w-3 h-3 mr-1" />}
               Kirim Ulang ({filtered.length})
             </Button>
-            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => resendBulk(true)} disabled={bulkSending} title="Paksa kirim meski sudah terkirim">
+            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => resendBulk(true)} disabled={bulkSending} title="Paksa kirim — termasuk order pending/batal akan diberi token baru">
               Paksa Kirim
             </Button>
             <Button size="sm" variant="ghost" className="h-7" onClick={load}><RefreshCw className="w-3 h-3" /></Button>
@@ -177,8 +232,8 @@ export default function ShowOrdersResendDialog({ open, onOpenChange, showId, sho
                     <Button
                       size="sm" variant="outline" className="h-7 mt-1"
                       onClick={(e) => resendOne(r.id, e.shiftKey)}
-                      disabled={!!sending[r.id] || r.status !== 'paid'}
-                      title="Kirim ulang WA. Shift+klik = paksa kirim meski sudah terkirim"
+                      disabled={!!sending[r.id] || r.kind === 'coin_topup'}
+                      title={r.status === 'paid' ? 'Kirim ulang WA. Shift+klik = paksa kirim meski sudah terkirim' : 'Pending/batal — token baru akan dibuat & order ditandai paid'}
                     >
                       {sending[r.id] ? <Loader2 className="w-3 h-3 animate-spin" /> : <><Send className="w-3 h-3 mr-1" />Kirim</>}
                     </Button>
