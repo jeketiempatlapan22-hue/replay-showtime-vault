@@ -12,7 +12,7 @@ const corsHeaders = {
 // Static credentials per playback_baru.txt
 const X_TOKEN_ID = '114e0e89-f8b4-44ee-9354-bb06805cc02f';
 const X_SEC_KEY = '49c647f3-c84b-4b93-9b84-9d1ad158428e';
-const PARTNER_SECRET = Deno.env.get('HANABIRA_PARTNER_SECRET') || 'Hanabirastream2026';
+const PARTNER_SECRET = Deno.env.get('HANABIRA_PARTNER_SECRET') || '';
 const PLAYBACK_URL = 'https://idn.mediastream48.workers.dev/api/proxy/playback';
 
 function b64url(bytes: Uint8Array): string {
@@ -54,6 +54,11 @@ async function generateApiToken(showId: string): Promise<string> {
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   try {
+    if (!PARTNER_SECRET) {
+      return new Response(JSON.stringify({ error: 'server_misconfigured' }), {
+        status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
     // Public endpoint — no auth required. Credentials are short-lived (2h) and
     // tied to a specific showId set by admin.
 
