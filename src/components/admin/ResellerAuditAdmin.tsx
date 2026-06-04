@@ -148,9 +148,14 @@ export default function ResellerAuditAdmin() {
                         onClick={() => setPending({ type: 'exhaust', phone: g.phone, label: g.label })}>
                         <ShieldOff className="w-3.5 h-3.5 mr-1" />Habiskan link
                       </Button>
+                      <Button size="sm" variant="ghost" className="h-7 text-blue-600 hover:text-blue-600"
+                        title="Lepaskan perangkat agar link bisa dipakai lagi"
+                        onClick={() => setPending({ type: 'reset_devices', phone: g.phone, label: g.label })}>
+                        <RotateCcw className="w-3.5 h-3.5 mr-1" />Reset device
+                      </Button>
                       <Button size="sm" variant="ghost" className="h-7 text-destructive hover:text-destructive"
-                        onClick={() => setPending({ type: 'reset', phone: g.phone, label: g.label })}>
-                        <Trash2 className="w-3.5 h-3.5 mr-1" />Reset
+                        onClick={() => setPending({ type: 'clear_log', phone: g.phone, label: g.label })}>
+                        <Trash2 className="w-3.5 h-3.5 mr-1" />Hapus riwayat
                       </Button>
                     </div>
                   </div>
