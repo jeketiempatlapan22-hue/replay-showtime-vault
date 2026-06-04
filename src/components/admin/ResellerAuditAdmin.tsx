@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ClipboardList, RefreshCw, Search, Trash2, ShieldOff } from 'lucide-react';
+import { ClipboardList, RefreshCw, Search, Trash2, ShieldOff, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -22,7 +22,8 @@ type StatRow = {
 };
 
 type PendingAction =
-  | { type: 'reset'; phone?: string; label?: string }
+  | { type: 'clear_log'; phone?: string; label?: string }
+  | { type: 'reset_devices'; phone?: string; label?: string }
   | { type: 'exhaust'; phone: string; label?: string };
 
 const kindBadge: Record<string, { label: string; cls: string }> = {
@@ -68,10 +69,14 @@ export default function ResellerAuditAdmin() {
     if (!pending || busy) return;
     setBusy(true);
     try {
-      if (pending.type === 'reset') {
+      if (pending.type === 'clear_log') {
         const { data, error } = await supabase.rpc('admin_clear_reseller_copy_log', { _phone: pending.phone ?? null });
         if (error) throw error;
         toast({ title: `Terhapus ${data ?? 0} catatan` });
+      } else if (pending.type === 'reset_devices') {
+        const { data, error } = await supabase.rpc('admin_reset_reseller_token_devices', { _phone: pending.phone ?? null });
+        if (error) throw error;
+        toast({ title: `${data ?? 0} perangkat dilepas. Link bisa dipakai lagi di perangkat lain.` });
       } else {
         const { data, error } = await supabase.rpc('admin_exhaust_reseller_tokens', { _phone: pending.phone });
         if (error) throw error;
@@ -90,8 +95,12 @@ export default function ResellerAuditAdmin() {
     new Date(s).toLocaleString('id-ID', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
 
   const target = pending
-    ? (pending.type === 'reset'
+    ? (pending.type === 'clear_log'
         ? (pending.phone ? `riwayat salin link +${pending.phone}` : 'SELURUH riwayat salin link reseller')
+        : pending.type === 'reset_devices'
+        ? (pending.phone
+            ? `daftar perangkat semua link token milik +${pending.phone}. Link tetap aktif dan bisa dipakai lagi di perangkat lain.`
+            : `daftar perangkat SEMUA link token reseller. Semua link tetap aktif.`)
         : `SEMUA link token aktif +${pending.phone} (link akan tidak bisa dipakai lagi)`)
     : '';
 
@@ -106,8 +115,11 @@ export default function ResellerAuditAdmin() {
             <Button size="sm" variant="outline" onClick={load} disabled={loading}>
               <RefreshCw className={`w-4 h-4 mr-1 ${loading ? 'animate-spin' : ''}`} />Muat ulang
             </Button>
-            <Button size="sm" variant="destructive" onClick={() => setPending({ type: 'reset' })} disabled={loading || rows.length === 0}>
-              <Trash2 className="w-4 h-4 mr-1" />Hapus semua
+            <Button size="sm" variant="outline" onClick={() => setPending({ type: 'reset_devices' })} disabled={loading || rows.length === 0} title="Lepaskan semua perangkat dari semua link reseller. Link tetap aktif.">
+              <RotateCcw className="w-4 h-4 mr-1" />Reset device semua
+            </Button>
+            <Button size="sm" variant="destructive" onClick={() => setPending({ type: 'clear_log' })} disabled={loading || rows.length === 0}>
+              <Trash2 className="w-4 h-4 mr-1" />Hapus riwayat
             </Button>
           </div>
         </CardHeader>
@@ -136,9 +148,14 @@ export default function ResellerAuditAdmin() {
                         onClick={() => setPending({ type: 'exhaust', phone: g.phone, label: g.label })}>
                         <ShieldOff className="w-3.5 h-3.5 mr-1" />Habiskan link
                       </Button>
+                      <Button size="sm" variant="ghost" className="h-7 text-blue-600 hover:text-blue-600"
+                        title="Lepaskan perangkat agar link bisa dipakai lagi"
+                        onClick={() => setPending({ type: 'reset_devices', phone: g.phone, label: g.label })}>
+                        <RotateCcw className="w-3.5 h-3.5 mr-1" />Reset device
+                      </Button>
                       <Button size="sm" variant="ghost" className="h-7 text-destructive hover:text-destructive"
-                        onClick={() => setPending({ type: 'reset', phone: g.phone, label: g.label })}>
-                        <Trash2 className="w-3.5 h-3.5 mr-1" />Reset
+                        onClick={() => setPending({ type: 'clear_log', phone: g.phone, label: g.label })}>
+                        <Trash2 className="w-3.5 h-3.5 mr-1" />Hapus riwayat
                       </Button>
                     </div>
                   </div>
@@ -170,11 +187,15 @@ export default function ResellerAuditAdmin() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {pending?.type === 'exhaust' ? 'Habiskan link token reseller?' : 'Konfirmasi hapus riwayat'}
+              {pending?.type === 'exhaust'
+                ? 'Habiskan link token reseller?'
+                : pending?.type === 'reset_devices'
+                ? 'Reset perangkat link token?'
+                : 'Konfirmasi hapus riwayat'}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              Anda akan {pending?.type === 'exhaust' ? 'menghabiskan (revoke)' : 'menghapus'} {target}.
-              Tindakan ini <strong>tidak bisa dibatalkan</strong>.
+              Anda akan {pending?.type === 'exhaust' ? 'menghabiskan (revoke)' : pending?.type === 'reset_devices' ? 'melepaskan' : 'menghapus'} {target}.
+              {pending?.type !== 'reset_devices' && <> Tindakan ini <strong>tidak bisa dibatalkan</strong>.</>}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -182,7 +203,7 @@ export default function ResellerAuditAdmin() {
             <AlertDialogAction
               onClick={(e) => { e.preventDefault(); void confirmAction(); }}
               disabled={busy}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              className={pending?.type === 'reset_devices' ? '' : 'bg-destructive text-destructive-foreground hover:bg-destructive/90'}
             >
               {busy ? 'Memproses…' : 'Ya, lanjutkan'}
             </AlertDialogAction>
