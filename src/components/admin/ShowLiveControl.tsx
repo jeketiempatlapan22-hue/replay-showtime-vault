@@ -113,26 +113,29 @@ export default function ShowLiveControl({ showId, showTitle }: Props) {
 
     setSaving(true);
     try {
-      // Pastikan hanya satu show yang is_live = true
-      if (isLive) {
-        await supabase.from('active_shows').update({ is_live: false }).neq('id', showId).eq('is_live', true);
-      }
-      const { error } = await supabase.from('active_shows').update({
-        is_live: isLive,
-        live_auto_schedule: autoSchedule,
-        live_url: normalizedLiveUrl,
-        live_type: liveType,
-        live_sources: normalizedSources,
-        live_password: livePassword,
-        live_require_password: requirePw,
-        replay_mode: replayMode,
-        replay_m3u8_url: replayM3u8.trim(),
-        replay_youtube_url: normalizedReplayYt,
-        idn_show_id: idnShowId.trim(),
-        group_link: groupLink.trim(),
-        replay_info: replayInfo.trim(),
-      } as any).eq('id', showId);
+      const { data, error } = await supabase.functions.invoke('manage-live', {
+        body: {
+          action: 'upsert_active_show',
+          show: {
+            id: showId,
+            is_live: isLive,
+            live_auto_schedule: autoSchedule,
+            live_url: normalizedLiveUrl,
+            live_type: liveType,
+            live_sources: normalizedSources,
+            live_password: livePassword,
+            live_require_password: requirePw,
+            replay_mode: replayMode,
+            replay_m3u8_url: replayM3u8.trim(),
+            replay_youtube_url: normalizedReplayYt,
+            idn_show_id: idnShowId.trim(),
+            group_link: groupLink.trim(),
+            replay_info: replayInfo.trim(),
+          },
+        },
+      });
       if (error) throw error;
+      if (data?.error) throw new Error(data.error);
       setLiveUrl(normalizedLiveUrl);
       setReplayYt(normalizedReplayYt);
       setLiveSources(normalizedSources);
