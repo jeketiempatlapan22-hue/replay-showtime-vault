@@ -561,12 +561,12 @@ export default function Live() {
   const liveActive = !!(status?.enabled || unlocked?.enabled);
 
   useEffect(() => {
-    if (!liveActive) { setChatReady(false); return; }
-    // Delay chat mount lebih lama (5s) supaya player live mendapat bandwidth & CPU dulu
-    // saat 1000+ user terhubung bersamaan. Mengurangi lonjakan websocket awal.
-    const delay = window.setTimeout(() => setChatReady(true), 5000);
+    // Mount chat segera setelah unlock berhasil (tidak perlu menunggu live aktif),
+    // dengan delay kecil agar player tetap mendapat prioritas resource saat ON AIR.
+    if (!unlocked) { setChatReady(false); return; }
+    const delay = window.setTimeout(() => setChatReady(true), liveActive ? 3000 : 600);
     return () => window.clearTimeout(delay);
-  }, [liveActive]);
+  }, [unlocked, liveActive]);
 
   // ============ VIEWER COUNTER (presence) — count unique browser_id ============
   // Heavily throttled to stay light at 1000+ concurrent viewers. Each sync/join/leave
@@ -752,7 +752,7 @@ export default function Live() {
             <div className="rounded-2xl bg-card/80 border border-border p-3 sm:p-4 space-y-3">
               <div className="flex items-start justify-between gap-2">
                 <h2 className="text-base sm:text-lg font-bold text-foreground font-sans leading-tight flex-1 min-w-0">
-                  {unlocked?.title || status?.title || 'Live'}
+                  {status?.title || unlocked?.title || 'Live'}
                 </h2>
                 {(() => {
                   const d = typeof document !== 'undefined' ? (document as PiPDocument) : null;
