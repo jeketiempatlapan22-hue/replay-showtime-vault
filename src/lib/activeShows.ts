@@ -24,7 +24,7 @@ export interface ActiveShow {
   is_live?: boolean;
   live_auto_schedule?: boolean;
   live_url?: string;
-  live_type?: 'm3u8' | 'youtube';
+  live_type?: 'm3u8' | 'youtube' | 'cloudflare';
   live_sources?: { label: string; type: 'm3u8' | 'youtube' | 'cloudflare'; url: string }[];
   live_password?: string;
   live_require_password?: boolean;
@@ -32,8 +32,20 @@ export interface ActiveShow {
   replay_mode?: boolean;
   replay_m3u8_url?: string;
   replay_youtube_url?: string;
+  idn_show_id?: string;
+  group_link?: string;
+  replay_info?: string;
   created_at?: string;
   updated_at?: string;
+}
+
+async function manageActiveShow(action: 'upsert_active_show' | 'delete_active_show', payload: Record<string, unknown>) {
+  const { data, error } = await supabase.functions.invoke('manage-live', {
+    body: { action, ...payload },
+  });
+  if (error) throw error;
+  if (data?.error) throw new Error(data.error);
+  return data;
 }
 
 export async function getActiveShows(adminMode = false): Promise<ActiveShow[]> {
@@ -57,20 +69,14 @@ export async function getActiveShows(adminMode = false): Promise<ActiveShow[]> {
 }
 
 export async function upsertActiveShow(show: Partial<ActiveShow> & { id?: string }) {
-  if (show.id) {
-    const { id, created_at, updated_at, ...rest } = show;
-    const { error } = await supabase.from('active_shows').update(rest).eq('id', id);
-    if (error) throw error;
-  } else {
-    const { id, created_at, updated_at, ...rest } = show;
-    const { error } = await supabase.from('active_shows').insert(rest as any);
-    if (error) throw error;
-  }
+  // Admin mutations go through the backend so sensitive stream/password columns
+  // stay protected from public Data API reads while admins can still fully manage shows.
+  const { created_at, updated_at, ...rest } = show;
+  await manageActiveShow('upsert_active_show', { show: rest as Record<string, unknown> });
 }
 
 export async function deleteActiveShow(id: string) {
-  const { error } = await supabase.from('active_shows').delete().eq('id', id);
-  if (error) throw error;
+  await manageActiveShow('delete_active_show', { id });
 }
 
 export function getShowDateTime(s: ActiveShow): Date {
