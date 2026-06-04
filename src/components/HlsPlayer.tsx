@@ -390,12 +390,17 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
           const lvl = hls.levels[data.level];
           setAutoActiveLabel(lvl?.height ? `${lvl.height}p` : '');
         } else if (hls && userQualityRef.current) {
-          // Enforce user's manual quality if hls.js drifted
+          // Enforce user's manual quality if hls.js drifted. Only act when the
+          // current level's height truly differs AND a matching level exists,
+          // to avoid bouncing between renditions.
           const lvl = hls.levels[data.level];
           if (lvl?.height && lvl.height !== userQualityRef.current) {
             const target = hls.levels.findIndex(l => l.height === userQualityRef.current);
-            if (target >= 0 && target !== data.level) {
-              try { hls.currentLevel = target; } catch { /* ignore */ }
+            if (target >= 0 && target !== data.level && hls.currentLevel !== target) {
+              try {
+                hls.autoLevelCapping = target;
+                hls.currentLevel = target;
+              } catch { /* ignore */ }
             }
           }
         }
@@ -486,25 +491,31 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
   }, [src, setBufferingState]);
 
   const selectQuality = (levelIndex: number) => {
-    if (!hlsRef.current) return;
-    hlsRef.current.currentLevel = levelIndex;
-    setCurrentQuality(levelIndex);
-    setShowQualityMenu(false);
+    const hls = hlsRef.current;
+    if (!hls) return;
+    // IMPORTANT: update userQualityRef BEFORE switching level, otherwise the
+    // LEVEL_SWITCHED enforcement still sees the previous preference and snaps
+    // the player back to the old quality (causes "resolusi naik-turun sendiri").
     if (levelIndex === -1) {
-      // Auto: re-enable adaptive
-      hlsRef.current.autoLevelCapping = -1;
-      hlsRef.current.capLevelToPlayerSize = true;
       userQualityRef.current = null;
+      hls.autoLevelCapping = -1;
+      hls.capLevelToPlayerSize = true;
+      hls.currentLevel = -1;
       try { localStorage.removeItem('replaytime-quality-height'); } catch { /* ignore */ }
     } else {
-      const lvl = hlsRef.current.levels[levelIndex];
+      const lvl = hls.levels[levelIndex];
       const h = lvl?.height || null;
-      // Lock the level so ABR/cap doesn't override user's choice
-      hlsRef.current.autoLevelCapping = levelIndex;
-      hlsRef.current.capLevelToPlayerSize = false;
       userQualityRef.current = h;
+      // Lock the level so ABR/cap doesn't override user's choice
+      hls.capLevelToPlayerSize = false;
+      hls.autoLevelCapping = levelIndex;
+      hls.loadLevel = levelIndex;
+      hls.nextLevel = levelIndex;
+      hls.currentLevel = levelIndex;
       if (h) try { localStorage.setItem('replaytime-quality-height', String(h)); } catch { /* ignore */ }
     }
+    setCurrentQuality(levelIndex);
+    setShowQualityMenu(false);
   };
 
   // Video event listeners
