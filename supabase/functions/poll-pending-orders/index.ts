@@ -292,10 +292,12 @@ Deno.serve(async (req) => {
 
   const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
   const { data: settings } = await admin
-    .from('site_settings').select('key,value').in('key', ['site_origin', 'wa_message_template']);
+    .from('site_settings').select('key,value').in('key', ['site_origin', 'wa_message_template', 'wa_show_template']);
   const sm = new Map((settings ?? []).map((s) => [s.key, s.value]));
   const origin = (sm.get('site_origin') || 'https://replaytime.lovable.app').replace(/\/+$/, '');
   const tpl = sm.get('wa_message_template') || DEFAULT_WA_TPL;
+  const showTpl = sm.get('wa_show_template') ||
+    '🔐 *TOKEN LIVE SATUAN*\n\n🎤 *{title}*\n\n📅 {date}\n\n🔗 *Link Live:*\n{live_link}\n\n🎬 *Link Replay:* {site}\n\n{password_line}👤 Hanya untuk *1 perangkat pertama*.\n\n— *ReplayTime* 💖';
 
   // Pull recent pending orders (last 7 days, newest first, generous cap).
   // Pakasir dynamic QRIS payments can be paid hours after creation; we keep
