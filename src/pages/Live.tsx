@@ -142,6 +142,13 @@ export default function Live() {
   });
 
   const showId = search.get('show') || '';
+  const isWeakNetwork = useMemo(() => {
+    if (typeof navigator === 'undefined') return false;
+    const conn = (navigator as Navigator & { connection?: { effectiveType?: string; downlink?: number; saveData?: boolean } }).connection;
+    const effective = conn?.effectiveType || '';
+    const downlink = typeof conn?.downlink === 'number' ? conn.downlink : 99;
+    return /^(slow-2g|2g|3g)$/i.test(effective) || downlink < 1.5 || conn?.saveData === true;
+  }, []);
 
   const fetchStatus = () => {
     if (showId) {
@@ -562,11 +569,11 @@ export default function Live() {
 
   useEffect(() => {
     // Mount chat segera setelah unlock berhasil (tidak perlu menunggu live aktif),
-    // dengan delay kecil agar player tetap mendapat prioritas resource saat ON AIR.
+    // dengan delay agar player tetap mendapat prioritas resource saat ON AIR.
     if (!unlocked) { setChatReady(false); return; }
-    const delay = window.setTimeout(() => setChatReady(true), liveActive ? 3000 : 600);
+    const delay = window.setTimeout(() => setChatReady(true), liveActive ? (isWeakNetwork ? 9000 : 5000) : 900);
     return () => window.clearTimeout(delay);
-  }, [unlocked, liveActive]);
+  }, [unlocked, liveActive, isWeakNetwork]);
 
   // ============ VIEWER COUNTER (presence) — count unique browser_id ============
   // Heavily throttled to stay light at 1000+ concurrent viewers. Each sync/join/leave
