@@ -69,10 +69,14 @@ export default function ResellerAuditAdmin() {
     if (!pending || busy) return;
     setBusy(true);
     try {
-      if (pending.type === 'reset') {
+      if (pending.type === 'clear_log') {
         const { data, error } = await supabase.rpc('admin_clear_reseller_copy_log', { _phone: pending.phone ?? null });
         if (error) throw error;
         toast({ title: `Terhapus ${data ?? 0} catatan` });
+      } else if (pending.type === 'reset_devices') {
+        const { data, error } = await supabase.rpc('admin_reset_reseller_token_devices', { _phone: pending.phone ?? null });
+        if (error) throw error;
+        toast({ title: `${data ?? 0} perangkat dilepas. Link bisa dipakai lagi di perangkat lain.` });
       } else {
         const { data, error } = await supabase.rpc('admin_exhaust_reseller_tokens', { _phone: pending.phone });
         if (error) throw error;
@@ -91,8 +95,12 @@ export default function ResellerAuditAdmin() {
     new Date(s).toLocaleString('id-ID', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
 
   const target = pending
-    ? (pending.type === 'reset'
+    ? (pending.type === 'clear_log'
         ? (pending.phone ? `riwayat salin link +${pending.phone}` : 'SELURUH riwayat salin link reseller')
+        : pending.type === 'reset_devices'
+        ? (pending.phone
+            ? `daftar perangkat semua link token milik +${pending.phone}. Link tetap aktif dan bisa dipakai lagi di perangkat lain.`
+            : `daftar perangkat SEMUA link token reseller. Semua link tetap aktif.`)
         : `SEMUA link token aktif +${pending.phone} (link akan tidak bisa dipakai lagi)`)
     : '';
 
