@@ -807,7 +807,7 @@ export default function Live() {
             {/* LIVE CHAT */}
             {chatReady ? (
               <Suspense fallback={<ChatFallback />}>
-                <LiveChat />
+                <LiveChat lite={isWeakNetwork} />
               </Suspense>
             ) : <ChatFallback />}
           </>
