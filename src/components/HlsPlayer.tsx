@@ -187,6 +187,33 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
       return Number.isFinite(current) && current > 0 ? current : -1;
     };
 
+    // Network/device profile: weak connections should prefer stability over ultra-low latency.
+    const conn = (navigator as Navigator & { connection?: { effectiveType?: string; downlink?: number; saveData?: boolean } }).connection;
+    const effective = conn?.effectiveType || '';
+    const downlink = typeof conn?.downlink === 'number' ? conn.downlink : 99;
+    const saveData = conn?.saveData === true;
+    const isVeryWeak = /^(slow-2g|2g)$/i.test(effective) || downlink < 0.8 || saveData;
+    const isWeak = isVeryWeak || /^3g$/i.test(effective) || downlink < 1.5;
+    const isMobile = typeof navigator !== 'undefined' && /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent || '');
+    const deviceMem = (navigator as Navigator & { deviceMemory?: number }).deviceMemory || 4;
+    const lowMem = deviceMem <= 2;
+    const liveStartDelay = isVeryWeak ? 24 : isWeak ? 18 : 6;
+    const liveSyncCount = isVeryWeak ? 8 : isWeak ? 6 : 3;
+    const liveMaxLatencyCount = isVeryWeak ? 30 : isWeak ? 24 : 12;
+    const stallRecoveryMs = isWeak ? 9000 : 12000;
+    const initialBwEstimate = isVeryWeak ? 220_000 : isWeak ? 450_000 : 1_200_000;
+    // Adaptive buffer sizing: give bad networks a larger forward cushion, while
+    // keeping low-memory devices conservative so the page itself stays responsive.
+    const bufferProfile = lowMem
+      ? { back: 16, max: 45, maxMax: 75, size: 45 * 1000 * 1000 }
+      : isVeryWeak
+        ? { back: 30, max: 75, maxMax: 150, size: 75 * 1000 * 1000 }
+        : isWeak
+          ? { back: 28, max: 65, maxMax: 140, size: 70 * 1000 * 1000 }
+          : isMobile
+            ? { back: 30, max: 90, maxMax: 240, size: 100 * 1000 * 1000 }
+            : { back: 45, max: 120, maxMax: 360, size: 180 * 1000 * 1000 };
+
     const seekToLiveEdgeOnce = (syncPosition?: number | null) => {
       if (initialLiveEdgeSyncRef.current) return;
       const seekable = video.seekable;
@@ -194,7 +221,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
       const edge = Number.isFinite(syncPosition || NaN) ? Number(syncPosition) : fallbackEdge;
       if (!Number.isFinite(edge) || edge <= 0) return;
       initialLiveEdgeSyncRef.current = true;
-      const target = Math.max(0, edge - 1.5);
+      const target = Math.max(0, edge - liveStartDelay);
       if (Math.abs(video.currentTime - target) > 2) {
         try { video.currentTime = target; } catch { /* ignore */ }
       }
@@ -211,8 +238,9 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
           lastProgressRef.current = { time: current, checkedAt: now, recoveries: 0 };
           return;
         }
-        // Only act after 12s of true stall to avoid interrupting normal playback
-        if (now - last.checkedAt < 12000) return;
+        // Only act after a true stall to avoid interrupting normal playback.
+        // On weak networks recover a little earlier so the spinner does not sit too long.
+        if (now - last.checkedAt < stallRecoveryMs) return;
 
         setBufferingState(true);
         lastProgressRef.current = { time: current, checkedAt: now, recoveries: last.recoveries + 1 };
@@ -225,7 +253,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
               const latency = Number.isFinite(edge) ? edge - current : 0;
               // Kalau benar-benar jauh tertinggal, lompat lembut mendekati live edge.
               // Kalau tidak, cukup lanjutkan loading supaya tidak terlihat refresh.
-              if (latency > 45) video.currentTime = Math.max(0, edge - 12);
+              if (latency > Math.max(45, liveStartDelay * 3)) video.currentTime = Math.max(0, edge - liveStartDelay);
               hlsInstance.startLoad(-1);
             } else {
               hlsInstance.startLoad(resumePosition());
@@ -235,23 +263,6 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
         safePlay();
       }, 4000);
     };
-
-    // Detect weak network → start bandwidth estimate low so ABR picks 360p/270p first
-    const conn = (navigator as Navigator & { connection?: { effectiveType?: string; downlink?: number; saveData?: boolean } }).connection;
-    const effective = conn?.effectiveType || '';
-    const downlink = typeof conn?.downlink === 'number' ? conn.downlink : 99;
-    const isWeak = /^(slow-2g|2g|3g)$/i.test(effective) || downlink < 1.5 || conn?.saveData === true;
-    const initialBwEstimate = isWeak ? 350_000 : 1_200_000;
-    // Adaptive buffer sizing: cukup besar untuk menahan fluktuasi jaringan tanpa memboroskan
-    // memori di perangkat low-end. Mobile/weak network pakai buffer lebih kecil.
-    const isMobile = typeof navigator !== 'undefined' && /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent || '');
-    const deviceMem = (navigator as Navigator & { deviceMemory?: number }).deviceMemory || 4;
-    const lowMem = deviceMem <= 2;
-    const bufferProfile = isWeak || lowMem
-      ? { back: 20, max: 45, maxMax: 90, size: 50 * 1000 * 1000 }
-      : isMobile
-        ? { back: 30, max: 90, maxMax: 240, size: 100 * 1000 * 1000 }
-        : { back: 45, max: 120, maxMax: 360, size: 180 * 1000 * 1000 };
 
     if (Hls.isSupported()) {
       const attachRequestHeaders = (target: { setRequestHeader?: (key: string, value: string) => void; set?: (key: string, value: string) => void }) => {
@@ -273,32 +284,32 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
           return new Request(context.url, nextInit);
         },
         enableWorker: true,
-        // Low-latency HLS aktif hanya jika browser & manifest mendukung. hls.js
-        // otomatis fallback ke mode normal jika manifest bukan LL-HLS, jadi aman.
-        lowLatencyMode: true,
+        // Weak networks need a steadier buffer more than ultra-low latency.
+        // Keep LL-HLS for good networks, but avoid chasing the live edge on bad ones.
+        lowLatencyMode: !isWeak,
         // Buffer tuning adaptif berdasarkan profil perangkat & jaringan.
         backBufferLength: bufferProfile.back,
         maxBufferLength: bufferProfile.max,
         maxMaxBufferLength: bufferProfile.maxMax,
         maxBufferSize: bufferProfile.size,
-        maxBufferHole: 0.5,
-        highBufferWatchdogPeriod: 2,
-        nudgeOffset: 0.1,
-        nudgeMaxRetry: 8,
-        maxFragLookUpTolerance: 0.2,
+        maxBufferHole: isWeak ? 1.2 : 0.5,
+        highBufferWatchdogPeriod: isWeak ? 3 : 2,
+        nudgeOffset: isWeak ? 0.2 : 0.1,
+        nudgeMaxRetry: isWeak ? 12 : 8,
+        maxFragLookUpTolerance: isWeak ? 0.5 : 0.2,
         // ABR: mulai dari kualitas terendah supaya cepat play, lalu naikkan halus.
         startLevel: -1,
         autoStartLoad: true,
         abrEwmaDefaultEstimate: initialBwEstimate,
         // Live: EWMA cepat agar reaktif, slow lebih panjang agar tidak osilasi.
-        abrEwmaFastLive: 4.0,
-        abrEwmaSlowLive: 12.0,
-        abrEwmaFastVoD: 3.0,
-        abrEwmaSlowVoD: 9.0,
+        abrEwmaFastLive: isWeak ? 8.0 : 4.0,
+        abrEwmaSlowLive: isWeak ? 24.0 : 12.0,
+        abrEwmaFastVoD: isWeak ? 6.0 : 3.0,
+        abrEwmaSlowVoD: isWeak ? 18.0 : 9.0,
         // Lebih konservatif saat naik level → kurangi switch-down setelah naik
         // (penyebab utama rebuffer saat level berpindah-pindah).
-        abrBandWidthFactor: 0.8,
-        abrBandWidthUpFactor: 0.5,
+        abrBandWidthFactor: isWeak ? 0.65 : 0.8,
+        abrBandWidthUpFactor: isWeak ? 0.35 : 0.5,
         abrMaxWithRealBitrate: true,
         testBandwidth: true,
         capLevelToPlayerSize: true,
@@ -313,21 +324,21 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
         levelLoadingMaxRetry: 8,
         levelLoadingRetryDelay: 400,
         levelLoadingMaxRetryTimeout: 6_000,
-        fragLoadingTimeOut: 25_000,
-        fragLoadingMaxRetry: 10,
-        fragLoadingRetryDelay: 500,
-        fragLoadingMaxRetryTimeout: 8_000,
+        fragLoadingTimeOut: isWeak ? 35_000 : 25_000,
+        fragLoadingMaxRetry: isWeak ? 14 : 10,
+        fragLoadingRetryDelay: isWeak ? 700 : 500,
+        fragLoadingMaxRetryTimeout: isWeak ? 12_000 : 8_000,
         // Stall detection — toleransi sedikit lebih longgar agar fluktuasi
         // jaringan tidak memicu nudge/recovery yang membuat video tersendat.
-        maxStarvationDelay: 6,
-        maxLoadingDelay: 6,
+        maxStarvationDelay: isWeak ? 10 : 6,
+        maxLoadingDelay: isWeak ? 10 : 6,
         appendErrorMaxRetry: 5,
         startPosition: -1,
         liveDurationInfinity: true,
-        // Sync ~3 segmen dari edge → latency rendah tapi tetap ada bantal buffer
-        // untuk menyerap jitter; max latency lebih besar untuk hindari snap.
-        liveSyncDurationCount: 3,
-        liveMaxLatencyDurationCount: 12,
+        // Stable live: weak networks intentionally stay farther behind edge to
+        // absorb jitter and avoid repeated rebuffer while switching fragments.
+        liveSyncDurationCount: liveSyncCount,
+        liveMaxLatencyDurationCount: liveMaxLatencyCount,
         progressive: true,
       });
       hlsRef.current = hls;
@@ -356,11 +367,12 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
             setCurrentQuality(match.index);
           }
         } else if (isWeak && hls) {
-          // Weak network: cap ABR ceiling to lowest rendition <= 360p (fallback 270p) until network improves.
+          // Weak network: cap ABR ceiling low on the first automatic open.
           // User can still pick higher manually; this only sets the *cap*, not a hard lock.
+          const maxAutoHeight = isVeryWeak ? 270 : 360;
           const capCandidate = manifestLevels
             .map((lvl, i) => ({ i, h: lvl.height || 0 }))
-            .filter(x => x.h > 0 && x.h <= 360)
+            .filter(x => x.h > 0 && x.h <= maxAutoHeight)
             .sort((a, b) => b.h - a.h)[0];
           if (capCandidate) hls.autoLevelCapping = capCandidate.i;
         }
@@ -404,10 +416,11 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
           const lvl = hls.levels[data.level];
           if (lvl?.height && lvl.height !== userQualityRef.current) {
             const target = hls.levels.findIndex(l => l.height === userQualityRef.current);
-            if (target >= 0 && target !== data.level && hls.currentLevel !== target) {
+            if (target >= 0 && target !== data.level && hls.nextLevel !== target) {
               try {
                 hls.autoLevelCapping = target;
-                hls.currentLevel = target;
+                hls.loadLevel = target;
+                hls.nextLevel = target;
               } catch { /* ignore */ }
             }
           }

@@ -142,6 +142,13 @@ export default function Live() {
   });
 
   const showId = search.get('show') || '';
+  const isWeakNetwork = useMemo(() => {
+    if (typeof navigator === 'undefined') return false;
+    const conn = (navigator as Navigator & { connection?: { effectiveType?: string; downlink?: number; saveData?: boolean } }).connection;
+    const effective = conn?.effectiveType || '';
+    const downlink = typeof conn?.downlink === 'number' ? conn.downlink : 99;
+    return /^(slow-2g|2g|3g)$/i.test(effective) || downlink < 1.5 || conn?.saveData === true;
+  }, []);
 
   const fetchStatus = () => {
     if (showId) {
@@ -562,20 +569,20 @@ export default function Live() {
 
   useEffect(() => {
     // Mount chat segera setelah unlock berhasil (tidak perlu menunggu live aktif),
-    // dengan delay kecil agar player tetap mendapat prioritas resource saat ON AIR.
+    // dengan delay agar player tetap mendapat prioritas resource saat ON AIR.
     if (!unlocked) { setChatReady(false); return; }
-    const delay = window.setTimeout(() => setChatReady(true), liveActive ? 3000 : 600);
+    const delay = window.setTimeout(() => setChatReady(true), liveActive ? (isWeakNetwork ? 9000 : 5000) : 900);
     return () => window.clearTimeout(delay);
-  }, [unlocked, liveActive]);
+  }, [unlocked, liveActive, isWeakNetwork]);
 
   // ============ VIEWER COUNTER (presence) — count unique browser_id ============
   // Heavily throttled to stay light at 1000+ concurrent viewers. Each sync/join/leave
   // event at scale fans out O(N) updates; we coalesce them into a single recount
   // every 5 seconds and only when the tab is visible.
   const showKey = search.get('show') || 'global';
-  const [viewerCount, setViewerCount] = useState<number>(0);
+  const [viewerCount, setViewerCount] = useState<number | null>(null);
   useEffect(() => {
-    if (!liveActive) { setViewerCount(0); return; }
+    if (!liveActive || isWeakNetwork) { setViewerCount(null); return; }
     const bid = getBrowserId();
     const channel = supabase.channel(`live-viewers:${showKey}`, {
       config: { presence: { key: bid } },
@@ -622,7 +629,7 @@ export default function Live() {
       try { void channel.untrack(); } catch { /* ignore */ }
       supabase.removeChannel(channel);
     };
-  }, [liveActive, showKey]);
+  }, [liveActive, showKey, isWeakNetwork]);
 
   return (
     <div className="min-h-screen bg-background relative z-10">
@@ -692,10 +699,12 @@ export default function Live() {
                 </Suspense>
 
                 <div className="flex items-center justify-between flex-wrap gap-2 px-1">
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-500/10 border border-red-500/30 text-red-500 text-xs font-semibold">
-                    <Eye className="w-3.5 h-3.5" />
-                    {viewerCount.toLocaleString('id-ID')} menonton
-                  </span>
+                  {viewerCount !== null && (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-500/10 border border-red-500/30 text-red-500 text-xs font-semibold">
+                      <Eye className="w-3.5 h-3.5" />
+                      {viewerCount.toLocaleString('id-ID')} menonton
+                    </span>
+                  )}
                   {unlocked.watermark && (
                     <span className="text-[10px] font-mono text-muted-foreground">ID: {unlocked.watermark}</span>
                   )}
@@ -798,7 +807,7 @@ export default function Live() {
             {/* LIVE CHAT */}
             {chatReady ? (
               <Suspense fallback={<ChatFallback />}>
-                <LiveChat />
+                <LiveChat lite={isWeakNetwork} />
               </Suspense>
             ) : <ChatFallback />}
           </>
