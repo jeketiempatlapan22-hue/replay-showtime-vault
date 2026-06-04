@@ -114,11 +114,33 @@ export default function ShowOrdersResendDialog({ open, onOpenChange, showId, sho
   };
 
   const counts = rows.reduce((acc, r) => {
-    if (r.status !== 'paid') return acc;
+    if (r.status !== 'paid') { if (r.kind !== 'coin_topup') acc.pending++; return acc; }
     const w = waStatus[r.id] || 'none';
     if (w === 'sent') acc.sent++; else acc.failed++;
     return acc;
-  }, { sent: 0, failed: 0 });
+  }, { sent: 0, failed: 0, pending: 0 });
+
+  const sendManual = async () => {
+    const phoneDigits = manualPhone.replace(/\D/g, '').replace(/^0/, '62');
+    if (!/^62[0-9]{8,13}$/.test(phoneDigits)) {
+      toast({ title: 'Nomor tidak valid', description: 'Format: 628xxxxxxxxx', variant: 'destructive' });
+      return;
+    }
+    setManualSending(true);
+    const { data, error } = await supabase.functions.invoke('resend-show-wa', {
+      body: { manual_send: true, show_id: showId, phone: phoneDigits },
+    });
+    setManualSending(false);
+    if (error) { toast({ title: 'Gagal', description: error.message, variant: 'destructive' }); return; }
+    const d = data as any;
+    if (d?.sent) {
+      toast({ title: `Token baru terkirim ke ${d.phone}` });
+      setManualPhone('');
+      void load();
+    } else {
+      toast({ title: 'Gagal kirim', description: d?.error || 'unknown', variant: 'destructive' });
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
