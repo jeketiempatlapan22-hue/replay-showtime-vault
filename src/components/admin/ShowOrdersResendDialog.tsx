@@ -150,9 +150,33 @@ export default function ShowOrdersResendDialog({ open, onOpenChange, showId, sho
           <DialogDescription className="truncate">{showTitle}</DialogDescription>
         </DialogHeader>
 
+        <div className="rounded-md border border-border p-2 bg-muted/30 space-y-1.5">
+          <div className="text-[11px] font-semibold flex items-center gap-1">
+            <UserPlus className="w-3 h-3" /> Kirim token baru ke nomor (tanpa order)
+          </div>
+          <div className="flex gap-1.5">
+            <Input
+              value={manualPhone}
+              onChange={(e) => setManualPhone(e.target.value)}
+              placeholder="628xxxxxxxxx"
+              inputMode="tel"
+              className="h-8 text-xs flex-1"
+              disabled={manualSending}
+            />
+            <Button size="sm" className="h-8 text-xs" onClick={sendManual} disabled={manualSending || !manualPhone}>
+              {manualSending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3 mr-1" />}
+              Kirim
+            </Button>
+          </div>
+          <p className="text-[10px] text-muted-foreground">Token baru (1 perangkat) + info replay & sandi akan dikirim via WA.</p>
+        </div>
+
         <div className="flex flex-wrap items-center gap-2 text-xs">
           <Badge variant={filter === 'failed' ? 'default' : 'outline'} className="cursor-pointer" onClick={() => setFilter('failed')}>
-            Gagal/Belum: {counts.failed}
+            Gagal/Belum: {counts.failed + counts.pending}
+          </Badge>
+          <Badge variant={filter === 'pending' ? 'default' : 'outline'} className="cursor-pointer" onClick={() => setFilter('pending')}>
+            Pending/Batal: {counts.pending}
           </Badge>
           <Badge variant={filter === 'paid' ? 'default' : 'outline'} className="cursor-pointer" onClick={() => setFilter('paid')}>
             Paid: {counts.sent + counts.failed}
@@ -165,7 +189,7 @@ export default function ShowOrdersResendDialog({ open, onOpenChange, showId, sho
               {bulkSending ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Send className="w-3 h-3 mr-1" />}
               Kirim Ulang ({filtered.length})
             </Button>
-            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => resendBulk(true)} disabled={bulkSending} title="Paksa kirim meski sudah terkirim">
+            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => resendBulk(true)} disabled={bulkSending} title="Paksa kirim — termasuk order pending/batal akan diberi token baru">
               Paksa Kirim
             </Button>
             <Button size="sm" variant="ghost" className="h-7" onClick={load}><RefreshCw className="w-3 h-3" /></Button>
