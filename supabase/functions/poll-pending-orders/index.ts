@@ -231,11 +231,13 @@ async function processOrder(admin: ReturnType<typeof createClient>, order: any, 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
-  // Auth: cron-only. Must be invoked with the service-role bearer (pg_cron).
+  // Auth: invoked by pg_cron (anon-key bearer) or service-role/admin tooling.
+  // Reject anonymous traffic that doesn't carry one of the project keys.
   const authHeader = req.headers.get('Authorization') || '';
   const bearer = authHeader.replace(/^Bearer\s+/i, '').trim();
   const SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-  if (!bearer || !SERVICE_ROLE || bearer !== SERVICE_ROLE) {
+  const ANON = Deno.env.get('SUPABASE_ANON_KEY') || '';
+  if (!bearer || (bearer !== SERVICE_ROLE && bearer !== ANON)) {
     return new Response(JSON.stringify({ error: 'unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
 
