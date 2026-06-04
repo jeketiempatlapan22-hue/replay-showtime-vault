@@ -514,12 +514,13 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
       const lvl = hls.levels[levelIndex];
       const h = lvl?.height || null;
       userQualityRef.current = h;
-      // Lock the level so ABR/cap doesn't override user's choice
+      // Lock the level so ABR/cap doesn't override user's choice.
       hls.capLevelToPlayerSize = false;
       hls.autoLevelCapping = levelIndex;
       hls.loadLevel = levelIndex;
+      // Use nextLevel (no buffer flush) instead of currentLevel to avoid the
+      // hard reload that causes a visible rebuffer when switching renditions.
       hls.nextLevel = levelIndex;
-      hls.currentLevel = levelIndex;
       if (h) try { localStorage.setItem('replaytime-quality-height', String(h)); } catch { /* ignore */ }
     }
     setCurrentQuality(levelIndex);
