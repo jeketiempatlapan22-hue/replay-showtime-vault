@@ -346,7 +346,7 @@ Deno.serve(async (req) => {
         .from('orders').select('*').in('id', ids).eq('status', 'pending');
       if (!refreshed?.length) return;
       for (const o of refreshed) {
-        try { await processOrder(admin, o, apiKey, slug, origin, tpl); } catch { /* keep going */ }
+        try { await processOrder(admin, o, apiKey, slug, origin, tpl, showTpl); } catch { /* keep going */ }
       }
     }
   })();
