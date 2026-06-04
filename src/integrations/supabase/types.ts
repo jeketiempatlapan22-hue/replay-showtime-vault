@@ -1694,6 +1694,14 @@ export type Database = {
           target_title: string
         }[]
       }
+      admin_reset_reseller_audit_token_devices: {
+        Args: { _audit_id: string }
+        Returns: number
+      }
+      admin_reset_reseller_token_devices: {
+        Args: { _phone?: string }
+        Returns: number
+      }
       admin_revoke_reseller_token: {
         Args: { _audit_id: string }
         Returns: boolean
@@ -1960,6 +1968,10 @@ export type Database = {
           ok: boolean
           phone: string
         }[]
+      }
+      reseller_reset_token_devices: {
+        Args: { _audit_id: string; _phone: string; _pin: string }
+        Returns: number
       }
       reseller_revoke_token: {
         Args: { _audit_id: string; _phone: string; _pin: string }
