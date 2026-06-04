@@ -187,6 +187,33 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
       return Number.isFinite(current) && current > 0 ? current : -1;
     };
 
+    // Network/device profile: weak connections should prefer stability over ultra-low latency.
+    const conn = (navigator as Navigator & { connection?: { effectiveType?: string; downlink?: number; saveData?: boolean } }).connection;
+    const effective = conn?.effectiveType || '';
+    const downlink = typeof conn?.downlink === 'number' ? conn.downlink : 99;
+    const saveData = conn?.saveData === true;
+    const isVeryWeak = /^(slow-2g|2g)$/i.test(effective) || downlink < 0.8 || saveData;
+    const isWeak = isVeryWeak || /^3g$/i.test(effective) || downlink < 1.5;
+    const isMobile = typeof navigator !== 'undefined' && /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent || '');
+    const deviceMem = (navigator as Navigator & { deviceMemory?: number }).deviceMemory || 4;
+    const lowMem = deviceMem <= 2;
+    const liveStartDelay = isVeryWeak ? 24 : isWeak ? 18 : 6;
+    const liveSyncCount = isVeryWeak ? 8 : isWeak ? 6 : 3;
+    const liveMaxLatencyCount = isVeryWeak ? 30 : isWeak ? 24 : 12;
+    const stallRecoveryMs = isWeak ? 9000 : 12000;
+    const initialBwEstimate = isVeryWeak ? 220_000 : isWeak ? 450_000 : 1_200_000;
+    // Adaptive buffer sizing: give bad networks a larger forward cushion, while
+    // keeping low-memory devices conservative so the page itself stays responsive.
+    const bufferProfile = lowMem
+      ? { back: 16, max: 45, maxMax: 75, size: 45 * 1000 * 1000 }
+      : isVeryWeak
+        ? { back: 30, max: 75, maxMax: 150, size: 75 * 1000 * 1000 }
+        : isWeak
+          ? { back: 28, max: 65, maxMax: 140, size: 70 * 1000 * 1000 }
+          : isMobile
+            ? { back: 30, max: 90, maxMax: 240, size: 100 * 1000 * 1000 }
+            : { back: 45, max: 120, maxMax: 360, size: 180 * 1000 * 1000 };
+
     const seekToLiveEdgeOnce = (syncPosition?: number | null) => {
       if (initialLiveEdgeSyncRef.current) return;
       const seekable = video.seekable;
@@ -194,7 +221,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
       const edge = Number.isFinite(syncPosition || NaN) ? Number(syncPosition) : fallbackEdge;
       if (!Number.isFinite(edge) || edge <= 0) return;
       initialLiveEdgeSyncRef.current = true;
-      const target = Math.max(0, edge - 1.5);
+      const target = Math.max(0, edge - liveStartDelay);
       if (Math.abs(video.currentTime - target) > 2) {
         try { video.currentTime = target; } catch { /* ignore */ }
       }
@@ -211,8 +238,9 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
           lastProgressRef.current = { time: current, checkedAt: now, recoveries: 0 };
           return;
         }
-        // Only act after 12s of true stall to avoid interrupting normal playback
-        if (now - last.checkedAt < 12000) return;
+        // Only act after a true stall to avoid interrupting normal playback.
+        // On weak networks recover a little earlier so the spinner does not sit too long.
+        if (now - last.checkedAt < stallRecoveryMs) return;
 
         setBufferingState(true);
         lastProgressRef.current = { time: current, checkedAt: now, recoveries: last.recoveries + 1 };
@@ -225,7 +253,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
               const latency = Number.isFinite(edge) ? edge - current : 0;
               // Kalau benar-benar jauh tertinggal, lompat lembut mendekati live edge.
               // Kalau tidak, cukup lanjutkan loading supaya tidak terlihat refresh.
-              if (latency > 45) video.currentTime = Math.max(0, edge - 12);
+              if (latency > Math.max(45, liveStartDelay * 3)) video.currentTime = Math.max(0, edge - liveStartDelay);
               hlsInstance.startLoad(-1);
             } else {
               hlsInstance.startLoad(resumePosition());
@@ -235,23 +263,6 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
         safePlay();
       }, 4000);
     };
-
-    // Detect weak network → start bandwidth estimate low so ABR picks 360p/270p first
-    const conn = (navigator as Navigator & { connection?: { effectiveType?: string; downlink?: number; saveData?: boolean } }).connection;
-    const effective = conn?.effectiveType || '';
-    const downlink = typeof conn?.downlink === 'number' ? conn.downlink : 99;
-    const isWeak = /^(slow-2g|2g|3g)$/i.test(effective) || downlink < 1.5 || conn?.saveData === true;
-    const initialBwEstimate = isWeak ? 350_000 : 1_200_000;
-    // Adaptive buffer sizing: cukup besar untuk menahan fluktuasi jaringan tanpa memboroskan
-    // memori di perangkat low-end. Mobile/weak network pakai buffer lebih kecil.
-    const isMobile = typeof navigator !== 'undefined' && /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent || '');
-    const deviceMem = (navigator as Navigator & { deviceMemory?: number }).deviceMemory || 4;
-    const lowMem = deviceMem <= 2;
-    const bufferProfile = isWeak || lowMem
-      ? { back: 20, max: 45, maxMax: 90, size: 50 * 1000 * 1000 }
-      : isMobile
-        ? { back: 30, max: 90, maxMax: 240, size: 100 * 1000 * 1000 }
-        : { back: 45, max: 120, maxMax: 360, size: 180 * 1000 * 1000 };
 
     if (Hls.isSupported()) {
       const attachRequestHeaders = (target: { setRequestHeader?: (key: string, value: string) => void; set?: (key: string, value: string) => void }) => {
