@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Send, Pin, PinOff, Trash2, MessageCircle, ShieldCheck, UserCog, Reply, X, Ban, CheckCircle2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -82,7 +82,7 @@ export default function LiveChat({ lite = false }: LiveChatProps) {
       .then(({ data }) => { if (data?.value) setAdminUsername(data.value); });
   }, []);
 
-  const refresh = async () => {
+  const refresh = useCallback(async () => {
     const [{ data: pins }, { data: list }, { data: blocks }] = await Promise.all([
       supabase.from('live_messages').select('*').eq('pinned', true).order('created_at', { ascending: false }),
       supabase.from('live_messages').select('*').eq('pinned', false).order('created_at', { ascending: false }).limit(messageLimit),
@@ -95,7 +95,7 @@ export default function LiveChat({ lite = false }: LiveChatProps) {
     setMessages(((list || []) as Msg[]).slice().reverse());
     setBlockedSet(new Set(((blocks || []) as { browser_id: string }[]).map(b => b.browser_id)));
     stickToBottomRef.current = true;
-  };
+  }, [isAdmin, messageLimit, myBrowserId]);
 
   useEffect(() => {
     refresh();
@@ -140,7 +140,7 @@ export default function LiveChat({ lite = false }: LiveChatProps) {
       )
       .subscribe();
     return () => { supabase.removeChannel(ch); };
-  }, [isAdmin, lite]);
+  }, [isAdmin, messageLimit, myBrowserId, refresh]);
 
   const handleScroll = () => {
     const el = listRef.current;
