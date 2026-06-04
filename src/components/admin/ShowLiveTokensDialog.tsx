@@ -267,7 +267,8 @@ export default function ShowLiveTokensDialog({ open, onOpenChange, showId, showT
                 )}
               </div>
             );
-          })}
+          });
+          })()}
         </div>
       </DialogContent>
     </Dialog>
