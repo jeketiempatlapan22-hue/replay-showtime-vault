@@ -752,7 +752,7 @@ export default function Live() {
             <div className="rounded-2xl bg-card/80 border border-border p-3 sm:p-4 space-y-3">
               <div className="flex items-start justify-between gap-2">
                 <h2 className="text-base sm:text-lg font-bold text-foreground font-sans leading-tight flex-1 min-w-0">
-                  {unlocked?.title || status?.title || 'Live'}
+                  {status?.title || unlocked?.title || 'Live'}
                 </h2>
                 {(() => {
                   const d = typeof document !== 'undefined' ? (document as PiPDocument) : null;
