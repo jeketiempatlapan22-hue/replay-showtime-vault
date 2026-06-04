@@ -187,11 +187,15 @@ export default function ResellerAuditAdmin() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {pending?.type === 'exhaust' ? 'Habiskan link token reseller?' : 'Konfirmasi hapus riwayat'}
+              {pending?.type === 'exhaust'
+                ? 'Habiskan link token reseller?'
+                : pending?.type === 'reset_devices'
+                ? 'Reset perangkat link token?'
+                : 'Konfirmasi hapus riwayat'}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              Anda akan {pending?.type === 'exhaust' ? 'menghabiskan (revoke)' : 'menghapus'} {target}.
-              Tindakan ini <strong>tidak bisa dibatalkan</strong>.
+              Anda akan {pending?.type === 'exhaust' ? 'menghabiskan (revoke)' : pending?.type === 'reset_devices' ? 'melepaskan' : 'menghapus'} {target}.
+              {pending?.type !== 'reset_devices' && <> Tindakan ini <strong>tidak bisa dibatalkan</strong>.</>}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -199,7 +203,7 @@ export default function ResellerAuditAdmin() {
             <AlertDialogAction
               onClick={(e) => { e.preventDefault(); void confirmAction(); }}
               disabled={busy}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              className={pending?.type === 'reset_devices' ? '' : 'bg-destructive text-destructive-foreground hover:bg-destructive/90'}
             >
               {busy ? 'Memproses…' : 'Ya, lanjutkan'}
             </AlertDialogAction>
