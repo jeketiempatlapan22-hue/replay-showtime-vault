@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ClipboardList, RefreshCw, Search, Trash2, ShieldOff } from 'lucide-react';
+import { ClipboardList, RefreshCw, Search, Trash2, ShieldOff, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -22,7 +22,8 @@ type StatRow = {
 };
 
 type PendingAction =
-  | { type: 'reset'; phone?: string; label?: string }
+  | { type: 'clear_log'; phone?: string; label?: string }
+  | { type: 'reset_devices'; phone?: string; label?: string }
   | { type: 'exhaust'; phone: string; label?: string };
 
 const kindBadge: Record<string, { label: string; cls: string }> = {
