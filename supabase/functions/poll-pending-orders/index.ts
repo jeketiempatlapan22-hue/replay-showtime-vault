@@ -103,7 +103,7 @@ function renderTemplate(tpl: string, vars: Record<string, string>) {
     .replace(/\{(\w+)\}/g, (_, k) => (vars as Record<string, string>)[k] ?? '');
 }
 
-async function processOrder(admin: ReturnType<typeof createClient>, order: any, apiKey: string, slug: string, origin: string, tpl: string) {
+async function processOrder(admin: ReturnType<typeof createClient>, order: any, apiKey: string, slug: string, origin: string, tpl: string, showTpl: string) {
   if (!order.pakasir_order_id) return { id: order.id, skipped: 'no_pakasir_id' };
 
   const url = `https://app.pakasir.com/api/transactiondetail?project=${encodeURIComponent(slug)}&amount=${order.amount}&order_id=${encodeURIComponent(order.pakasir_order_id)}&api_key=${encodeURIComponent(apiKey)}`;
@@ -177,37 +177,80 @@ async function processOrder(admin: ReturnType<typeof createClient>, order: any, 
     return { id: order.id, status: 'already_sent' };
   }
 
-  const replayPart = order.replay_id ? `&replay=${order.replay_id}` : '';
-  const link = `${origin}/akses?token=${accessToken}${replayPart}`;
+  const isShowPurchase = !!order.show_id && !order.replay_id;
+  const isReplayOnlyPurchase = !!order.replay_id && !order.show_id;
+  const link = isShowPurchase
+    ? `${origin}/live?show=${order.show_id}&t=${accessToken}`
+    : `${origin}/akses?token=${accessToken}${order.replay_id ? `&replay=${order.replay_id}` : ''}`;
 
-  // Pull replay password (admin-set on the active show card) when available.
   let password = '';
   let liveLink = '';
-  if (order.show_id) {
+  let showDate = '';
+  let groupLink = '';
+  let replayInfo = '';
+  if (isShowPurchase) {
     const { data: showRow } = await admin
-      .from('active_shows').select('live_password').eq('id', order.show_id).maybeSingle();
-    password = String(showRow?.live_password || '').trim();
-    if (!order.replay_id) {
-      liveLink = `${origin}/live?show=${order.show_id}&t=${accessToken}`;
+      .from('active_shows')
+      .select('live_password,show_date,show_time,group_link,replay_info')
+      .eq('id', order.show_id).maybeSingle();
+    password = String((showRow as any)?.live_password || '').trim();
+    groupLink = String((showRow as any)?.group_link || '').trim();
+    replayInfo = String((showRow as any)?.replay_info || '').trim();
+    if ((showRow as any)?.show_date) {
+      const d = String((showRow as any).show_date);
+      const t = String((showRow as any).show_time || '').slice(0, 5);
+      showDate = t ? `${d} ${t}` : d;
     }
+    liveLink = link;
   }
-  // Fallback: standalone replay → use replays.password.
-  if (!password && order.replay_id && !order.show_id) {
+  if (isReplayOnlyPurchase) {
     const { data: rep } = await admin
       .from('replays').select('password').eq('id', order.replay_id).maybeSingle();
-    password = String(rep?.password || '').trim();
+    // Pembelian replay: link token sudah cukup, jangan kirim sandi.
+    password = '';
+    void rep;
   }
 
   const dateStr = new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
-  const message = renderTemplate(tpl, {
-    title: order.item_title || '',
-    date: dateStr,
-    link,
-    live_link: liveLink,
-    password,
-    order_id: order.pakasir_order_id || '',
-    site: origin,
-  });
+  const plainSite = origin.replace(/^https?:\/\//, '').replace(/\/+$/, '');
+
+  const fillTpl = (t: string, dateValue: string, linkValue: string, liveLinkValue: string) => t
+    .replace(/\{date_line\}/g, dateValue ? `📅 ${dateValue}\n\n` : '')
+    .replace(/\{password_line\}/g, password ? `🗝️ Sandi: *${password}*\n\n` : '')
+    .replace(/\{live_link_block\}/g, liveLinkValue ? `📺 *Link Live*\n${liveLinkValue}\n\n` : '')
+    .replace(/\{title\}/g, order.item_title || '')
+    .replace(/\{link\}/g, linkValue)
+    .replace(/\{live_link\}/g, liveLinkValue)
+    .replace(/\{password\}/g, password)
+    .replace(/\{date\}/g, dateValue)
+    .replace(/\{order_id\}/g, order.pakasir_order_id || '')
+    .replace(/\{site\}/g, plainSite);
+
+  let message: string;
+  if (isShowPurchase) {
+    message = fillTpl(showTpl, showDate || dateStr, link, link);
+    const extras: string[] = [];
+    if (replayInfo) extras.push('', '🎞️ *Info Replay*', replayInfo);
+    if (groupLink) extras.push('', '👥 *Link Grup*', groupLink);
+    if (extras.length) message = message + '\n' + extras.join('\n');
+  } else if (isReplayOnlyPurchase) {
+    message = [
+      '🎬 *RealTime48*',
+      '━━━━━━━━━━━━━━',
+      '',
+      `🎤 *${order.item_title || ''}*`,
+      `📅 ${dateStr}`,
+      '',
+      '🎞️ *Link Replay*',
+      link,
+      '',
+      '━━━━━━━━━━━━━━',
+      '✨ Selamat menonton! 💖',
+    ].join('\n');
+  } else {
+    message = fillTpl(tpl, dateStr, link, liveLink);
+  }
+
 
   const sent = await sendFonnte(order.user_phone, message);
   // If Fonnte fails, release the claim so a later run can retry.
@@ -249,10 +292,12 @@ Deno.serve(async (req) => {
 
   const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
   const { data: settings } = await admin
-    .from('site_settings').select('key,value').in('key', ['site_origin', 'wa_message_template']);
+    .from('site_settings').select('key,value').in('key', ['site_origin', 'wa_message_template', 'wa_show_template']);
   const sm = new Map((settings ?? []).map((s) => [s.key, s.value]));
   const origin = (sm.get('site_origin') || 'https://replaytime.lovable.app').replace(/\/+$/, '');
   const tpl = sm.get('wa_message_template') || DEFAULT_WA_TPL;
+  const showTpl = sm.get('wa_show_template') ||
+    '🔐 *TOKEN LIVE SATUAN*\n\n🎤 *{title}*\n\n📅 {date}\n\n🔗 *Link Live:*\n{live_link}\n\n🎬 *Link Replay:* {site}\n\n{password_line}👤 Hanya untuk *1 perangkat pertama*.\n\n— *ReplayTime* 💖';
 
   // Pull recent pending orders (last 7 days, newest first, generous cap).
   // Pakasir dynamic QRIS payments can be paid hours after creation; we keep
@@ -277,7 +322,7 @@ Deno.serve(async (req) => {
   const freshCutoff = Date.now() - 30 * 60_000; // 30 min
   for (const o of orders ?? []) {
     try {
-      const r = await processOrder(admin, o, apiKey, slug, origin, tpl);
+      const r = await processOrder(admin, o, apiKey, slug, origin, tpl, showTpl);
       results.push(r);
       // Track fresh-still-pending orders for fast-lane rescan within this same invocation.
       if (r?.status === 'pending' && new Date(o.created_at).getTime() >= freshCutoff) {
@@ -301,7 +346,7 @@ Deno.serve(async (req) => {
         .from('orders').select('*').in('id', ids).eq('status', 'pending');
       if (!refreshed?.length) return;
       for (const o of refreshed) {
-        try { await processOrder(admin, o, apiKey, slug, origin, tpl); } catch { /* keep going */ }
+        try { await processOrder(admin, o, apiKey, slug, origin, tpl, showTpl); } catch { /* keep going */ }
       }
     }
   })();
