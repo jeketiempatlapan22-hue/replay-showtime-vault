@@ -123,7 +123,7 @@ const ScheduleCountdown = memo(function ScheduleCountdown({ title, showDate, sho
       </div>
     </div>
   );
-}
+});
 
 export default function Live() {
   const navigate = useNavigate();
