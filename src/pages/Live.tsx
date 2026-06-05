@@ -141,6 +141,10 @@ export default function Live() {
   const [sourceIdx, setSourceIdx] = useState<number>(() => {
     try { return Math.max(0, Number(sessionStorage.getItem(SS_SRC_KEY) || '0')); } catch { return 0; }
   });
+  const playerRef = useRef<HlsPlayerHandle | null>(null);
+  const [pipActive, setPipActive] = useState(false);
+  const handlePipChange = useCallback((active: boolean) => setPipActive(active), []);
+
 
   const showId = search.get('show') || '';
   const isWeakNetwork = useMemo(() => {
