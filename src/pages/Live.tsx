@@ -35,7 +35,7 @@ interface UnlockedConfig { title: string; type: SrcType; url: string; sources: P
 type SourceLike = Partial<Record<keyof PrivateSource, unknown>>;
 interface IdnTokenResponse { error?: string; xApiToken?: string; xSecKey?: string; xTokenId?: string; xShowId?: string; playbackUrl?: string }
 type PiPDocument = Document & { pictureInPictureEnabled?: boolean; pictureInPictureElement?: Element | null; exitPictureInPicture?: () => Promise<void> };
-type PiPVideo = HTMLVideoElement & { requestPictureInPicture?: () => Promise<unknown>; disablePictureInPicture?: boolean };
+
 
 const SS_KEY_BASE = 'replaytime-live-unlocked';
 const SS_SRC_KEY = 'replaytime-live-source-idx';
