@@ -771,23 +771,23 @@ export default function Live() {
                 {(() => {
                   const d = typeof document !== 'undefined' ? (document as PiPDocument) : null;
                   const supported = !!d && 'pictureInPictureEnabled' in d && !!d.pictureInPictureEnabled;
-                  if (!supported) return null;
+                  const isHls = liveActive && activeSource && (activeSource.url.startsWith('idn://') || activeSource.type === 'm3u8');
+                  if (!supported || !isHls) return null;
                   return (
                     <button
                       type="button"
-                      aria-label="Picture in Picture"
-                      title="Picture in Picture"
+                      aria-label={pipActive ? 'Tutup Picture in Picture' : 'Picture in Picture'}
+                      title={pipActive ? 'Tutup Picture in Picture' : 'Picture in Picture'}
                       onClick={async () => {
                         try {
-                          const doc = document as PiPDocument;
-                          if (doc.pictureInPictureElement) { await doc.exitPictureInPicture?.(); return; }
-                          const v = document.querySelector('video') as PiPVideo | null;
-                          if (v && typeof v.requestPictureInPicture === 'function' && !v.disablePictureInPicture) {
-                            await v.requestPictureInPicture();
+                          if (pipActive) {
+                            await playerRef.current?.exitPip();
+                          } else {
+                            await playerRef.current?.requestPip();
                           }
                         } catch { /* ignore */ }
                       }}
-                      className="shrink-0 inline-flex items-center justify-center w-9 h-9 rounded-full bg-secondary text-foreground hover:bg-primary hover:text-primary-foreground border border-border transition-colors"
+                      className={`shrink-0 inline-flex items-center justify-center w-9 h-9 rounded-full border border-border transition-colors ${pipActive ? 'bg-primary text-primary-foreground' : 'bg-secondary text-foreground hover:bg-primary hover:text-primary-foreground'}`}
                     >
                       <PictureInPicture2 className="w-4 h-4" />
                     </button>
