@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, lazy, Suspense } from 'react';
+import { useEffect, useMemo, useState, useRef, useCallback, memo, lazy, Suspense } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Loader2, Users, Eye, PictureInPicture2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -8,6 +8,7 @@ import { getBrowserId } from '@/lib/browserId';
 import { clearMembershipCredentials, saveMembershipCredentials } from '@/lib/membershipAccess';
 import MemberAvatar from '@/components/MemberAvatar';
 import { useAutoHideOnInteraction } from '@/hooks/useAutoHideOnInteraction';
+import type { HlsPlayerHandle } from '@/components/HlsPlayer';
 
 // Lazy-load player & chat: bundle awal lebih kecil, terutama di mobile.
 const HlsPlayer = lazy(() => import('@/components/HlsPlayer'));
@@ -34,7 +35,7 @@ interface UnlockedConfig { title: string; type: SrcType; url: string; sources: P
 type SourceLike = Partial<Record<keyof PrivateSource, unknown>>;
 interface IdnTokenResponse { error?: string; xApiToken?: string; xSecKey?: string; xTokenId?: string; xShowId?: string; playbackUrl?: string }
 type PiPDocument = Document & { pictureInPictureEnabled?: boolean; pictureInPictureElement?: Element | null; exitPictureInPicture?: () => Promise<void> };
-type PiPVideo = HTMLVideoElement & { requestPictureInPicture?: () => Promise<unknown>; disablePictureInPicture?: boolean };
+
 
 const SS_KEY_BASE = 'replaytime-live-unlocked';
 const SS_SRC_KEY = 'replaytime-live-source-idx';
@@ -63,7 +64,7 @@ const toPrivateSources = (value: unknown): PrivateSource[] => Array.isArray(valu
 
 function pad(n: number) { return String(n).padStart(2, '0'); }
 
-function ScheduleCountdown({ title, showDate, showTime, imageUrl }: { title: string; showDate?: string; showTime?: string; imageUrl?: string }) {
+const ScheduleCountdown = memo(function ScheduleCountdown({ title, showDate, showTime, imageUrl }: { title: string; showDate?: string; showTime?: string; imageUrl?: string }) {
   const target = showDate && showTime ? new Date(`${showDate}T${showTime}`) : null;
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
@@ -122,7 +123,7 @@ function ScheduleCountdown({ title, showDate, showTime, imageUrl }: { title: str
       </div>
     </div>
   );
-}
+});
 
 export default function Live() {
   const navigate = useNavigate();
@@ -140,6 +141,10 @@ export default function Live() {
   const [sourceIdx, setSourceIdx] = useState<number>(() => {
     try { return Math.max(0, Number(sessionStorage.getItem(SS_SRC_KEY) || '0')); } catch { return 0; }
   });
+  const playerRef = useRef<HlsPlayerHandle | null>(null);
+  const [pipActive, setPipActive] = useState(false);
+  const handlePipChange = useCallback((active: boolean) => setPipActive(active), []);
+
 
   const showId = search.get('show') || '';
   const isWeakNetwork = useMemo(() => {
@@ -691,10 +696,10 @@ export default function Live() {
                         <Loader2 className="w-8 h-8 text-primary animate-spin" />
                       </div>
                     ) : (
-                      <HlsPlayer key={`idn-${idnResolved.key}`} src={idnResolved.url} headers={idnResolved.headers} title={unlocked.title} watermark={unlocked.watermark} onFatalError={handleSourceFatalError} hideSeekButtons />
+                      <HlsPlayer ref={playerRef} key={`idn-${idnResolved.key}`} src={idnResolved.url} headers={idnResolved.headers} title={unlocked.title} watermark={unlocked.watermark} onFatalError={handleSourceFatalError} onPipChange={handlePipChange} hideSeekButtons />
                     )
                   ) : activeSource.type === 'm3u8'
-                    ? <HlsPlayer key={`m3u8-${safeIdx}`} src={activeSource.url} title={unlocked.title} watermark={unlocked.watermark} onFatalError={handleSourceFatalError} hideSeekButtons />
+                    ? <HlsPlayer ref={playerRef} key={`m3u8-${safeIdx}`} src={activeSource.url} title={unlocked.title} watermark={unlocked.watermark} onFatalError={handleSourceFatalError} onPipChange={handlePipChange} hideSeekButtons />
                     : <EmbedPlayer key={`em-${safeIdx}-${activeSource.type}`} type={activeSource.type} source={activeSource.url} title={unlocked.title} watermark={unlocked.watermark} hideSeekButtons isLive />}
                 </Suspense>
 
@@ -766,23 +771,23 @@ export default function Live() {
                 {(() => {
                   const d = typeof document !== 'undefined' ? (document as PiPDocument) : null;
                   const supported = !!d && 'pictureInPictureEnabled' in d && !!d.pictureInPictureEnabled;
-                  if (!supported) return null;
+                  const isHls = liveActive && activeSource && (activeSource.url.startsWith('idn://') || activeSource.type === 'm3u8');
+                  if (!supported || !isHls) return null;
                   return (
                     <button
                       type="button"
-                      aria-label="Picture in Picture"
-                      title="Picture in Picture"
+                      aria-label={pipActive ? 'Tutup Picture in Picture' : 'Picture in Picture'}
+                      title={pipActive ? 'Tutup Picture in Picture' : 'Picture in Picture'}
                       onClick={async () => {
                         try {
-                          const doc = document as PiPDocument;
-                          if (doc.pictureInPictureElement) { await doc.exitPictureInPicture?.(); return; }
-                          const v = document.querySelector('video') as PiPVideo | null;
-                          if (v && typeof v.requestPictureInPicture === 'function' && !v.disablePictureInPicture) {
-                            await v.requestPictureInPicture();
+                          if (pipActive) {
+                            await playerRef.current?.exitPip();
+                          } else {
+                            await playerRef.current?.requestPip();
                           }
                         } catch { /* ignore */ }
                       }}
-                      className="shrink-0 inline-flex items-center justify-center w-9 h-9 rounded-full bg-secondary text-foreground hover:bg-primary hover:text-primary-foreground border border-border transition-colors"
+                      className={`shrink-0 inline-flex items-center justify-center w-9 h-9 rounded-full border border-border transition-colors ${pipActive ? 'bg-primary text-primary-foreground' : 'bg-secondary text-foreground hover:bg-primary hover:text-primary-foreground'}`}
                     >
                       <PictureInPicture2 className="w-4 h-4" />
                     </button>
