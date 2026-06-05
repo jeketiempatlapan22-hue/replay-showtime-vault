@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, lazy, Suspense } from 'react';
+import { useEffect, useMemo, useState, useRef, useCallback, memo, lazy, Suspense } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Loader2, Users, Eye, PictureInPicture2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -8,6 +8,7 @@ import { getBrowserId } from '@/lib/browserId';
 import { clearMembershipCredentials, saveMembershipCredentials } from '@/lib/membershipAccess';
 import MemberAvatar from '@/components/MemberAvatar';
 import { useAutoHideOnInteraction } from '@/hooks/useAutoHideOnInteraction';
+import type { HlsPlayerHandle } from '@/components/HlsPlayer';
 
 // Lazy-load player & chat: bundle awal lebih kecil, terutama di mobile.
 const HlsPlayer = lazy(() => import('@/components/HlsPlayer'));
