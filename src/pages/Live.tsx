@@ -64,7 +64,7 @@ const toPrivateSources = (value: unknown): PrivateSource[] => Array.isArray(valu
 
 function pad(n: number) { return String(n).padStart(2, '0'); }
 
-function ScheduleCountdown({ title, showDate, showTime, imageUrl }: { title: string; showDate?: string; showTime?: string; imageUrl?: string }) {
+const ScheduleCountdown = memo(function ScheduleCountdown({ title, showDate, showTime, imageUrl }: { title: string; showDate?: string; showTime?: string; imageUrl?: string }) {
   const target = showDate && showTime ? new Date(`${showDate}T${showTime}`) : null;
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
