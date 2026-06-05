@@ -696,10 +696,10 @@ export default function Live() {
                         <Loader2 className="w-8 h-8 text-primary animate-spin" />
                       </div>
                     ) : (
-                      <HlsPlayer key={`idn-${idnResolved.key}`} src={idnResolved.url} headers={idnResolved.headers} title={unlocked.title} watermark={unlocked.watermark} onFatalError={handleSourceFatalError} hideSeekButtons />
+                      <HlsPlayer ref={playerRef} key={`idn-${idnResolved.key}`} src={idnResolved.url} headers={idnResolved.headers} title={unlocked.title} watermark={unlocked.watermark} onFatalError={handleSourceFatalError} onPipChange={handlePipChange} hideSeekButtons />
                     )
                   ) : activeSource.type === 'm3u8'
-                    ? <HlsPlayer key={`m3u8-${safeIdx}`} src={activeSource.url} title={unlocked.title} watermark={unlocked.watermark} onFatalError={handleSourceFatalError} hideSeekButtons />
+                    ? <HlsPlayer ref={playerRef} key={`m3u8-${safeIdx}`} src={activeSource.url} title={unlocked.title} watermark={unlocked.watermark} onFatalError={handleSourceFatalError} onPipChange={handlePipChange} hideSeekButtons />
                     : <EmbedPlayer key={`em-${safeIdx}-${activeSource.type}`} type={activeSource.type} source={activeSource.url} title={unlocked.title} watermark={unlocked.watermark} hideSeekButtons isLive />}
                 </Suspense>
 
