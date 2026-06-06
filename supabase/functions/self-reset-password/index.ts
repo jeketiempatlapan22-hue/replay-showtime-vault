@@ -2,6 +2,7 @@
 // User-requested simplification: any registered identifier can reset its password directly.
 // Includes basic rate limiting via login_attempts to deter brute-force enumeration.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
+import { ipGuard } from '../_shared/ip-guard.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
