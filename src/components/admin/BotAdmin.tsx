@@ -123,7 +123,11 @@ export default function BotAdmin() {
         body: { phone: testPhone, message: testMsg },
       });
       if (error) throw error;
-      toast({ title: 'Pesan terkirim', description: JSON.stringify(data).slice(0, 100) });
+      if ((data as { ok?: boolean })?.ok) {
+        toast({ title: 'Pesan terkirim', description: JSON.stringify(data).slice(0, 100) });
+      } else {
+        toast({ title: 'Gagal kirim WA', description: JSON.stringify((data as any)?.data || data || {}).slice(0, 160), variant: 'destructive' });
+      }
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'gagal';
       toast({ title: 'Gagal kirim', description: msg, variant: 'destructive' });
@@ -146,7 +150,12 @@ export default function BotAdmin() {
       });
       if (error) throw error;
       setBotTestResult(data as { ok?: boolean; reply?: string; reason?: string; command?: string; delivered?: boolean });
-      toast({ title: (data as { ok?: boolean })?.ok ? 'Uji bot berhasil' : 'Uji bot selesai', description: message });
+      const sent = (data as any)?.send?.ok !== false;
+      toast({
+        title: (data as { ok?: boolean })?.ok && sent ? 'Uji bot berhasil' : 'Uji bot selesai',
+        description: sent ? message : JSON.stringify((data as any)?.send?.data || (data as any)?.send || {}).slice(0, 160),
+        variant: sent ? 'default' : 'destructive',
+      });
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'gagal';
       setBotTestResult({ ok: false, reason: msg });
