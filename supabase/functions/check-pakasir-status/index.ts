@@ -271,32 +271,25 @@ Deno.serve(async (req) => {
 
     // === COIN TOP-UP branch ===
     if (order.kind === 'coin_topup') {
-      const claimedAt = new Date().toISOString();
-      const { data: claimed } = await admin.from('orders').update({ token_sent_at: claimedAt })
-        .eq('id', order.id).is('token_sent_at', null).select('id');
-      if (claimed && claimed.length > 0) {
-        let newBal: number | null = null;
-        if (order.user_id && order.coin_amount > 0) {
-          const { data: credited, error: gerr } = await admin.rpc('credit_coin_topup_order', { _order_id: order.id });
-          if (gerr) {
-            await admin.from('orders').update({ token_sent_at: null }).eq('id', order.id).eq('token_sent_at', claimedAt);
-            throw new Error('coin_credit_failed:' + gerr.message);
-          }
-          const row = Array.isArray(credited) ? credited[0] : credited;
-          newBal = Number(row?.new_balance ?? 0);
-        }
+      let newBal: number | null = null;
+      if (order.user_id && order.coin_amount > 0) {
+        const { data: credited, error: gerr } = await admin.rpc('credit_coin_topup_order', { _order_id: order.id });
+        if (gerr) throw new Error('coin_credit_failed:' + gerr.message);
+        const row = Array.isArray(credited) ? credited[0] : credited;
+        newBal = Number(row?.new_balance ?? 0);
+      }
+      if (!alreadySent) {
         const msg = `✅ *Top-up berhasil*\n+${order.coin_amount} koin sudah masuk.${newBal != null ? `\nSaldo sekarang: *${newBal}* koin` : ''}\n\nTerima kasih 💖 — *ReplayTime*`;
         const sent = await sendFonnte(order.user_phone, msg);
-        if (!sent.ok) {
-          await admin.from('orders').update({ token_sent_at: null }).eq('id', order.id).eq('token_sent_at', claimedAt);
+        if (sent.ok) {
+          await admin.from('orders').update({ token_sent_at: new Date().toISOString() }).eq('id', order.id);
         }
         await admin.from('wa_outbox').insert({
           phone: order.user_phone, message: msg, status: sent.ok ? 'sent' : 'failed',
           error: sent.ok ? null : JSON.stringify(sent.data),
           related_order_id: order.id, fonnte_response: sent.data as Record<string, unknown>,
         });
-      }
-      return new Response(JSON.stringify({ ok: true, status: 'paid', topup: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      return new Response(JSON.stringify({ ok: true, status: 'paid', topup: true, new_balance: newBal }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     // Mark paid + provision a fresh single-device token row
@@ -375,25 +368,8 @@ Deno.serve(async (req) => {
       message = fillTpl(tpl, dateStr, link, '');
     }
 
-    // Atomic claim: only the first caller flips token_sent_at NULL -> now().
-    const claimedAt = new Date().toISOString();
-    const { data: claimed } = await admin
-      .from('orders')
-      .update({ token_sent_at: claimedAt })
-      .eq('id', order.id)
-      .is('token_sent_at', null)
-      .select('id');
-    if (!claimed || claimed.length === 0) {
-      return new Response(JSON.stringify({ ok: true, status: 'paid', access_token: accessToken, already: true }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
     const sent = await sendFonnte(order.user_phone, message);
-    if (!sent.ok) {
-      await admin.from('orders').update({ token_sent_at: null })
-        .eq('id', order.id).eq('token_sent_at', claimedAt);
-    }
+    if (sent.ok) await admin.from('orders').update({ token_sent_at: new Date().toISOString() }).eq('id', order.id);
     await admin.from('token_deliveries').insert({
       phone: order.user_phone, replay_id: order.replay_id, replay_title: order.item_title,
       order_id: order.id, access_token: accessToken, link,
