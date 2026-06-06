@@ -195,6 +195,7 @@ async function processOrder(admin: ReturnType<typeof createClient>, order: any, 
       newBal = Number(row?.new_balance ?? 0);
     }
     const msg = `✅ *Top-up berhasil*\n+${order.coin_amount} koin sudah masuk.${newBal != null ? `\nSaldo sekarang: *${newBal}* koin` : ''}\n\nTerima kasih 💖 — *ReplayTime*`;
+    if (await isFonntePaused(admin)) return { id: order.id, status: 'paid', topup: true, skipped: 'fonnte_timeout_pause' };
     if (await shouldDelayWaRetry(admin, order.id)) return { id: order.id, status: 'paid', topup: true, skipped: 'wa_retry_backoff' };
     const sent = await sendFonnte(order.user_phone, msg);
     if (sent.ok) await admin.from('orders').update({ token_sent_at: new Date().toISOString() }).eq('id', order.id);
@@ -472,6 +473,9 @@ Deno.serve(async (req) => {
           .replace(/\{replay_info\}/g, tok.replay_info || '')
           .replace(/\{replay_info_block\}/g, tok.replay_info ? `🎬 *Info Replay:*\n${tok.replay_info}\n\n` : '')
           .replace(/\{site\}/g, origin.replace(/^https?:\/\//, ''));
+        if (await isFonntePaused(admin)) {
+          memResults.push({ id: mo.id, finalized: !mo.membership_token_id, skipped: 'fonnte_timeout_pause' }); continue;
+        }
         if (await shouldDelayWaRetry(admin, mo.id)) {
           memResults.push({ id: mo.id, finalized: !mo.membership_token_id, skipped: 'wa_retry_backoff' }); continue;
         }
