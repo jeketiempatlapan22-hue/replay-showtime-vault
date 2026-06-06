@@ -108,7 +108,8 @@ async function sendFonnteOnce(phone: string, message: string) {
 
 // Auto-retry lebih agresif agar token/notifikasi tidak hilang saat Fonnte lambat.
 async function sendFonnte(phone: string, message: string) {
-  const delays = [0, 1000, 3000, 7000, 12000];
+  // Keep cron invocations short; failed sends are retried by the next cron/admin action.
+  const delays = [0];
   let last: { ok: boolean; data: unknown } = { ok: false, data: { error: 'no_attempt' } };
   for (let i = 0; i < delays.length; i++) {
     if (delays[i]) await new Promise((r) => setTimeout(r, delays[i]));
@@ -348,27 +349,29 @@ Deno.serve(async (req) => {
   const showTpl = sm.get('wa_show_template') ||
     '🔐 *TOKEN LIVE SATUAN*\n\n🎤 *{title}*\n\n📅 {date}\n\n🔗 *Link Live:*\n{live_link}\n\n🎬 *Link Replay:* {site}\n\n{password_line}👤 Hanya untuk *1 perangkat pertama*.\n\n— *ReplayTime* 💖';
 
-  // Pull recent pending orders plus paid orders whose WhatsApp delivery failed.
-  // Pakasir dynamic QRIS payments can be paid hours after creation; we keep
-  // a wide window so even users who close the dialog still get their token.
-  const since = new Date(Date.now() - 7 * 24 * 3600_000).toISOString();
-  const { data: orders, error } = await admin
-    .from('orders')
-    .select('*')
-    .or('status.eq.pending,and(status.eq.paid,token_sent_at.is.null)')
-    .gte('created_at', since)
-    .order('created_at', { ascending: false })
-    .limit(250);
-  console.log(`[poll] scanning ${orders?.length ?? 0} pending orders since ${since}`);
-
-  if (error) {
-    return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: corsHeaders });
-  }
+  // Prioritize confirmed-paid orders that still need WA, then fresh pending QRIS.
+  // This avoids long scans of old unpaid orders that were causing function timeouts.
+  const pendingSince = new Date(Date.now() - 2 * 24 * 3600_000).toISOString();
+  const unsentSince = new Date(Date.now() - 30 * 24 * 3600_000).toISOString();
+  const [{ data: paidUnsent, error: paidErr }, { data: pendingOrders, error: pendingErr }] = await Promise.all([
+    admin.from('orders').select('*').eq('status', 'paid').is('token_sent_at', null).gte('created_at', unsentSince).order('paid_at', { ascending: false }).limit(8),
+    admin.from('orders').select('*').eq('status', 'pending').gte('created_at', pendingSince).order('created_at', { ascending: false }).limit(30),
+  ]);
+  const error = paidErr || pendingErr;
+  if (error) return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: corsHeaders });
+  const seen = new Set<string>();
+  const orders = [...(paidUnsent ?? []), ...(pendingOrders ?? [])].filter((o) => !seen.has(o.id) && seen.add(o.id));
+  console.log(`[poll] scanning ${orders.length} orders (${paidUnsent?.length ?? 0} paid-unsent, ${pendingOrders?.length ?? 0} pending)`);
 
   const results: any[] = [];
-  const freshPending: any[] = [];
+  const startedAt = Date.now();
+  const TIME_BUDGET_MS = 45_000;
   const freshCutoff = Date.now() - 30 * 60_000; // 30 min
   for (const o of orders ?? []) {
+    if (Date.now() - startedAt > TIME_BUDGET_MS) {
+      results.push({ skipped: 'time_budget_reached' });
+      break;
+    }
     if (o.status === 'paid' && o.token_sent_at && await hasSentWa(admin, o.id)) {
       results.push({ id: o.id, skipped: 'already_delivered' });
       continue;
@@ -376,10 +379,7 @@ Deno.serve(async (req) => {
     try {
       const r = await processOrder(admin, o, apiKey, slug, origin, tpl, showTpl);
       results.push(r);
-      // Track fresh-still-pending orders for fast-lane rescan within this same invocation.
-      if (r?.status === 'pending' && new Date(o.created_at).getTime() >= freshCutoff) {
-        freshPending.push(o);
-      }
+      void freshCutoff;
     } catch (e) {
       results.push({ id: o.id, error: String(e) });
     }
