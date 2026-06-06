@@ -82,6 +82,9 @@ Deno.serve(async (req) => {
     const SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
 
+    const guard = await ipGuard(admin, req, 'self-reset-password', 10);
+    if (guard.blocked) return json(guard.body, guard.status);
+
     const body = await req.json().catch(() => ({}));
     const identifier = String(body.identifier || '').trim();
     const password = String(body.password || '');
