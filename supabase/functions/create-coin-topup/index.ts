@@ -16,7 +16,7 @@ function normalizePhone(raw: string) {
   return d;
 }
 function validPhone(p: string) { return /^62\d{8,13}$/.test(p); }
-function genOrderId() { return 'tc' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+function genOrderId() { return `tc${Date.now().toString(36)}${crypto.randomUUID().replace(/-/g, '').slice(0, 18)}`; }
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });

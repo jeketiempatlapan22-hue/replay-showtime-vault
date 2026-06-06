@@ -21,7 +21,7 @@ function validPhone(p: string) {
 }
 
 function genOrderId() {
-  return 'rt' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  return `rt${Date.now().toString(36)}${crypto.randomUUID().replace(/-/g, '').slice(0, 18)}`;
 }
 
 Deno.serve(async (req) => {
