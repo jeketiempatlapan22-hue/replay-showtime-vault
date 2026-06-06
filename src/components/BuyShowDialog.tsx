@@ -203,7 +203,6 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
       return;
     }
     try { localStorage.setItem('replaytime-phone', phone); } catch { /* ignore */ }
-    if (useStaticQris) { setStatus('static_qris'); return; }
     setStatus('creating');
     try {
       const { data, error } = await supabase.functions.invoke('create-pakasir-order', {
@@ -235,8 +234,8 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
       setStatus('qr');
     } catch (e: any) {
       const msg = e?.message || 'Gagal membuat order';
-      toast.error(`${msg}. Menampilkan QRIS statis sebagai alternatif.`);
-      setStatus('static_qris');
+      toast.error(`${msg}. Silakan coba buat QRIS dinamis lagi.`);
+      setStatus('form');
     }
   };
 
