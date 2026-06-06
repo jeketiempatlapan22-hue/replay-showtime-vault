@@ -248,15 +248,16 @@ Deno.serve(async (req) => {
     if (!order) return new Response(JSON.stringify({ error: 'order not found' }), { status: 404, headers: corsHeaders });
 
     const alreadySent = order.token_sent_at && await hasSentWa(admin, order.id);
-    if (order.status === 'paid' && alreadySent) {
-      return new Response(JSON.stringify({ ok: true, status: 'paid', already: true, access_token: order.access_token }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
 
     const verified = await verifyPakasirPaid(apiKey, slug, order.pakasir_order_id || '', Number(order.amount || 0));
     if (!verified.paid) {
       return new Response(JSON.stringify({ ok: true, status: verified.status || 'pending' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (order.status === 'paid' && alreadySent) {
+      return new Response(JSON.stringify({ ok: true, status: 'paid', already: true, access_token: order.access_token }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
