@@ -718,7 +718,7 @@ export default function Live() {
       try { void channel.untrack(); } catch { /* ignore */ }
       supabase.removeChannel(channel);
     };
-  }, [liveActive, showKey, playbackPriorityMode]);
+  }, [liveActive, showKey]);
 
   return (
     <div className="min-h-screen bg-background relative z-10">
