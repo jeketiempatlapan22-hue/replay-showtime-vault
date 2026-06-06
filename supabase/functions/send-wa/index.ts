@@ -30,7 +30,12 @@ export async function sendFonnte(phone: string, message: string): Promise<{ ok: 
         body: form,
         signal: AbortSignal.timeout(timeoutMs),
       });
-      const data = await res.json().catch(() => ({}));
+      const raw = await res.text();
+      let data: unknown;
+      try { data = raw ? JSON.parse(raw) : {}; } catch { data = { raw: raw.slice(0, 500) }; }
+      if (!res.ok && data && typeof data === 'object') {
+        data = { ...(data as Record<string, unknown>), http_status: res.status, http_status_text: res.statusText };
+      }
       last = { ok: res.ok && (data as { status?: boolean })?.status !== false, data };
       if (last.ok) return last;
     } catch (e) {
