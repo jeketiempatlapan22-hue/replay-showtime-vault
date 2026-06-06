@@ -661,6 +661,7 @@ export default function Admin() {
                 { v: 'preview', label: 'Preview', Icon: Eye },
                 { v: 'comments', label: 'Komentar', Icon: MessageCircle },
                 { v: 'security', label: 'Blokir', Icon: ShieldCheck },
+                { v: 'ip_manager', label: 'IP & Rate Limit', Icon: ShieldCheck },
                 { v: 'settings', label: 'Setelan', Icon: Settings },
               ].map(({ v, label, Icon }) => (
                 <button
