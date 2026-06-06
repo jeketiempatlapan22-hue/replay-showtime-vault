@@ -20,6 +20,9 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
+    const guard = await ipGuard(supabase, req, "membership-self-reset", 10);
+    if (guard.blocked) return json(guard.body, guard.status);
+
     const { data: t } = await supabase
       .from("membership_tokens").select("*").eq("token", mtoken).maybeSingle();
     if (!t || t.revoked) return json({ ok: false, reason: "revoked" });
