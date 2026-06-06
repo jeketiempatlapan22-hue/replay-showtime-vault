@@ -17,7 +17,7 @@ function normalizePhone(raw: string) {
   return d;
 }
 
-async function sendFonnteOnce(phone: string, message: string) {
+async function sendFonnteOnce(phone: string, message: string, timeoutMs: number) {
   const tok = Deno.env.get('FONNTE_TOKEN');
   if (!tok) return { ok: false, data: { error: 'no_token' } };
   const form = new FormData();
@@ -27,20 +27,19 @@ async function sendFonnteOnce(phone: string, message: string) {
   try {
     const res = await fetch('https://api.fonnte.com/send', {
       method: 'POST', headers: { Authorization: tok }, body: form,
-      signal: AbortSignal.timeout(6000),
+      signal: AbortSignal.timeout(timeoutMs),
     });
     const data = await res.json().catch(() => ({}));
     return { ok: res.ok && (data as { status?: boolean })?.status !== false, data };
   } catch (e) { return { ok: false, data: { error: String(e) } }; }
 }
 async function sendFonnte(phone: string, message: string) {
-  // Satu percobaan per request admin agar Edge Function tidak timeout.
-  // Retry berikutnya ditangani oleh tombol admin / poller otomatis.
-  const delays = [0];
+  // Fonnte kadang lambat (>10s). Coba 2x dengan timeout naik bertahap supaya
+  // tidak "Signal timed out" prematurely di admin UI.
+  const attempts = [12000, 20000];
   let last: { ok: boolean; data: unknown } = { ok: false, data: { error: 'no_attempt' } };
-  for (let i = 0; i < delays.length; i++) {
-    if (delays[i]) await new Promise((r) => setTimeout(r, delays[i]));
-    last = await sendFonnteOnce(phone, message);
+  for (let i = 0; i < attempts.length; i++) {
+    last = await sendFonnteOnce(phone, message, attempts[i]);
     if (last.ok) return last;
   }
   return last;
