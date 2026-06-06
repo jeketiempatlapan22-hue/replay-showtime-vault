@@ -671,7 +671,7 @@ export default function Live() {
   const showKey = search.get('show') || 'global';
   const [viewerCount, setViewerCount] = useState<number | null>(null);
   useEffect(() => {
-    if (!liveActive || playbackPriorityMode) { setViewerCount(null); return; }
+    if (!liveActive) { setViewerCount(null); return; }
     const bid = getBrowserId();
     const channel = supabase.channel(`live-viewers:${showKey}`, {
       config: { presence: { key: bid } },
@@ -718,7 +718,7 @@ export default function Live() {
       try { void channel.untrack(); } catch { /* ignore */ }
       supabase.removeChannel(channel);
     };
-  }, [liveActive, showKey, playbackPriorityMode]);
+  }, [liveActive, showKey]);
 
   return (
     <div className="min-h-screen bg-background relative z-10">
