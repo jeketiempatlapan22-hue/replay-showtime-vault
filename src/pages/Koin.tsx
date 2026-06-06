@@ -76,10 +76,23 @@ export default function Koin() {
       // Poll
       pollRef.current && clearInterval(pollRef.current);
       pollRef.current = setInterval(async () => {
-        const { data: row } = await supabase.from('orders').select('status').eq('id', r.order_id).maybeSingle();
-        if (row?.status === 'paid') { setPaid(true); clearInterval(pollRef.current); return; }
-        try { await supabase.functions.invoke('check-pakasir-status', { body: { order_id: r.order_id } }); } catch { /* ignore */ }
-      }, 4000);
+        const { data: row } = await supabase.from('orders').select('status,token_sent_at').eq('id', r.order_id).maybeSingle();
+        let checked: any = null;
+        try {
+          const { data: chk } = await supabase.functions.invoke('check-pakasir-status', { body: { order_id: r.order_id } });
+          checked = chk;
+        } catch { /* ignore */ }
+        if (row?.status === 'paid' || checked?.status === 'paid') {
+          const [{ data: bal }, { data: t }] = await Promise.all([
+            supabase.from('coin_balances').select('balance').eq('user_id', user.id).maybeSingle(),
+            supabase.from('coin_transactions').select('id,delta,reason,created_at').eq('user_id', user.id).order('created_at', { ascending: false }).limit(30),
+          ]);
+          setBalance(Number(bal?.balance ?? 0));
+          setTxs((t || []) as Tx[]);
+          setPaid(true);
+          if (row?.token_sent_at || checked?.sent !== false) clearInterval(pollRef.current);
+        }
+      }, 2500);
     } catch (e: any) {
       toast.error(e?.message || 'Gagal membuat top-up');
       setTopupOpen(false);
