@@ -378,7 +378,7 @@ Deno.serve(async (req) => {
       .in('status', ['reserved', 'paid'])
       .eq('kind', 'qris')
       .not('pakasir_order_id', 'is', null)
-      .gte('created_at', since)
+      .gte('created_at', pendingSince)
       .order('created_at', { ascending: false }).limit(1);
     for (const mo of mOrders ?? []) {
       try {
