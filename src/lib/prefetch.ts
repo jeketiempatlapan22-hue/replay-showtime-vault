@@ -34,6 +34,10 @@ export async function prefetchM3U8(url: string) {
     preconnect(url);
     const res = await fetch(url, { method: 'GET', mode: 'cors', credentials: 'omit', cache: 'force-cache' });
     if (!res.ok) return;
+    const conn = (navigator as Navigator & { connection?: { effectiveType?: string; downlink?: number; saveData?: boolean } }).connection;
+    const constrained = conn?.saveData === true || /^(slow-2g|2g|3g)$/i.test(conn?.effectiveType || '') || (typeof conn?.downlink === 'number' && conn.downlink < 2);
+    const mobileOrTv = /Mobi|Android|iPhone|iPad|SmartTV|Tizen|Web0S|NetCast|Roku|AFT/i.test(navigator.userAgent || '');
+    if (constrained || mobileOrTv) return;
     const text = await res.text();
     // Parse first few segment URIs to warm them
     const lines = text.split(/\r?\n/).filter(l => l && !l.startsWith('#'));
