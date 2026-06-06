@@ -22,13 +22,15 @@ async function sendFonnteOnce(phone: string, message: string) {
   const form = new FormData();
   form.append('target', normalizePhone(phone)); form.append('message', message); form.append('countryCode', '62');
   try {
-    const res = await fetch('https://api.fonnte.com/send', { method: 'POST', headers: { Authorization: tok }, body: form, signal: AbortSignal.timeout(12000) });
+    const res = await fetch('https://api.fonnte.com/send', { method: 'POST', headers: { Authorization: tok }, body: form, signal: AbortSignal.timeout(6000) });
     const data = await res.json().catch(() => ({}));
     return { ok: res.ok && (data as any)?.status !== false, data };
   } catch (e) { return { ok: false, data: { error: String(e) } }; }
 }
 async function sendFonnte(phone: string, message: string) {
-  const delays = [0, 1000, 3000, 7000, 12000];
+  // Jangan tahan transaksi koin terlalu lama; token tetap dikembalikan di website,
+  // WA gagal bisa dikirim ulang dari admin/poller.
+  const delays = [0];
   let last: any = { ok: false, data: { error: 'no_attempt' } };
   for (let i = 0; i < delays.length; i++) {
     if (delays[i]) await new Promise((r) => setTimeout(r, delays[i]));
