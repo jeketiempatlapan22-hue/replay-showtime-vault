@@ -823,7 +823,7 @@ Deno.serve(async (req) => {
   return { finalReply, sendResult };
   };
 
-  if (!testMode && ADMIN_ONLY.has(cmd) && isBotAdmin) {
+  if (!testMode) {
     const background = (async () => {
       await processAndSendReply();
     })().catch(async (e) => {
