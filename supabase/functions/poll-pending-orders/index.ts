@@ -496,7 +496,7 @@ Deno.serve(async (req) => {
   }
 
 
-  return new Response(JSON.stringify({ ok: true, scanned: results.length, fast_lane: freshPending.length, membership: memResults.length, results, membership_results: memResults }), {
+  return new Response(JSON.stringify({ ok: true, scanned: results.length, membership: memResults.length, results, membership_results: memResults }), {
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });
 });
