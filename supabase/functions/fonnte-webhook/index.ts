@@ -51,14 +51,19 @@ async function sendFonnte(phone: string, message: string, inboxId = ''): Promise
       let res = await fetch('https://api.fonnte.com/send', {
         method: 'POST', headers: { Authorization: token }, body: buildForm(true), signal: AbortSignal.timeout(timeoutMs),
       });
-      let data = await res.json().catch(() => ({}));
+      let raw = await res.text();
+      let data: unknown;
+      try { data = raw ? JSON.parse(raw) : {}; } catch { data = { raw: raw.slice(0, 500) }; }
+      if (!res.ok && data && typeof data === 'object') data = { ...(data as Record<string, unknown>), http_status: res.status, http_status_text: res.statusText };
       let ok = res.ok && (data as { status?: boolean })?.status !== false;
       const reason = String((data as { reason?: string })?.reason || '').toLowerCase();
       if (!ok && inboxId && (reason.includes('inbox') || reason.includes('body'))) {
         res = await fetch('https://api.fonnte.com/send', {
           method: 'POST', headers: { Authorization: token }, body: buildForm(false), signal: AbortSignal.timeout(timeoutMs),
         });
-        data = await res.json().catch(() => ({}));
+        raw = await res.text();
+        try { data = raw ? JSON.parse(raw) : {}; } catch { data = { raw: raw.slice(0, 500) }; }
+        if (!res.ok && data && typeof data === 'object') data = { ...(data as Record<string, unknown>), http_status: res.status, http_status_text: res.statusText };
         ok = res.ok && (data as { status?: boolean })?.status !== false;
       }
       last = { ok, data, error: ok ? undefined : JSON.stringify(data) };
