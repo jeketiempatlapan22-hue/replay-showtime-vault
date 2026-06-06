@@ -15,7 +15,7 @@ function normalizePhone(raw: string) {
 
 export async function sendFonnte(phone: string, message: string): Promise<{ ok: boolean; data: unknown }> {
   const token = Deno.env.get('FONNTE_TOKEN');
-  if (!token) throw new Error('FONNTE_TOKEN not configured');
+  if (!token) return { ok: false, data: { error: 'FONNTE_TOKEN not configured' } };
   const form = new FormData();
   form.append('target', normalizePhone(phone));
   form.append('message', message);
@@ -82,11 +82,11 @@ Deno.serve(async (req) => {
     });
 
     return new Response(JSON.stringify({ ok: result.ok, data: result.data }), {
-      status: result.ok ? 200 : 502,
+      status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'unknown';
-    return new Response(JSON.stringify({ error: msg }), { status: 500, headers: corsHeaders });
+    return new Response(JSON.stringify({ ok: false, error: msg }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
 });
