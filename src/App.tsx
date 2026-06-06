@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useState } from 'react';
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes, useLocation } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -9,20 +9,21 @@ import BlockedScreen from "@/components/BlockedScreen";
 import { useDevToolsDetector } from "@/hooks/useDevToolsDetector";
 import { getBrowserId } from "@/lib/browserId";
 import { supabase } from "@/integrations/supabase/client";
-import Index from "./pages/Index";
-import Admin from "./pages/Admin";
-import Live from "./pages/Live";
-import Kunci from "./pages/Kunci";
-import Auth from "./pages/Auth";
-import NotFound from "./pages/NotFound";
-import Akses from "./pages/Akses";
-import Shows from "./pages/Shows";
-import Koin from "./pages/Koin";
-import Membership from "./pages/Membership";
-import Profil from "./pages/Profil";
-import ResetPassword from "./pages/ResetPassword";
 import BottomNav from "./components/BottomNav";
-import Reseller from "./pages/Reseller";
+
+const Index = lazy(() => import("./pages/Index"));
+const Admin = lazy(() => import("./pages/Admin"));
+const Live = lazy(() => import("./pages/Live"));
+const Kunci = lazy(() => import("./pages/Kunci"));
+const Auth = lazy(() => import("./pages/Auth"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+const Akses = lazy(() => import("./pages/Akses"));
+const Shows = lazy(() => import("./pages/Shows"));
+const Koin = lazy(() => import("./pages/Koin"));
+const Membership = lazy(() => import("./pages/Membership"));
+const Profil = lazy(() => import("./pages/Profil"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+const Reseller = lazy(() => import("./pages/Reseller"));
 
 const queryClient = new QueryClient();
 
@@ -49,9 +50,11 @@ function ProtectedShell({ children }: { children: React.ReactNode }) {
       });
   }, [isAdminRoute]);
 
-  useDevToolsDetector(() => {
+  const handleDevToolsDetected = useCallback(() => {
     if (!isAdminRoute) setBlocked(true);
-  });
+  }, [isAdminRoute]);
+
+  useDevToolsDetector(handleDevToolsDetected);
 
   if (checking) return null;
   if (blocked && !isAdminRoute) return <BlockedScreen />;
@@ -66,6 +69,7 @@ const App = () => (
       <BrowserRouter>
         <ErrorBoundary>
           <ProtectedShell>
+            <Suspense fallback={<div className="min-h-screen bg-background" />}>
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/live" element={<Live />} />
@@ -82,6 +86,7 @@ const App = () => (
               <Route path="/reseller" element={<Reseller />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
+            </Suspense>
             <BottomNav />
           </ProtectedShell>
         </ErrorBoundary>
