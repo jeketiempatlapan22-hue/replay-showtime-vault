@@ -690,7 +690,7 @@ export default function Live() {
           }
           if (unique !== lastCount) { lastCount = unique; setViewerCount(unique); }
         } catch { /* ignore */ }
-      }, 5000);
+      }, 15000);
     };
     let tracked = false;
     let heartbeat: number | null = null;
