@@ -718,8 +718,24 @@ export default function Live() {
             <div className="text-3xl">⚠️</div>
             <h2 className="text-base sm:text-lg font-bold text-foreground">Tidak bisa membuka live</h2>
             <p className="text-sm text-muted-foreground whitespace-pre-line">{pwError}</p>
+            {resetInfo?.eligible && resetInfo.remaining > 0 && (
+              <div className="rounded-xl border border-primary/40 bg-primary/10 p-3 text-left space-y-2">
+                <p className="text-xs sm:text-sm text-foreground">
+                  Anda bisa <b>mereset token</b> agar berpindah ke perangkat ini. Sisa kesempatan reset manual: <b>{resetInfo.remaining}/{resetInfo.max}</b>.
+                </p>
+                <p className="text-[11px] text-muted-foreground">
+                  Setelah reset, perangkat lama otomatis keluar dan token hanya berlaku di perangkat ini.
+                </p>
+                <Button size="sm" className="w-full" disabled={resetting} onClick={doSelfResetToken}>
+                  {resetting ? 'Mereset…' : `Reset token & pindah ke perangkat ini (sisa ${resetInfo.remaining})`}
+                </Button>
+              </div>
+            )}
+            {resetInfo && !resetInfo.eligible && resetInfo.max > 0 && (
+              <p className="text-[11px] text-muted-foreground italic">Kuota reset manual habis ({resetInfo.max}×). Hubungi admin untuk reset.</p>
+            )}
             <div className="flex flex-col sm:flex-row gap-2 pt-1">
-              <Button variant="outline" className="flex-1" onClick={() => { setPwError(''); const t = search.get('t'); const mt = search.get('mtoken'); const mp = search.get('mp') || search.get('mpassword') || ''; if (mt) void doUnlock({ mtoken: mt, mpassword: mp }); else if (t) void doUnlock({ token: t }); }}>
+              <Button variant="outline" className="flex-1" onClick={() => { setPwError(''); setResetInfo(null); const t = search.get('t'); const mt = search.get('mtoken'); const mp = search.get('mp') || search.get('mpassword') || ''; if (mt) void doUnlock({ mtoken: mt, mpassword: mp }); else if (t) void doUnlock({ token: t }); }}>
                 Coba lagi
               </Button>
               <Button variant="secondary" className="flex-1" onClick={() => navigate(`/kunci${showId ? `?show=${showId}` : ''}`)}>
@@ -728,6 +744,7 @@ export default function Live() {
               <Button className="flex-1" onClick={() => navigate('/')}>Kembali</Button>
             </div>
           </div>
+
         ) : !unlocked ? (
           // Initial unlock attempt in flight
           <div className="flex items-center justify-center py-20"><Loader2 className="w-10 h-10 text-primary animate-spin" /></div>
