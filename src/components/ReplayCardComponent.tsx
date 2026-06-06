@@ -73,8 +73,14 @@ export default function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWa
     }
   }, [isPurchased, purchasedToken, replay.id, isUnlocked, onUnlock]);
 
+  const accessLink = purchasedToken
+    ? `${window.location.origin}/akses?token=${purchasedToken}&replay=${replay.id}`
+    : '';
   const copyToken = async () => {
     try { await navigator.clipboard.writeText(purchasedToken); toast({ title: 'Sandi disalin' }); } catch { /* ignore */ }
+  };
+  const copyLink = async () => {
+    try { await navigator.clipboard.writeText(accessLink); toast({ title: 'Link akses disalin', description: 'Tempel di browser untuk menonton.' }); } catch { /* ignore */ }
   };
 
   const handleSubmitPassword = async () => {
