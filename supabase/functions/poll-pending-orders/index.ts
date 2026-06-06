@@ -109,7 +109,7 @@ async function sendFonnteOnce(phone: string, message: string, timeoutMs: number)
 // Cron berjalan tiap 30s — kita kasih waktu cukup untuk Fonnte lambat tapi
 // tetap hemat budget. 12s + retry 16s = max ~28s per pesan.
 async function sendFonnte(phone: string, message: string) {
-  const attempts = [12000, 16000];
+  const attempts = [18000, 26000];
   let last: { ok: boolean; data: unknown } = { ok: false, data: { error: 'no_attempt' } };
   for (let i = 0; i < attempts.length; i++) {
     last = await sendFonnteOnce(phone, message, attempts[i]);
@@ -122,6 +122,16 @@ async function hasSentWa(admin: ReturnType<typeof createClient>, orderId: string
   const { data } = await admin.from('wa_outbox')
     .select('id').eq('related_order_id', orderId).eq('status', 'sent').limit(1);
   return !!data?.length;
+}
+
+async function shouldDelayWaRetry(admin: ReturnType<typeof createClient>, orderId: string, windowMs = 4 * 60_000) {
+  const { data } = await admin.from('wa_outbox')
+    .select('status,created_at')
+    .eq('related_order_id', orderId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return data?.status === 'failed' && Date.now() - new Date(data.created_at).getTime() < windowMs;
 }
 
 const DEFAULT_WA_TPL =
@@ -169,6 +179,7 @@ async function processOrder(admin: ReturnType<typeof createClient>, order: any, 
       newBal = Number(row?.new_balance ?? 0);
     }
     const msg = `✅ *Top-up berhasil*\n+${order.coin_amount} koin sudah masuk.${newBal != null ? `\nSaldo sekarang: *${newBal}* koin` : ''}\n\nTerima kasih 💖 — *ReplayTime*`;
+    if (await shouldDelayWaRetry(admin, order.id)) return { id: order.id, status: 'paid', topup: true, skipped: 'wa_retry_backoff' };
     const sent = await sendFonnte(order.user_phone, msg);
     if (sent.ok) await admin.from('orders').update({ token_sent_at: new Date().toISOString() }).eq('id', order.id);
     await admin.from('wa_outbox').insert({
@@ -262,6 +273,7 @@ async function processOrder(admin: ReturnType<typeof createClient>, order: any, 
   }
 
 
+  if (await shouldDelayWaRetry(admin, order.id)) return { id: order.id, status: 'paid', skipped: 'wa_retry_backoff' };
   const sent = await sendFonnte(order.user_phone, message);
   if (sent.ok) await admin.from('orders').update({ token_sent_at: new Date().toISOString() }).eq('id', order.id);
   await admin.from('token_deliveries').insert({
