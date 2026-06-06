@@ -83,12 +83,32 @@ Deno.serve(async (req) => {
     if (price <= 0) return new Response(JSON.stringify({ error: 'coin_price_unset' }), { status: 400, headers: corsHeaders });
 
     // Idempotency: don't double-charge if user already has an unrevoked token for this item
+    let existingToken = '';
     if (resolvedShowId && !resolvedReplayId) {
       const { data: existing } = await admin.from('active_show_tokens').select('token').eq('show_id', resolvedShowId).eq('label', `coin:${user.id}`).eq('revoked', false).maybeSingle();
-      if (existing?.token) return new Response(JSON.stringify({ ok: true, already: true, access_token: existing.token }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      existingToken = existing?.token || '';
     } else if (resolvedReplayId) {
       const { data: existing } = await admin.from('replay_personal_tokens').select('token').eq('replay_id', resolvedReplayId).eq('label', `coin:${user.id}`).eq('revoked', false).maybeSingle();
-      if (existing?.token) return new Response(JSON.stringify({ ok: true, already: true, access_token: existing.token }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      existingToken = existing?.token || '';
+    }
+    if (existingToken) {
+      const { data: settings } = await admin.from('site_settings').select('key,value').eq('key', 'site_origin');
+      const origin = ((settings ?? [])[0]?.value || 'https://replaytime.lovable.app').replace(/\/+$/, '');
+      const link = resolvedShowId && !resolvedReplayId
+        ? `${origin}/live?show=${resolvedShowId}&t=${existingToken}`
+        : `${origin}/akses?token=${existingToken}${resolvedReplayId ? `&replay=${resolvedReplayId}` : ''}`;
+      const message = `✅ *Akses Anda masih aktif*\n\n${itemTitle}\n🔗 ${link}\n\nToken tidak ditagih ulang.`;
+      const sent = await sendFonnte(phone, message);
+      await admin.from('wa_outbox').insert({
+        phone, message, status: sent.ok ? 'sent' : 'failed',
+        error: sent.ok ? null : JSON.stringify(sent.data), fonnte_response: sent.data,
+      });
+      await admin.from('token_deliveries').insert({
+        phone, replay_id: resolvedReplayId, replay_title: itemTitle,
+        order_id: null, access_token: existingToken, link,
+        source: 'coins-existing', requested_by: 'purchase-with-coins',
+      });
+      return new Response(JSON.stringify({ ok: true, already: true, access_token: existingToken, link, sent: sent.ok }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     // Atomic debit
