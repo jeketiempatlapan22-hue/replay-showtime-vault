@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, RefreshCw, Send, Copy, UserPlus } from 'lucide-react';
+import { Loader2, RefreshCw, Send, Copy, UserPlus, Trash2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -50,12 +50,14 @@ export default function ShowOrdersResendDialog({ open, onOpenChange, showId, sho
   const load = async () => {
     if (!showId) return;
     setLoading(true);
-    const { data } = await supabase
+    // Limit ke 200 order terbaru agar dialog cepat dibuka.
+    const ordersP = supabase
       .from('orders')
       .select('id,user_phone,item_title,status,kind,amount,coin_amount,created_at,paid_at,token_sent_at,access_token')
       .eq('show_id', showId)
       .order('created_at', { ascending: false })
-      .limit(500);
+      .limit(200);
+    const { data } = await ordersP;
     const list = (data || []) as Order[];
     setRows(list);
     const ids = list.map((r) => r.id);
@@ -63,9 +65,10 @@ export default function ShowOrdersResendDialog({ open, onOpenChange, showId, sho
     if (ids.length) {
       const { data: outbox } = await supabase
         .from('wa_outbox')
-        .select('related_order_id,status,created_at')
+        .select('related_order_id,status')
         .in('related_order_id', ids)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(1000);
       (outbox || []).forEach((o: any) => {
         if (!o.related_order_id) return;
         if (!map[o.related_order_id]) map[o.related_order_id] = o.status === 'sent' ? 'sent' : 'failed';
@@ -74,6 +77,32 @@ export default function ShowOrdersResendDialog({ open, onOpenChange, showId, sho
     list.forEach((r) => { if (!map[r.id]) map[r.id] = 'none'; });
     setWaStatus(map);
     setLoading(false);
+  };
+
+  const deleteLog = async (id: string) => {
+    if (!confirm('Hapus log WA untuk order ini?')) return;
+    const { data, error } = await supabase.rpc('admin_delete_wa_outbox_for_orders', { _order_ids: [id] });
+    if (error) { toast({ title: 'Gagal hapus log', description: error.message, variant: 'destructive' }); return; }
+    toast({ title: `Log dihapus (${data || 0})` });
+    setWaStatus((p) => ({ ...p, [id]: 'none' }));
+  };
+
+  const deleteLogBulk = async (scope: 'filtered' | 'all') => {
+    if (scope === 'all') {
+      if (!confirm(`Hapus SEMUA log WA untuk show "${showTitle}"?`)) return;
+      const { data, error } = await supabase.rpc('admin_delete_wa_outbox_for_show', { _show_id: showId });
+      if (error) { toast({ title: 'Gagal', description: error.message, variant: 'destructive' }); return; }
+      toast({ title: `Hapus log: ${data || 0}` });
+      void load();
+      return;
+    }
+    const ids = filtered.map((r) => r.id);
+    if (!ids.length) { toast({ title: 'Tidak ada order pada filter ini', variant: 'destructive' }); return; }
+    if (!confirm(`Hapus log WA untuk ${ids.length} order pada filter ini?`)) return;
+    const { data, error } = await supabase.rpc('admin_delete_wa_outbox_for_orders', { _order_ids: ids });
+    if (error) { toast({ title: 'Gagal', description: error.message, variant: 'destructive' }); return; }
+    toast({ title: `Hapus log: ${data || 0}` });
+    void load();
   };
 
   useEffect(() => { if (open) void load(); /* eslint-disable-next-line */ }, [open, showId]);
@@ -232,6 +261,12 @@ export default function ShowOrdersResendDialog({ open, onOpenChange, showId, sho
             <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => resendBulk(true)} disabled={bulkSending} title="Paksa kirim ulang — termasuk order yang belum lunas (admin only)">
               Paksa Kirim
             </Button>
+            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => deleteLogBulk('filtered')} title="Hapus log WA untuk order di filter">
+              <Trash2 className="w-3 h-3 mr-1" /> Hapus Log
+            </Button>
+            <Button size="sm" variant="ghost" className="h-7 text-xs text-destructive" onClick={() => deleteLogBulk('all')} title="Hapus SEMUA log WA untuk show ini">
+              <Trash2 className="w-3 h-3 mr-1" /> Semua
+            </Button>
             <Button size="sm" variant="ghost" className="h-7" onClick={load}><RefreshCw className="w-3 h-3" /></Button>
           </div>
         </div>
@@ -286,6 +321,11 @@ export default function ShowOrdersResendDialog({ open, onOpenChange, showId, sho
                     >
                       {sending[r.id] ? <Loader2 className="w-3 h-3 animate-spin" /> : <><Send className="w-3 h-3 mr-1" />Kirim</>}
                     </Button>
+                    {w !== 'none' && (
+                      <Button size="sm" variant="ghost" className="h-7 mt-1 text-destructive ml-1" title="Hapus log WA untuk order ini" onClick={() => deleteLog(r.id)}>
+                        <Trash2 className="w-3 h-3" />
+                      </Button>
+                    )}
                   </div>
                 </div>
               );
