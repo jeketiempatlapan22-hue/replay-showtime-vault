@@ -420,10 +420,10 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
             hls.capLevelToPlayerSize = false;
             setCurrentQuality(match.index);
           }
-        } else if (isWeak && hls) {
-          // Weak network: cap ABR ceiling low on the first automatic open.
-          // User can still pick higher manually; this only sets the *cap*, not a hard lock.
-          const maxAutoHeight = isVeryWeak ? 270 : 360;
+        } else if ((isWeak || isMobile || lowMem) && hls) {
+          // Start conservatively on phones/TV/weak devices, then let users raise quality manually.
+          // This avoids first-minute stalls caused by ABR over-estimating bandwidth.
+          const maxAutoHeight = isVeryWeak ? 270 : isWeak || lowMem ? 360 : 480;
           const capCandidate = manifestLevels
             .map((lvl, i) => ({ i, h: lvl.height || 0 }))
             .filter(x => x.h > 0 && x.h <= maxAutoHeight)
@@ -462,7 +462,8 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
       hls.on(Hls.Events.LEVEL_SWITCHED, (_, data) => {
         if (hls && hls.autoLevelEnabled) {
           const lvl = hls.levels[data.level];
-          setAutoActiveLabel(lvl?.height ? `${lvl.height}p` : '');
+          const nextLabel = lvl?.height ? `${lvl.height}p` : '';
+          setAutoActiveLabel(prev => prev === nextLabel ? prev : nextLabel);
         } else if (hls && userQualityRef.current) {
           // Enforce user's manual quality if hls.js drifted. Only act when the
           // current level's height truly differs AND a matching level exists,
@@ -603,7 +604,8 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
     const onPause = () => setIsPlaying(false);
     // Throttle: hanya update saat detik bulat berubah → kurangi re-render dari ~4Hz ke 1Hz
     let lastSec = -1;
-    const onTimeUpdate = () => {
+      const onTimeUpdate = () => {
+        if (isLiveRef.current) return;
       const t = video.currentTime;
       const sec = Math.floor(t);
       if (sec !== lastSec) {
