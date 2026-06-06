@@ -97,9 +97,8 @@ async function sendFonnteOnce(phone: string, message: string, timeoutMs: number)
   }
 }
 
-// Coba 2x dengan timeout naik supaya user benar-benar terima token walau Fonnte lambat.
 async function sendFonnte(phone: string, message: string) {
-  const attempts = [18000, 32000];
+  const attempts = [10000];
   let last: { ok: boolean; data: unknown } = { ok: false, data: { error: 'no_attempt' } };
   for (let i = 0; i < attempts.length; i++) {
     last = await sendFonnteOnce(phone, message, attempts[i]);
@@ -114,7 +113,7 @@ async function hasSentWa(admin: ReturnType<typeof createClient>, orderId: string
   return !!data?.length;
 }
 
-async function shouldDelayWaRetry(admin: ReturnType<typeof createClient>, orderId: string, windowMs = 4 * 60_000) {
+async function shouldDelayWaRetry(admin: ReturnType<typeof createClient>, orderId: string, windowMs = 15 * 60_000) {
   const { data } = await admin.from('wa_outbox')
     .select('status,created_at')
     .eq('related_order_id', orderId)
@@ -122,6 +121,24 @@ async function shouldDelayWaRetry(admin: ReturnType<typeof createClient>, orderI
     .limit(1)
     .maybeSingle();
   return data?.status === 'failed' && Date.now() - new Date(data.created_at).getTime() < windowMs;
+}
+
+function isTimeoutText(value: unknown) {
+  const text = typeof value === 'string' ? value : JSON.stringify(value ?? '');
+  return /timed out|TimeoutError|Signal timed out|abort/i.test(text);
+}
+
+async function isFonntePaused(admin: ReturnType<typeof createClient>, windowMs = 15 * 60_000) {
+  const since = new Date(Date.now() - windowMs).toISOString();
+  const { data } = await admin.from('wa_outbox')
+    .select('status,error,created_at')
+    .gte('created_at', since)
+    .order('created_at', { ascending: false })
+    .limit(10);
+  const rows = data ?? [];
+  const timeoutFails = rows.filter((r: any) => r.status === 'failed' && isTimeoutText(r.error)).length;
+  const hasRecentSent = rows.some((r: any) => r.status === 'sent');
+  return timeoutFails >= 3 && !hasRecentSent;
 }
 
 Deno.serve(async (req) => {
