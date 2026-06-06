@@ -47,7 +47,6 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
   const [now, setNow] = useState(Date.now());
   const [lastChecked, setLastChecked] = useState<number>(0);
   const [staticQrisUrl, setStaticQrisUrl] = useState<string>('');
-  const [useStaticQris, setUseStaticQris] = useState<boolean>(false);
   const [ownerWa, setOwnerWa] = useState<string>('6288809048431');
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
@@ -63,7 +62,6 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
         for (const row of data || []) {
           if (row.key === 'static_qris_url') setStaticQrisUrl(String(row.value || ''));
           if (row.key === 'owner_wa_number') setOwnerWa(String(row.value || '6288809048431'));
-          if (row.key === 'use_static_qris') setUseStaticQris(String(row.value || 'false') === 'true');
         }
       } catch { /* ignore */ }
       // Coin price for the item
