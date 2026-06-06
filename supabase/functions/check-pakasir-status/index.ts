@@ -292,6 +292,9 @@ Deno.serve(async (req) => {
         newBal = Number(row?.new_balance ?? 0);
       }
       if (!alreadySent) {
+        if (await shouldDelayWaRetry(admin, order.id)) {
+          return new Response(JSON.stringify({ ok: true, status: 'paid', topup: true, new_balance: newBal, sent: false, retry_delayed: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
         const msg = `✅ *Top-up berhasil*\n+${order.coin_amount} koin sudah masuk.${newBal != null ? `\nSaldo sekarang: *${newBal}* koin` : ''}\n\nTerima kasih 💖 — *ReplayTime*`;
         const sent = await sendFonnte(order.user_phone, msg);
         if (sent.ok) {
