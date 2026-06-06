@@ -244,8 +244,8 @@ Deno.serve(async (req) => {
         .replace(/\{replay_info_block\}/g, tok.replay_info ? `🎬 *Info Replay:*\n${tok.replay_info}\n\n` : '')
         .replace(/\{site\}/g, morigin.replace(/^https?:\/\//, ''));
 
-      if (await shouldDelayWaRetry(admin, mOrder.id)) {
-        return new Response(JSON.stringify({ ok: true, status: 'paid', membership: true, sent: false, retry_delayed: true }), {
+      if (await isFonntePaused(admin)) {
+        return new Response(JSON.stringify({ ok: true, status: 'paid', membership: true, sent: false, retry_delayed: true, reason: 'fonnte_timeout_pause' }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
@@ -309,6 +309,9 @@ Deno.serve(async (req) => {
         newBal = Number(row?.new_balance ?? 0);
       }
       if (!alreadySent) {
+        if (await isFonntePaused(admin)) {
+          return new Response(JSON.stringify({ ok: true, status: 'paid', topup: true, new_balance: newBal, sent: false, retry_delayed: true, reason: 'fonnte_timeout_pause' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
         if (await shouldDelayWaRetry(admin, order.id)) {
           return new Response(JSON.stringify({ ok: true, status: 'paid', topup: true, new_balance: newBal, sent: false, retry_delayed: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
         }
@@ -402,6 +405,11 @@ Deno.serve(async (req) => {
       message = fillTpl(tpl, dateStr, link, '');
     }
 
+    if (await isFonntePaused(admin)) {
+      return new Response(JSON.stringify({ ok: true, status: 'paid', access_token: accessToken, sent: false, retry_delayed: true, reason: 'fonnte_timeout_pause' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
     if (await shouldDelayWaRetry(admin, order.id)) {
       return new Response(JSON.stringify({ ok: true, status: 'paid', access_token: accessToken, sent: false, retry_delayed: true }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
