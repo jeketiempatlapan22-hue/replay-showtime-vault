@@ -212,22 +212,29 @@ Deno.serve(async (req) => {
         if (!order) { results.push({ id: oid, error: 'not_found' }); continue; }
         // Non-paid orders must never receive token links from the resend path.
         // QRIS purchases are fulfilled only by Pakasir-verified webhook/polling.
-        if (order.status !== 'paid') {
+        // Non-paid orders only proceed when admin explicitly uses `force`.
+        // Coin top-ups are never delivered without real payment.
+        if (order.status !== 'paid' && !force) {
           results.push({ id: oid, skipped: 'payment_not_verified' });
           continue;
         }
+        if (order.kind === 'coin_topup' && order.status !== 'paid') {
+          results.push({ id: oid, skipped: 'topup_needs_payment' });
+          continue;
+        }
+        const labelPrefix = order.status === 'paid' ? 'paid-resend' : 'admin-force';
         if (order.kind !== 'coin_topup' && !order.access_token) {
           const newTok = crypto.randomUUID().replace(/-/g, '').slice(0, 24);
           if (order.show_id && !order.replay_id) {
             await admin.from('active_show_tokens').insert({
               show_id: order.show_id, token: newTok,
-              label: `paid-resend:${order.user_phone || ''}`.slice(0, 120),
+              label: `${labelPrefix}:${order.user_phone || ''}`.slice(0, 120),
               kind: 'personal', max_devices: 1, revoked: false,
             });
           } else if (order.replay_id) {
             await admin.from('replay_personal_tokens').insert({
               replay_id: order.replay_id, token: newTok,
-              label: `paid-resend:${order.user_phone || ''}`.slice(0, 120),
+              label: `${labelPrefix}:${order.user_phone || ''}`.slice(0, 120),
               max_devices: 1, revoked: false,
             });
           }
