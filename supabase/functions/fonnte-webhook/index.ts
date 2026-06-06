@@ -501,9 +501,14 @@ Deno.serve(async (req) => {
         .maybeSingle();
       if (!lastOrder) {
         reply = '📭 Belum ada order atas nomor ini. Silakan beli show dari aplikasi terlebih dahulu.';
-      } else if (lastOrder.status === 'paid' && lastOrder.token_sent_at) {
+      } else if (lastOrder.kind === 'coin_topup' && lastOrder.status === 'paid') {
+        const { data: bal } = await admin.from('coin_balances').select('balance').eq('user_id', (lastOrder as any).user_id).maybeSingle();
+        reply = `✅ Top-up koin Anda sudah lunas dan diproses.\nSaldo saat ini: *${(bal as any)?.balance ?? '-'}* koin.`;
+      } else if (lastOrder.status === 'paid' && lastOrder.access_token) {
         const origin = (map.get('site_origin') || 'https://replaytime.lovable.app').replace(/\/+$/, '');
-        const link = `${origin}/akses?token=${lastOrder.access_token}${lastOrder.replay_id ? `&replay=${lastOrder.replay_id}` : ''}`;
+        const link = lastOrder.show_id && !lastOrder.replay_id
+          ? `${origin}/live?show=${lastOrder.show_id}&t=${lastOrder.access_token}`
+          : `${origin}/akses?token=${lastOrder.access_token}${lastOrder.replay_id ? `&replay=${lastOrder.replay_id}` : ''}`;
         reply = `✅ Order Anda sudah lunas.\n\n${lastOrder.item_title}\n🔗 ${link}`;
       } else {
         try {
