@@ -292,7 +292,17 @@ Deno.serve(async (req) => {
   const bearer = authHeader.replace(/^Bearer\s+/i, '').trim();
   const SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
   const ANON = Deno.env.get('SUPABASE_ANON_KEY') || '';
-  if (!bearer || (bearer !== SERVICE_ROLE && bearer !== ANON)) {
+  let allowed = !!bearer && (bearer === SERVICE_ROLE || bearer === ANON);
+  if (!allowed && bearer) {
+    try {
+      const userClient = createClient(Deno.env.get('SUPABASE_URL')!, ANON, { global: { headers: { Authorization: authHeader } } });
+      const { data: ud } = await userClient.auth.getUser();
+      const adminCheck = createClient(Deno.env.get('SUPABASE_URL')!, SERVICE_ROLE);
+      const { data: isAdmin } = await adminCheck.rpc('has_role', { _user_id: ud?.user?.id, _role: 'admin' });
+      allowed = !!isAdmin;
+    } catch { allowed = false; }
+  }
+  if (!allowed) {
     return new Response(JSON.stringify({ error: 'unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
 
