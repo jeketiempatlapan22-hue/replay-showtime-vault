@@ -366,7 +366,6 @@ Deno.serve(async (req) => {
   const results: any[] = [];
   const startedAt = Date.now();
   const TIME_BUDGET_MS = 45_000;
-  const freshCutoff = Date.now() - 30 * 60_000; // 30 min
   for (const o of orders ?? []) {
     if (Date.now() - startedAt > TIME_BUDGET_MS) {
       results.push({ skipped: 'time_budget_reached' });
@@ -379,31 +378,10 @@ Deno.serve(async (req) => {
     try {
       const r = await processOrder(admin, o, apiKey, slug, origin, tpl, showTpl);
       results.push(r);
-      void freshCutoff;
     } catch (e) {
       results.push({ id: o.id, error: String(e) });
     }
   }
-
-  // Fast-lane fallback: when the Pakasir webhook does not arrive, do two extra
-  // polls of fresh (<30 min old) still-pending orders inside this same invocation
-  // at +20s and +40s. Combined with the per-minute cron this gives ~20s effective
-  // detection latency for new payments without needing sub-minute cron support.
-  const fastLane = (async () => {
-    if (freshPending.length === 0) return;
-    for (const delay of [20_000, 20_000]) {
-      await new Promise((r) => setTimeout(r, delay));
-      const ids = freshPending.map((o) => o.id);
-      const { data: refreshed } = await admin
-        .from('orders').select('*').in('id', ids).eq('status', 'pending');
-      if (!refreshed?.length) return;
-      for (const o of refreshed) {
-        try { await processOrder(admin, o, apiKey, slug, origin, tpl, showTpl); } catch { /* keep going */ }
-      }
-    }
-  })();
-  const runtime = (globalThis as unknown as { EdgeRuntime?: { waitUntil?: (p: Promise<unknown>) => void } }).EdgeRuntime;
-  if (runtime?.waitUntil) runtime.waitUntil(fastLane); else fastLane.catch(() => {});
 
   // === MEMBERSHIP ORDERS (reserved QRIS yang webhook-nya tidak sampai) ===
   // Bila sudah terbayar di Pakasir → finalize + kirim WA. Idempotent.
