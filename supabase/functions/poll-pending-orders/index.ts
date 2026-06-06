@@ -69,7 +69,7 @@ async function sendFonnteOnce(phone: string, message: string) {
   try {
     const res = await fetch('https://api.fonnte.com/send', {
       method: 'POST', headers: { Authorization: token }, body: form,
-      signal: AbortSignal.timeout(8000),
+      signal: AbortSignal.timeout(12000),
     });
     const data = await res.json().catch(() => ({}));
     return { ok: res.ok && (data as { status?: boolean })?.status !== false, data };
@@ -78,11 +78,9 @@ async function sendFonnteOnce(phone: string, message: string) {
   }
 }
 
-// Auto-retry Fonnte send up to 3 attempts with exponential backoff (1s, 3s).
-// This handles transient Fonnte 5xx, network blips, or rate-limit hiccups so
-// the user reliably receives their token even if the first send fails.
+// Auto-retry lebih agresif agar token/notifikasi tidak hilang saat Fonnte lambat.
 async function sendFonnte(phone: string, message: string) {
-  const delays = [0, 1000, 3000];
+  const delays = [0, 1000, 3000, 7000, 12000];
   let last: { ok: boolean; data: unknown } = { ok: false, data: { error: 'no_attempt' } };
   for (let i = 0; i < delays.length; i++) {
     if (delays[i]) await new Promise((r) => setTimeout(r, delays[i]));
@@ -90,6 +88,12 @@ async function sendFonnte(phone: string, message: string) {
     if (last.ok) return { ...last, attempts: i + 1 };
   }
   return { ...last, attempts: delays.length };
+}
+
+async function hasSentWa(admin: ReturnType<typeof createClient>, orderId: string) {
+  const { data } = await admin.from('wa_outbox')
+    .select('id').eq('related_order_id', orderId).eq('status', 'sent').limit(1);
+  return !!data?.length;
 }
 
 const DEFAULT_WA_TPL =
@@ -104,44 +108,52 @@ function renderTemplate(tpl: string, vars: Record<string, string>) {
 }
 
 async function processOrder(admin: ReturnType<typeof createClient>, order: any, apiKey: string, slug: string, origin: string, tpl: string, showTpl: string) {
-  if (!order.pakasir_order_id) return { id: order.id, skipped: 'no_pakasir_id' };
+  if (!order.pakasir_order_id && order.status !== 'paid') return { id: order.id, skipped: 'no_pakasir_id' };
 
-  const url = `https://app.pakasir.com/api/transactiondetail?project=${encodeURIComponent(slug)}&amount=${order.amount}&order_id=${encodeURIComponent(order.pakasir_order_id)}&api_key=${encodeURIComponent(apiKey)}`;
-  let pjson: any = {};
-  try {
-    const pres = await fetch(url);
-    pjson = await pres.json().catch(() => ({}));
-  } catch (e) {
-    return { id: order.id, error: 'pakasir_fetch:' + String(e) };
-  }
-  const tx = pjson?.transaction || pjson?.payment || {};
-  const pStatus = String(tx.status || pjson?.status || '').toLowerCase();
-  const isPaid = pStatus === 'completed' || pStatus === 'paid' || pStatus === 'success';
+  let pStatus = order.status === 'paid' ? 'paid' : '';
+  let isPaid = order.status === 'paid';
   if (!isPaid) {
-    // Persist terminal non-paid statuses (canceled/expired/failed) so we stop re-polling them.
-    if (pStatus === 'canceled' || pStatus === 'cancelled' || pStatus === 'expired' || pStatus === 'failed') {
-      await admin.from('orders').update({ status: pStatus }).eq('id', order.id);
+    const url = `https://app.pakasir.com/api/transactiondetail?project=${encodeURIComponent(slug)}&amount=${order.amount}&order_id=${encodeURIComponent(order.pakasir_order_id)}&api_key=${encodeURIComponent(apiKey)}`;
+    let pjson: any = {};
+    try {
+      const pres = await fetch(url, { signal: AbortSignal.timeout(15000) });
+      pjson = await pres.json().catch(() => ({}));
+    } catch (e) {
+      return { id: order.id, error: 'pakasir_fetch:' + String(e) };
     }
-    return { id: order.id, status: pStatus || 'pending' };
+    const tx = pjson?.transaction || pjson?.payment || {};
+    pStatus = String(tx.status || pjson?.status || '').toLowerCase();
+    isPaid = pStatus === 'completed' || pStatus === 'paid' || pStatus === 'success';
+    if (!isPaid) {
+      if (pStatus === 'canceled' || pStatus === 'cancelled' || pStatus === 'expired' || pStatus === 'failed') {
+        await admin.from('orders').update({ status: pStatus }).eq('id', order.id);
+      }
+      return { id: order.id, status: pStatus || 'pending' };
+    }
+  }
+
+  const alreadySent = order.token_sent_at && await hasSentWa(admin, order.id);
+  if (order.token_sent_at && !alreadySent) {
+    await admin.from('orders').update({ token_sent_at: null }).eq('id', order.id);
+    order.token_sent_at = null;
   }
 
   // === COIN TOP-UP branch ===
   if (order.kind === 'coin_topup') {
-    if (order.status !== 'paid') {
-      await admin.from('orders').update({ status: 'paid', paid_at: new Date().toISOString() }).eq('id', order.id);
-    }
-    if (order.token_sent_at) return { id: order.id, status: 'already_sent' };
+    if (order.token_sent_at && alreadySent) return { id: order.id, status: 'already_sent' };
     const claimedAt = new Date().toISOString();
     const { data: claimed } = await admin.from('orders').update({ token_sent_at: claimedAt })
       .eq('id', order.id).is('token_sent_at', null).select('id');
     if (!claimed || claimed.length === 0) return { id: order.id, status: 'already_sent' };
     let newBal: number | null = null;
     if (order.user_id && order.coin_amount > 0) {
-      const { data: bal, error: gerr } = await admin.rpc('grant_coins', {
-        _user_id: order.user_id, _delta: order.coin_amount,
-        _reason: 'topup', _meta: { order_id: order.id } as any, _order_id: order.id,
-      });
-      if (!gerr) newBal = bal as number;
+      const { data: credited, error: gerr } = await admin.rpc('credit_coin_topup_order', { _order_id: order.id });
+      if (gerr) {
+        await admin.from('orders').update({ token_sent_at: null }).eq('id', order.id).eq('token_sent_at', claimedAt);
+        return { id: order.id, error: 'coin_credit_failed:' + gerr.message };
+      }
+      const row = Array.isArray(credited) ? credited[0] : credited;
+      newBal = Number(row?.new_balance ?? 0);
     }
     const msg = `✅ *Top-up berhasil*\n+${order.coin_amount} koin sudah masuk.${newBal != null ? `\nSaldo sekarang: *${newBal}* koin` : ''}\n\nTerima kasih 💖 — *ReplayTime*`;
     const sent = await sendFonnte(order.user_phone, msg);
@@ -162,7 +174,7 @@ async function processOrder(admin: ReturnType<typeof createClient>, order: any, 
       status: 'paid', paid_at: new Date().toISOString(), access_token: accessToken,
     }).eq('id', order.id);
   }
-  if (order.token_sent_at) return { id: order.id, status: 'already_sent' };
+  if (order.token_sent_at && alreadySent) return { id: order.id, status: 'already_sent' };
 
   // Atomically claim the delivery slot: only one worker can flip
   // token_sent_at from NULL -> now(). Others get 0 rows back and exit.
@@ -280,7 +292,26 @@ Deno.serve(async (req) => {
   const bearer = authHeader.replace(/^Bearer\s+/i, '').trim();
   const SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
   const ANON = Deno.env.get('SUPABASE_ANON_KEY') || '';
-  if (!bearer || (bearer !== SERVICE_ROLE && bearer !== ANON)) {
+  const PUBLISHABLE = Deno.env.get('SUPABASE_PUBLISHABLE_KEY') || '';
+  const PUBLISHABLES = (Deno.env.get('SUPABASE_PUBLISHABLE_KEYS') || '').split(',').map((s) => s.trim()).filter(Boolean);
+  const accepted = [SERVICE_ROLE, ANON, PUBLISHABLE, ...PUBLISHABLES].filter(Boolean);
+  let allowed = !!bearer && accepted.includes(bearer);
+  if (!allowed && bearer.split('.').length === 3) {
+    try {
+      const payload = JSON.parse(atob(bearer.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+      allowed = payload?.role === 'anon' || payload?.role === 'service_role';
+    } catch { allowed = false; }
+  }
+  if (!allowed && bearer) {
+    try {
+      const userClient = createClient(Deno.env.get('SUPABASE_URL')!, ANON, { global: { headers: { Authorization: authHeader } } });
+      const { data: ud } = await userClient.auth.getUser();
+      const adminCheck = createClient(Deno.env.get('SUPABASE_URL')!, SERVICE_ROLE);
+      const { data: isAdmin } = await adminCheck.rpc('has_role', { _user_id: ud?.user?.id, _role: 'admin' });
+      allowed = !!isAdmin;
+    } catch { allowed = false; }
+  }
+  if (!allowed) {
     return new Response(JSON.stringify({ error: 'unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
 
@@ -299,18 +330,17 @@ Deno.serve(async (req) => {
   const showTpl = sm.get('wa_show_template') ||
     '🔐 *TOKEN LIVE SATUAN*\n\n🎤 *{title}*\n\n📅 {date}\n\n🔗 *Link Live:*\n{live_link}\n\n🎬 *Link Replay:* {site}\n\n{password_line}👤 Hanya untuk *1 perangkat pertama*.\n\n— *ReplayTime* 💖';
 
-  // Pull recent pending orders (last 7 days, newest first, generous cap).
+  // Pull recent pending orders plus paid orders whose WhatsApp delivery failed.
   // Pakasir dynamic QRIS payments can be paid hours after creation; we keep
   // a wide window so even users who close the dialog still get their token.
   const since = new Date(Date.now() - 7 * 24 * 3600_000).toISOString();
   const { data: orders, error } = await admin
     .from('orders')
     .select('*')
-    .eq('status', 'pending')
+    .or('status.eq.pending,and(status.eq.paid,token_sent_at.is.null)')
     .gte('created_at', since)
-    .not('pakasir_order_id', 'is', null)
     .order('created_at', { ascending: false })
-    .limit(100);
+    .limit(250);
   console.log(`[poll] scanning ${orders?.length ?? 0} pending orders since ${since}`);
 
   if (error) {
@@ -321,6 +351,10 @@ Deno.serve(async (req) => {
   const freshPending: any[] = [];
   const freshCutoff = Date.now() - 30 * 60_000; // 30 min
   for (const o of orders ?? []) {
+    if (o.status === 'paid' && o.token_sent_at && await hasSentWa(admin, o.id)) {
+      results.push({ id: o.id, skipped: 'already_delivered' });
+      continue;
+    }
     try {
       const r = await processOrder(admin, o, apiKey, slug, origin, tpl, showTpl);
       results.push(r);

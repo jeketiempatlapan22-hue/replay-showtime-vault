@@ -186,7 +186,7 @@ export default function Membership() {
             toast.success('Pembayaran berhasil! Cek WhatsApp.');
           }
           try { await supabase.functions.invoke('check-pakasir-status', { body: { order_id: r.order_id } }); } catch { /* ignore */ }
-        }, 4000);
+        }, 2500);
       }
     } catch (err: any) {
       const msg = err?.message || String(err);
