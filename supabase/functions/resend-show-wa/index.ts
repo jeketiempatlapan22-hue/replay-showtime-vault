@@ -29,7 +29,12 @@ async function sendFonnteOnce(phone: string, message: string, timeoutMs: number)
       method: 'POST', headers: { Authorization: tok }, body: form,
       signal: AbortSignal.timeout(timeoutMs),
     });
-    const data = await res.json().catch(() => ({}));
+    const raw = await res.text();
+    let data: unknown;
+    try { data = raw ? JSON.parse(raw) : {}; } catch { data = { raw: raw.slice(0, 500) }; }
+    if (!res.ok && data && typeof data === 'object') {
+      data = { ...(data as Record<string, unknown>), http_status: res.status, http_status_text: res.statusText };
+    }
     return { ok: res.ok && (data as { status?: boolean })?.status !== false, data };
   } catch (e) { return { ok: false, data: { error: String(e) } }; }
 }
@@ -189,8 +194,7 @@ Deno.serve(async (req) => {
         user_phone: phone, item_title: show.title, access_token: newTok,
       } as any;
       const message = await buildMessage(admin, pseudoOrder);
-      const paused = await isFonntePaused(admin);
-      const sent = paused ? { ok: false, data: { error: 'fonnte_timeout_pause' } } : await sendFonnte(phone, message);
+      const sent = await sendFonnte(phone, message);
       await admin.from('wa_outbox').insert({
         phone, message, status: sent.ok ? 'sent' : 'failed',
         error: sent.ok ? null : JSON.stringify(sent.data),
@@ -268,7 +272,7 @@ Deno.serve(async (req) => {
           }
         }
         const message = await buildMessage(admin, order);
-        const paused = await isFonntePaused(admin);
+        const paused = ids.length > 1 && await isFonntePaused(admin);
         const sent = paused ? { ok: false, data: { error: 'fonnte_timeout_pause' } } : await sendFonnte(order.user_phone, message);
         await admin.from('wa_outbox').insert({
           phone: order.user_phone, message, status: sent.ok ? 'sent' : 'failed',

@@ -111,7 +111,7 @@ export default function MembershipAdmin() {
     });
     setSendingId(null);
     if (error || !data?.ok) {
-      toast.error('Gagal kirim WA: ' + (error?.message || JSON.stringify(data?.data || data || {})));
+      toast.error('Gagal kirim WA: ' + (error?.message || JSON.stringify(data?.data || data || {})).slice(0, 180));
     } else {
       toast.success(`Link membership terkirim ke ${r.phone}`);
     }

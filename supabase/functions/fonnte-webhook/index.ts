@@ -51,14 +51,19 @@ async function sendFonnte(phone: string, message: string, inboxId = ''): Promise
       let res = await fetch('https://api.fonnte.com/send', {
         method: 'POST', headers: { Authorization: token }, body: buildForm(true), signal: AbortSignal.timeout(timeoutMs),
       });
-      let data = await res.json().catch(() => ({}));
+      let raw = await res.text();
+      let data: unknown;
+      try { data = raw ? JSON.parse(raw) : {}; } catch { data = { raw: raw.slice(0, 500) }; }
+      if (!res.ok && data && typeof data === 'object') data = { ...(data as Record<string, unknown>), http_status: res.status, http_status_text: res.statusText };
       let ok = res.ok && (data as { status?: boolean })?.status !== false;
       const reason = String((data as { reason?: string })?.reason || '').toLowerCase();
       if (!ok && inboxId && (reason.includes('inbox') || reason.includes('body'))) {
         res = await fetch('https://api.fonnte.com/send', {
           method: 'POST', headers: { Authorization: token }, body: buildForm(false), signal: AbortSignal.timeout(timeoutMs),
         });
-        data = await res.json().catch(() => ({}));
+        raw = await res.text();
+        try { data = raw ? JSON.parse(raw) : {}; } catch { data = { raw: raw.slice(0, 500) }; }
+        if (!res.ok && data && typeof data === 'object') data = { ...(data as Record<string, unknown>), http_status: res.status, http_status_text: res.statusText };
         ok = res.ok && (data as { status?: boolean })?.status !== false;
       }
       last = { ok, data, error: ok ? undefined : JSON.stringify(data) };
@@ -257,10 +262,7 @@ async function sendAndAudit(
   admin: ReturnType<typeof createClient>,
   opts: { phone: string; message: string; inboxId?: string; testMode?: boolean; deliverTest?: boolean; command?: string; device?: string; fromMe?: boolean },
 ) {
-  const paused = !(opts.testMode && !opts.deliverTest) && await isFonntePaused(admin);
-  const sendResult = paused
-    ? { ok: false, data: { error: 'fonnte_timeout_pause' }, error: 'fonnte_timeout_pause' }
-    : opts.testMode && !opts.deliverTest
+  const sendResult = opts.testMode && !opts.deliverTest
     ? { ok: true, data: { skipped: true, reason: 'test_mode' } }
     : await sendFonnte(opts.phone, opts.message, opts.inboxId || '');
 
@@ -433,9 +435,10 @@ Deno.serve(async (req) => {
     .maybeSingle();
 
   if (!command) {
-    await sendAndAudit(admin, {
+    const unknownReply = '❓ Command tidak dikenali. Ketik */menu* untuk daftar perintah.';
+    const background = sendAndAudit(admin, {
       phone: phoneNorm,
-      message: '❓ Command tidak dikenali. Ketik */menu* untuk daftar perintah.',
+      message: unknownReply,
       inboxId,
       testMode,
       deliverTest,
@@ -443,7 +446,14 @@ Deno.serve(async (req) => {
       device: deviceNorm,
       fromMe,
     });
-    return new Response('ok', { headers: corsHeaders });
+    if (testMode) {
+      const sendResult = await background;
+      return json({ ok: true, phone: phoneNorm, command: cmd, reply: unknownReply, delivered: deliverTest, send: sendResult });
+    }
+    const runtime = (globalThis as unknown as { EdgeRuntime?: { waitUntil?: (promise: Promise<unknown>) => void } }).EdgeRuntime;
+    if (runtime?.waitUntil) runtime.waitUntil(background);
+    else await background;
+    return new Response('accepted', { status: 202, headers: corsHeaders });
   }
 
   // Admin-only commands
@@ -458,10 +468,10 @@ Deno.serve(async (req) => {
     const adminPhones = new Set((admins ?? []).map((a: any) => normalizePhone(a.phone)));
     isBotAdmin = candidatePhones.some((p) => adminPhones.has(p));
     if (!isBotAdmin) {
-        const deniedMessage = '🔒 Command ini hanya untuk admin bot. Hubungi owner untuk akses.';
-      await sendAndAudit(admin, {
+      const deniedMessage = '🔒 Command ini hanya untuk admin bot. Hubungi owner untuk akses.';
+      const background = sendAndAudit(admin, {
         phone: phoneNorm,
-          message: deniedMessage,
+        message: deniedMessage,
         inboxId,
         testMode,
         deliverTest,
@@ -469,10 +479,14 @@ Deno.serve(async (req) => {
         device: deviceNorm,
         fromMe,
       });
-        if (testMode) {
-          return json({ ok: true, phone: phoneNorm, command: cmd, reply: deniedMessage, delivered: deliverTest });
-        }
-      return new Response('ok', { headers: corsHeaders });
+      if (testMode) {
+        const sendResult = await background;
+        return json({ ok: true, phone: phoneNorm, command: cmd, reply: deniedMessage, delivered: deliverTest, send: sendResult });
+      }
+      const runtime = (globalThis as unknown as { EdgeRuntime?: { waitUntil?: (promise: Promise<unknown>) => void } }).EdgeRuntime;
+      if (runtime?.waitUntil) runtime.waitUntil(background);
+      else await background;
+      return new Response('accepted', { status: 202, headers: corsHeaders });
     }
   }
 
@@ -826,7 +840,7 @@ Deno.serve(async (req) => {
   return { finalReply, sendResult };
   };
 
-  if (!testMode && ADMIN_ONLY.has(cmd) && isBotAdmin) {
+  if (!testMode) {
     const background = (async () => {
       await processAndSendReply();
     })().catch(async (e) => {

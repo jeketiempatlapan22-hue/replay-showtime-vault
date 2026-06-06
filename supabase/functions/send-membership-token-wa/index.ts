@@ -28,7 +28,12 @@ async function sendFonnteOnce(phone: string, message: string, timeoutMs: number)
       method: 'POST', headers: { Authorization: tok }, body: form,
       signal: AbortSignal.timeout(timeoutMs),
     });
-    const data = await res.json().catch(() => ({}));
+    const raw = await res.text();
+    let data: unknown;
+    try { data = raw ? JSON.parse(raw) : {}; } catch { data = { raw: raw.slice(0, 500) }; }
+    if (!res.ok && data && typeof data === 'object') {
+      data = { ...(data as Record<string, unknown>), http_status: res.status, http_status_text: res.statusText };
+    }
     return { ok: res.ok && (data as { status?: boolean })?.status !== false, data };
   } catch (e) { return { ok: false, data: { error: String(e) } }; }
 }
@@ -144,10 +149,10 @@ Deno.serve(async (req) => {
     });
 
     return new Response(JSON.stringify({ ok: sent.ok, data: sent.data }), {
-      status: sent.ok ? 200 : 502,
+      status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (e) {
-    return new Response(JSON.stringify({ error: String(e) }), { status: 500, headers: corsHeaders });
+    return new Response(JSON.stringify({ ok: false, error: String(e) }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
 });
