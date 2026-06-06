@@ -34,15 +34,31 @@ async function sendFonnteOnce(phone: string, message: string, timeoutMs: number)
   } catch (e) { return { ok: false, data: { error: String(e) } }; }
 }
 async function sendFonnte(phone: string, message: string) {
-  // Fonnte kadang lambat (>10s). Coba 2x dengan timeout naik bertahap supaya
-  // tidak "Signal timed out" prematurely di admin UI.
-  const attempts = [18000, 32000];
+  const attempts = [10000];
   let last: { ok: boolean; data: unknown } = { ok: false, data: { error: 'no_attempt' } };
   for (let i = 0; i < attempts.length; i++) {
     last = await sendFonnteOnce(phone, message, attempts[i]);
     if (last.ok) return last;
   }
   return last;
+}
+
+function isTimeoutText(value: unknown) {
+  const text = typeof value === 'string' ? value : JSON.stringify(value ?? '');
+  return /timed out|TimeoutError|Signal timed out|abort/i.test(text);
+}
+
+async function isFonntePaused(admin: ReturnType<typeof createClient>, windowMs = 15 * 60_000) {
+  const since = new Date(Date.now() - windowMs).toISOString();
+  const { data } = await admin.from('wa_outbox')
+    .select('status,error,created_at')
+    .gte('created_at', since)
+    .order('created_at', { ascending: false })
+    .limit(10);
+  const rows = data ?? [];
+  const timeoutFails = rows.filter((r: any) => r.status === 'failed' && isTimeoutText(r.error)).length;
+  const hasRecentSent = rows.some((r: any) => r.status === 'sent');
+  return timeoutFails >= 3 && !hasRecentSent;
 }
 
 async function buildMessage(admin: any, order: any) {
@@ -173,7 +189,8 @@ Deno.serve(async (req) => {
         user_phone: phone, item_title: show.title, access_token: newTok,
       } as any;
       const message = await buildMessage(admin, pseudoOrder);
-      const sent = await sendFonnte(phone, message);
+      const paused = await isFonntePaused(admin);
+      const sent = paused ? { ok: false, data: { error: 'fonnte_timeout_pause' } } : await sendFonnte(phone, message);
       await admin.from('wa_outbox').insert({
         phone, message, status: sent.ok ? 'sent' : 'failed',
         error: sent.ok ? null : JSON.stringify(sent.data),
@@ -251,7 +268,8 @@ Deno.serve(async (req) => {
           }
         }
         const message = await buildMessage(admin, order);
-        const sent = await sendFonnte(order.user_phone, message);
+        const paused = await isFonntePaused(admin);
+        const sent = paused ? { ok: false, data: { error: 'fonnte_timeout_pause' } } : await sendFonnte(order.user_phone, message);
         await admin.from('wa_outbox').insert({
           phone: order.user_phone, message, status: sent.ok ? 'sent' : 'failed',
           error: sent.ok ? null : JSON.stringify(sent.data),
