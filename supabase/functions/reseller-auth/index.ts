@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { ipGuard } from '../_shared/ip-guard.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
