@@ -95,9 +95,9 @@ async function sendFonnteOnce(phone: string, message: string) {
   }
 }
 
-// Auto-retry lebih agresif agar token/notifikasi tetap terkirim saat Fonnte lambat.
+// Keep webhook short; failed sends are retried by poller/admin resend.
 async function sendFonnte(phone: string, message: string) {
-  const delays = [0, 1000, 3000, 7000, 12000];
+  const delays = [0];
   let last: { ok: boolean; data: unknown } = { ok: false, data: { error: 'no_attempt' } };
   for (let i = 0; i < delays.length; i++) {
     if (delays[i]) await new Promise((r) => setTimeout(r, delays[i]));
@@ -249,17 +249,10 @@ Deno.serve(async (req) => {
 
   // === COIN TOP-UP branch ===
   if (order.kind === 'coin_topup') {
-    const claimedAt = new Date().toISOString();
-    const { data: claimed } = await admin.from('orders').update({ token_sent_at: claimedAt })
-      .eq('id', order.id).is('token_sent_at', null).select('id');
-    if (!claimed || claimed.length === 0) {
-      return new Response(JSON.stringify({ ok: true, already: true }), { headers: corsHeaders });
-    }
     let newBal: number | null = null;
     if (order.user_id && order.coin_amount > 0) {
       const { data: credited, error: gerr } = await admin.rpc('credit_coin_topup_order', { _order_id: order.id });
       if (gerr) {
-        await admin.from('orders').update({ token_sent_at: null }).eq('id', order.id).eq('token_sent_at', claimedAt);
         return new Response(JSON.stringify({ error: 'coin_credit_failed', detail: gerr.message }), { status: 500, headers: corsHeaders });
       }
       const row = Array.isArray(credited) ? credited[0] : credited;
@@ -276,9 +269,7 @@ Deno.serve(async (req) => {
       '💖 Terima kasih — *ReplayTime*',
     ].filter((l) => l !== null).join('\n');
     const sent = await sendFonnte(order.user_phone, msg);
-    if (!sent.ok) {
-      await admin.from('orders').update({ token_sent_at: null }).eq('id', order.id).eq('token_sent_at', claimedAt);
-    }
+    if (sent.ok) await admin.from('orders').update({ token_sent_at: new Date().toISOString() }).eq('id', order.id);
     await admin.from('wa_outbox').insert({
       phone: order.user_phone, message: msg, status: sent.ok ? 'sent' : 'failed',
       error: sent.ok ? null : JSON.stringify(sent.data),
@@ -370,26 +361,8 @@ Deno.serve(async (req) => {
   }
 
 
-  // Atomic claim: only the first caller flips token_sent_at NULL -> now().
-  const claimedAt = new Date().toISOString();
-  const { data: claimed } = await admin
-    .from('orders')
-    .update({ token_sent_at: claimedAt })
-    .eq('id', order.id)
-    .is('token_sent_at', null)
-    .select('id');
-  if (!claimed || claimed.length === 0) {
-    return new Response(JSON.stringify({ ok: true, already: true }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
-  }
-
   const sent = await sendFonnte(order.user_phone, message);
-  // Release the claim if Fonnte failed so a retry path can resend later.
-  if (!sent.ok) {
-    await admin.from('orders').update({ token_sent_at: null })
-      .eq('id', order.id).eq('token_sent_at', claimedAt);
-  }
+  if (sent.ok) await admin.from('orders').update({ token_sent_at: new Date().toISOString() }).eq('id', order.id);
   await admin.from('token_deliveries').insert({
     phone: order.user_phone, replay_id: order.replay_id, replay_title: order.item_title,
     order_id: order.id, access_token: accessToken, link,
