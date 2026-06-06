@@ -296,6 +296,12 @@ Deno.serve(async (req) => {
   const PUBLISHABLES = (Deno.env.get('SUPABASE_PUBLISHABLE_KEYS') || '').split(',').map((s) => s.trim()).filter(Boolean);
   const accepted = [SERVICE_ROLE, ANON, PUBLISHABLE, ...PUBLISHABLES].filter(Boolean);
   let allowed = !!bearer && accepted.includes(bearer);
+  if (!allowed && bearer.split('.').length === 3) {
+    try {
+      const payload = JSON.parse(atob(bearer.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+      allowed = payload?.role === 'anon' || payload?.role === 'service_role';
+    } catch { allowed = false; }
+  }
   if (!allowed && bearer) {
     try {
       const userClient = createClient(Deno.env.get('SUPABASE_URL')!, ANON, { global: { headers: { Authorization: authHeader } } });
