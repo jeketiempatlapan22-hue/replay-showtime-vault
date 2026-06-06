@@ -261,6 +261,12 @@ export default function ShowOrdersResendDialog({ open, onOpenChange, showId, sho
             <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => resendBulk(true)} disabled={bulkSending} title="Paksa kirim ulang — termasuk order yang belum lunas (admin only)">
               Paksa Kirim
             </Button>
+            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => deleteLogBulk('filtered')} title="Hapus log WA untuk order di filter">
+              <Trash2 className="w-3 h-3 mr-1" /> Hapus Log
+            </Button>
+            <Button size="sm" variant="ghost" className="h-7 text-xs text-destructive" onClick={() => deleteLogBulk('all')} title="Hapus SEMUA log WA untuk show ini">
+              <Trash2 className="w-3 h-3 mr-1" /> Semua
+            </Button>
             <Button size="sm" variant="ghost" className="h-7" onClick={load}><RefreshCw className="w-3 h-3" /></Button>
           </div>
         </div>
