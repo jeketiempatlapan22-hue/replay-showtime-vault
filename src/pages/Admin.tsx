@@ -689,7 +689,7 @@ export default function Admin() {
       <div className="max-w-6xl mx-auto px-2 sm:px-4 py-4">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="hidden">
-            <TabsTrigger value="replays" /><TabsTrigger value="shows" /><TabsTrigger value="members" /><TabsTrigger value="bot" /><TabsTrigger value="history" /><TabsTrigger value="reseller_audit" /><TabsTrigger value="reseller_billing" /><TabsTrigger value="reseller_pricing" /><TabsTrigger value="membership" /><TabsTrigger value="mb_packages" /><TabsTrigger value="pakasir" /><TabsTrigger value="coins" /><TabsTrigger value="users" /><TabsTrigger value="preview" /><TabsTrigger value="comments" /><TabsTrigger value="security" /><TabsTrigger value="settings" />
+            <TabsTrigger value="replays" /><TabsTrigger value="shows" /><TabsTrigger value="members" /><TabsTrigger value="bot" /><TabsTrigger value="history" /><TabsTrigger value="reseller_audit" /><TabsTrigger value="reseller_billing" /><TabsTrigger value="reseller_pricing" /><TabsTrigger value="membership" /><TabsTrigger value="mb_packages" /><TabsTrigger value="pakasir" /><TabsTrigger value="coins" /><TabsTrigger value="users" /><TabsTrigger value="preview" /><TabsTrigger value="comments" /><TabsTrigger value="security" /><TabsTrigger value="ip_manager" /><TabsTrigger value="settings" />
           </TabsList>
 
           <TabsContent value="bot"><BotAdmin /></TabsContent>
