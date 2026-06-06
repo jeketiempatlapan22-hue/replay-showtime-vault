@@ -110,42 +110,50 @@ function renderTemplate(tpl: string, vars: Record<string, string>) {
 async function processOrder(admin: ReturnType<typeof createClient>, order: any, apiKey: string, slug: string, origin: string, tpl: string, showTpl: string) {
   if (!order.pakasir_order_id) return { id: order.id, skipped: 'no_pakasir_id' };
 
-  const url = `https://app.pakasir.com/api/transactiondetail?project=${encodeURIComponent(slug)}&amount=${order.amount}&order_id=${encodeURIComponent(order.pakasir_order_id)}&api_key=${encodeURIComponent(apiKey)}`;
-  let pjson: any = {};
-  try {
-    const pres = await fetch(url);
-    pjson = await pres.json().catch(() => ({}));
-  } catch (e) {
-    return { id: order.id, error: 'pakasir_fetch:' + String(e) };
-  }
-  const tx = pjson?.transaction || pjson?.payment || {};
-  const pStatus = String(tx.status || pjson?.status || '').toLowerCase();
-  const isPaid = pStatus === 'completed' || pStatus === 'paid' || pStatus === 'success';
+  let pStatus = order.status === 'paid' ? 'paid' : '';
+  let isPaid = order.status === 'paid';
   if (!isPaid) {
-    // Persist terminal non-paid statuses (canceled/expired/failed) so we stop re-polling them.
-    if (pStatus === 'canceled' || pStatus === 'cancelled' || pStatus === 'expired' || pStatus === 'failed') {
-      await admin.from('orders').update({ status: pStatus }).eq('id', order.id);
+    const url = `https://app.pakasir.com/api/transactiondetail?project=${encodeURIComponent(slug)}&amount=${order.amount}&order_id=${encodeURIComponent(order.pakasir_order_id)}&api_key=${encodeURIComponent(apiKey)}`;
+    let pjson: any = {};
+    try {
+      const pres = await fetch(url, { signal: AbortSignal.timeout(15000) });
+      pjson = await pres.json().catch(() => ({}));
+    } catch (e) {
+      return { id: order.id, error: 'pakasir_fetch:' + String(e) };
     }
-    return { id: order.id, status: pStatus || 'pending' };
+    const tx = pjson?.transaction || pjson?.payment || {};
+    pStatus = String(tx.status || pjson?.status || '').toLowerCase();
+    isPaid = pStatus === 'completed' || pStatus === 'paid' || pStatus === 'success';
+    if (!isPaid) {
+      if (pStatus === 'canceled' || pStatus === 'cancelled' || pStatus === 'expired' || pStatus === 'failed') {
+        await admin.from('orders').update({ status: pStatus }).eq('id', order.id);
+      }
+      return { id: order.id, status: pStatus || 'pending' };
+    }
+  }
+
+  const alreadySent = order.token_sent_at && await hasSentWa(admin, order.id);
+  if (order.token_sent_at && !alreadySent) {
+    await admin.from('orders').update({ token_sent_at: null }).eq('id', order.id);
+    order.token_sent_at = null;
   }
 
   // === COIN TOP-UP branch ===
   if (order.kind === 'coin_topup') {
-    if (order.status !== 'paid') {
-      await admin.from('orders').update({ status: 'paid', paid_at: new Date().toISOString() }).eq('id', order.id);
-    }
-    if (order.token_sent_at) return { id: order.id, status: 'already_sent' };
+    if (order.token_sent_at && alreadySent) return { id: order.id, status: 'already_sent' };
     const claimedAt = new Date().toISOString();
     const { data: claimed } = await admin.from('orders').update({ token_sent_at: claimedAt })
       .eq('id', order.id).is('token_sent_at', null).select('id');
     if (!claimed || claimed.length === 0) return { id: order.id, status: 'already_sent' };
     let newBal: number | null = null;
     if (order.user_id && order.coin_amount > 0) {
-      const { data: bal, error: gerr } = await admin.rpc('grant_coins', {
-        _user_id: order.user_id, _delta: order.coin_amount,
-        _reason: 'topup', _meta: { order_id: order.id } as any, _order_id: order.id,
-      });
-      if (!gerr) newBal = bal as number;
+      const { data: credited, error: gerr } = await admin.rpc('credit_coin_topup_order', { _order_id: order.id });
+      if (gerr) {
+        await admin.from('orders').update({ token_sent_at: null }).eq('id', order.id).eq('token_sent_at', claimedAt);
+        return { id: order.id, error: 'coin_credit_failed:' + gerr.message };
+      }
+      const row = Array.isArray(credited) ? credited[0] : credited;
+      newBal = Number(row?.new_balance ?? 0);
     }
     const msg = `✅ *Top-up berhasil*\n+${order.coin_amount} koin sudah masuk.${newBal != null ? `\nSaldo sekarang: *${newBal}* koin` : ''}\n\nTerima kasih 💖 — *ReplayTime*`;
     const sent = await sendFonnte(order.user_phone, msg);
@@ -166,7 +174,7 @@ async function processOrder(admin: ReturnType<typeof createClient>, order: any, 
       status: 'paid', paid_at: new Date().toISOString(), access_token: accessToken,
     }).eq('id', order.id);
   }
-  if (order.token_sent_at) return { id: order.id, status: 'already_sent' };
+  if (order.token_sent_at && alreadySent) return { id: order.id, status: 'already_sent' };
 
   // Atomically claim the delivery slot: only one worker can flip
   // token_sent_at from NULL -> now(). Others get 0 rows back and exit.
