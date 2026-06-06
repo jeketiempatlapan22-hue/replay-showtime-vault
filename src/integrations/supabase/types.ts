@@ -1616,6 +1616,14 @@ export type Database = {
         Args: { _phone?: string }
         Returns: number
       }
+      admin_delete_wa_outbox_for_orders: {
+        Args: { _order_ids: string[] }
+        Returns: number
+      }
+      admin_delete_wa_outbox_for_show: {
+        Args: { _show_id: string }
+        Returns: number
+      }
       admin_exhaust_reseller_tokens: {
         Args: { _phone: string }
         Returns: number
