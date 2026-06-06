@@ -20,6 +20,9 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
+    const guard = await ipGuard(supabase, req, "show-token-self-reset", 10);
+    if (guard.blocked) return json(guard.body, guard.status);
+
     const { data: t } = await supabase
       .from("active_show_tokens").select("*").eq("token", token).maybeSingle();
     if (!t) return json({ ok: false, reason: "token_not_found" });
