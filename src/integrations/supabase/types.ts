@@ -276,6 +276,45 @@ export type Database = {
         }
         Relationships: []
       }
+      blocked_ips: {
+        Row: {
+          auto_blocked: boolean
+          blocked_at: string
+          created_at: string
+          created_by: string | null
+          id: string
+          ip: unknown
+          is_active: boolean
+          reason: string
+          unblocked_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          auto_blocked?: boolean
+          blocked_at?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          ip: unknown
+          is_active?: boolean
+          reason?: string
+          unblocked_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          auto_blocked?: boolean
+          blocked_at?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          ip?: unknown
+          is_active?: boolean
+          reason?: string
+          unblocked_at?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       bot_admins: {
         Row: {
           created_at: string
@@ -562,6 +601,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      ip_visit_log: {
+        Row: {
+          endpoint: string
+          first_seen_at: string
+          id: string
+          ip: unknown
+          last_seen_at: string
+          path: string
+          user_agent: string
+          visit_count: number
+        }
+        Insert: {
+          endpoint?: string
+          first_seen_at?: string
+          id?: string
+          ip: unknown
+          last_seen_at?: string
+          path?: string
+          user_agent?: string
+          visit_count?: number
+        }
+        Update: {
+          endpoint?: string
+          first_seen_at?: string
+          id?: string
+          ip?: unknown
+          last_seen_at?: string
+          path?: string
+          user_agent?: string
+          visit_count?: number
+        }
+        Relationships: []
       }
       live_config_private: {
         Row: {
@@ -1089,6 +1161,30 @@ export type Database = {
         }
         Relationships: []
       }
+      rate_limit_violations: {
+        Row: {
+          created_at: string
+          endpoint: string
+          id: string
+          ip: unknown
+          violation_count: number
+        }
+        Insert: {
+          created_at?: string
+          endpoint?: string
+          id?: string
+          ip: unknown
+          violation_count?: number
+        }
+        Update: {
+          created_at?: string
+          endpoint?: string
+          id?: string
+          ip?: unknown
+          violation_count?: number
+        }
+        Relationships: []
+      }
       ratings: {
         Row: {
           browser_id: string
@@ -1511,6 +1607,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_block_ip: {
+        Args: { _ip: unknown; _reason: string }
+        Returns: string
+      }
       admin_clear_live_messages: { Args: never; Returns: number }
       admin_clear_reseller_copy_log: {
         Args: { _phone?: string }
@@ -1672,6 +1772,62 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      admin_list_blocked_ips: {
+        Args: never
+        Returns: {
+          auto_blocked: boolean
+          blocked_at: string
+          created_at: string
+          created_by: string | null
+          id: string
+          ip: unknown
+          is_active: boolean
+          reason: string
+          unblocked_at: string | null
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "blocked_ips"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      admin_list_ip_violations: {
+        Args: { _limit?: number }
+        Returns: {
+          created_at: string
+          endpoint: string
+          id: string
+          ip: unknown
+          violation_count: number
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "rate_limit_violations"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      admin_list_ip_visits: {
+        Args: { _limit?: number }
+        Returns: {
+          endpoint: string
+          first_seen_at: string
+          id: string
+          ip: unknown
+          last_seen_at: string
+          path: string
+          user_agent: string
+          visit_count: number
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "ip_visit_log"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       admin_override_reseller_bill: {
         Args: { _amount: number; _bill_id: string }
         Returns: undefined
@@ -1712,6 +1868,7 @@ export type Database = {
         Args: { _audit_id: string }
         Returns: boolean
       }
+      admin_unblock_ip: { Args: { _id: string }; Returns: boolean }
       check_login_lock: {
         Args: { _identifier: string }
         Returns: {
@@ -1832,6 +1989,7 @@ export type Database = {
         Returns: boolean
       }
       increment_view_count: { Args: { _replay_id: string }; Returns: number }
+      is_ip_blocked: { Args: { _ip: unknown }; Returns: boolean }
       mark_reseller_bill_paid: {
         Args: { _bill_id: string }
         Returns: undefined
@@ -1840,6 +1998,19 @@ export type Database = {
       rate_replay: {
         Args: { _browser_id: string; _rating: number; _replay_id: string }
         Returns: undefined
+      }
+      record_ip_visit: {
+        Args: {
+          _endpoint: string
+          _ip: unknown
+          _max_per_min?: number
+          _path: string
+          _user_agent: string
+        }
+        Returns: {
+          blocked: boolean
+          reason: string
+        }[]
       }
       record_login_attempt: {
         Args: { _identifier: string; _success: boolean }

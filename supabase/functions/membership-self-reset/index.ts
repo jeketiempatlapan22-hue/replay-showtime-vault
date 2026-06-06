@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { ipGuard } from "../_shared/ip-guard.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -18,6 +19,9 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
+
+    const guard = await ipGuard(supabase, req, "membership-self-reset", 10);
+    if (guard.blocked) return json(guard.body, guard.status);
 
     const { data: t } = await supabase
       .from("membership_tokens").select("*").eq("token", mtoken).maybeSingle();

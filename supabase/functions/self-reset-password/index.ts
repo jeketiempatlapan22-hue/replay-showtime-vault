@@ -2,6 +2,7 @@
 // User-requested simplification: any registered identifier can reset its password directly.
 // Includes basic rate limiting via login_attempts to deter brute-force enumeration.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
+import { ipGuard } from '../_shared/ip-guard.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -80,6 +81,9 @@ Deno.serve(async (req) => {
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
     const SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
+
+    const guard = await ipGuard(admin, req, 'self-reset-password', 10);
+    if (guard.blocked) return json(guard.body, guard.status);
 
     const body = await req.json().catch(() => ({}));
     const identifier = String(body.identifier || '').trim();

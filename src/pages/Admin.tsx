@@ -14,6 +14,7 @@ import UserManagement from '@/components/admin/UserManagement';
 import ReplayPersonalTokensDialog from '@/components/admin/ReplayPersonalTokensDialog';
 import ShowLiveControl from '@/components/admin/ShowLiveControl';
 import BulkShowImport from '@/components/admin/BulkShowImport';
+import IpManager from '@/components/admin/IpManager';
 import { getMembers, upsertMember, deleteMember, uploadMemberPhoto, type Member } from '@/lib/members';
 import { getActiveShows, upsertActiveShow, deleteActiveShow, type ActiveShow } from '@/lib/activeShows';
 import { Switch } from '@/components/ui/switch';
@@ -660,6 +661,7 @@ export default function Admin() {
                 { v: 'preview', label: 'Preview', Icon: Eye },
                 { v: 'comments', label: 'Komentar', Icon: MessageCircle },
                 { v: 'security', label: 'Blokir', Icon: ShieldCheck },
+                { v: 'ip_manager', label: 'IP & Rate Limit', Icon: ShieldCheck },
                 { v: 'settings', label: 'Setelan', Icon: Settings },
               ].map(({ v, label, Icon }) => (
                 <button
@@ -675,7 +677,7 @@ export default function Admin() {
           </SheetContent>
         </Sheet>
         <Button variant="ghost" size="icon" onClick={() => navigate('/')} className="shrink-0" title="Beranda"><ArrowLeft className="w-5 h-5" /></Button>
-        <h1 className="text-base sm:text-xl font-bold font-sans text-foreground flex-1 min-w-0 truncate">Admin · {({ replays: 'Replay', shows: 'Streaming Show', members: 'Member', bot: 'Bot WA', history: 'Riwayat', reseller_audit: 'Audit Reseller', reseller_billing: 'Tagihan Reseller', reseller_pricing: 'Harga Reseller', membership: 'Membership Token', mb_packages: 'Paket Membership', pakasir: 'Pakasir Webhook', coins: 'Koin', users: 'Manajemen User', preview: 'Preview', comments: 'Komentar', security: 'Blokir', settings: 'Setelan' } as Record<string, string>)[activeTab]}</h1>
+        <h1 className="text-base sm:text-xl font-bold font-sans text-foreground flex-1 min-w-0 truncate">Admin · {({ replays: 'Replay', shows: 'Streaming Show', members: 'Member', bot: 'Bot WA', history: 'Riwayat', reseller_audit: 'Audit Reseller', reseller_billing: 'Tagihan Reseller', reseller_pricing: 'Harga Reseller', membership: 'Membership Token', mb_packages: 'Paket Membership', pakasir: 'Pakasir Webhook', coins: 'Koin', users: 'Manajemen User', preview: 'Preview', comments: 'Komentar', security: 'Blokir', ip_manager: 'IP & Rate Limit', settings: 'Setelan' } as Record<string, string>)[activeTab]}</h1>
         <div className="flex items-center gap-1 sm:gap-2 shrink-0">
           <Button size="sm" onClick={() => { resetForm(); setShowAddDialog(true); }} className="text-xs sm:text-sm">
             <Plus className="w-4 h-4 sm:mr-1" /> <span className="hidden sm:inline">Tambah</span>
@@ -687,7 +689,7 @@ export default function Admin() {
       <div className="max-w-6xl mx-auto px-2 sm:px-4 py-4">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="hidden">
-            <TabsTrigger value="replays" /><TabsTrigger value="shows" /><TabsTrigger value="members" /><TabsTrigger value="bot" /><TabsTrigger value="history" /><TabsTrigger value="reseller_audit" /><TabsTrigger value="reseller_billing" /><TabsTrigger value="reseller_pricing" /><TabsTrigger value="membership" /><TabsTrigger value="mb_packages" /><TabsTrigger value="pakasir" /><TabsTrigger value="coins" /><TabsTrigger value="users" /><TabsTrigger value="preview" /><TabsTrigger value="comments" /><TabsTrigger value="security" /><TabsTrigger value="settings" />
+            <TabsTrigger value="replays" /><TabsTrigger value="shows" /><TabsTrigger value="members" /><TabsTrigger value="bot" /><TabsTrigger value="history" /><TabsTrigger value="reseller_audit" /><TabsTrigger value="reseller_billing" /><TabsTrigger value="reseller_pricing" /><TabsTrigger value="membership" /><TabsTrigger value="mb_packages" /><TabsTrigger value="pakasir" /><TabsTrigger value="coins" /><TabsTrigger value="users" /><TabsTrigger value="preview" /><TabsTrigger value="comments" /><TabsTrigger value="security" /><TabsTrigger value="ip_manager" /><TabsTrigger value="settings" />
           </TabsList>
 
           <TabsContent value="bot"><BotAdmin /></TabsContent>
@@ -700,6 +702,7 @@ export default function Admin() {
           <TabsContent value="pakasir"><PakasirAdmin /></TabsContent>
           <TabsContent value="coins"><CoinAdmin /></TabsContent>
           <TabsContent value="users"><UserManagement /></TabsContent>
+          <TabsContent value="ip_manager"><IpManager /></TabsContent>
 
           {/* ===== REPLAYS TAB ===== */}
           <TabsContent value="replays">

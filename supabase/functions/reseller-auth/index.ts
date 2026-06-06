@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { ipGuard } from '../_shared/ip-guard.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -20,6 +21,10 @@ Deno.serve(async (req) => {
   if (req.method !== 'POST') return json({ error: 'method_not_allowed' }, 405);
 
   const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+
+  const guard = await ipGuard(admin, req, 'reseller-auth', 15);
+  if (guard.blocked) return json(guard.body, guard.status);
+
   let body: { phone?: string; pin?: string } = {};
   try { body = await req.json(); } catch { return json({ error: 'bad_json' }, 400); }
 
