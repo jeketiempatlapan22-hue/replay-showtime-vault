@@ -252,22 +252,22 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
     const isMobile = typeof navigator !== 'undefined' && /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent || '');
     const deviceMem = (navigator as Navigator & { deviceMemory?: number }).deviceMemory || 4;
     const lowMem = deviceMem <= 2;
-    const liveStartDelay = isVeryWeak ? 24 : isWeak ? 18 : 6;
-    const liveSyncCount = isVeryWeak ? 8 : isWeak ? 6 : 3;
-    const liveMaxLatencyCount = isVeryWeak ? 30 : isWeak ? 24 : 12;
-    const stallRecoveryMs = isWeak ? 9000 : 12000;
-    const initialBwEstimate = isVeryWeak ? 220_000 : isWeak ? 450_000 : 1_200_000;
+    const liveStartDelay = isVeryWeak ? 30 : isWeak ? 22 : 12;
+    const liveSyncCount = isVeryWeak ? 10 : isWeak ? 7 : 4;
+    const liveMaxLatencyCount = isVeryWeak ? 36 : isWeak ? 28 : 16;
+    const stallRecoveryMs = isWeak ? 9000 : 14000;
+    const initialBwEstimate = isVeryWeak ? 220_000 : isWeak ? 450_000 : 900_000;
     // Adaptive buffer sizing: give bad networks a larger forward cushion, while
     // keeping low-memory devices conservative so the page itself stays responsive.
     const bufferProfile = lowMem
-      ? { back: 16, max: 45, maxMax: 75, size: 45 * 1000 * 1000 }
+      ? { back: 8, max: 24, maxMax: 45, size: 30 * 1000 * 1000 }
       : isVeryWeak
-        ? { back: 30, max: 75, maxMax: 150, size: 75 * 1000 * 1000 }
+        ? { back: 12, max: 32, maxMax: 60, size: 40 * 1000 * 1000 }
         : isWeak
-          ? { back: 28, max: 65, maxMax: 140, size: 70 * 1000 * 1000 }
+          ? { back: 16, max: 40, maxMax: 75, size: 55 * 1000 * 1000 }
           : isMobile
-            ? { back: 30, max: 90, maxMax: 240, size: 100 * 1000 * 1000 }
-            : { back: 45, max: 120, maxMax: 360, size: 180 * 1000 * 1000 };
+            ? { back: 18, max: 48, maxMax: 90, size: 65 * 1000 * 1000 }
+            : { back: 24, max: 60, maxMax: 120, size: 90 * 1000 * 1000 };
 
     const seekToLiveEdgeOnce = (syncPosition?: number | null) => {
       if (initialLiveEdgeSyncRef.current) return;
@@ -339,9 +339,8 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
           return new Request(context.url, nextInit);
         },
         enableWorker: true,
-        // Weak networks need a steadier buffer more than ultra-low latency.
-        // Keep LL-HLS for good networks, but avoid chasing the live edge on bad ones.
-        lowLatencyMode: !isWeak,
+        // Prefer smooth playback over ultra-low latency; chasing the live edge is a common cause of rebuffering.
+        lowLatencyMode: false,
         // Buffer tuning adaptif berdasarkan profil perangkat & jaringan.
         backBufferLength: bufferProfile.back,
         maxBufferLength: bufferProfile.max,
