@@ -99,7 +99,7 @@ async function sendFonnteOnce(phone: string, message: string, timeoutMs: number)
 
 // Coba 2x dengan timeout naik supaya user benar-benar terima token walau Fonnte lambat.
 async function sendFonnte(phone: string, message: string) {
-  const attempts = [14000, 20000];
+  const attempts = [18000, 32000];
   let last: { ok: boolean; data: unknown } = { ok: false, data: { error: 'no_attempt' } };
   for (let i = 0; i < attempts.length; i++) {
     last = await sendFonnteOnce(phone, message, attempts[i]);
@@ -112,6 +112,16 @@ async function hasSentWa(admin: ReturnType<typeof createClient>, orderId: string
   const { data } = await admin.from('wa_outbox')
     .select('id').eq('related_order_id', orderId).eq('status', 'sent').limit(1);
   return !!data?.length;
+}
+
+async function shouldDelayWaRetry(admin: ReturnType<typeof createClient>, orderId: string, windowMs = 4 * 60_000) {
+  const { data } = await admin.from('wa_outbox')
+    .select('status,created_at')
+    .eq('related_order_id', orderId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return data?.status === 'failed' && Date.now() - new Date(data.created_at).getTime() < windowMs;
 }
 
 Deno.serve(async (req) => {
@@ -217,6 +227,11 @@ Deno.serve(async (req) => {
         .replace(/\{replay_info_block\}/g, tok.replay_info ? `🎬 *Info Replay:*\n${tok.replay_info}\n\n` : '')
         .replace(/\{site\}/g, morigin.replace(/^https?:\/\//, ''));
 
+      if (await shouldDelayWaRetry(admin, mOrder.id)) {
+        return new Response(JSON.stringify({ ok: true, status: 'paid', membership: true, sent: false, retry_delayed: true }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
       const sentM = await sendFonnte(mOrder.phone, mmsg);
       const nowIso = new Date().toISOString();
       await admin.from('membership_orders').update({
@@ -367,6 +382,11 @@ Deno.serve(async (req) => {
       message = fillTpl(tpl, dateStr, link, '');
     }
 
+    if (await shouldDelayWaRetry(admin, order.id)) {
+      return new Response(JSON.stringify({ ok: true, status: 'paid', access_token: accessToken, sent: false, retry_delayed: true }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
     const sent = await sendFonnte(order.user_phone, message);
     if (sent.ok) await admin.from('orders').update({ token_sent_at: new Date().toISOString() }).eq('id', order.id);
     await admin.from('token_deliveries').insert({
