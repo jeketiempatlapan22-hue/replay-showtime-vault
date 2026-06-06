@@ -632,18 +632,18 @@ export default function Admin() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background overflow-x-hidden">
       {/* Header with hamburger */}
       <div className="sticky top-0 z-20 bg-card/90 backdrop-blur border-b border-border px-3 sm:px-6 py-3 flex items-center gap-2 sm:gap-3">
         <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
           <SheetTrigger asChild>
             <Button variant="ghost" size="icon" className="shrink-0" title="Menu"><Menu className="w-5 h-5" /></Button>
           </SheetTrigger>
-          <SheetContent side="left" className="w-72 p-0">
-            <SheetHeader className="p-4 border-b border-border">
+          <SheetContent side="left" className="w-[82vw] max-w-xs p-0 flex flex-col">
+            <SheetHeader className="p-4 border-b border-border shrink-0">
               <SheetTitle>Admin Panel</SheetTitle>
             </SheetHeader>
-            <nav className="p-2">
+            <nav className="flex-1 overflow-y-auto overscroll-contain p-2 pb-6">
               {[
                 { v: 'replays', label: 'Replay', Icon: List },
                 { v: 'shows', label: 'Streaming Show', Icon: Radio },
@@ -669,8 +669,8 @@ export default function Admin() {
                   onClick={() => { setActiveTab(v); setMenuOpen(false); }}
                   className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm transition-colors ${activeTab === v ? 'bg-primary/15 text-primary font-medium' : 'text-foreground hover:bg-secondary'}`}
                 >
-                  <Icon className="w-4 h-4" />
-                  <span>{label}</span>
+                  <Icon className="w-4 h-4 shrink-0" />
+                  <span className="min-w-0 truncate">{label}</span>
                 </button>
               ))}
             </nav>
@@ -686,7 +686,7 @@ export default function Admin() {
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto px-2 sm:px-4 py-4">
+      <div className="w-full max-w-6xl mx-auto px-2 sm:px-4 py-4 overflow-x-hidden">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="hidden">
             <TabsTrigger value="replays" /><TabsTrigger value="shows" /><TabsTrigger value="members" /><TabsTrigger value="bot" /><TabsTrigger value="history" /><TabsTrigger value="reseller_audit" /><TabsTrigger value="reseller_billing" /><TabsTrigger value="reseller_pricing" /><TabsTrigger value="membership" /><TabsTrigger value="mb_packages" /><TabsTrigger value="pakasir" /><TabsTrigger value="coins" /><TabsTrigger value="users" /><TabsTrigger value="preview" /><TabsTrigger value="comments" /><TabsTrigger value="security" /><TabsTrigger value="ip_manager" /><TabsTrigger value="settings" />
