@@ -278,17 +278,10 @@ Deno.serve(async (req) => {
     return json({ ok: false, reason: 'unauthorized' }, 401);
   }
 
-  // Optional shared-secret for production webhook calls. When FONNTE_WEBHOOK_SECRET
-  // is set, Fonnte must be configured to send it as the X-Webhook-Secret header.
-  // Falls back to "open" when secret unset (with a 7s rate limit per phone) for
-  // backward compatibility with existing Fonnte deployments.
-  if (!testMode) {
-    if (Deno.env.get('FONNTE_WEBHOOK_SECRET')) {
-      if (!hasValidWebhookSecret(req)) {
-        return new Response('ok', { headers: corsHeaders });
-      }
-    }
-  }
+  // Fonnte often cannot attach custom headers to incoming webhooks. Keep the
+  // secret check optional so the real WhatsApp webhook still replies; admin
+  // commands remain protected by the bot_admins phone whitelist below.
+  const webhookSecretOk = !Deno.env.get('FONNTE_WEBHOOK_SECRET') || hasValidWebhookSecret(req);
 
   // Fonnte sends as multipart/form-data, x-www-form-urlencoded, or json
   let phone = '', text = '', device = '', inboxId = '', fromMe = false, deliverTest = false, participant = '';
@@ -360,7 +353,7 @@ Deno.serve(async (req) => {
     inboxId,
     fromMe,
     eventName: 'received',
-    detail: participantNorm ? { participant: participantNorm, group_id: groupId || undefined } : {},
+    detail: { ...(participantNorm ? { participant: participantNorm, group_id: groupId || undefined } : {}), webhook_secret: webhookSecretOk ? 'ok' : 'missing' },
   });
 
   // Only process commands starting with '/' — silently ignore other chatter
