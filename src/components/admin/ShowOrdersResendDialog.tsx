@@ -259,10 +259,12 @@ export default function ShowOrdersResendDialog({ open, onOpenChange, showId, sho
                       {r.kind === 'coin_topup' ? `${r.coin_amount} koin` : `Rp ${(r.amount || 0).toLocaleString('id-ID')}`}
                     </div>
                     <Button
-                      size="sm" variant="outline" className="h-7 mt-1"
+                      size="sm" variant={r.status === 'paid' ? 'outline' : 'destructive'} className="h-7 mt-1"
                       onClick={(e) => resendOne(r.id, e.shiftKey)}
-                      disabled={!!sending[r.id] || r.kind === 'coin_topup' || r.status !== 'paid'}
-                      title={r.status === 'paid' ? 'Kirim ulang WA. Shift+klik = paksa kirim meski sudah terkirim' : 'Belum lunas — token tidak bisa dikirim'}
+                      disabled={!!sending[r.id] || r.kind === 'coin_topup'}
+                      title={r.status === 'paid'
+                        ? 'Kirim ulang WA. Shift+klik = paksa kirim meski sudah terkirim'
+                        : 'PAKSA kirim token meski belum lunas (admin only)'}
                     >
                       {sending[r.id] ? <Loader2 className="w-3 h-3 animate-spin" /> : <><Send className="w-3 h-3 mr-1" />Kirim</>}
                     </Button>
