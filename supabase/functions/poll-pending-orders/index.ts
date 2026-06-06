@@ -69,7 +69,7 @@ async function sendFonnteOnce(phone: string, message: string) {
   try {
     const res = await fetch('https://api.fonnte.com/send', {
       method: 'POST', headers: { Authorization: token }, body: form,
-      signal: AbortSignal.timeout(8000),
+      signal: AbortSignal.timeout(12000),
     });
     const data = await res.json().catch(() => ({}));
     return { ok: res.ok && (data as { status?: boolean })?.status !== false, data };
@@ -78,11 +78,9 @@ async function sendFonnteOnce(phone: string, message: string) {
   }
 }
 
-// Auto-retry Fonnte send up to 3 attempts with exponential backoff (1s, 3s).
-// This handles transient Fonnte 5xx, network blips, or rate-limit hiccups so
-// the user reliably receives their token even if the first send fails.
+// Auto-retry lebih agresif agar token/notifikasi tidak hilang saat Fonnte lambat.
 async function sendFonnte(phone: string, message: string) {
-  const delays = [0, 1000, 3000];
+  const delays = [0, 1000, 3000, 7000, 12000];
   let last: { ok: boolean; data: unknown } = { ok: false, data: { error: 'no_attempt' } };
   for (let i = 0; i < delays.length; i++) {
     if (delays[i]) await new Promise((r) => setTimeout(r, delays[i]));
@@ -90,6 +88,12 @@ async function sendFonnte(phone: string, message: string) {
     if (last.ok) return { ...last, attempts: i + 1 };
   }
   return { ...last, attempts: delays.length };
+}
+
+async function hasSentWa(admin: ReturnType<typeof createClient>, orderId: string) {
+  const { data } = await admin.from('wa_outbox')
+    .select('id').eq('related_order_id', orderId).eq('status', 'sent').limit(1);
+  return !!data?.length;
 }
 
 const DEFAULT_WA_TPL =
