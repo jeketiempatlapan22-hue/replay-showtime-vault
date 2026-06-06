@@ -160,15 +160,10 @@ async function processOrder(admin: ReturnType<typeof createClient>, order: any, 
   // === COIN TOP-UP branch ===
   if (order.kind === 'coin_topup') {
     if (order.token_sent_at && alreadySent) return { id: order.id, status: 'already_sent' };
-    const claimedAt = new Date().toISOString();
-    const { data: claimed } = await admin.from('orders').update({ token_sent_at: claimedAt })
-      .eq('id', order.id).is('token_sent_at', null).select('id');
-    if (!claimed || claimed.length === 0) return { id: order.id, status: 'already_sent' };
     let newBal: number | null = null;
     if (order.user_id && order.coin_amount > 0) {
       const { data: credited, error: gerr } = await admin.rpc('credit_coin_topup_order', { _order_id: order.id });
       if (gerr) {
-        await admin.from('orders').update({ token_sent_at: null }).eq('id', order.id).eq('token_sent_at', claimedAt);
         return { id: order.id, error: 'coin_credit_failed:' + gerr.message };
       }
       const row = Array.isArray(credited) ? credited[0] : credited;
@@ -176,9 +171,7 @@ async function processOrder(admin: ReturnType<typeof createClient>, order: any, 
     }
     const msg = `✅ *Top-up berhasil*\n+${order.coin_amount} koin sudah masuk.${newBal != null ? `\nSaldo sekarang: *${newBal}* koin` : ''}\n\nTerima kasih 💖 — *ReplayTime*`;
     const sent = await sendFonnte(order.user_phone, msg);
-    if (!sent.ok) {
-      await admin.from('orders').update({ token_sent_at: null }).eq('id', order.id).eq('token_sent_at', claimedAt);
-    }
+    if (sent.ok) await admin.from('orders').update({ token_sent_at: new Date().toISOString() }).eq('id', order.id);
     await admin.from('wa_outbox').insert({
       phone: order.user_phone, message: msg, status: sent.ok ? 'sent' : 'failed',
       error: sent.ok ? null : JSON.stringify(sent.data),
@@ -194,19 +187,6 @@ async function processOrder(admin: ReturnType<typeof createClient>, order: any, 
     }).eq('id', order.id);
   }
   if (order.token_sent_at && alreadySent) return { id: order.id, status: 'already_sent' };
-
-  // Atomically claim the delivery slot: only one worker can flip
-  // token_sent_at from NULL -> now(). Others get 0 rows back and exit.
-  const claimedAt = new Date().toISOString();
-  const { data: claimed } = await admin
-    .from('orders')
-    .update({ token_sent_at: claimedAt })
-    .eq('id', order.id)
-    .is('token_sent_at', null)
-    .select('id');
-  if (!claimed || claimed.length === 0) {
-    return { id: order.id, status: 'already_sent' };
-  }
 
   const isShowPurchase = !!order.show_id && !order.replay_id;
   const isReplayOnlyPurchase = !!order.replay_id && !order.show_id;
@@ -284,11 +264,7 @@ async function processOrder(admin: ReturnType<typeof createClient>, order: any, 
 
 
   const sent = await sendFonnte(order.user_phone, message);
-  // If Fonnte fails, release the claim so a later run can retry.
-  if (!sent.ok) {
-    await admin.from('orders').update({ token_sent_at: null })
-      .eq('id', order.id).eq('token_sent_at', claimedAt);
-  }
+  if (sent.ok) await admin.from('orders').update({ token_sent_at: new Date().toISOString() }).eq('id', order.id);
   await admin.from('token_deliveries').insert({
     phone: order.user_phone, replay_id: order.replay_id, replay_title: order.item_title,
     order_id: order.id, access_token: accessToken, link,
