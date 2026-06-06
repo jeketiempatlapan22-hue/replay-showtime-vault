@@ -667,7 +667,7 @@ export default function Live() {
   // ============ VIEWER COUNTER (presence) — count unique browser_id ============
   // Heavily throttled to stay light at 1000+ concurrent viewers. Each sync/join/leave
   // event at scale fans out O(N) updates; we coalesce them into a single recount
-  // every 5 seconds and only when the tab is visible.
+  // every 15 seconds and only when the tab is visible.
   const showKey = search.get('show') || 'global';
   const [viewerCount, setViewerCount] = useState<number | null>(null);
   useEffect(() => {
@@ -690,7 +690,7 @@ export default function Live() {
           }
           if (unique !== lastCount) { lastCount = unique; setViewerCount(unique); }
         } catch { /* ignore */ }
-      }, 5000);
+      }, 15000);
     };
     let tracked = false;
     let heartbeat: number | null = null;
