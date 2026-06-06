@@ -911,11 +911,13 @@ export default function Live() {
             </div>
 
             {/* LIVE CHAT */}
-            {chatReady ? (
-              <Suspense fallback={<ChatFallback />}>
-                <LiveChat lite={isWeakNetwork} />
-              </Suspense>
-            ) : <ChatFallback />}
+            <div ref={chatHostRef}>
+              {chatReady ? (
+                <Suspense fallback={<ChatFallback />}>
+                  <LiveChat lite={playbackPriorityMode} />
+                </Suspense>
+              ) : <ChatIdle />}
+            </div>
           </>
         )}
       </div>
