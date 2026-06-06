@@ -88,7 +88,7 @@ async function sendFonnteOnce(phone: string, message: string) {
   try {
     const res = await fetch('https://api.fonnte.com/send', {
       method: 'POST', headers: { Authorization: token }, body: form,
-      signal: AbortSignal.timeout(12000),
+      signal: AbortSignal.timeout(15000),
     });
     const data = await res.json().catch(() => ({}));
     return { ok: res.ok && (data as { status?: boolean })?.status !== false, data };
@@ -99,7 +99,8 @@ async function sendFonnteOnce(phone: string, message: string) {
 
 // Auto-retry lebih agresif untuk menghindari token/notifikasi hilang saat Fonnte lambat.
 async function sendFonnte(phone: string, message: string) {
-  const delays = [0, 1000, 3000, 7000, 12000];
+  // Keep browser polling responsive; failed WA is retried by cron/admin resend.
+  const delays = [0];
   let last: { ok: boolean; data: unknown } = { ok: false, data: { error: 'no_attempt' } };
   for (let i = 0; i < delays.length; i++) {
     if (delays[i]) await new Promise((r) => setTimeout(r, delays[i]));
