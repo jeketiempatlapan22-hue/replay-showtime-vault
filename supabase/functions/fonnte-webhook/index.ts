@@ -257,10 +257,7 @@ async function sendAndAudit(
   admin: ReturnType<typeof createClient>,
   opts: { phone: string; message: string; inboxId?: string; testMode?: boolean; deliverTest?: boolean; command?: string; device?: string; fromMe?: boolean },
 ) {
-  const paused = !(opts.testMode && !opts.deliverTest) && await isFonntePaused(admin);
-  const sendResult = paused
-    ? { ok: false, data: { error: 'fonnte_timeout_pause' }, error: 'fonnte_timeout_pause' }
-    : opts.testMode && !opts.deliverTest
+  const sendResult = opts.testMode && !opts.deliverTest
     ? { ok: true, data: { skipped: true, reason: 'test_mode' } }
     : await sendFonnte(opts.phone, opts.message, opts.inboxId || '');
 
