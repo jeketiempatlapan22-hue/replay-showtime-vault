@@ -430,9 +430,10 @@ Deno.serve(async (req) => {
     .maybeSingle();
 
   if (!command) {
-    await sendAndAudit(admin, {
+    const unknownReply = '❓ Command tidak dikenali. Ketik */menu* untuk daftar perintah.';
+    const background = sendAndAudit(admin, {
       phone: phoneNorm,
-      message: '❓ Command tidak dikenali. Ketik */menu* untuk daftar perintah.',
+      message: unknownReply,
       inboxId,
       testMode,
       deliverTest,
@@ -440,7 +441,14 @@ Deno.serve(async (req) => {
       device: deviceNorm,
       fromMe,
     });
-    return new Response('ok', { headers: corsHeaders });
+    if (testMode) {
+      const sendResult = await background;
+      return json({ ok: true, phone: phoneNorm, command: cmd, reply: unknownReply, delivered: deliverTest, send: sendResult });
+    }
+    const runtime = (globalThis as unknown as { EdgeRuntime?: { waitUntil?: (promise: Promise<unknown>) => void } }).EdgeRuntime;
+    if (runtime?.waitUntil) runtime.waitUntil(background);
+    else await background;
+    return new Response('accepted', { status: 202, headers: corsHeaders });
   }
 
   // Admin-only commands
@@ -455,10 +463,10 @@ Deno.serve(async (req) => {
     const adminPhones = new Set((admins ?? []).map((a: any) => normalizePhone(a.phone)));
     isBotAdmin = candidatePhones.some((p) => adminPhones.has(p));
     if (!isBotAdmin) {
-        const deniedMessage = '🔒 Command ini hanya untuk admin bot. Hubungi owner untuk akses.';
-      await sendAndAudit(admin, {
+      const deniedMessage = '🔒 Command ini hanya untuk admin bot. Hubungi owner untuk akses.';
+      const background = sendAndAudit(admin, {
         phone: phoneNorm,
-          message: deniedMessage,
+        message: deniedMessage,
         inboxId,
         testMode,
         deliverTest,
@@ -466,10 +474,14 @@ Deno.serve(async (req) => {
         device: deviceNorm,
         fromMe,
       });
-        if (testMode) {
-          return json({ ok: true, phone: phoneNorm, command: cmd, reply: deniedMessage, delivered: deliverTest });
-        }
-      return new Response('ok', { headers: corsHeaders });
+      if (testMode) {
+        const sendResult = await background;
+        return json({ ok: true, phone: phoneNorm, command: cmd, reply: deniedMessage, delivered: deliverTest, send: sendResult });
+      }
+      const runtime = (globalThis as unknown as { EdgeRuntime?: { waitUntil?: (promise: Promise<unknown>) => void } }).EdgeRuntime;
+      if (runtime?.waitUntil) runtime.waitUntil(background);
+      else await background;
+      return new Response('accepted', { status: 202, headers: corsHeaders });
     }
   }
 
