@@ -249,6 +249,11 @@ Deno.serve(async (req) => {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
+      if (await shouldDelayWaRetry(admin, mOrder.id)) {
+        return new Response(JSON.stringify({ ok: true, status: 'paid', membership: true, sent: false, retry_delayed: true }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
       const sentM = await sendFonnte(mOrder.phone, mmsg);
       const nowIso = new Date().toISOString();
       await admin.from('membership_orders').update({
