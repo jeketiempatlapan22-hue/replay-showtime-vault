@@ -108,7 +108,7 @@ function renderTemplate(tpl: string, vars: Record<string, string>) {
 }
 
 async function processOrder(admin: ReturnType<typeof createClient>, order: any, apiKey: string, slug: string, origin: string, tpl: string, showTpl: string) {
-  if (!order.pakasir_order_id) return { id: order.id, skipped: 'no_pakasir_id' };
+  if (!order.pakasir_order_id && order.status !== 'paid') return { id: order.id, skipped: 'no_pakasir_id' };
 
   let pStatus = order.status === 'paid' ? 'paid' : '';
   let isPaid = order.status === 'paid';
@@ -311,16 +311,15 @@ Deno.serve(async (req) => {
   const showTpl = sm.get('wa_show_template') ||
     '🔐 *TOKEN LIVE SATUAN*\n\n🎤 *{title}*\n\n📅 {date}\n\n🔗 *Link Live:*\n{live_link}\n\n🎬 *Link Replay:* {site}\n\n{password_line}👤 Hanya untuk *1 perangkat pertama*.\n\n— *ReplayTime* 💖';
 
-  // Pull recent pending orders (last 7 days, newest first, generous cap).
+  // Pull recent pending orders plus paid orders whose WhatsApp delivery failed.
   // Pakasir dynamic QRIS payments can be paid hours after creation; we keep
   // a wide window so even users who close the dialog still get their token.
   const since = new Date(Date.now() - 7 * 24 * 3600_000).toISOString();
   const { data: orders, error } = await admin
     .from('orders')
     .select('*')
-    .eq('status', 'pending')
+    .or('status.eq.pending,and(status.eq.paid,token_sent_at.is.null)')
     .gte('created_at', since)
-    .not('pakasir_order_id', 'is', null)
     .order('created_at', { ascending: false })
     .limit(100);
   console.log(`[poll] scanning ${orders?.length ?? 0} pending orders since ${since}`);
