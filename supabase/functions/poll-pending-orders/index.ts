@@ -380,7 +380,9 @@ Deno.serve(async (req) => {
   const MAX_WA_ATTEMPTS = 3;
   const BACKOFF_MIN = [0, 1, 5, 15, 60, 360]; // index = attempts done
   const memResults: any[] = [];
-  try {
+  if (Date.now() - startedAt > 10_000) {
+    memResults.push({ skipped: 'time_budget_reached' });
+  } else try {
     const memTpl = (await admin.from('site_settings').select('value').eq('key', 'wa_membership_template').maybeSingle())
       .data?.value ||
       '👑 *MEMBERSHIP AKTIF*\n\n📦 *{package_name}*\n📅 Berlaku hingga: {expires_at}\n\n🔗 *Link Akses:*\n{link}\n\n{replay_info_block}👤 Berlaku untuk *{max_devices} perangkat*.\n\n— *ReplayTime* 💖';
