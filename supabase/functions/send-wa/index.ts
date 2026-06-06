@@ -20,13 +20,24 @@ export async function sendFonnte(phone: string, message: string): Promise<{ ok: 
   form.append('target', normalizePhone(phone));
   form.append('message', message);
   form.append('countryCode', '62');
-  const res = await fetch('https://api.fonnte.com/send', {
-    method: 'POST',
-    headers: { Authorization: token },
-    body: form,
-  });
-  const data = await res.json().catch(() => ({}));
-  return { ok: res.ok && (data as { status?: boolean })?.status !== false, data };
+  const attempts = [18000, 32000];
+  let last: { ok: boolean; data: unknown } = { ok: false, data: { error: 'no_attempt' } };
+  for (const timeoutMs of attempts) {
+    try {
+      const res = await fetch('https://api.fonnte.com/send', {
+        method: 'POST',
+        headers: { Authorization: token },
+        body: form,
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+      const data = await res.json().catch(() => ({}));
+      last = { ok: res.ok && (data as { status?: boolean })?.status !== false, data };
+      if (last.ok) return last;
+    } catch (e) {
+      last = { ok: false, data: { error: e instanceof Error ? e.message : String(e) } };
+    }
+  }
+  return last;
 }
 
 Deno.serve(async (req) => {
