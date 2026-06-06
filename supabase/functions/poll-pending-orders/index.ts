@@ -337,10 +337,10 @@ Deno.serve(async (req) => {
   const { data: orders, error } = await admin
     .from('orders')
     .select('*')
-    .in('status', ['pending', 'paid'])
+    .or('status.eq.pending,and(status.eq.paid,token_sent_at.is.null)')
     .gte('created_at', since)
     .order('created_at', { ascending: false })
-    .limit(750);
+    .limit(250);
   console.log(`[poll] scanning ${orders?.length ?? 0} pending orders since ${since}`);
 
   if (error) {
