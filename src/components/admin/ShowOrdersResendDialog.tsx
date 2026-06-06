@@ -160,7 +160,16 @@ export default function ShowOrdersResendDialog({ open, onOpenChange, showId, sho
       setManualPhone('');
       void load();
     } else {
-      toast({ title: 'Gagal kirim', description: d?.error || 'unknown', variant: 'destructive' });
+      const errStr = String(d?.error || '');
+      const isTimeout = /timed out|TimeoutError|abort/i.test(errStr);
+      toast({
+        title: isTimeout ? 'WhatsApp lambat merespons' : 'Gagal kirim',
+        description: isTimeout
+          ? 'Token sudah dibuat. Pesan kemungkinan tetap terkirim — cek HP user / coba lagi beberapa detik.'
+          : (errStr || 'unknown'),
+        variant: isTimeout ? 'default' : 'destructive',
+      });
+      if (isTimeout) { setManualPhone(''); void load(); }
     }
   };
 
