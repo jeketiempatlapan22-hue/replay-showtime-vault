@@ -702,6 +702,7 @@ export default function Admin() {
           <TabsContent value="pakasir"><PakasirAdmin /></TabsContent>
           <TabsContent value="coins"><CoinAdmin /></TabsContent>
           <TabsContent value="users"><UserManagement /></TabsContent>
+          <TabsContent value="ip_manager"><IpManager /></TabsContent>
 
           {/* ===== REPLAYS TAB ===== */}
           <TabsContent value="replays">
