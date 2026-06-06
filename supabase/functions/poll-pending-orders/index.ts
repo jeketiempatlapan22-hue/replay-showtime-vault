@@ -28,7 +28,7 @@ async function verifyPakasirPaid(apiKey: string, slug: string, pakasirOrderId: s
   let pjson: any = {};
   let ok = false;
   try {
-    const pres = await fetch(url, { signal: AbortSignal.timeout(15000) });
+    const pres = await fetch(url, { signal: AbortSignal.timeout(4000) });
     ok = pres.ok;
     pjson = await pres.json().catch(() => ({}));
   } catch (e) {
@@ -97,7 +97,7 @@ async function sendFonnteOnce(phone: string, message: string) {
   try {
     const res = await fetch('https://api.fonnte.com/send', {
       method: 'POST', headers: { Authorization: token }, body: form,
-      signal: AbortSignal.timeout(6000),
+      signal: AbortSignal.timeout(5000),
     });
     const data = await res.json().catch(() => ({}));
     return { ok: res.ok && (data as { status?: boolean })?.status !== false, data };
@@ -139,7 +139,7 @@ function renderTemplate(tpl: string, vars: Record<string, string>) {
 async function processOrder(admin: ReturnType<typeof createClient>, order: any, apiKey: string, slug: string, origin: string, tpl: string, showTpl: string) {
   if (!order.pakasir_order_id && order.status !== 'paid') return { id: order.id, skipped: 'no_pakasir_id' };
 
-  if (order.pakasir_order_id && Number(order.amount || 0) >= 100) {
+  if (order.status !== 'paid' && order.pakasir_order_id && Number(order.amount || 0) >= 100) {
     const verified = await verifyPakasirPaid(apiKey, slug, order.pakasir_order_id, Number(order.amount || 0));
     if (!verified.paid) {
       if (verified.status === 'canceled' || verified.status === 'cancelled' || verified.status === 'expired' || verified.status === 'failed') {
@@ -330,8 +330,8 @@ Deno.serve(async (req) => {
   const pendingSince = new Date(Date.now() - 2 * 24 * 3600_000).toISOString();
   const unsentSince = new Date(Date.now() - 30 * 24 * 3600_000).toISOString();
   const [{ data: paidUnsent, error: paidErr }, { data: pendingOrders, error: pendingErr }] = await Promise.all([
-    admin.from('orders').select('*').eq('status', 'paid').gte('created_at', unsentSince).order('paid_at', { ascending: false }).limit(3),
-    admin.from('orders').select('*').eq('status', 'pending').gte('created_at', pendingSince).order('created_at', { ascending: false }).limit(3),
+    admin.from('orders').select('*').eq('status', 'paid').gte('created_at', unsentSince).order('paid_at', { ascending: false }).limit(2),
+    admin.from('orders').select('*').eq('status', 'pending').gte('created_at', pendingSince).order('created_at', { ascending: false }).limit(2),
   ]);
   const error = paidErr || pendingErr;
   if (error) return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: corsHeaders });
@@ -379,7 +379,7 @@ Deno.serve(async (req) => {
       .eq('kind', 'qris')
       .not('pakasir_order_id', 'is', null)
       .gte('created_at', since)
-      .order('created_at', { ascending: false }).limit(3);
+      .order('created_at', { ascending: false }).limit(1);
     for (const mo of mOrders ?? []) {
       try {
         // Skip jika sudah punya token & WA sudah pernah sukses (idempotent guard).
