@@ -138,12 +138,16 @@ function renderTemplate(tpl: string, vars: Record<string, string>) {
 async function processOrder(admin: ReturnType<typeof createClient>, order: any, apiKey: string, slug: string, origin: string, tpl: string, showTpl: string) {
   if (!order.pakasir_order_id && order.status !== 'paid') return { id: order.id, skipped: 'no_pakasir_id' };
 
-  const verified = await verifyPakasirPaid(apiKey, slug, order.pakasir_order_id || '', Number(order.amount || 0));
-  if (!verified.paid) {
-    if (verified.status === 'canceled' || verified.status === 'cancelled' || verified.status === 'expired' || verified.status === 'failed') {
-      await admin.from('orders').update({ status: verified.status }).eq('id', order.id);
+  if (order.pakasir_order_id && Number(order.amount || 0) >= 100) {
+    const verified = await verifyPakasirPaid(apiKey, slug, order.pakasir_order_id, Number(order.amount || 0));
+    if (!verified.paid) {
+      if (verified.status === 'canceled' || verified.status === 'cancelled' || verified.status === 'expired' || verified.status === 'failed') {
+        await admin.from('orders').update({ status: verified.status }).eq('id', order.id);
+      }
+      return { id: order.id, status: verified.status || 'pending' };
     }
-    return { id: order.id, status: verified.status || 'pending' };
+  } else if (order.status !== 'paid') {
+    return { id: order.id, skipped: 'payment_not_verified' };
   }
 
   const alreadySent = order.token_sent_at && await hasSentWa(admin, order.id);
@@ -442,16 +446,8 @@ Deno.serve(async (req) => {
           }
         }
 
-        let paid = mo.status === 'paid';
-        if (!paid) {
-          const purl = `https://app.pakasir.com/api/transactiondetail?project=${encodeURIComponent(slug)}&amount=${mo.amount}&order_id=${encodeURIComponent(mo.pakasir_order_id)}&api_key=${encodeURIComponent(apiKey)}`;
-          const pres = await fetch(purl);
-          const pjson: any = await pres.json().catch(() => ({}));
-          const tx = pjson?.transaction || pjson?.payment || {};
-          const ps = String(tx.status || pjson?.status || '').toLowerCase();
-          paid = ps === 'completed' || ps === 'paid' || ps === 'success';
-          if (!paid) { memResults.push({ id: mo.id, status: ps || 'pending' }); continue; }
-        }
+        const verified = await verifyPakasirPaid(apiKey, slug, mo.pakasir_order_id, Number(mo.amount || 0));
+        if (!verified.paid) { memResults.push({ id: mo.id, status: verified.status || 'pending' }); continue; }
 
         let tok: any = null;
         if (!mo.membership_token_id) {
