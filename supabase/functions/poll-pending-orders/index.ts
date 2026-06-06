@@ -330,8 +330,8 @@ Deno.serve(async (req) => {
   const pendingSince = new Date(Date.now() - 2 * 24 * 3600_000).toISOString();
   const unsentSince = new Date(Date.now() - 30 * 24 * 3600_000).toISOString();
   const [{ data: paidUnsent, error: paidErr }, { data: pendingOrders, error: pendingErr }] = await Promise.all([
-    admin.from('orders').select('*').eq('status', 'paid').gte('created_at', unsentSince).order('paid_at', { ascending: false }).limit(20),
-    admin.from('orders').select('*').eq('status', 'pending').gte('created_at', pendingSince).order('created_at', { ascending: false }).limit(30),
+    admin.from('orders').select('*').eq('status', 'paid').gte('created_at', unsentSince).order('paid_at', { ascending: false }).limit(3),
+    admin.from('orders').select('*').eq('status', 'pending').gte('created_at', pendingSince).order('created_at', { ascending: false }).limit(3),
   ]);
   const error = paidErr || pendingErr;
   if (error) return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: corsHeaders });
