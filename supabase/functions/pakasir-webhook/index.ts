@@ -97,7 +97,7 @@ async function sendFonnteOnce(phone: string, message: string, timeoutMs: number)
 
 // Fonnte kadang lambat (>10s). Coba 2x supaya user benar-benar terima token.
 async function sendFonnte(phone: string, message: string) {
-  const attempts = [14000, 20000];
+  const attempts = [18000, 32000];
   let last: { ok: boolean; data: unknown } = { ok: false, data: { error: 'no_attempt' } };
   for (let i = 0; i < attempts.length; i++) {
     last = await sendFonnteOnce(phone, message, attempts[i]);
