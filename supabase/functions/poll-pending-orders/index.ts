@@ -292,7 +292,10 @@ Deno.serve(async (req) => {
   const bearer = authHeader.replace(/^Bearer\s+/i, '').trim();
   const SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
   const ANON = Deno.env.get('SUPABASE_ANON_KEY') || '';
-  let allowed = !!bearer && (bearer === SERVICE_ROLE || bearer === ANON);
+  const PUBLISHABLE = Deno.env.get('SUPABASE_PUBLISHABLE_KEY') || '';
+  const PUBLISHABLES = (Deno.env.get('SUPABASE_PUBLISHABLE_KEYS') || '').split(',').map((s) => s.trim()).filter(Boolean);
+  const accepted = [SERVICE_ROLE, ANON, PUBLISHABLE, ...PUBLISHABLES].filter(Boolean);
+  let allowed = !!bearer && accepted.includes(bearer);
   if (!allowed && bearer) {
     try {
       const userClient = createClient(Deno.env.get('SUPABASE_URL')!, ANON, { global: { headers: { Authorization: authHeader } } });
