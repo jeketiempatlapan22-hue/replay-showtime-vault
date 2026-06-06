@@ -296,9 +296,9 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
   };
 
   const accessLink = accessToken
-    ? (kind === 'replay_only' && replayId
-      ? `${window.location.origin}/akses?token=${accessToken}&replay=${replayId}`
-      : `${window.location.origin}/live?show=${showId}&t=${accessToken}`)
+    ? (kind === 'show' && showId && !replayId
+      ? `${window.location.origin}/live?show=${showId}&t=${accessToken}`
+      : `${window.location.origin}/akses?token=${accessToken}${replayId ? `&replay=${replayId}` : ''}`)
     : '';
 
   const copyLink = async () => {
