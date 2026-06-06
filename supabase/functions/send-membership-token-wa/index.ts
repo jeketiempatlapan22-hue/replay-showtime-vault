@@ -33,7 +33,7 @@ async function sendFonnteOnce(phone: string, message: string, timeoutMs: number)
   } catch (e) { return { ok: false, data: { error: String(e) } }; }
 }
 async function sendFonnte(phone: string, message: string) {
-  const attempts = [18000, 32000];
+  const attempts = [10000];
   let last: { ok: boolean; data: unknown } = { ok: false, data: { error: 'no_attempt' } };
   for (let i = 0; i < attempts.length; i++) {
     last = await sendFonnteOnce(phone, message, attempts[i]);

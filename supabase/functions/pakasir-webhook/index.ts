@@ -95,9 +95,8 @@ async function sendFonnteOnce(phone: string, message: string, timeoutMs: number)
   }
 }
 
-// Fonnte kadang lambat (>10s). Coba 2x supaya user benar-benar terima token.
 async function sendFonnte(phone: string, message: string) {
-  const attempts = [18000, 32000];
+  const attempts = [10000];
   let last: { ok: boolean; data: unknown } = { ok: false, data: { error: 'no_attempt' } };
   for (let i = 0; i < attempts.length; i++) {
     last = await sendFonnteOnce(phone, message, attempts[i]);
@@ -110,6 +109,24 @@ async function hasSentWa(admin: ReturnType<typeof createClient>, orderId: string
   const { data } = await admin.from('wa_outbox')
     .select('id').eq('related_order_id', orderId).eq('status', 'sent').limit(1);
   return !!data?.length;
+}
+
+function isTimeoutText(value: unknown) {
+  const text = typeof value === 'string' ? value : JSON.stringify(value ?? '');
+  return /timed out|TimeoutError|Signal timed out|abort/i.test(text);
+}
+
+async function isFonntePaused(admin: ReturnType<typeof createClient>, windowMs = 15 * 60_000) {
+  const since = new Date(Date.now() - windowMs).toISOString();
+  const { data } = await admin.from('wa_outbox')
+    .select('status,error,created_at')
+    .gte('created_at', since)
+    .order('created_at', { ascending: false })
+    .limit(10);
+  const rows = data ?? [];
+  const timeoutFails = rows.filter((r: any) => r.status === 'failed' && isTimeoutText(r.error)).length;
+  const hasRecentSent = rows.some((r: any) => r.status === 'sent');
+  return timeoutFails >= 3 && !hasRecentSent;
 }
 
 Deno.serve(async (req) => {
@@ -192,7 +209,8 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
-    const sent = await sendFonnte(mOrder.phone, msg);
+    const paused = await isFonntePaused(admin);
+    const sent = paused ? { ok: false, data: { error: 'fonnte_timeout_pause' } } : await sendFonnte(mOrder.phone, msg);
     const nowIso = new Date().toISOString();
     await admin.from('membership_orders').update({
       wa_attempts: (Number(mOrder.wa_attempts) || 0) + 1,
@@ -267,7 +285,8 @@ Deno.serve(async (req) => {
       '━━━━━━━━━━━━━━',
       '💖 Terima kasih — *ReplayTime*',
     ].filter((l) => l !== null).join('\n');
-    const sent = await sendFonnte(order.user_phone, msg);
+    const paused = await isFonntePaused(admin);
+    const sent = paused ? { ok: false, data: { error: 'fonnte_timeout_pause' } } : await sendFonnte(order.user_phone, msg);
     if (sent.ok) await admin.from('orders').update({ token_sent_at: new Date().toISOString() }).eq('id', order.id);
     await admin.from('wa_outbox').insert({
       phone: order.user_phone, message: msg, status: sent.ok ? 'sent' : 'failed',
@@ -360,7 +379,8 @@ Deno.serve(async (req) => {
   }
 
 
-  const sent = await sendFonnte(order.user_phone, message);
+  const paused = await isFonntePaused(admin);
+  const sent = paused ? { ok: false, data: { error: 'fonnte_timeout_pause' } } : await sendFonnte(order.user_phone, message);
   if (sent.ok) await admin.from('orders').update({ token_sent_at: new Date().toISOString() }).eq('id', order.id);
   await admin.from('token_deliveries').insert({
     phone: order.user_phone, replay_id: order.replay_id, replay_title: order.item_title,

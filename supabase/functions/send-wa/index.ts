@@ -20,7 +20,7 @@ export async function sendFonnte(phone: string, message: string): Promise<{ ok: 
   form.append('target', normalizePhone(phone));
   form.append('message', message);
   form.append('countryCode', '62');
-  const attempts = [18000, 32000];
+  const attempts = [10000];
   let last: { ok: boolean; data: unknown } = { ok: false, data: { error: 'no_attempt' } };
   for (const timeoutMs of attempts) {
     try {
