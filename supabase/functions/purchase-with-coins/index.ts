@@ -22,13 +22,13 @@ async function sendFonnteOnce(phone: string, message: string) {
   const form = new FormData();
   form.append('target', normalizePhone(phone)); form.append('message', message); form.append('countryCode', '62');
   try {
-    const res = await fetch('https://api.fonnte.com/send', { method: 'POST', headers: { Authorization: tok }, body: form, signal: AbortSignal.timeout(8000) });
+    const res = await fetch('https://api.fonnte.com/send', { method: 'POST', headers: { Authorization: tok }, body: form, signal: AbortSignal.timeout(12000) });
     const data = await res.json().catch(() => ({}));
     return { ok: res.ok && (data as any)?.status !== false, data };
   } catch (e) { return { ok: false, data: { error: String(e) } }; }
 }
 async function sendFonnte(phone: string, message: string) {
-  const delays = [0, 1000, 3000];
+  const delays = [0, 1000, 3000, 7000, 12000];
   let last: any = { ok: false, data: { error: 'no_attempt' } };
   for (let i = 0; i < delays.length; i++) {
     if (delays[i]) await new Promise((r) => setTimeout(r, delays[i]));
@@ -114,7 +114,7 @@ Deno.serve(async (req) => {
       user_id: user.id, user_phone: phone, item_title: itemTitle,
       amount: 0, kind: kind === 'replay_only' ? 'replay_only' : kind,
       coin_amount: price, status: 'paid',
-      paid_at: new Date().toISOString(), token_sent_at: new Date().toISOString(),
+      paid_at: new Date().toISOString(),
       access_token: accessToken, show_id: resolvedShowId, replay_id: resolvedReplayId,
     }).select('id').single();
 
@@ -182,6 +182,9 @@ Deno.serve(async (req) => {
     }
 
     const sent = await sendFonnte(phone, message);
+    if (sent.ok && order?.id) {
+      await admin.from('orders').update({ token_sent_at: new Date().toISOString() }).eq('id', order.id);
+    }
     await admin.from('token_deliveries').insert({
       phone, replay_id: resolvedReplayId, replay_title: itemTitle,
       order_id: order?.id || null, access_token: accessToken, link,
@@ -194,7 +197,7 @@ Deno.serve(async (req) => {
     });
 
     return new Response(JSON.stringify({
-      ok: true, access_token: accessToken, balance: newBalance, sent: sent.ok, link,
+      ok: true, access_token: accessToken, balance: newBalance, new_balance: newBalance, sent: sent.ok, link,
     }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   } catch (e) {
     return new Response(JSON.stringify({ error: String(e) }), { status: 500, headers: corsHeaders });
