@@ -7,6 +7,14 @@ import { cn } from '@/lib/utils';
 
 export default function BottomNav() {
   const location = useLocation();
+
+  // Hide before mounting auth/balance listeners on immersive routes.
+  if (/^\/(adpan|auth|live)/.test(location.pathname)) return null;
+
+  return <BottomNavContent locationPath={location.pathname} />;
+}
+
+function BottomNavContent({ locationPath }: { locationPath: string }) {
   const { user } = useAuth();
   const [balance, setBalance] = useState<number | null>(null);
 
@@ -25,9 +33,6 @@ export default function BottomNav() {
     window.addEventListener('focus', refresh);
     return () => { mounted = false; supabase.removeChannel(ch); window.removeEventListener('focus', refresh); };
   }, [user]);
-
-  // Hide on admin/auth/live (immersive) routes
-  if (/^\/(adpan|auth|live)/.test(location.pathname)) return null;
 
   const items = [
     { to: '/', label: 'Beranda', Icon: Home, match: (p: string) => p === '/' },
