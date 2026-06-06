@@ -321,6 +321,11 @@ export default function ShowOrdersResendDialog({ open, onOpenChange, showId, sho
                     >
                       {sending[r.id] ? <Loader2 className="w-3 h-3 animate-spin" /> : <><Send className="w-3 h-3 mr-1" />Kirim</>}
                     </Button>
+                    {w !== 'none' && (
+                      <Button size="sm" variant="ghost" className="h-7 mt-1 text-destructive ml-1" title="Hapus log WA untuk order ini" onClick={() => deleteLog(r.id)}>
+                        <Trash2 className="w-3 h-3" />
+                      </Button>
+                    )}
                   </div>
                 </div>
               );
