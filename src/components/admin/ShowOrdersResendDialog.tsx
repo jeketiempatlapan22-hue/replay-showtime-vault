@@ -211,12 +211,19 @@ export default function ShowOrdersResendDialog({ open, onOpenChange, showId, sho
               {bulkSending ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Send className="w-3 h-3 mr-1" />}
               Kirim Ulang ({filtered.length})
             </Button>
-            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => resendBulk(true)} disabled={bulkSending} title="Paksa kirim ulang hanya untuk order yang sudah lunas">
+            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => resendBulk(true)} disabled={bulkSending} title="Paksa kirim ulang — termasuk order yang belum lunas (admin only)">
               Paksa Kirim
             </Button>
             <Button size="sm" variant="ghost" className="h-7" onClick={load}><RefreshCw className="w-3 h-3" /></Button>
           </div>
         </div>
+
+        <Input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Cari nomor WA atau judul order…"
+          className="h-8 text-xs"
+        />
 
         {loading ? (
           <div className="flex justify-center py-8"><Loader2 className="w-5 h-5 animate-spin" /></div>
