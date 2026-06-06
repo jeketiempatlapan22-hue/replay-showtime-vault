@@ -19,6 +19,27 @@ function genToken() {
   return crypto.randomUUID().replace(/-/g, '').slice(0, 24);
 }
 
+const PAID_STATUSES = new Set(['completed', 'paid', 'success']);
+
+async function verifyPakasirPaid(apiKey: string, slug: string, pakasirOrderId: string, amount: number) {
+  if (!pakasirOrderId || !amount || amount < 100) return { paid: false, status: 'invalid_order' };
+  const url = `https://app.pakasir.com/api/transactiondetail?project=${encodeURIComponent(slug)}&amount=${amount}&order_id=${encodeURIComponent(pakasirOrderId)}&api_key=${encodeURIComponent(apiKey)}`;
+  const pres = await fetch(url, { method: 'GET', signal: AbortSignal.timeout(15000) });
+  const pjson: any = await pres.json().catch(() => ({}));
+  const tx = pjson?.transaction || pjson?.payment || {};
+  const status = String(tx.status || pjson?.status || '').toLowerCase();
+  const returnedOrderId = String(tx.order_id || tx.orderId || tx.merchant_order_id || pjson?.order_id || '').trim();
+  const returnedProject = String(tx.project || pjson?.project || '').trim();
+  const returnedAmount = Number(tx.amount ?? tx.nominal ?? pjson?.amount ?? 0);
+  const orderMatches = !returnedOrderId || returnedOrderId === pakasirOrderId;
+  const projectMatches = !returnedProject || returnedProject === slug;
+  const amountMatches = !Number.isFinite(returnedAmount) || returnedAmount <= 0 || returnedAmount === amount;
+  return {
+    paid: pres.ok && PAID_STATUSES.has(status) && orderMatches && projectMatches && amountMatches,
+    status: status || (pres.ok ? 'pending' : 'unreachable'),
+  };
+}
+
 // Provision a fresh single-device token row for this paid order.
 // Always issues a brand-new token (never reuses a stale order.access_token)
 // and writes the matching row into active_show_tokens / replay_personal_tokens
@@ -127,8 +148,12 @@ Deno.serve(async (req) => {
   const { data: mOrder } = await admin
     .from('membership_orders').select('*').eq('pakasir_order_id', orderId).maybeSingle();
   if (mOrder) {
-    if (status !== 'completed' && status !== 'paid' && status !== 'success') {
+    if (!PAID_STATUSES.has(status)) {
       return new Response(JSON.stringify({ ok: true, ignored: true, status }), { headers: corsHeaders });
+    }
+    const verified = await verifyPakasirPaid(expectedKey, expectedSlug || project, orderId, Number(mOrder.amount || 0));
+    if (!verified.paid) {
+      return new Response(JSON.stringify({ ok: true, ignored: true, status: verified.status, verified: false }), { headers: corsHeaders });
     }
     if (mOrder.status === 'paid' && mOrder.membership_token_id) {
       return new Response(JSON.stringify({ ok: true, already: true }), { headers: corsHeaders });
@@ -201,9 +226,14 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ error: 'order not found' }), { status: 404, headers: corsHeaders });
   }
 
-  if (status !== 'completed' && status !== 'paid' && status !== 'success') {
+  if (!PAID_STATUSES.has(status)) {
     await admin.from('orders').update({ status }).eq('id', order.id);
     return new Response(JSON.stringify({ ok: true, ignored: true, status }), { headers: corsHeaders });
+  }
+
+  const verified = await verifyPakasirPaid(expectedKey, expectedSlug || project, orderId, Number(order.amount || 0));
+  if (!verified.paid) {
+    return new Response(JSON.stringify({ ok: true, ignored: true, status: verified.status, verified: false }), { headers: corsHeaders });
   }
 
   // Idempotent: skip only when paid and WA was actually sent.
