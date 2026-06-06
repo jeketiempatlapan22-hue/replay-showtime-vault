@@ -206,17 +206,19 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ ok: true, ignored: true, status }), { headers: corsHeaders });
   }
 
-  // Idempotent: skip if already paid+sent
-  if (order.status === 'paid' && order.token_sent_at) {
+  // Idempotent: skip only when paid and WA was actually sent.
+  const alreadySent = order.token_sent_at && await hasSentWa(admin, order.id);
+  if (order.status === 'paid' && alreadySent) {
     return new Response(JSON.stringify({ ok: true, already: true }), { headers: corsHeaders });
+  }
+  if (order.token_sent_at && !alreadySent) {
+    await admin.from('orders').update({ token_sent_at: null }).eq('id', order.id);
+    order.token_sent_at = null;
   }
 
 
   // === COIN TOP-UP branch ===
   if (order.kind === 'coin_topup') {
-    if (order.status !== 'paid') {
-      await admin.from('orders').update({ status: 'paid', paid_at: new Date().toISOString() }).eq('id', order.id);
-    }
     const claimedAt = new Date().toISOString();
     const { data: claimed } = await admin.from('orders').update({ token_sent_at: claimedAt })
       .eq('id', order.id).is('token_sent_at', null).select('id');
@@ -225,11 +227,13 @@ Deno.serve(async (req) => {
     }
     let newBal: number | null = null;
     if (order.user_id && order.coin_amount > 0) {
-      const { data: bal, error: gerr } = await admin.rpc('grant_coins', {
-        _user_id: order.user_id, _delta: order.coin_amount,
-        _reason: 'topup', _meta: { order_id: order.id } as any, _order_id: order.id,
-      });
-      if (!gerr) newBal = bal as number;
+      const { data: credited, error: gerr } = await admin.rpc('credit_coin_topup_order', { _order_id: order.id });
+      if (gerr) {
+        await admin.from('orders').update({ token_sent_at: null }).eq('id', order.id).eq('token_sent_at', claimedAt);
+        return new Response(JSON.stringify({ error: 'coin_credit_failed', detail: gerr.message }), { status: 500, headers: corsHeaders });
+      }
+      const row = Array.isArray(credited) ? credited[0] : credited;
+      newBal = Number(row?.new_balance ?? 0);
     }
     const msg = [
       '✅ *Top-up Berhasil*',
