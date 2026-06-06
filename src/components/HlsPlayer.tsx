@@ -120,6 +120,58 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
     };
   }, [onPipChange]);
 
+  // Deteksi dukungan AirPlay / Remote Playback (Cast) untuk TV / proyektor.
+  useEffect(() => {
+    const video = videoRef.current as (HTMLVideoElement & {
+      webkitShowPlaybackTargetPicker?: () => void;
+      remote?: { watchAvailability?: (cb: (avail: boolean) => void) => Promise<number>; cancelWatchAvailability?: (id: number) => Promise<void>; prompt?: () => Promise<void> };
+    }) | null;
+    if (!video) return;
+    const hasAirplay = typeof video.webkitShowPlaybackTargetPicker === 'function'
+      || (typeof (window as any).WebKitPlaybackTargetAvailabilityEvent !== 'undefined');
+    const hasRemote = !!video.remote && typeof video.remote.prompt === 'function';
+    setCastSupported(hasAirplay || hasRemote);
+    let watchId: number | null = null;
+    const onAirplayAvail = (e: Event & { availability?: string }) => {
+      setCastAvailable(e.availability === 'available');
+    };
+    if (hasAirplay) {
+      try { video.addEventListener('webkitplaybacktargetavailabilitychanged', onAirplayAvail as EventListener); } catch { /* ignore */ }
+      setCastAvailable(true); // tampilkan tombol; iOS akan menampilkan picker walau availability belum diketahui
+    }
+    if (hasRemote && video.remote?.watchAvailability) {
+      video.remote.watchAvailability((avail) => setCastAvailable(!!avail))
+        .then((id) => { watchId = id; })
+        .catch(() => { setCastAvailable(true); });
+    }
+    return () => {
+      if (hasAirplay) {
+        try { video.removeEventListener('webkitplaybacktargetavailabilitychanged', onAirplayAvail as EventListener); } catch { /* ignore */ }
+      }
+      if (hasRemote && watchId != null && video.remote?.cancelWatchAvailability) {
+        try { video.remote.cancelWatchAvailability(watchId); } catch { /* ignore */ }
+      }
+    };
+  }, [src]);
+
+  const showCastPicker = useCallback(() => {
+    const video = videoRef.current as (HTMLVideoElement & {
+      webkitShowPlaybackTargetPicker?: () => void;
+      remote?: { prompt?: () => Promise<void> };
+    }) | null;
+    if (!video) return;
+    try {
+      if (typeof video.webkitShowPlaybackTargetPicker === 'function') {
+        video.webkitShowPlaybackTargetPicker();
+        return;
+      }
+      if (video.remote?.prompt) {
+        void video.remote.prompt().catch(() => {});
+      }
+    } catch { /* ignore */ }
+  }, []);
+
+
   useEffect(() => {
     onFatalErrorRef.current = onFatalError;
   }, [onFatalError]);
