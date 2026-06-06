@@ -289,6 +289,7 @@ Deno.serve(async (req) => {
           error: sent.ok ? null : JSON.stringify(sent.data),
           related_order_id: order.id, fonnte_response: sent.data as Record<string, unknown>,
         });
+      }
       return new Response(JSON.stringify({ ok: true, status: 'paid', topup: true, new_balance: newBal }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 

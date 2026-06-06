@@ -144,7 +144,7 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
       .channel(`order-${orderId}`)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders', filter: `id=eq.${orderId}` }, (payload: any) => {
         const row = payload?.new;
-        if (row?.status === 'paid') {
+        if (row?.status === 'paid' && row?.access_token) {
           const tok = row.access_token || '';
           setAccessToken(tok);
           persistPaid(tok);
