@@ -169,7 +169,7 @@ export default function ResellerAuditAdmin() {
                             <span className="text-sm truncate">{it.target_title || '—'}</span>
                           </div>
                           <div className="flex items-center gap-1.5 shrink-0 max-w-[45%] sm:max-w-none">
-                            <span className="hidden xs:inline text-[10px] text-muted-foreground truncate">{fmtDate(it.last_copied)}</span>
+                            <span className="hidden min-[380px]:inline text-[10px] text-muted-foreground truncate">{fmtDate(it.last_copied)}</span>
                             <Badge className="text-[11px] font-semibold">{it.copies} link</Badge>
                           </div>
                         </div>
