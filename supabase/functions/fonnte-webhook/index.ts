@@ -44,7 +44,7 @@ async function sendFonnte(phone: string, message: string, inboxId = ''): Promise
     if (withInbox && /^\d+$/.test(inboxId)) form.append('inboxid', inboxId);
     return form;
   };
-  const timeouts = [18000, 32000];
+  const timeouts = [12000];
   let last: { ok: boolean; data?: unknown; error?: string } = { ok: false, error: 'no_attempt' };
   for (const timeoutMs of timeouts) {
     try {
@@ -235,11 +235,32 @@ async function logBotEvent(
   } catch { /* audit logging must never block bot replies */ }
 }
 
+function isTimeoutText(value: unknown) {
+  const text = typeof value === 'string' ? value : JSON.stringify(value ?? '');
+  return /timed out|TimeoutError|Signal timed out|abort/i.test(text);
+}
+
+async function isFonntePaused(admin: ReturnType<typeof createClient>, windowMs = 15 * 60_000) {
+  const since = new Date(Date.now() - windowMs).toISOString();
+  const { data } = await admin.from('wa_outbox')
+    .select('status,error,created_at')
+    .gte('created_at', since)
+    .order('created_at', { ascending: false })
+    .limit(8);
+  const rows = data ?? [];
+  const timeoutFails = rows.filter((r: any) => r.status === 'failed' && isTimeoutText(r.error)).length;
+  const hasRecentSent = rows.some((r: any) => r.status === 'sent');
+  return timeoutFails >= 3 && !hasRecentSent;
+}
+
 async function sendAndAudit(
   admin: ReturnType<typeof createClient>,
   opts: { phone: string; message: string; inboxId?: string; testMode?: boolean; deliverTest?: boolean; command?: string; device?: string; fromMe?: boolean },
 ) {
-  const sendResult = opts.testMode && !opts.deliverTest
+  const paused = !(opts.testMode && !opts.deliverTest) && await isFonntePaused(admin);
+  const sendResult = paused
+    ? { ok: false, data: { error: 'fonnte_timeout_pause' }, error: 'fonnte_timeout_pause' }
+    : opts.testMode && !opts.deliverTest
     ? { ok: true, data: { skipped: true, reason: 'test_mode' } }
     : await sendFonnte(opts.phone, opts.message, opts.inboxId || '');
 
