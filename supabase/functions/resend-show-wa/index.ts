@@ -210,8 +210,6 @@ Deno.serve(async (req) => {
       try {
         const { data: order } = await admin.from('orders').select('*').eq('id', oid).maybeSingle();
         if (!order) { results.push({ id: oid, error: 'not_found' }); continue; }
-        // Non-paid orders must never receive token links from the resend path.
-        // QRIS purchases are fulfilled only by Pakasir-verified webhook/polling.
         // Non-paid orders only proceed when admin explicitly uses `force`.
         // Coin top-ups are never delivered without real payment.
         if (order.status !== 'paid' && !force) {
