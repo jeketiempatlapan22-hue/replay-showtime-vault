@@ -70,14 +70,27 @@ export default function ShowOrdersResendDialog({ open, onOpenChange, showId, sho
 
   useEffect(() => { if (open) void load(); /* eslint-disable-next-line */ }, [open, showId]);
 
+  const q = search.trim().toLowerCase();
+  const qDigits = q.replace(/\D/g, '');
   const filtered = rows.filter((r) => {
     const w = waStatus[r.id] || 'none';
-    if (filter === 'all') return true;
-    if (filter === 'pending') return r.status !== 'paid';
-    if (filter === 'paid') return r.status === 'paid';
-    // 'failed' = paid tapi WA gagal/belum. Pending hanya dipantau, tidak bisa dikirimi token.
-    if (r.status === 'paid') return w !== 'sent';
-    return false;
+    let pass = false;
+    if (filter === 'all') pass = true;
+    else if (filter === 'pending') pass = r.status !== 'paid';
+    else if (filter === 'paid') pass = r.status === 'paid';
+    else if (filter === 'failed') {
+      // Gagal/Belum: paid tapi WA gagal/belum, ATAU pending (admin bisa paksa kirim).
+      if (r.status === 'paid') pass = w !== 'sent';
+      else pass = r.kind !== 'coin_topup';
+    }
+    if (!pass) return false;
+    if (!q) return true;
+    const phoneDigits = (r.user_phone || '').replace(/\D/g, '');
+    return (
+      (r.user_phone || '').toLowerCase().includes(q) ||
+      (qDigits && phoneDigits.includes(qDigits)) ||
+      (r.item_title || '').toLowerCase().includes(q)
+    );
   });
 
   const resendOne = async (id: string, shiftForce = false) => {
