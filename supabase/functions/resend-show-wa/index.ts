@@ -210,38 +210,28 @@ Deno.serve(async (req) => {
       try {
         const { data: order } = await admin.from('orders').select('*').eq('id', oid).maybeSingle();
         if (!order) { results.push({ id: oid, error: 'not_found' }); continue; }
-        // Non-paid orders: with `force`, treat the resend as an admin override —
-        // mint a fresh token, mark the order paid, and dispatch the WA. Skip
-        // coin top-ups (coin credit requires a real payment confirmation).
+        // Non-paid orders must never receive token links from the resend path.
+        // QRIS purchases are fulfilled only by Pakasir-verified webhook/polling.
         if (order.status !== 'paid') {
-          if (!force) {
-            results.push({ id: oid, skipped: `status_${order.status}` });
-            continue;
-          }
-          if (order.kind === 'coin_topup') {
-            results.push({ id: oid, skipped: 'topup_needs_payment' });
-            continue;
-          }
-          // Mint fresh token + persist to active_show_tokens / replay_personal_tokens.
+          results.push({ id: oid, skipped: 'payment_not_verified' });
+          continue;
+        }
+        if (order.kind !== 'coin_topup' && !order.access_token) {
           const newTok = crypto.randomUUID().replace(/-/g, '').slice(0, 24);
           if (order.show_id && !order.replay_id) {
             await admin.from('active_show_tokens').insert({
               show_id: order.show_id, token: newTok,
-              label: `force:${order.user_phone || ''}`.slice(0, 120),
+              label: `paid-resend:${order.user_phone || ''}`.slice(0, 120),
               kind: 'personal', max_devices: 1, revoked: false,
             });
           } else if (order.replay_id) {
             await admin.from('replay_personal_tokens').insert({
               replay_id: order.replay_id, token: newTok,
-              label: `force:${order.user_phone || ''}`.slice(0, 120),
+              label: `paid-resend:${order.user_phone || ''}`.slice(0, 120),
               max_devices: 1, revoked: false,
             });
           }
-          await admin.from('orders').update({
-            status: 'paid', paid_at: order.paid_at || new Date().toISOString(),
-            access_token: newTok,
-          }).eq('id', order.id);
-          order.status = 'paid';
+          await admin.from('orders').update({ access_token: newTok }).eq('id', order.id);
           order.access_token = newTok;
         }
         // Dedup: latest wa_outbox is 'sent' -> skip unless force.

@@ -74,15 +74,18 @@ export default function ShowOrdersResendDialog({ open, onOpenChange, showId, sho
     if (filter === 'all') return true;
     if (filter === 'pending') return r.status !== 'paid';
     if (filter === 'paid') return r.status === 'paid';
-    // 'failed' = paid tapi WA gagal/belum, ATAU pending/cancelled (butuh paksa kirim)
+    // 'failed' = paid tapi WA gagal/belum. Pending hanya dipantau, tidak bisa dikirimi token.
     if (r.status === 'paid') return w !== 'sent';
-    return r.kind !== 'coin_topup'; // pending show/replay = bisa di-paksa
+    return false;
   });
 
   const resendOne = async (id: string, shiftForce = false) => {
     const row = rows.find((r) => r.id === id);
-    // Pending/cancelled show order → always force (mint fresh token + mark paid + send).
-    const force = shiftForce || (row && row.status !== 'paid' && row.kind !== 'coin_topup');
+    if (row && row.status !== 'paid') {
+      toast({ title: 'Belum lunas', description: 'Token hanya bisa dikirim setelah pembayaran terverifikasi.', variant: 'destructive' });
+      return;
+    }
+    const force = shiftForce;
     setSending((p) => ({ ...p, [id]: true }));
     const { data, error } = await supabase.functions.invoke('resend-show-wa', { body: { order_id: id, force } });
     setSending((p) => ({ ...p, [id]: false }));
@@ -189,7 +192,7 @@ export default function ShowOrdersResendDialog({ open, onOpenChange, showId, sho
               {bulkSending ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Send className="w-3 h-3 mr-1" />}
               Kirim Ulang ({filtered.length})
             </Button>
-            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => resendBulk(true)} disabled={bulkSending} title="Paksa kirim — termasuk order pending/batal akan diberi token baru">
+            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => resendBulk(true)} disabled={bulkSending} title="Paksa kirim ulang hanya untuk order yang sudah lunas">
               Paksa Kirim
             </Button>
             <Button size="sm" variant="ghost" className="h-7" onClick={load}><RefreshCw className="w-3 h-3" /></Button>
@@ -232,8 +235,8 @@ export default function ShowOrdersResendDialog({ open, onOpenChange, showId, sho
                     <Button
                       size="sm" variant="outline" className="h-7 mt-1"
                       onClick={(e) => resendOne(r.id, e.shiftKey)}
-                      disabled={!!sending[r.id] || r.kind === 'coin_topup'}
-                      title={r.status === 'paid' ? 'Kirim ulang WA. Shift+klik = paksa kirim meski sudah terkirim' : 'Pending/batal — token baru akan dibuat & order ditandai paid'}
+                      disabled={!!sending[r.id] || r.kind === 'coin_topup' || r.status !== 'paid'}
+                      title={r.status === 'paid' ? 'Kirim ulang WA. Shift+klik = paksa kirim meski sudah terkirim' : 'Belum lunas — token tidak bisa dikirim'}
                     >
                       {sending[r.id] ? <Loader2 className="w-3 h-3 animate-spin" /> : <><Send className="w-3 h-3 mr-1" />Kirim</>}
                     </Button>
