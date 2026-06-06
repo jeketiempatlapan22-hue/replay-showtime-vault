@@ -20,6 +20,34 @@ function genToken() {
   return crypto.randomUUID().replace(/-/g, '').slice(0, 24);
 }
 
+const PAID_STATUSES = new Set(['completed', 'paid', 'success']);
+
+async function verifyPakasirPaid(apiKey: string, slug: string, pakasirOrderId: string, amount: number) {
+  if (!pakasirOrderId || !amount || amount < 100) return { paid: false, status: 'invalid_order' };
+  const url = `https://app.pakasir.com/api/transactiondetail?project=${encodeURIComponent(slug)}&amount=${amount}&order_id=${encodeURIComponent(pakasirOrderId)}&api_key=${encodeURIComponent(apiKey)}`;
+  let pjson: any = {};
+  let ok = false;
+  try {
+    const pres = await fetch(url, { signal: AbortSignal.timeout(15000) });
+    ok = pres.ok;
+    pjson = await pres.json().catch(() => ({}));
+  } catch (e) {
+    return { paid: false, status: 'pakasir_fetch:' + String(e) };
+  }
+  const tx = pjson?.transaction || pjson?.payment || {};
+  const status = String(tx.status || pjson?.status || '').toLowerCase();
+  const returnedOrderId = String(tx.order_id || tx.orderId || tx.merchant_order_id || pjson?.order_id || '').trim();
+  const returnedProject = String(tx.project || pjson?.project || '').trim();
+  const returnedAmount = Number(tx.amount ?? tx.nominal ?? pjson?.amount ?? 0);
+  const orderMatches = !returnedOrderId || returnedOrderId === pakasirOrderId;
+  const projectMatches = !returnedProject || returnedProject === slug;
+  const amountMatches = !Number.isFinite(returnedAmount) || returnedAmount <= 0 || returnedAmount === amount;
+  return {
+    paid: ok && PAID_STATUSES.has(status) && orderMatches && projectMatches && amountMatches,
+    status: status || (ok ? 'pending' : 'unreachable'),
+  };
+}
+
 // Provision a fresh single-device token row for this paid order.
 // Always issues a brand-new token (never reuses a stale order.access_token)
 // and writes the matching row into active_show_tokens / replay_personal_tokens
@@ -110,26 +138,16 @@ function renderTemplate(tpl: string, vars: Record<string, string>) {
 async function processOrder(admin: ReturnType<typeof createClient>, order: any, apiKey: string, slug: string, origin: string, tpl: string, showTpl: string) {
   if (!order.pakasir_order_id && order.status !== 'paid') return { id: order.id, skipped: 'no_pakasir_id' };
 
-  let pStatus = order.status === 'paid' ? 'paid' : '';
-  let isPaid = order.status === 'paid';
-  if (!isPaid) {
-    const url = `https://app.pakasir.com/api/transactiondetail?project=${encodeURIComponent(slug)}&amount=${order.amount}&order_id=${encodeURIComponent(order.pakasir_order_id)}&api_key=${encodeURIComponent(apiKey)}`;
-    let pjson: any = {};
-    try {
-      const pres = await fetch(url, { signal: AbortSignal.timeout(15000) });
-      pjson = await pres.json().catch(() => ({}));
-    } catch (e) {
-      return { id: order.id, error: 'pakasir_fetch:' + String(e) };
-    }
-    const tx = pjson?.transaction || pjson?.payment || {};
-    pStatus = String(tx.status || pjson?.status || '').toLowerCase();
-    isPaid = pStatus === 'completed' || pStatus === 'paid' || pStatus === 'success';
-    if (!isPaid) {
-      if (pStatus === 'canceled' || pStatus === 'cancelled' || pStatus === 'expired' || pStatus === 'failed') {
-        await admin.from('orders').update({ status: pStatus }).eq('id', order.id);
+  if (order.pakasir_order_id && Number(order.amount || 0) >= 100) {
+    const verified = await verifyPakasirPaid(apiKey, slug, order.pakasir_order_id, Number(order.amount || 0));
+    if (!verified.paid) {
+      if (verified.status === 'canceled' || verified.status === 'cancelled' || verified.status === 'expired' || verified.status === 'failed') {
+        await admin.from('orders').update({ status: verified.status }).eq('id', order.id);
       }
-      return { id: order.id, status: pStatus || 'pending' };
+      return { id: order.id, status: verified.status || 'pending' };
     }
+  } else if (order.status !== 'paid') {
+    return { id: order.id, skipped: 'payment_not_verified' };
   }
 
   const alreadySent = order.token_sent_at && await hasSentWa(admin, order.id);
@@ -428,16 +446,8 @@ Deno.serve(async (req) => {
           }
         }
 
-        let paid = mo.status === 'paid';
-        if (!paid) {
-          const purl = `https://app.pakasir.com/api/transactiondetail?project=${encodeURIComponent(slug)}&amount=${mo.amount}&order_id=${encodeURIComponent(mo.pakasir_order_id)}&api_key=${encodeURIComponent(apiKey)}`;
-          const pres = await fetch(purl);
-          const pjson: any = await pres.json().catch(() => ({}));
-          const tx = pjson?.transaction || pjson?.payment || {};
-          const ps = String(tx.status || pjson?.status || '').toLowerCase();
-          paid = ps === 'completed' || ps === 'paid' || ps === 'success';
-          if (!paid) { memResults.push({ id: mo.id, status: ps || 'pending' }); continue; }
-        }
+        const verified = await verifyPakasirPaid(apiKey, slug, mo.pakasir_order_id, Number(mo.amount || 0));
+        if (!verified.paid) { memResults.push({ id: mo.id, status: verified.status || 'pending' }); continue; }
 
         let tok: any = null;
         if (!mo.membership_token_id) {

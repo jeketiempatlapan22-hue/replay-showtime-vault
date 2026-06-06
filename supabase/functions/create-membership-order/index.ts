@@ -16,7 +16,7 @@ function normalizePhone(raw: string) {
 }
 const validPhone = (p: string) => /^62\d{8,13}$/.test(p);
 const validEmail = (e: string) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(e);
-const genOrderId = () => 'mb' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+const genOrderId = () => `mb${Date.now().toString(36)}${crypto.randomUUID().replace(/-/g, '').slice(0, 18)}`;
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });

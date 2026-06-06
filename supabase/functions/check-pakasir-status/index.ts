@@ -21,6 +21,27 @@ function genToken() {
   return crypto.randomUUID().replace(/-/g, '').slice(0, 24);
 }
 
+const PAID_STATUSES = new Set(['completed', 'paid', 'success']);
+
+async function verifyPakasirPaid(apiKey: string, slug: string, pakasirOrderId: string, amount: number) {
+  if (!pakasirOrderId || !amount || amount < 100) return { paid: false, status: 'invalid_order' };
+  const url = `https://app.pakasir.com/api/transactiondetail?project=${encodeURIComponent(slug)}&amount=${amount}&order_id=${encodeURIComponent(pakasirOrderId)}&api_key=${encodeURIComponent(apiKey)}`;
+  const pres = await fetch(url, { method: 'GET', signal: AbortSignal.timeout(15000) });
+  const pjson: any = await pres.json().catch(() => ({}));
+  const tx = pjson?.transaction || pjson?.payment || {};
+  const status = String(tx.status || pjson?.status || '').toLowerCase();
+  const returnedOrderId = String(tx.order_id || tx.orderId || tx.merchant_order_id || pjson?.order_id || '').trim();
+  const returnedProject = String(tx.project || pjson?.project || '').trim();
+  const returnedAmount = Number(tx.amount ?? tx.nominal ?? pjson?.amount ?? 0);
+  const orderMatches = !returnedOrderId || returnedOrderId === pakasirOrderId;
+  const projectMatches = !returnedProject || returnedProject === slug;
+  const amountMatches = !Number.isFinite(returnedAmount) || returnedAmount <= 0 || returnedAmount === amount;
+  return {
+    paid: pres.ok && PAID_STATUSES.has(status) && orderMatches && projectMatches && amountMatches,
+    status: status || (pres.ok ? 'pending' : 'unreachable'),
+  };
+}
+
 // Provision a fresh single-device token row for this paid order.
 // Always issues a brand-new token (never reuses a stale order.access_token)
 // and writes the matching row into active_show_tokens / replay_personal_tokens
@@ -130,14 +151,10 @@ Deno.serve(async (req) => {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
         }
-        const purl = `https://app.pakasir.com/api/transactiondetail?project=${encodeURIComponent(slug)}&amount=${mOrder.amount}&order_id=${encodeURIComponent(mOrder.pakasir_order_id)}&api_key=${encodeURIComponent(apiKey)}`;
-        const pres = await fetch(purl, { method: 'GET' });
-        const pjson: any = await pres.json().catch(() => ({}));
-        const tx = pjson?.transaction || pjson?.payment || {};
-        const ps = String(tx.status || pjson?.status || '').toLowerCase();
-        paid = ps === 'completed' || ps === 'paid' || ps === 'success';
+        const verified = await verifyPakasirPaid(apiKey, slug, mOrder.pakasir_order_id, Number(mOrder.amount || 0));
+        paid = verified.paid;
         if (!paid) {
-          return new Response(JSON.stringify({ ok: true, status: ps || 'pending', membership: true }), {
+          return new Response(JSON.stringify({ ok: true, status: verified.status || 'pending', membership: true }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
         }
@@ -231,26 +248,18 @@ Deno.serve(async (req) => {
     if (!order) return new Response(JSON.stringify({ error: 'order not found' }), { status: 404, headers: corsHeaders });
 
     const alreadySent = order.token_sent_at && await hasSentWa(admin, order.id);
-    if (order.status === 'paid' && alreadySent) {
-      return new Response(JSON.stringify({ ok: true, status: 'paid', already: true, access_token: order.access_token }), {
+
+    const verified = await verifyPakasirPaid(apiKey, slug, order.pakasir_order_id || '', Number(order.amount || 0));
+    if (!verified.paid) {
+      return new Response(JSON.stringify({ ok: true, status: verified.status || 'pending' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    let isPaid = order.status === 'paid';
-    let pStatus = order.status === 'paid' ? 'paid' : '';
-    if (!isPaid) {
-      const url = `https://app.pakasir.com/api/transactiondetail?project=${encodeURIComponent(slug)}&amount=${order.amount}&order_id=${encodeURIComponent(order.pakasir_order_id || '')}&api_key=${encodeURIComponent(apiKey)}`;
-      const pres = await fetch(url, { method: 'GET', signal: AbortSignal.timeout(15000) });
-      const pjson: any = await pres.json().catch(() => ({}));
-      const tx = pjson?.transaction || pjson?.payment || {};
-      pStatus = String(tx.status || pjson?.status || '').toLowerCase();
-      isPaid = pStatus === 'completed' || pStatus === 'paid' || pStatus === 'success';
-      if (!isPaid) {
-        return new Response(JSON.stringify({ ok: true, status: pStatus || 'pending' }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
+    if (order.status === 'paid' && alreadySent) {
+      return new Response(JSON.stringify({ ok: true, status: 'paid', already: true, access_token: order.access_token }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     if (order.token_sent_at && !alreadySent) {
