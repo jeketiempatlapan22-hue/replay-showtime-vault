@@ -28,7 +28,7 @@ async function verifyPakasirPaid(apiKey: string, slug: string, pakasirOrderId: s
   let pjson: any = {};
   let ok = false;
   try {
-    const pres = await fetch(url, { signal: AbortSignal.timeout(15000) });
+    const pres = await fetch(url, { signal: AbortSignal.timeout(4000) });
     ok = pres.ok;
     pjson = await pres.json().catch(() => ({}));
   } catch (e) {
@@ -97,7 +97,7 @@ async function sendFonnteOnce(phone: string, message: string) {
   try {
     const res = await fetch('https://api.fonnte.com/send', {
       method: 'POST', headers: { Authorization: token }, body: form,
-      signal: AbortSignal.timeout(12000),
+      signal: AbortSignal.timeout(5000),
     });
     const data = await res.json().catch(() => ({}));
     return { ok: res.ok && (data as { status?: boolean })?.status !== false, data };
@@ -108,7 +108,8 @@ async function sendFonnteOnce(phone: string, message: string) {
 
 // Auto-retry lebih agresif agar token/notifikasi tidak hilang saat Fonnte lambat.
 async function sendFonnte(phone: string, message: string) {
-  const delays = [0, 1000, 3000, 7000, 12000];
+  // Keep cron invocations short; failed sends are retried by the next cron/admin action.
+  const delays = [0];
   let last: { ok: boolean; data: unknown } = { ok: false, data: { error: 'no_attempt' } };
   for (let i = 0; i < delays.length; i++) {
     if (delays[i]) await new Promise((r) => setTimeout(r, delays[i]));
@@ -138,7 +139,7 @@ function renderTemplate(tpl: string, vars: Record<string, string>) {
 async function processOrder(admin: ReturnType<typeof createClient>, order: any, apiKey: string, slug: string, origin: string, tpl: string, showTpl: string) {
   if (!order.pakasir_order_id && order.status !== 'paid') return { id: order.id, skipped: 'no_pakasir_id' };
 
-  if (order.pakasir_order_id && Number(order.amount || 0) >= 100) {
+  if (order.status !== 'paid' && order.pakasir_order_id && Number(order.amount || 0) >= 100) {
     const verified = await verifyPakasirPaid(apiKey, slug, order.pakasir_order_id, Number(order.amount || 0));
     if (!verified.paid) {
       if (verified.status === 'canceled' || verified.status === 'cancelled' || verified.status === 'expired' || verified.status === 'failed') {
@@ -159,15 +160,10 @@ async function processOrder(admin: ReturnType<typeof createClient>, order: any, 
   // === COIN TOP-UP branch ===
   if (order.kind === 'coin_topup') {
     if (order.token_sent_at && alreadySent) return { id: order.id, status: 'already_sent' };
-    const claimedAt = new Date().toISOString();
-    const { data: claimed } = await admin.from('orders').update({ token_sent_at: claimedAt })
-      .eq('id', order.id).is('token_sent_at', null).select('id');
-    if (!claimed || claimed.length === 0) return { id: order.id, status: 'already_sent' };
     let newBal: number | null = null;
     if (order.user_id && order.coin_amount > 0) {
       const { data: credited, error: gerr } = await admin.rpc('credit_coin_topup_order', { _order_id: order.id });
       if (gerr) {
-        await admin.from('orders').update({ token_sent_at: null }).eq('id', order.id).eq('token_sent_at', claimedAt);
         return { id: order.id, error: 'coin_credit_failed:' + gerr.message };
       }
       const row = Array.isArray(credited) ? credited[0] : credited;
@@ -175,9 +171,7 @@ async function processOrder(admin: ReturnType<typeof createClient>, order: any, 
     }
     const msg = `✅ *Top-up berhasil*\n+${order.coin_amount} koin sudah masuk.${newBal != null ? `\nSaldo sekarang: *${newBal}* koin` : ''}\n\nTerima kasih 💖 — *ReplayTime*`;
     const sent = await sendFonnte(order.user_phone, msg);
-    if (!sent.ok) {
-      await admin.from('orders').update({ token_sent_at: null }).eq('id', order.id).eq('token_sent_at', claimedAt);
-    }
+    if (sent.ok) await admin.from('orders').update({ token_sent_at: new Date().toISOString() }).eq('id', order.id);
     await admin.from('wa_outbox').insert({
       phone: order.user_phone, message: msg, status: sent.ok ? 'sent' : 'failed',
       error: sent.ok ? null : JSON.stringify(sent.data),
@@ -193,19 +187,6 @@ async function processOrder(admin: ReturnType<typeof createClient>, order: any, 
     }).eq('id', order.id);
   }
   if (order.token_sent_at && alreadySent) return { id: order.id, status: 'already_sent' };
-
-  // Atomically claim the delivery slot: only one worker can flip
-  // token_sent_at from NULL -> now(). Others get 0 rows back and exit.
-  const claimedAt = new Date().toISOString();
-  const { data: claimed } = await admin
-    .from('orders')
-    .update({ token_sent_at: claimedAt })
-    .eq('id', order.id)
-    .is('token_sent_at', null)
-    .select('id');
-  if (!claimed || claimed.length === 0) {
-    return { id: order.id, status: 'already_sent' };
-  }
 
   const isShowPurchase = !!order.show_id && !order.replay_id;
   const isReplayOnlyPurchase = !!order.replay_id && !order.show_id;
@@ -283,11 +264,7 @@ async function processOrder(admin: ReturnType<typeof createClient>, order: any, 
 
 
   const sent = await sendFonnte(order.user_phone, message);
-  // If Fonnte fails, release the claim so a later run can retry.
-  if (!sent.ok) {
-    await admin.from('orders').update({ token_sent_at: null })
-      .eq('id', order.id).eq('token_sent_at', claimedAt);
-  }
+  if (sent.ok) await admin.from('orders').update({ token_sent_at: new Date().toISOString() }).eq('id', order.id);
   await admin.from('token_deliveries').insert({
     phone: order.user_phone, replay_id: order.replay_id, replay_title: order.item_title,
     order_id: order.id, access_token: accessToken, link,
@@ -348,27 +325,28 @@ Deno.serve(async (req) => {
   const showTpl = sm.get('wa_show_template') ||
     '🔐 *TOKEN LIVE SATUAN*\n\n🎤 *{title}*\n\n📅 {date}\n\n🔗 *Link Live:*\n{live_link}\n\n🎬 *Link Replay:* {site}\n\n{password_line}👤 Hanya untuk *1 perangkat pertama*.\n\n— *ReplayTime* 💖';
 
-  // Pull recent pending orders plus paid orders whose WhatsApp delivery failed.
-  // Pakasir dynamic QRIS payments can be paid hours after creation; we keep
-  // a wide window so even users who close the dialog still get their token.
-  const since = new Date(Date.now() - 7 * 24 * 3600_000).toISOString();
-  const { data: orders, error } = await admin
-    .from('orders')
-    .select('*')
-    .or('status.eq.pending,and(status.eq.paid,token_sent_at.is.null)')
-    .gte('created_at', since)
-    .order('created_at', { ascending: false })
-    .limit(250);
-  console.log(`[poll] scanning ${orders?.length ?? 0} pending orders since ${since}`);
-
-  if (error) {
-    return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: corsHeaders });
-  }
+  // Prioritize confirmed-paid orders that still need WA, then fresh pending QRIS.
+  // This avoids long scans of old unpaid orders that were causing function timeouts.
+  const pendingSince = new Date(Date.now() - 2 * 24 * 3600_000).toISOString();
+  const unsentSince = new Date(Date.now() - 30 * 24 * 3600_000).toISOString();
+  const [{ data: paidUnsent, error: paidErr }, { data: pendingOrders, error: pendingErr }] = await Promise.all([
+    admin.from('orders').select('*').eq('status', 'paid').gte('created_at', unsentSince).order('paid_at', { ascending: false }).limit(2),
+    admin.from('orders').select('*').eq('status', 'pending').gte('created_at', pendingSince).order('created_at', { ascending: false }).limit(2),
+  ]);
+  const error = paidErr || pendingErr;
+  if (error) return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: corsHeaders });
+  const seen = new Set<string>();
+  const orders = [...(paidUnsent ?? []), ...(pendingOrders ?? [])].filter((o) => !seen.has(o.id) && seen.add(o.id));
+  console.log(`[poll] scanning ${orders.length} orders (${paidUnsent?.length ?? 0} paid-unsent, ${pendingOrders?.length ?? 0} pending)`);
 
   const results: any[] = [];
-  const freshPending: any[] = [];
-  const freshCutoff = Date.now() - 30 * 60_000; // 30 min
+  const startedAt = Date.now();
+  const TIME_BUDGET_MS = 45_000;
   for (const o of orders ?? []) {
+    if (Date.now() - startedAt > TIME_BUDGET_MS) {
+      results.push({ skipped: 'time_budget_reached' });
+      break;
+    }
     if (o.status === 'paid' && o.token_sent_at && await hasSentWa(admin, o.id)) {
       results.push({ id: o.id, skipped: 'already_delivered' });
       continue;
@@ -376,34 +354,10 @@ Deno.serve(async (req) => {
     try {
       const r = await processOrder(admin, o, apiKey, slug, origin, tpl, showTpl);
       results.push(r);
-      // Track fresh-still-pending orders for fast-lane rescan within this same invocation.
-      if (r?.status === 'pending' && new Date(o.created_at).getTime() >= freshCutoff) {
-        freshPending.push(o);
-      }
     } catch (e) {
       results.push({ id: o.id, error: String(e) });
     }
   }
-
-  // Fast-lane fallback: when the Pakasir webhook does not arrive, do two extra
-  // polls of fresh (<30 min old) still-pending orders inside this same invocation
-  // at +20s and +40s. Combined with the per-minute cron this gives ~20s effective
-  // detection latency for new payments without needing sub-minute cron support.
-  const fastLane = (async () => {
-    if (freshPending.length === 0) return;
-    for (const delay of [20_000, 20_000]) {
-      await new Promise((r) => setTimeout(r, delay));
-      const ids = freshPending.map((o) => o.id);
-      const { data: refreshed } = await admin
-        .from('orders').select('*').in('id', ids).eq('status', 'pending');
-      if (!refreshed?.length) return;
-      for (const o of refreshed) {
-        try { await processOrder(admin, o, apiKey, slug, origin, tpl, showTpl); } catch { /* keep going */ }
-      }
-    }
-  })();
-  const runtime = (globalThis as unknown as { EdgeRuntime?: { waitUntil?: (p: Promise<unknown>) => void } }).EdgeRuntime;
-  if (runtime?.waitUntil) runtime.waitUntil(fastLane); else fastLane.catch(() => {});
 
   // === MEMBERSHIP ORDERS (reserved QRIS yang webhook-nya tidak sampai) ===
   // Bila sudah terbayar di Pakasir → finalize + kirim WA. Idempotent.
@@ -412,7 +366,7 @@ Deno.serve(async (req) => {
   // - Maks 5 percobaan pengiriman WA per order.
   // - Backoff bertingkat (menit sejak last attempt): 1, 5, 15, 60, 360.
   // - Dedup: jika order sudah punya token & wa_sent_at, skip.
-  const MAX_WA_ATTEMPTS = 5;
+  const MAX_WA_ATTEMPTS = 3;
   const BACKOFF_MIN = [0, 1, 5, 15, 60, 360]; // index = attempts done
   const memResults: any[] = [];
   try {
@@ -424,8 +378,8 @@ Deno.serve(async (req) => {
       .in('status', ['reserved', 'paid'])
       .eq('kind', 'qris')
       .not('pakasir_order_id', 'is', null)
-      .gte('created_at', since)
-      .order('created_at', { ascending: false }).limit(100);
+      .gte('created_at', pendingSince)
+      .order('created_at', { ascending: false }).limit(1);
     for (const mo of mOrders ?? []) {
       try {
         // Skip jika sudah punya token & WA sudah pernah sukses (idempotent guard).
@@ -518,7 +472,7 @@ Deno.serve(async (req) => {
   }
 
 
-  return new Response(JSON.stringify({ ok: true, scanned: results.length, fast_lane: freshPending.length, membership: memResults.length, results, membership_results: memResults }), {
+  return new Response(JSON.stringify({ ok: true, scanned: results.length, membership: memResults.length, results, membership_results: memResults }), {
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });
 });

@@ -43,6 +43,7 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
   const [totalPayment, setTotalPayment] = useState<number>(0);
   const [pakasirOrderId, setPakasirOrderId] = useState<string>('');
   const [accessToken, setAccessToken] = useState<string>('');
+  const [waSent, setWaSent] = useState<boolean | null>(null);
   const [createdAt, setCreatedAt] = useState<number>(0);
   const [now, setNow] = useState(Date.now());
   const [lastChecked, setLastChecked] = useState<number>(0);
@@ -106,6 +107,7 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
       setQrUrl(''); setQrString(''); setQrDataUrl(''); setTotalPayment(0);
       setPakasirOrderId('');
       setAccessToken('');
+      setWaSent(null);
       setCreatedAt(0);
       try { channelRef.current && supabase.removeChannel(channelRef.current); } catch { /* ignore */ }
       channelRef.current = null;
@@ -142,7 +144,7 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
       .channel(`order-${orderId}`)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders', filter: `id=eq.${orderId}` }, (payload: any) => {
         const row = payload?.new;
-        if (row?.status === 'paid') {
+        if (row?.status === 'paid' && row?.access_token) {
           const tok = row.access_token || '';
           setAccessToken(tok);
           persistPaid(tok);
@@ -169,6 +171,7 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
         const c = chk as any;
         if (c?.status === 'paid' && c?.access_token) {
           setAccessToken(c.access_token);
+          setWaSent(typeof c.sent === 'boolean' ? c.sent : null);
           persistPaid(c.access_token);
           setStatus('paid');
         }
@@ -266,6 +269,7 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
       const r = data as any;
       if (!r?.ok) throw new Error(r?.error || 'Gagal memproses pembelian');
       setAccessToken(r.access_token || '');
+      setWaSent(typeof r.sent === 'boolean' ? r.sent : null);
       persistPaid(r.access_token || '');
       setCoinBalance(r.new_balance ?? Math.max(0, coinBalance - coinPrice));
       setStatus('paid');
@@ -289,6 +293,16 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
 
   const copyToken = async () => {
     try { await navigator.clipboard.writeText(accessToken); toast.success('Token disalin'); } catch { /* ignore */ }
+  };
+
+  const accessLink = accessToken
+    ? (kind === 'show' && showId && !replayId
+      ? `${window.location.origin}/live?show=${showId}&t=${accessToken}`
+      : `${window.location.origin}/akses?token=${accessToken}${replayId ? `&replay=${replayId}` : ''}`)
+    : '';
+
+  const copyLink = async () => {
+    try { await navigator.clipboard.writeText(accessLink); toast.success('Link disalin'); } catch { /* ignore */ }
   };
 
   return (
@@ -426,11 +440,18 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
             <div className="flex flex-col items-center gap-2">
               <CheckCircle2 className="w-12 h-12 text-green-500" />
               <p className="text-base font-semibold text-foreground">Pembayaran Berhasil!</p>
-              <p className="text-xs text-muted-foreground text-center">Token akses sudah dikirim via WhatsApp ke nomor Anda.</p>
+              <p className="text-xs text-muted-foreground text-center">
+                {waSent === false ? 'WhatsApp sedang lambat, gunakan link akses di bawah ini.' : 'Token akses dikirim via WhatsApp dan juga tersedia di bawah ini.'}
+              </p>
             </div>
             {accessToken && (
               <div className="rounded-md border border-border bg-card p-3 space-y-2">
-                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Token Anda</div>
+                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Link akses Anda</div>
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 text-xs font-mono break-all">{accessLink}</code>
+                  <Button size="sm" variant="outline" onClick={copyLink}><Copy className="w-3.5 h-3.5" /></Button>
+                </div>
+                <div className="text-[10px] uppercase tracking-wider text-muted-foreground pt-1">Token</div>
                 <div className="flex items-center gap-2">
                   <code className="flex-1 text-xs font-mono break-all">{accessToken}</code>
                   <Button size="sm" variant="outline" onClick={copyToken}><Copy className="w-3.5 h-3.5" /></Button>
