@@ -25,6 +25,11 @@ const ChatFallback = () => (
     <Loader2 className="w-6 h-6 text-primary animate-spin" />
   </div>
 );
+const ChatIdle = () => (
+  <div className="rounded-2xl bg-card/60 border border-border h-[42vh] min-h-[260px] flex items-center justify-center">
+    <span className="text-xs text-muted-foreground">Live Chat</span>
+  </div>
+);
 
 type SrcType = 'm3u8' | 'youtube' | 'cloudflare';
 interface PublicSource { label: string; type: SrcType }
@@ -144,6 +149,7 @@ export default function Live() {
     try { return Math.max(0, Number(sessionStorage.getItem(SS_SRC_KEY) || '0')); } catch { return 0; }
   });
   const playerRef = useRef<HlsPlayerHandle | null>(null);
+  const chatHostRef = useRef<HTMLDivElement | null>(null);
   const [pipActive, setPipActive] = useState(false);
   const handlePipChange = useCallback((active: boolean) => setPipActive(active), []);
 
@@ -156,6 +162,14 @@ export default function Live() {
     const downlink = typeof conn?.downlink === 'number' ? conn.downlink : 99;
     return /^(slow-2g|2g|3g)$/i.test(effective) || downlink < 1.5 || conn?.saveData === true;
   }, []);
+
+  const playbackPriorityMode = useMemo(() => {
+    if (typeof navigator === 'undefined' || typeof window === 'undefined') return false;
+    const mem = (navigator as Navigator & { deviceMemory?: number }).deviceMemory || 4;
+    const mobileOrTv = /Mobi|Android|iPhone|iPad|SmartTV|Tizen|Web0S|NetCast|Roku|AFT/i.test(navigator.userAgent || '');
+    const coarsePointer = window.matchMedia?.('(pointer: coarse)').matches === true;
+    return isWeakNetwork || mem <= 2 || mobileOrTv || coarsePointer;
+  }, [isWeakNetwork]);
 
   const fetchStatus = () => {
     if (showId) {
@@ -625,12 +639,30 @@ export default function Live() {
   const liveActive = !!(status?.enabled || unlocked?.enabled);
 
   useEffect(() => {
-    // Mount chat segera setelah unlock berhasil (tidak perlu menunggu live aktif),
-    // dengan delay agar player tetap mendapat prioritas resource saat ON AIR.
+    // Chat realtime dimuat hanya saat area chat mendekati layar agar bandwidth/CPU tetap diprioritaskan ke player.
     if (!unlocked) { setChatReady(false); return; }
-    const delay = window.setTimeout(() => setChatReady(true), liveActive ? (isWeakNetwork ? 9000 : 5000) : 900);
-    return () => window.clearTimeout(delay);
-  }, [unlocked, liveActive, isWeakNetwork]);
+    if (!liveActive) {
+      const delay = window.setTimeout(() => setChatReady(true), 1200);
+      return () => window.clearTimeout(delay);
+    }
+    const node = chatHostRef.current;
+    if (!node) return;
+    let delay: number | null = null;
+    if (typeof IntersectionObserver === 'undefined') {
+      delay = window.setTimeout(() => setChatReady(true), playbackPriorityMode ? 60000 : 30000);
+      return () => { if (delay) window.clearTimeout(delay); };
+    }
+    const observer = new IntersectionObserver((entries) => {
+      if (!entries.some(entry => entry.isIntersecting)) return;
+      delay = window.setTimeout(() => setChatReady(true), playbackPriorityMode ? 5000 : 1200);
+      observer.disconnect();
+    }, { rootMargin: '240px 0px' });
+    observer.observe(node);
+    return () => {
+      observer.disconnect();
+      if (delay) window.clearTimeout(delay);
+    };
+  }, [unlocked, liveActive, playbackPriorityMode]);
 
   // ============ VIEWER COUNTER (presence) — count unique browser_id ============
   // Heavily throttled to stay light at 1000+ concurrent viewers. Each sync/join/leave
@@ -639,7 +671,7 @@ export default function Live() {
   const showKey = search.get('show') || 'global';
   const [viewerCount, setViewerCount] = useState<number | null>(null);
   useEffect(() => {
-    if (!liveActive || isWeakNetwork) { setViewerCount(null); return; }
+    if (!liveActive || playbackPriorityMode) { setViewerCount(null); return; }
     const bid = getBrowserId();
     const channel = supabase.channel(`live-viewers:${showKey}`, {
       config: { presence: { key: bid } },
@@ -686,7 +718,7 @@ export default function Live() {
       try { void channel.untrack(); } catch { /* ignore */ }
       supabase.removeChannel(channel);
     };
-  }, [liveActive, showKey, isWeakNetwork]);
+  }, [liveActive, showKey, playbackPriorityMode]);
 
   return (
     <div className="min-h-screen bg-background relative z-10">
@@ -879,11 +911,13 @@ export default function Live() {
             </div>
 
             {/* LIVE CHAT */}
-            {chatReady ? (
-              <Suspense fallback={<ChatFallback />}>
-                <LiveChat lite={isWeakNetwork} />
-              </Suspense>
-            ) : <ChatFallback />}
+            <div ref={chatHostRef}>
+              {chatReady ? (
+                <Suspense fallback={<ChatFallback />}>
+                  <LiveChat lite={playbackPriorityMode} />
+                </Suspense>
+              ) : <ChatIdle />}
+            </div>
           </>
         )}
       </div>

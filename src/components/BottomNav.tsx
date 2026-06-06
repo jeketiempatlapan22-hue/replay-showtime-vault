@@ -7,6 +7,14 @@ import { cn } from '@/lib/utils';
 
 export default function BottomNav() {
   const location = useLocation();
+
+  // Hide before mounting auth/balance listeners on immersive routes.
+  if (/^\/(adpan|auth|live)/.test(location.pathname)) return null;
+
+  return <BottomNavContent locationPath={location.pathname} />;
+}
+
+function BottomNavContent({ locationPath }: { locationPath: string }) {
   const { user } = useAuth();
   const [balance, setBalance] = useState<number | null>(null);
 
@@ -26,9 +34,6 @@ export default function BottomNav() {
     return () => { mounted = false; supabase.removeChannel(ch); window.removeEventListener('focus', refresh); };
   }, [user]);
 
-  // Hide on admin/auth/live (immersive) routes
-  if (/^\/(adpan|auth|live)/.test(location.pathname)) return null;
-
   const items = [
     { to: '/', label: 'Beranda', Icon: Home, match: (p: string) => p === '/' },
     { to: '/shows', label: 'Shows', Icon: Tv, match: (p: string) => p.startsWith('/shows') || p.startsWith('/show') },
@@ -40,7 +45,7 @@ export default function BottomNav() {
     <nav className="fixed bottom-0 inset-x-0 z-30 md:hidden bg-card/95 backdrop-blur border-t border-border pb-[env(safe-area-inset-bottom)]">
       <div className="grid grid-cols-4">
         {items.map(({ to, label, Icon, match }) => {
-          const active = match(location.pathname);
+          const active = match(locationPath);
           return (
             <Link
               key={label}
