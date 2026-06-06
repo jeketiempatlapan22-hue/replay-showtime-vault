@@ -453,6 +453,9 @@ Deno.serve(async (req) => {
           .replace(/\{replay_info\}/g, tok.replay_info || '')
           .replace(/\{replay_info_block\}/g, tok.replay_info ? `🎬 *Info Replay:*\n${tok.replay_info}\n\n` : '')
           .replace(/\{site\}/g, origin.replace(/^https?:\/\//, ''));
+        if (await shouldDelayWaRetry(admin, mo.id)) {
+          memResults.push({ id: mo.id, finalized: !mo.membership_token_id, skipped: 'wa_retry_backoff' }); continue;
+        }
         const sent = await sendFonnte(mo.phone, msg);
         const nowIso = new Date().toISOString();
         await admin.from('membership_orders').update({
