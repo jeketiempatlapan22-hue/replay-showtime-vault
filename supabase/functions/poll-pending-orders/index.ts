@@ -366,7 +366,7 @@ Deno.serve(async (req) => {
   // - Maks 5 percobaan pengiriman WA per order.
   // - Backoff bertingkat (menit sejak last attempt): 1, 5, 15, 60, 360.
   // - Dedup: jika order sudah punya token & wa_sent_at, skip.
-  const MAX_WA_ATTEMPTS = 5;
+  const MAX_WA_ATTEMPTS = 3;
   const BACKOFF_MIN = [0, 1, 5, 15, 60, 360]; // index = attempts done
   const memResults: any[] = [];
   try {
@@ -379,7 +379,7 @@ Deno.serve(async (req) => {
       .eq('kind', 'qris')
       .not('pakasir_order_id', 'is', null)
       .gte('created_at', since)
-      .order('created_at', { ascending: false }).limit(100);
+      .order('created_at', { ascending: false }).limit(3);
     for (const mo of mOrders ?? []) {
       try {
         // Skip jika sudah punya token & WA sudah pernah sukses (idempotent guard).
