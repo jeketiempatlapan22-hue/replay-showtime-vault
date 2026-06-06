@@ -494,7 +494,7 @@ Deno.serve(async (req) => {
       // Recheck the user's most recent pending order via Pakasir poller.
       const { data: lastOrder } = await admin
         .from('orders')
-        .select('id,status,token_sent_at,access_token,replay_id,show_id,item_title,pakasir_order_id')
+        .select('id,user_id,status,kind,token_sent_at,access_token,replay_id,show_id,item_title,pakasir_order_id')
         .eq('user_phone', phoneNorm)
         .order('created_at', { ascending: false })
         .limit(1)
