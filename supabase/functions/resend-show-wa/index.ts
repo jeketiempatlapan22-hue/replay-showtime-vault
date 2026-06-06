@@ -36,7 +36,7 @@ async function sendFonnteOnce(phone: string, message: string, timeoutMs: number)
 async function sendFonnte(phone: string, message: string) {
   // Fonnte kadang lambat (>10s). Coba 2x dengan timeout naik bertahap supaya
   // tidak "Signal timed out" prematurely di admin UI.
-  const attempts = [12000, 20000];
+  const attempts = [18000, 32000];
   let last: { ok: boolean; data: unknown } = { ok: false, data: { error: 'no_attempt' } };
   for (let i = 0; i < attempts.length; i++) {
     last = await sendFonnteOnce(phone, message, attempts[i]);
@@ -260,10 +260,13 @@ Deno.serve(async (req) => {
         if (sent.ok) {
           await admin.from('orders').update({ token_sent_at: new Date().toISOString() }).eq('id', order.id);
           if (order.kind !== 'coin_topup' && order.access_token) {
+            const link = order.show_id && !order.replay_id
+              ? `${(await admin.from('site_settings').select('value').eq('key', 'site_origin').maybeSingle()).data?.value || 'https://replaytime.lovable.app'}/live?show=${order.show_id}&t=${order.access_token}`
+              : `${(await admin.from('site_settings').select('value').eq('key', 'site_origin').maybeSingle()).data?.value || 'https://replaytime.lovable.app'}/akses?token=${order.access_token}${order.replay_id ? `&replay=${order.replay_id}` : ''}`;
             await admin.from('token_deliveries').insert({
               phone: order.user_phone, replay_id: order.replay_id, replay_title: order.item_title,
               order_id: order.id, access_token: order.access_token,
-              link: '', source: 'admin-resend', requested_by: 'resend-show-wa',
+              link, source: 'admin-resend', requested_by: 'resend-show-wa',
             });
           }
         }
