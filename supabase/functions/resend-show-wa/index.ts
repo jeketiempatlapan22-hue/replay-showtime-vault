@@ -267,7 +267,8 @@ Deno.serve(async (req) => {
           }
         }
         const message = await buildMessage(admin, order);
-        const sent = await sendFonnte(order.user_phone, message);
+        const paused = ids.length > 1 && await isFonntePaused(admin);
+        const sent = paused ? { ok: false, data: { error: 'fonnte_timeout_pause' } } : await sendFonnte(order.user_phone, message);
         await admin.from('wa_outbox').insert({
           phone: order.user_phone, message, status: sent.ok ? 'sent' : 'failed',
           error: sent.ok ? null : JSON.stringify(sent.data),
