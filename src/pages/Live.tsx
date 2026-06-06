@@ -334,6 +334,37 @@ export default function Live() {
     if (!silent) setSubmitting(false);
   };
 
+  const doSelfResetToken = async () => {
+    const tParam = search.get('t');
+    if (!tParam) return;
+    if (!confirm('Reset token ini? Perangkat lain yang sedang memakai token akan otomatis keluar, dan token hanya akan berlaku di perangkat ini.')) return;
+    setResetting(true);
+    try {
+      const { data } = await supabase.functions.invoke('show-token-self-reset', {
+        body: { token: tParam, browser_id: getBrowserId() },
+      });
+      if (data?.ok) {
+        setResetInfo({ remaining: Number(data.remaining || 0), max: Number(data.max || 3), eligible: Number(data.remaining || 0) > 0 });
+        setPwError('');
+        await doUnlock({ token: tParam });
+      } else {
+        const reason = data?.reason as string | undefined;
+        const msg = reason === 'multi_device_no_reset' ? 'Token multi-device tidak bisa direset manual.'
+          : reason === 'quota_exhausted' ? 'Kuota reset manual sudah habis. Hubungi admin untuk reset.'
+          : reason === 'single_use_no_reset' ? 'Token sekali pakai tidak bisa direset.'
+          : reason === 'expired' ? 'Token sudah kedaluwarsa.'
+          : reason === 'revoked' ? 'Token sudah dicabut.'
+          : 'Gagal reset token. Coba lagi atau hubungi admin.';
+        setPwError(msg);
+        setResetInfo({ remaining: Number(data?.remaining || 0), max: Number(data?.max || 0), eligible: false });
+      }
+    } catch {
+      setPwError('Gagal terhubung ke server saat reset token.');
+    }
+    setResetting(false);
+  };
+
+
   useEffect(() => {
     fetchStatus();
     const tParam = search.get('t');
