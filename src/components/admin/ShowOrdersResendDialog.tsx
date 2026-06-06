@@ -95,11 +95,16 @@ export default function ShowOrdersResendDialog({ open, onOpenChange, showId, sho
 
   const resendOne = async (id: string, shiftForce = false) => {
     const row = rows.find((r) => r.id === id);
-    if (row && row.status !== 'paid') {
-      toast({ title: 'Belum lunas', description: 'Token hanya bisa dikirim setelah pembayaran terverifikasi.', variant: 'destructive' });
+    if (row && row.kind === 'coin_topup' && row.status !== 'paid') {
+      toast({ title: 'Top-up koin butuh pembayaran nyata', variant: 'destructive' });
       return;
     }
-    const force = shiftForce;
+    // Untuk order belum lunas, admin wajib konfirmasi paksa kirim.
+    if (row && row.status !== 'paid') {
+      if (!confirm(`Order ini BELUM LUNAS.\nTetap PAKSA kirim token ke ${row.user_phone}?`)) return;
+    }
+    // Auto-force untuk order belum lunas atau saat Shift+klik.
+    const force = shiftForce || (row?.status !== 'paid');
     setSending((p) => ({ ...p, [id]: true }));
     const { data, error } = await supabase.functions.invoke('resend-show-wa', { body: { order_id: id, force } });
     setSending((p) => ({ ...p, [id]: false }));
