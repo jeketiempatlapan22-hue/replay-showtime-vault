@@ -109,7 +109,7 @@ async function sendFonnteOnce(phone: string, message: string, timeoutMs: number)
 // Cron berjalan tiap 30s — kita kasih waktu cukup untuk Fonnte lambat tapi
 // tetap hemat budget. 12s + retry 16s = max ~28s per pesan.
 async function sendFonnte(phone: string, message: string) {
-  const attempts = [12000, 16000];
+  const attempts = [18000, 26000];
   let last: { ok: boolean; data: unknown } = { ok: false, data: { error: 'no_attempt' } };
   for (let i = 0; i < attempts.length; i++) {
     last = await sendFonnteOnce(phone, message, attempts[i]);
@@ -122,6 +122,16 @@ async function hasSentWa(admin: ReturnType<typeof createClient>, orderId: string
   const { data } = await admin.from('wa_outbox')
     .select('id').eq('related_order_id', orderId).eq('status', 'sent').limit(1);
   return !!data?.length;
+}
+
+async function shouldDelayWaRetry(admin: ReturnType<typeof createClient>, orderId: string, windowMs = 4 * 60_000) {
+  const { data } = await admin.from('wa_outbox')
+    .select('status,created_at')
+    .eq('related_order_id', orderId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return data?.status === 'failed' && Date.now() - new Date(data.created_at).getTime() < windowMs;
 }
 
 const DEFAULT_WA_TPL =
@@ -169,6 +179,7 @@ async function processOrder(admin: ReturnType<typeof createClient>, order: any, 
       newBal = Number(row?.new_balance ?? 0);
     }
     const msg = `✅ *Top-up berhasil*\n+${order.coin_amount} koin sudah masuk.${newBal != null ? `\nSaldo sekarang: *${newBal}* koin` : ''}\n\nTerima kasih 💖 — *ReplayTime*`;
+    if (await shouldDelayWaRetry(admin, order.id)) return { id: order.id, status: 'paid', topup: true, skipped: 'wa_retry_backoff' };
     const sent = await sendFonnte(order.user_phone, msg);
     if (sent.ok) await admin.from('orders').update({ token_sent_at: new Date().toISOString() }).eq('id', order.id);
     await admin.from('wa_outbox').insert({
@@ -262,6 +273,7 @@ async function processOrder(admin: ReturnType<typeof createClient>, order: any, 
   }
 
 
+  if (await shouldDelayWaRetry(admin, order.id)) return { id: order.id, status: 'paid', skipped: 'wa_retry_backoff' };
   const sent = await sendFonnte(order.user_phone, message);
   if (sent.ok) await admin.from('orders').update({ token_sent_at: new Date().toISOString() }).eq('id', order.id);
   await admin.from('token_deliveries').insert({
@@ -368,7 +380,9 @@ Deno.serve(async (req) => {
   const MAX_WA_ATTEMPTS = 3;
   const BACKOFF_MIN = [0, 1, 5, 15, 60, 360]; // index = attempts done
   const memResults: any[] = [];
-  try {
+  if (Date.now() - startedAt > 10_000) {
+    memResults.push({ skipped: 'time_budget_reached' });
+  } else try {
     const memTpl = (await admin.from('site_settings').select('value').eq('key', 'wa_membership_template').maybeSingle())
       .data?.value ||
       '👑 *MEMBERSHIP AKTIF*\n\n📦 *{package_name}*\n📅 Berlaku hingga: {expires_at}\n\n🔗 *Link Akses:*\n{link}\n\n{replay_info_block}👤 Berlaku untuk *{max_devices} perangkat*.\n\n— *ReplayTime* 💖';
@@ -441,6 +455,9 @@ Deno.serve(async (req) => {
           .replace(/\{replay_info\}/g, tok.replay_info || '')
           .replace(/\{replay_info_block\}/g, tok.replay_info ? `🎬 *Info Replay:*\n${tok.replay_info}\n\n` : '')
           .replace(/\{site\}/g, origin.replace(/^https?:\/\//, ''));
+        if (await shouldDelayWaRetry(admin, mo.id)) {
+          memResults.push({ id: mo.id, finalized: !mo.membership_token_id, skipped: 'wa_retry_backoff' }); continue;
+        }
         const sent = await sendFonnte(mo.phone, msg);
         const nowIso = new Date().toISOString();
         await admin.from('membership_orders').update({

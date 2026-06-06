@@ -106,24 +106,24 @@ export default function ResellerAuditAdmin() {
 
   return (
     <>
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between gap-2">
-          <CardTitle className="text-base sm:text-lg flex items-center gap-2">
+      <Card className="overflow-hidden">
+        <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-3 sm:px-6">
+          <CardTitle className="text-base sm:text-lg flex items-center gap-2 leading-tight">
             <ClipboardList className="w-4 h-4" /> Riwayat Salin Link Reseller
           </CardTitle>
-          <div className="flex gap-1">
-            <Button size="sm" variant="outline" onClick={load} disabled={loading}>
+          <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1 sm:mx-0 sm:px-0 sm:pb-0">
+            <Button size="sm" variant="outline" className="shrink-0" onClick={load} disabled={loading}>
               <RefreshCw className={`w-4 h-4 mr-1 ${loading ? 'animate-spin' : ''}`} />Muat ulang
             </Button>
-            <Button size="sm" variant="outline" onClick={() => setPending({ type: 'reset_devices' })} disabled={loading || rows.length === 0} title="Lepaskan semua perangkat dari semua link reseller. Link tetap aktif.">
+            <Button size="sm" variant="outline" className="shrink-0" onClick={() => setPending({ type: 'reset_devices' })} disabled={loading || rows.length === 0} title="Lepaskan semua perangkat dari semua link reseller. Link tetap aktif.">
               <RotateCcw className="w-4 h-4 mr-1" />Reset device semua
             </Button>
-            <Button size="sm" variant="destructive" onClick={() => setPending({ type: 'clear_log' })} disabled={loading || rows.length === 0}>
+            <Button size="sm" variant="destructive" className="shrink-0" onClick={() => setPending({ type: 'clear_log' })} disabled={loading || rows.length === 0}>
               <Trash2 className="w-4 h-4 mr-1" />Hapus riwayat
             </Button>
           </div>
         </CardHeader>
-        <CardContent className="space-y-3">
+        <CardContent className="space-y-3 px-3 sm:px-6">
           <div className="relative">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <Input placeholder="Cari nomor / label / judul…" className="pl-9" value={q} onChange={(e) => setQ(e.target.value)} />
@@ -136,24 +136,24 @@ export default function ResellerAuditAdmin() {
           ) : (
             <div className="space-y-3">
               {grouped.map((g) => (
-                <div key={g.phone} className="border border-border rounded-lg bg-card/50 overflow-hidden">
-                  <div className="flex items-center justify-between gap-2 p-3 bg-secondary/30 border-b border-border flex-wrap">
+                <div key={g.phone} className="border border-border rounded-lg bg-card/50 overflow-hidden min-w-0">
+                  <div className="flex flex-col gap-2 p-3 bg-secondary/30 border-b border-border">
                     <div className="flex items-center gap-2 flex-wrap min-w-0">
-                      <span className="font-mono text-sm font-semibold">+{g.phone}</span>
+                      <span className="font-mono text-sm font-semibold truncate">+{g.phone}</span>
                       {g.label && <span className="text-xs text-muted-foreground">({g.label})</span>}
                       <Badge variant="secondary" className="text-[10px]">{g.total} link total</Badge>
                     </div>
-                    <div className="flex gap-1">
-                      <Button size="sm" variant="ghost" className="h-7 text-amber-600 hover:text-amber-600"
+                    <div className="grid grid-cols-2 sm:flex gap-1">
+                      <Button size="sm" variant="ghost" className="h-8 justify-start text-xs text-amber-600 hover:text-amber-600"
                         onClick={() => setPending({ type: 'exhaust', phone: g.phone, label: g.label })}>
                         <ShieldOff className="w-3.5 h-3.5 mr-1" />Habiskan link
                       </Button>
-                      <Button size="sm" variant="ghost" className="h-7 text-blue-600 hover:text-blue-600"
+                      <Button size="sm" variant="ghost" className="h-8 justify-start text-xs text-blue-600 hover:text-blue-600"
                         title="Lepaskan perangkat agar link bisa dipakai lagi"
                         onClick={() => setPending({ type: 'reset_devices', phone: g.phone, label: g.label })}>
                         <RotateCcw className="w-3.5 h-3.5 mr-1" />Reset device
                       </Button>
-                      <Button size="sm" variant="ghost" className="h-7 text-destructive hover:text-destructive"
+                      <Button size="sm" variant="ghost" className="h-8 justify-start text-xs text-destructive hover:text-destructive col-span-2 sm:col-span-1"
                         onClick={() => setPending({ type: 'clear_log', phone: g.phone, label: g.label })}>
                         <Trash2 className="w-3.5 h-3.5 mr-1" />Hapus riwayat
                       </Button>
@@ -163,13 +163,13 @@ export default function ResellerAuditAdmin() {
                     {g.items.map((it, i) => {
                       const kb = kindBadge[it.kind];
                       return (
-                        <div key={`${it.kind}-${it.target_id}-${i}`} className="flex items-center justify-between gap-2 px-2 py-1.5 rounded hover:bg-secondary/40">
+                        <div key={`${it.kind}-${it.target_id}-${i}`} className="flex items-center justify-between gap-2 px-2 py-1.5 rounded hover:bg-secondary/40 min-w-0">
                           <div className="flex items-center gap-2 min-w-0 flex-1">
                             <Badge variant="outline" className={`text-[10px] shrink-0 ${kb.cls}`}>{kb.label}</Badge>
                             <span className="text-sm truncate">{it.target_title || '—'}</span>
                           </div>
-                          <div className="flex items-center gap-2 shrink-0">
-                            <span className="text-[10px] text-muted-foreground">{fmtDate(it.last_copied)}</span>
+                          <div className="flex items-center gap-1.5 shrink-0 max-w-[45%] sm:max-w-none">
+                            <span className="hidden min-[380px]:inline text-[10px] text-muted-foreground truncate">{fmtDate(it.last_copied)}</span>
                             <Badge className="text-[11px] font-semibold">{it.copies} link</Badge>
                           </div>
                         </div>

@@ -44,24 +44,30 @@ async function sendFonnte(phone: string, message: string, inboxId = ''): Promise
     if (withInbox && /^\d+$/.test(inboxId)) form.append('inboxid', inboxId);
     return form;
   };
-  try {
-    let res = await fetch('https://api.fonnte.com/send', {
-      method: 'POST', headers: { Authorization: token }, body: buildForm(true), signal: AbortSignal.timeout(7000),
-    });
-    let data = await res.json().catch(() => ({}));
-    let ok = res.ok && (data as { status?: boolean })?.status !== false;
-    const reason = String((data as { reason?: string })?.reason || '').toLowerCase();
-    if (!ok && inboxId && (reason.includes('inbox') || reason.includes('body'))) {
-      res = await fetch('https://api.fonnte.com/send', {
-        method: 'POST', headers: { Authorization: token }, body: buildForm(false), signal: AbortSignal.timeout(7000),
+  const timeouts = [18000, 32000];
+  let last: { ok: boolean; data?: unknown; error?: string } = { ok: false, error: 'no_attempt' };
+  for (const timeoutMs of timeouts) {
+    try {
+      let res = await fetch('https://api.fonnte.com/send', {
+        method: 'POST', headers: { Authorization: token }, body: buildForm(true), signal: AbortSignal.timeout(timeoutMs),
       });
-      data = await res.json().catch(() => ({}));
-      ok = res.ok && (data as { status?: boolean })?.status !== false;
+      let data = await res.json().catch(() => ({}));
+      let ok = res.ok && (data as { status?: boolean })?.status !== false;
+      const reason = String((data as { reason?: string })?.reason || '').toLowerCase();
+      if (!ok && inboxId && (reason.includes('inbox') || reason.includes('body'))) {
+        res = await fetch('https://api.fonnte.com/send', {
+          method: 'POST', headers: { Authorization: token }, body: buildForm(false), signal: AbortSignal.timeout(timeoutMs),
+        });
+        data = await res.json().catch(() => ({}));
+        ok = res.ok && (data as { status?: boolean })?.status !== false;
+      }
+      last = { ok, data, error: ok ? undefined : JSON.stringify(data) };
+      if (ok) return last;
+    } catch (e) {
+      last = { ok: false, error: e instanceof Error ? e.message : 'send_failed' };
     }
-    return { ok, data, error: ok ? undefined : JSON.stringify(data) };
-  } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : 'send_failed' };
   }
+  return last;
 }
 
 function buildBaseUrl() {
@@ -272,17 +278,10 @@ Deno.serve(async (req) => {
     return json({ ok: false, reason: 'unauthorized' }, 401);
   }
 
-  // Optional shared-secret for production webhook calls. When FONNTE_WEBHOOK_SECRET
-  // is set, Fonnte must be configured to send it as the X-Webhook-Secret header.
-  // Falls back to "open" when secret unset (with a 7s rate limit per phone) for
-  // backward compatibility with existing Fonnte deployments.
-  if (!testMode) {
-    if (Deno.env.get('FONNTE_WEBHOOK_SECRET')) {
-      if (!hasValidWebhookSecret(req)) {
-        return new Response('ok', { headers: corsHeaders });
-      }
-    }
-  }
+  // Fonnte often cannot attach custom headers to incoming webhooks. Keep the
+  // secret check optional so the real WhatsApp webhook still replies; admin
+  // commands remain protected by the bot_admins phone whitelist below.
+  const webhookSecretOk = !Deno.env.get('FONNTE_WEBHOOK_SECRET') || hasValidWebhookSecret(req);
 
   // Fonnte sends as multipart/form-data, x-www-form-urlencoded, or json
   let phone = '', text = '', device = '', inboxId = '', fromMe = false, deliverTest = false, participant = '';
@@ -354,7 +353,7 @@ Deno.serve(async (req) => {
     inboxId,
     fromMe,
     eventName: 'received',
-    detail: participantNorm ? { participant: participantNorm, group_id: groupId || undefined } : {},
+    detail: { ...(participantNorm ? { participant: participantNorm, group_id: groupId || undefined } : {}), webhook_secret: webhookSecretOk ? 'ok' : 'missing' },
   });
 
   // Only process commands starting with '/' — silently ignore other chatter

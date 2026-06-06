@@ -39,6 +39,14 @@ export default function ShowOrdersResendDialog({ open, onOpenChange, showId, sho
   const [manualPhone, setManualPhone] = useState('');
   const [manualSending, setManualSending] = useState(false);
 
+  const stringifyError = (value: unknown) => {
+    if (!value) return '';
+    if (typeof value === 'string') return value;
+    try { return JSON.stringify(value); } catch { return String(value); }
+  };
+
+  const isFonnteTimeout = (value: unknown) => /timed out|TimeoutError|abort/i.test(stringifyError(value));
+
   const load = async () => {
     if (!showId) return;
     setLoading(true);
@@ -114,7 +122,8 @@ export default function ShowOrdersResendDialog({ open, onOpenChange, showId, sho
     else if (r?.skipped === 'already_sent') toast({ title: 'Sudah terkirim sebelumnya', description: 'Shift+klik untuk paksa kirim ulang.' });
     else if (r?.skipped === 'topup_needs_payment') toast({ title: 'Top-up koin butuh pembayaran nyata', variant: 'destructive' });
     else if (r?.skipped) toast({ title: `Dilewati: ${r.skipped}`, variant: 'destructive' });
-    else toast({ title: 'Gagal kirim', description: r?.error || 'unknown', variant: 'destructive' });
+    else if (isFonnteTimeout(r?.error)) toast({ title: 'WhatsApp lambat merespons', description: 'Token sudah dibuat. Coba kirim ulang beberapa detik lagi bila belum masuk.', variant: 'default' });
+    else toast({ title: 'Gagal kirim', description: stringifyError(r?.error) || 'unknown', variant: 'destructive' });
     void load();
   };
 
@@ -160,8 +169,8 @@ export default function ShowOrdersResendDialog({ open, onOpenChange, showId, sho
       setManualPhone('');
       void load();
     } else {
-      const errStr = String(d?.error || '');
-      const isTimeout = /timed out|TimeoutError|abort/i.test(errStr);
+      const errStr = stringifyError(d?.error || '');
+      const isTimeout = isFonnteTimeout(errStr);
       toast({
         title: isTimeout ? 'WhatsApp lambat merespons' : 'Gagal kirim',
         description: isTimeout
