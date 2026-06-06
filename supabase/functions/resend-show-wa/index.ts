@@ -27,14 +27,16 @@ async function sendFonnteOnce(phone: string, message: string) {
   try {
     const res = await fetch('https://api.fonnte.com/send', {
       method: 'POST', headers: { Authorization: tok }, body: form,
-      signal: AbortSignal.timeout(8000),
+      signal: AbortSignal.timeout(15000),
     });
     const data = await res.json().catch(() => ({}));
     return { ok: res.ok && (data as { status?: boolean })?.status !== false, data };
   } catch (e) { return { ok: false, data: { error: String(e) } }; }
 }
 async function sendFonnte(phone: string, message: string) {
-  const delays = [0, 1000, 3000];
+  // Satu percobaan per request admin agar Edge Function tidak timeout.
+  // Retry berikutnya ditangani oleh tombol admin / poller otomatis.
+  const delays = [0];
   let last: { ok: boolean; data: unknown } = { ok: false, data: { error: 'no_attempt' } };
   for (let i = 0; i < delays.length; i++) {
     if (delays[i]) await new Promise((r) => setTimeout(r, delays[i]));
