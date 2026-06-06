@@ -332,6 +332,10 @@ Deno.serve(async (req) => {
   const freshPending: any[] = [];
   const freshCutoff = Date.now() - 30 * 60_000; // 30 min
   for (const o of orders ?? []) {
+    if (o.status === 'paid' && o.token_sent_at && await hasSentWa(admin, o.id)) {
+      results.push({ id: o.id, skipped: 'already_delivered' });
+      continue;
+    }
     try {
       const r = await processOrder(admin, o, apiKey, slug, origin, tpl, showTpl);
       results.push(r);
