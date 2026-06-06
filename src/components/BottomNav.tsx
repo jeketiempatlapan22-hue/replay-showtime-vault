@@ -45,7 +45,7 @@ function BottomNavContent({ locationPath }: { locationPath: string }) {
     <nav className="fixed bottom-0 inset-x-0 z-30 md:hidden bg-card/95 backdrop-blur border-t border-border pb-[env(safe-area-inset-bottom)]">
       <div className="grid grid-cols-4">
         {items.map(({ to, label, Icon, match }) => {
-          const active = match(location.pathname);
+          const active = match(locationPath);
           return (
             <Link
               key={label}
