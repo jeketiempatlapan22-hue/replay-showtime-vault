@@ -163,13 +163,13 @@ export default function ResellerAuditAdmin() {
                     {g.items.map((it, i) => {
                       const kb = kindBadge[it.kind];
                       return (
-                        <div key={`${it.kind}-${it.target_id}-${i}`} className="flex items-center justify-between gap-2 px-2 py-1.5 rounded hover:bg-secondary/40">
+                        <div key={`${it.kind}-${it.target_id}-${i}`} className="flex items-center justify-between gap-2 px-2 py-1.5 rounded hover:bg-secondary/40 min-w-0">
                           <div className="flex items-center gap-2 min-w-0 flex-1">
                             <Badge variant="outline" className={`text-[10px] shrink-0 ${kb.cls}`}>{kb.label}</Badge>
                             <span className="text-sm truncate">{it.target_title || '—'}</span>
                           </div>
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            <span className="text-[10px] text-muted-foreground">{fmtDate(it.last_copied)}</span>
+                          <div className="flex items-center gap-1.5 shrink-0 max-w-[45%] sm:max-w-none">
+                            <span className="hidden xs:inline text-[10px] text-muted-foreground truncate">{fmtDate(it.last_copied)}</span>
                             <Badge className="text-[11px] font-semibold">{it.copies} link</Badge>
                           </div>
                         </div>
