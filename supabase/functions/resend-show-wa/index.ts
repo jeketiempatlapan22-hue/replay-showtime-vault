@@ -189,8 +189,7 @@ Deno.serve(async (req) => {
         user_phone: phone, item_title: show.title, access_token: newTok,
       } as any;
       const message = await buildMessage(admin, pseudoOrder);
-      const paused = await isFonntePaused(admin);
-      const sent = paused ? { ok: false, data: { error: 'fonnte_timeout_pause' } } : await sendFonnte(phone, message);
+      const sent = await sendFonnte(phone, message);
       await admin.from('wa_outbox').insert({
         phone, message, status: sent.ok ? 'sent' : 'failed',
         error: sent.ok ? null : JSON.stringify(sent.data),
@@ -268,8 +267,7 @@ Deno.serve(async (req) => {
           }
         }
         const message = await buildMessage(admin, order);
-        const paused = await isFonntePaused(admin);
-        const sent = paused ? { ok: false, data: { error: 'fonnte_timeout_pause' } } : await sendFonnte(order.user_phone, message);
+        const sent = await sendFonnte(order.user_phone, message);
         await admin.from('wa_outbox').insert({
           phone: order.user_phone, message, status: sent.ok ? 'sent' : 'failed',
           error: sent.ok ? null : JSON.stringify(sent.data),
