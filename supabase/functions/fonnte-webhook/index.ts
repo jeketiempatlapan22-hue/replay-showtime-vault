@@ -44,24 +44,30 @@ async function sendFonnte(phone: string, message: string, inboxId = ''): Promise
     if (withInbox && /^\d+$/.test(inboxId)) form.append('inboxid', inboxId);
     return form;
   };
-  try {
-    let res = await fetch('https://api.fonnte.com/send', {
-      method: 'POST', headers: { Authorization: token }, body: buildForm(true), signal: AbortSignal.timeout(7000),
-    });
-    let data = await res.json().catch(() => ({}));
-    let ok = res.ok && (data as { status?: boolean })?.status !== false;
-    const reason = String((data as { reason?: string })?.reason || '').toLowerCase();
-    if (!ok && inboxId && (reason.includes('inbox') || reason.includes('body'))) {
-      res = await fetch('https://api.fonnte.com/send', {
-        method: 'POST', headers: { Authorization: token }, body: buildForm(false), signal: AbortSignal.timeout(7000),
+  const timeouts = [18000, 32000];
+  let last: { ok: boolean; data?: unknown; error?: string } = { ok: false, error: 'no_attempt' };
+  for (const timeoutMs of timeouts) {
+    try {
+      let res = await fetch('https://api.fonnte.com/send', {
+        method: 'POST', headers: { Authorization: token }, body: buildForm(true), signal: AbortSignal.timeout(timeoutMs),
       });
-      data = await res.json().catch(() => ({}));
-      ok = res.ok && (data as { status?: boolean })?.status !== false;
+      let data = await res.json().catch(() => ({}));
+      let ok = res.ok && (data as { status?: boolean })?.status !== false;
+      const reason = String((data as { reason?: string })?.reason || '').toLowerCase();
+      if (!ok && inboxId && (reason.includes('inbox') || reason.includes('body'))) {
+        res = await fetch('https://api.fonnte.com/send', {
+          method: 'POST', headers: { Authorization: token }, body: buildForm(false), signal: AbortSignal.timeout(timeoutMs),
+        });
+        data = await res.json().catch(() => ({}));
+        ok = res.ok && (data as { status?: boolean })?.status !== false;
+      }
+      last = { ok, data, error: ok ? undefined : JSON.stringify(data) };
+      if (ok) return last;
+    } catch (e) {
+      last = { ok: false, error: e instanceof Error ? e.message : 'send_failed' };
     }
-    return { ok, data, error: ok ? undefined : JSON.stringify(data) };
-  } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : 'send_failed' };
   }
+  return last;
 }
 
 function buildBaseUrl() {
