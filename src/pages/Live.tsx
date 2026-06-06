@@ -136,6 +136,8 @@ export default function Live() {
   const [, setSubmitting] = useState(false);
   const [failedSourceKeys, setFailedSourceKeys] = useState<string[]>([]);
   const [tokenInfo, setTokenInfo] = useState<{ kind: string; max_devices: number } | null>(null);
+  const [resetInfo, setResetInfo] = useState<{ remaining: number; max: number; eligible: boolean } | null>(null);
+  const [resetting, setResetting] = useState(false);
   const [chatReady, setChatReady] = useState(false);
   const navVisible = useAutoHideOnInteraction(!!unlocked, 3000);
   const [sourceIdx, setSourceIdx] = useState<number>(() => {
