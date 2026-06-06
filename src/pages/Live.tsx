@@ -157,6 +157,14 @@ export default function Live() {
     return /^(slow-2g|2g|3g)$/i.test(effective) || downlink < 1.5 || conn?.saveData === true;
   }, []);
 
+  const playbackPriorityMode = useMemo(() => {
+    if (typeof navigator === 'undefined' || typeof window === 'undefined') return false;
+    const mem = (navigator as Navigator & { deviceMemory?: number }).deviceMemory || 4;
+    const mobileOrTv = /Mobi|Android|iPhone|iPad|SmartTV|Tizen|Web0S|NetCast|Roku|AFT/i.test(navigator.userAgent || '');
+    const coarsePointer = window.matchMedia?.('(pointer: coarse)').matches === true;
+    return isWeakNetwork || mem <= 2 || mobileOrTv || coarsePointer;
+  }, [isWeakNetwork]);
+
   const fetchStatus = () => {
     if (showId) {
       return supabase.from('active_shows')
@@ -628,9 +636,9 @@ export default function Live() {
     // Mount chat segera setelah unlock berhasil (tidak perlu menunggu live aktif),
     // dengan delay agar player tetap mendapat prioritas resource saat ON AIR.
     if (!unlocked) { setChatReady(false); return; }
-    const delay = window.setTimeout(() => setChatReady(true), liveActive ? (isWeakNetwork ? 9000 : 5000) : 900);
+    const delay = window.setTimeout(() => setChatReady(true), liveActive ? (playbackPriorityMode ? 45000 : 18000) : 1200);
     return () => window.clearTimeout(delay);
-  }, [unlocked, liveActive, isWeakNetwork]);
+  }, [unlocked, liveActive, playbackPriorityMode]);
 
   // ============ VIEWER COUNTER (presence) — count unique browser_id ============
   // Heavily throttled to stay light at 1000+ concurrent viewers. Each sync/join/leave
@@ -639,7 +647,7 @@ export default function Live() {
   const showKey = search.get('show') || 'global';
   const [viewerCount, setViewerCount] = useState<number | null>(null);
   useEffect(() => {
-    if (!liveActive || isWeakNetwork) { setViewerCount(null); return; }
+    if (!liveActive || playbackPriorityMode) { setViewerCount(null); return; }
     const bid = getBrowserId();
     const channel = supabase.channel(`live-viewers:${showKey}`, {
       config: { presence: { key: bid } },
@@ -686,7 +694,7 @@ export default function Live() {
       try { void channel.untrack(); } catch { /* ignore */ }
       supabase.removeChannel(channel);
     };
-  }, [liveActive, showKey, isWeakNetwork]);
+  }, [liveActive, showKey, playbackPriorityMode]);
 
   return (
     <div className="min-h-screen bg-background relative z-10">
