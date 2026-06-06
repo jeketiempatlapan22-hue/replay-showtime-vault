@@ -25,6 +25,11 @@ const ChatFallback = () => (
     <Loader2 className="w-6 h-6 text-primary animate-spin" />
   </div>
 );
+const ChatIdle = () => (
+  <div className="rounded-2xl bg-card/60 border border-border h-[42vh] min-h-[260px] flex items-center justify-center">
+    <span className="text-xs text-muted-foreground">Live Chat</span>
+  </div>
+);
 
 type SrcType = 'm3u8' | 'youtube' | 'cloudflare';
 interface PublicSource { label: string; type: SrcType }
@@ -144,6 +149,7 @@ export default function Live() {
     try { return Math.max(0, Number(sessionStorage.getItem(SS_SRC_KEY) || '0')); } catch { return 0; }
   });
   const playerRef = useRef<HlsPlayerHandle | null>(null);
+  const chatHostRef = useRef<HTMLDivElement | null>(null);
   const [pipActive, setPipActive] = useState(false);
   const handlePipChange = useCallback((active: boolean) => setPipActive(active), []);
 
@@ -633,11 +639,29 @@ export default function Live() {
   const liveActive = !!(status?.enabled || unlocked?.enabled);
 
   useEffect(() => {
-    // Mount chat segera setelah unlock berhasil (tidak perlu menunggu live aktif),
-    // dengan delay agar player tetap mendapat prioritas resource saat ON AIR.
+    // Chat realtime dimuat hanya saat area chat mendekati layar agar bandwidth/CPU tetap diprioritaskan ke player.
     if (!unlocked) { setChatReady(false); return; }
-    const delay = window.setTimeout(() => setChatReady(true), liveActive ? (playbackPriorityMode ? 45000 : 18000) : 1200);
-    return () => window.clearTimeout(delay);
+    if (!liveActive) {
+      const delay = window.setTimeout(() => setChatReady(true), 1200);
+      return () => window.clearTimeout(delay);
+    }
+    const node = chatHostRef.current;
+    if (!node) return;
+    let delay: number | null = null;
+    if (typeof IntersectionObserver === 'undefined') {
+      delay = window.setTimeout(() => setChatReady(true), playbackPriorityMode ? 60000 : 30000);
+      return () => { if (delay) window.clearTimeout(delay); };
+    }
+    const observer = new IntersectionObserver((entries) => {
+      if (!entries.some(entry => entry.isIntersecting)) return;
+      delay = window.setTimeout(() => setChatReady(true), playbackPriorityMode ? 5000 : 1200);
+      observer.disconnect();
+    }, { rootMargin: '240px 0px' });
+    observer.observe(node);
+    return () => {
+      observer.disconnect();
+      if (delay) window.clearTimeout(delay);
+    };
   }, [unlocked, liveActive, playbackPriorityMode]);
 
   // ============ VIEWER COUNTER (presence) — count unique browser_id ============
