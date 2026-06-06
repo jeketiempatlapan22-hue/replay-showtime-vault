@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHandle } from 'react';
 import Hls from 'hls.js';
-import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, RotateCcw, RotateCw, Loader2, Settings, Check } from 'lucide-react';
+import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, RotateCcw, RotateCw, Loader2, Settings, Check, Cast } from 'lucide-react';
 import { isFullscreenActive, onFullscreenChange, requestFs, exitFs } from '@/lib/fullscreen';
 import LiveWatermark from '@/components/LiveWatermark';
 
@@ -83,6 +83,8 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
   const [showQualityMenu, setShowQualityMenu] = useState(false);
   const [isLiveStream, setIsLiveStream] = useState(false);
   const [needsUnmute, setNeedsUnmute] = useState(false);
+  const [castSupported, setCastSupported] = useState(false);
+  const [castAvailable, setCastAvailable] = useState(false);
 
   // Expose PiP API to parent
   useImperativeHandle(ref, () => ({
@@ -117,6 +119,58 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
       video.removeEventListener('leavepictureinpicture', onLeave);
     };
   }, [onPipChange]);
+
+  // Deteksi dukungan AirPlay / Remote Playback (Cast) untuk TV / proyektor.
+  useEffect(() => {
+    const video = videoRef.current as (HTMLVideoElement & {
+      webkitShowPlaybackTargetPicker?: () => void;
+      remote?: { watchAvailability?: (cb: (avail: boolean) => void) => Promise<number>; cancelWatchAvailability?: (id: number) => Promise<void>; prompt?: () => Promise<void> };
+    }) | null;
+    if (!video) return;
+    const hasAirplay = typeof video.webkitShowPlaybackTargetPicker === 'function'
+      || (typeof (window as any).WebKitPlaybackTargetAvailabilityEvent !== 'undefined');
+    const hasRemote = !!video.remote && typeof video.remote.prompt === 'function';
+    setCastSupported(hasAirplay || hasRemote);
+    let watchId: number | null = null;
+    const onAirplayAvail = (e: Event & { availability?: string }) => {
+      setCastAvailable(e.availability === 'available');
+    };
+    if (hasAirplay) {
+      try { video.addEventListener('webkitplaybacktargetavailabilitychanged', onAirplayAvail as EventListener); } catch { /* ignore */ }
+      setCastAvailable(true); // tampilkan tombol; iOS akan menampilkan picker walau availability belum diketahui
+    }
+    if (hasRemote && video.remote?.watchAvailability) {
+      video.remote.watchAvailability((avail) => setCastAvailable(!!avail))
+        .then((id) => { watchId = id; })
+        .catch(() => { setCastAvailable(true); });
+    }
+    return () => {
+      if (hasAirplay) {
+        try { video.removeEventListener('webkitplaybacktargetavailabilitychanged', onAirplayAvail as EventListener); } catch { /* ignore */ }
+      }
+      if (hasRemote && watchId != null && video.remote?.cancelWatchAvailability) {
+        try { video.remote.cancelWatchAvailability(watchId); } catch { /* ignore */ }
+      }
+    };
+  }, [src]);
+
+  const showCastPicker = useCallback(() => {
+    const video = videoRef.current as (HTMLVideoElement & {
+      webkitShowPlaybackTargetPicker?: () => void;
+      remote?: { prompt?: () => Promise<void> };
+    }) | null;
+    if (!video) return;
+    try {
+      if (typeof video.webkitShowPlaybackTargetPicker === 'function') {
+        video.webkitShowPlaybackTargetPicker();
+        return;
+      }
+      if (video.remote?.prompt) {
+        void video.remote.prompt().catch(() => {});
+      }
+    } catch { /* ignore */ }
+  }, []);
+
 
   useEffect(() => {
     onFatalErrorRef.current = onFatalError;
@@ -162,8 +216,9 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
     video.volume = initialVolumeRef.current;
     video.muted = initialMutedRef.current;
     video.setAttribute('playsinline', 'true');
-    // Cegah tombol AirPlay/Cast browser memicu pause/interupsi yang tidak diinginkan
-    try { (video as HTMLVideoElement & { disableRemotePlayback?: boolean }).disableRemotePlayback = true; } catch { /* ignore */ }
+    // Aktifkan AirPlay / Cast bawaan browser supaya bisa dilempar ke TV / proyektor.
+    try { (video as HTMLVideoElement & { disableRemotePlayback?: boolean }).disableRemotePlayback = false; } catch { /* ignore */ }
+    try { video.setAttribute('x-webkit-airplay', 'allow'); } catch { /* ignore */ }
 
     const safePlay = () => {
       try {
@@ -893,6 +948,17 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
               </div>
             )}
 
+            {castSupported && castAvailable && (
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); showCastPicker(); resetHideTimer(); }}
+                className="p-2 text-white hover:text-primary transition-colors"
+                aria-label="Hubungkan ke TV / Proyektor (AirPlay / Cast)"
+                title="Hubungkan ke TV / Proyektor"
+              >
+                <Cast className="w-5 h-5" />
+              </button>
+            )}
             <button type="button" onClick={(e) => { e.stopPropagation(); toggleFullscreen(); resetHideTimer(); }} className="p-2 text-white hover:text-primary transition-colors" aria-label="Fullscreen">
               {isFullscreen ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
             </button>

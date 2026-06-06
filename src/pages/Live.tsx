@@ -136,6 +136,8 @@ export default function Live() {
   const [, setSubmitting] = useState(false);
   const [failedSourceKeys, setFailedSourceKeys] = useState<string[]>([]);
   const [tokenInfo, setTokenInfo] = useState<{ kind: string; max_devices: number } | null>(null);
+  const [resetInfo, setResetInfo] = useState<{ remaining: number; max: number; eligible: boolean } | null>(null);
+  const [resetting, setResetting] = useState(false);
   const [chatReady, setChatReady] = useState(false);
   const navVisible = useAutoHideOnInteraction(!!unlocked, 3000);
   const [sourceIdx, setSourceIdx] = useState<number>(() => {
@@ -305,13 +307,63 @@ export default function Live() {
         } else {
           setPwError(reasonMessage(data?.reason));
         }
+        // Untuk device_limit pada token show (?t=), cek apakah masih ada kuota reset manual.
+        if (data?.reason === 'device_limit') {
+          const tParam = search.get('t');
+          if (tParam) {
+            try {
+              const { data: peek } = await supabase.functions.invoke('show-token-self-reset', {
+                body: { token: tParam, browser_id: getBrowserId(), peek: true },
+              });
+              if (peek?.ok) {
+                setResetInfo({ remaining: Number(peek.remaining || 0), max: Number(peek.max || 3), eligible: true });
+              } else {
+                setResetInfo({ remaining: 0, max: 0, eligible: false });
+              }
+            } catch { setResetInfo(null); }
+          }
+        } else {
+          setResetInfo(null);
+        }
       }
+
 
     } catch {
       if (!silent) setPwError('Gagal terhubung ke server.');
     }
     if (!silent) setSubmitting(false);
   };
+
+  const doSelfResetToken = async () => {
+    const tParam = search.get('t');
+    if (!tParam) return;
+    if (!confirm('Reset token ini? Perangkat lain yang sedang memakai token akan otomatis keluar, dan token hanya akan berlaku di perangkat ini.')) return;
+    setResetting(true);
+    try {
+      const { data } = await supabase.functions.invoke('show-token-self-reset', {
+        body: { token: tParam, browser_id: getBrowserId() },
+      });
+      if (data?.ok) {
+        setResetInfo({ remaining: Number(data.remaining || 0), max: Number(data.max || 3), eligible: Number(data.remaining || 0) > 0 });
+        setPwError('');
+        await doUnlock({ token: tParam });
+      } else {
+        const reason = data?.reason as string | undefined;
+        const msg = reason === 'multi_device_no_reset' ? 'Token multi-device tidak bisa direset manual.'
+          : reason === 'quota_exhausted' ? 'Kuota reset manual sudah habis. Hubungi admin untuk reset.'
+          : reason === 'single_use_no_reset' ? 'Token sekali pakai tidak bisa direset.'
+          : reason === 'expired' ? 'Token sudah kedaluwarsa.'
+          : reason === 'revoked' ? 'Token sudah dicabut.'
+          : 'Gagal reset token. Coba lagi atau hubungi admin.';
+        setPwError(msg);
+        setResetInfo({ remaining: Number(data?.remaining || 0), max: Number(data?.max || 0), eligible: false });
+      }
+    } catch {
+      setPwError('Gagal terhubung ke server saat reset token.');
+    }
+    setResetting(false);
+  };
+
 
   useEffect(() => {
     fetchStatus();
@@ -666,8 +718,24 @@ export default function Live() {
             <div className="text-3xl">⚠️</div>
             <h2 className="text-base sm:text-lg font-bold text-foreground">Tidak bisa membuka live</h2>
             <p className="text-sm text-muted-foreground whitespace-pre-line">{pwError}</p>
+            {resetInfo?.eligible && resetInfo.remaining > 0 && (
+              <div className="rounded-xl border border-primary/40 bg-primary/10 p-3 text-left space-y-2">
+                <p className="text-xs sm:text-sm text-foreground">
+                  Anda bisa <b>mereset token</b> agar berpindah ke perangkat ini. Sisa kesempatan reset manual: <b>{resetInfo.remaining}/{resetInfo.max}</b>.
+                </p>
+                <p className="text-[11px] text-muted-foreground">
+                  Setelah reset, perangkat lama otomatis keluar dan token hanya berlaku di perangkat ini.
+                </p>
+                <Button size="sm" className="w-full" disabled={resetting} onClick={doSelfResetToken}>
+                  {resetting ? 'Mereset…' : `Reset token & pindah ke perangkat ini (sisa ${resetInfo.remaining})`}
+                </Button>
+              </div>
+            )}
+            {resetInfo && !resetInfo.eligible && resetInfo.max > 0 && (
+              <p className="text-[11px] text-muted-foreground italic">Kuota reset manual habis ({resetInfo.max}×). Hubungi admin untuk reset.</p>
+            )}
             <div className="flex flex-col sm:flex-row gap-2 pt-1">
-              <Button variant="outline" className="flex-1" onClick={() => { setPwError(''); const t = search.get('t'); const mt = search.get('mtoken'); const mp = search.get('mp') || search.get('mpassword') || ''; if (mt) void doUnlock({ mtoken: mt, mpassword: mp }); else if (t) void doUnlock({ token: t }); }}>
+              <Button variant="outline" className="flex-1" onClick={() => { setPwError(''); setResetInfo(null); const t = search.get('t'); const mt = search.get('mtoken'); const mp = search.get('mp') || search.get('mpassword') || ''; if (mt) void doUnlock({ mtoken: mt, mpassword: mp }); else if (t) void doUnlock({ token: t }); }}>
                 Coba lagi
               </Button>
               <Button variant="secondary" className="flex-1" onClick={() => navigate(`/kunci${showId ? `?show=${showId}` : ''}`)}>
@@ -676,6 +744,7 @@ export default function Live() {
               <Button className="flex-1" onClick={() => navigate('/')}>Kembali</Button>
             </div>
           </div>
+
         ) : !unlocked ? (
           // Initial unlock attempt in flight
           <div className="flex items-center justify-center py-20"><Loader2 className="w-10 h-10 text-primary animate-spin" /></div>

@@ -50,6 +50,8 @@ export type Database = {
           id: string
           kind: string
           label: string
+          manual_resets_max: number
+          manual_resets_used: number
           max_devices: number
           revoked: boolean
           show_id: string
@@ -64,6 +66,8 @@ export type Database = {
           id?: string
           kind?: string
           label?: string
+          manual_resets_max?: number
+          manual_resets_used?: number
           max_devices?: number
           revoked?: boolean
           show_id: string
@@ -78,6 +82,8 @@ export type Database = {
           id?: string
           kind?: string
           label?: string
+          manual_resets_max?: number
+          manual_resets_used?: number
           max_devices?: number
           revoked?: boolean
           show_id?: string
