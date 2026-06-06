@@ -948,6 +948,17 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
               </div>
             )}
 
+            {castSupported && castAvailable && (
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); showCastPicker(); resetHideTimer(); }}
+                className="p-2 text-white hover:text-primary transition-colors"
+                aria-label="Hubungkan ke TV / Proyektor (AirPlay / Cast)"
+                title="Hubungkan ke TV / Proyektor"
+              >
+                <Cast className="w-5 h-5" />
+              </button>
+            )}
             <button type="button" onClick={(e) => { e.stopPropagation(); toggleFullscreen(); resetHideTimer(); }} className="p-2 text-white hover:text-primary transition-colors" aria-label="Fullscreen">
               {isFullscreen ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
             </button>
