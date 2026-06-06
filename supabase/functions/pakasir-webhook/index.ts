@@ -76,7 +76,7 @@ async function ensurePurchaseToken(admin: ReturnType<typeof createClient>, order
   return newTok;
 }
 
-async function sendFonnteOnce(phone: string, message: string) {
+async function sendFonnteOnce(phone: string, message: string, timeoutMs: number) {
   const token = Deno.env.get('FONNTE_TOKEN');
   if (!token) return { ok: false, data: { error: 'no token' } };
   const form = new FormData();
@@ -86,7 +86,7 @@ async function sendFonnteOnce(phone: string, message: string) {
   try {
     const res = await fetch('https://api.fonnte.com/send', {
       method: 'POST', headers: { Authorization: token }, body: form,
-      signal: AbortSignal.timeout(6000),
+      signal: AbortSignal.timeout(timeoutMs),
     });
     const data = await res.json().catch(() => ({}));
     return { ok: res.ok && (data as { status?: boolean })?.status !== false, data };
@@ -95,13 +95,12 @@ async function sendFonnteOnce(phone: string, message: string) {
   }
 }
 
-// Keep webhook short; failed sends are retried by poller/admin resend.
+// Fonnte kadang lambat (>10s). Coba 2x supaya user benar-benar terima token.
 async function sendFonnte(phone: string, message: string) {
-  const delays = [0];
+  const attempts = [14000, 20000];
   let last: { ok: boolean; data: unknown } = { ok: false, data: { error: 'no_attempt' } };
-  for (let i = 0; i < delays.length; i++) {
-    if (delays[i]) await new Promise((r) => setTimeout(r, delays[i]));
-    last = await sendFonnteOnce(phone, message);
+  for (let i = 0; i < attempts.length; i++) {
+    last = await sendFonnteOnce(phone, message, attempts[i]);
     if (last.ok) return last;
   }
   return last;
