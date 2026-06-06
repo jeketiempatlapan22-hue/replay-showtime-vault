@@ -1715,6 +1715,13 @@ export type Database = {
         }[]
       }
       convert_show_to_replay: { Args: { _show_id: string }; Returns: string }
+      credit_coin_topup_order: {
+        Args: { _order_id: string }
+        Returns: {
+          already_credited: boolean
+          new_balance: number
+        }[]
+      }
       cron_clear_live_messages: { Args: never; Returns: undefined }
       debit_coins_for_purchase: {
         Args: {
