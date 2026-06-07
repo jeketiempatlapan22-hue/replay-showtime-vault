@@ -113,6 +113,7 @@ Deno.serve(async (req) => {
   if (error) return json({ error: 'create_failed', detail: error.message }, 500);
 
   const link = `${origin}/live?show=${s.id}&t=${token}`;
+  const livePw = s.live_password ? String(s.live_password) : '';
   const message = [
     '🔐 *TOKEN LIVE SATUAN*',
     '',
@@ -125,6 +126,7 @@ Deno.serve(async (req) => {
     '',
     '🎬 *Link Replay:*',
     siteOnly,
+    ...(livePw ? ['', `🔐 Sandi Replay: *${livePw}*`] : []),
     '',
     '👤 Hanya untuk *1 perangkat pertama* & hanya untuk show ini.',
     '',
