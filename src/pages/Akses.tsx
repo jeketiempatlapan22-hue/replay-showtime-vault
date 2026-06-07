@@ -5,6 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import ThemedBackground from '@/components/ThemedBackground';
+import DeviceResetButton from '@/components/DeviceResetButton';
+
 
 type ReplayLite = {
   id: string;
@@ -57,13 +59,9 @@ export default function Akses() {
     navigate(`/?token=${encodeURIComponent(token)}&replay=${replay.id}`);
   }, [replay, token, navigate]);
 
-  // Auto-open replay langsung setelah token tervalidasi
-  useEffect(() => {
-    if (replay && !loading && !error) {
-      const t = setTimeout(handleOpen, 600);
-      return () => clearTimeout(t);
-    }
-  }, [replay, loading, error, handleOpen]);
+  // Auto-open dinonaktifkan agar user punya waktu pakai tombol Reset Perangkat
+  // di panel ini sebelum masuk ke replay.
+
 
   return (
     <div className="relative min-h-screen overflow-hidden">
@@ -125,9 +123,13 @@ export default function Akses() {
                     Buka Replay
                   </Button>
 
+                  {/* Tombol reset perangkat untuk token ini */}
+                  <DeviceResetButton kind="show" token={token} />
+
                   <p className="text-[11px] text-center text-muted-foreground leading-relaxed">
                     🔒 Link ini bersifat pribadi. Jangan dibagikan ke orang lain.
                   </p>
+
                 </div>
               </>
             ) : null}
