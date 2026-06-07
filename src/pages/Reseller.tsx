@@ -436,12 +436,11 @@ function TokensPanel({ session }: { session: Session }) {
     setBusyId(row.audit_id);
     try {
       if (kind === 'revoke') {
-        const { data, error } = await (supabase.rpc as any)('reseller_revoke_token', {
+        const { data, error } = await (supabase.rpc as any)('reseller_reset_token_devices', {
           _phone: session.phone, _pin: session.pin, _audit_id: row.audit_id,
         });
         if (error) throw error;
-        if (!data) throw new Error('Link tidak ditemukan');
-        toast({ title: '✅ Link direset', description: 'Link sudah tidak bisa dipakai.' });
+        toast({ title: '🔄 Link direset', description: `${data ?? 0} perangkat dilepas. Link bisa dipakai lagi di perangkat lain; perangkat lama otomatis keluar.` });
       } else if (kind === 'block') {
         const { data, error } = await (supabase.rpc as any)('reseller_block_token', {
           _phone: session.phone, _pin: session.pin, _audit_id: row.audit_id,
