@@ -272,6 +272,12 @@ export default function ActiveShowCard({ show, index = 0 }: { show: ActiveShow; 
           );
         })()}
 
+        {/* Reset perangkat untuk token show satuan */}
+        {purchasedToken && (
+          <DeviceResetButton kind="show" token={purchasedToken} />
+        )}
+
+
         {/* Action buttons */}
         <div className="pt-2 space-y-2">
           {isLiveNow && (
