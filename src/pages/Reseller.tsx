@@ -508,7 +508,7 @@ function TokensPanel({ session }: { session: Session }) {
             </div>
           </div>
           <div className="grid grid-cols-3 gap-1">
-            <Button size="sm" variant="outline" disabled={r.revoked || busyId === r.audit_id}
+            <Button size="sm" variant="outline" disabled={busyId === r.audit_id}
               onClick={() => setConfirm({ kind: 'revoke', row: r })}>
               <ShieldOff className="w-3.5 h-3.5 mr-1" />Reset
             </Button>
