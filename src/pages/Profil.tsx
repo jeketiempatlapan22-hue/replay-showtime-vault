@@ -10,6 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { saveMembershipCredentials } from '@/lib/membershipAccess';
+import DeviceResetButton from '@/components/DeviceResetButton';
 
 interface MyMembership {
   order_id: string;
