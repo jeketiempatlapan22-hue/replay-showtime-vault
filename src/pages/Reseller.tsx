@@ -537,7 +537,7 @@ function TokensPanel({ session }: { session: Session }) {
                 ? <>Semua perangkat yang sudah membuka link <strong>{confirm.row.target_title}</strong> akan diblokir total dari website, dan link akan direset.</>
                 : confirm?.kind === 'delete'
                 ? <>Link <strong>{confirm.row.target_title}</strong> akan dihapus permanen dari riwayat & tidak bisa dipakai lagi. Tindakan tidak bisa dibatalkan.</>
-                : <>Link <strong>{confirm?.row.target_title}</strong> tidak akan bisa dipakai lagi. Tindakan tidak bisa dibatalkan.</>}
+                : <>Semua perangkat yang sedang memakai link <strong>{confirm?.row.target_title}</strong> akan dilepas & otomatis keluar. Link tetap aktif dan bisa dipakai lagi di perangkat lain.</>}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
