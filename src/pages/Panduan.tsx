@@ -13,6 +13,8 @@ import imgProjector from '@/assets/guide-projector.jpg';
 import imgRegister from '@/assets/guide-register.jpg';
 import imgCoin from '@/assets/guide-coin.jpg';
 import imgBuyShow from '@/assets/guide-buy-show.jpg';
+import imgLiveTv from '@/assets/guide-live-tv.jpg';
+import imgLiveProjector from '@/assets/guide-live-projector.jpg';
 
 type Guide = {
   id: string;
