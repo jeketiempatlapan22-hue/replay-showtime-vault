@@ -9,6 +9,7 @@ import RatingStars from '@/components/RatingStars';
 const CommentSection = lazy(() => import('@/components/CommentSection'));
 import HlsPlayer, { type HlsPlayerHandle } from '@/components/HlsPlayer';
 import EmbedPlayer from '@/components/EmbedPlayer';
+import DeviceResetButton from '@/components/DeviceResetButton';
 import { prefetchM3U8, prefetchYouTube, prefetchCloudflare } from '@/lib/prefetch';
 import { useAutoHideOnInteraction } from '@/hooks/useAutoHideOnInteraction';
 
@@ -51,6 +52,8 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
   const [sourceLoading, setSourceLoading] = useState(true);
   const [sourceError] = useState<string | null>(null);
   const [needsPassword, setNeedsPassword] = useState(false);
+  const [deviceLimit, setDeviceLimit] = useState(false);
+  const [lockedToken, setLockedToken] = useState('');
   const [pwInput, setPwInput] = useState('');
   const [pwError, setPwError] = useState('');
   const [pwChecking, setPwChecking] = useState(false);
@@ -73,6 +76,8 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
     setSourceLoading(true);
     setHlsFailed(false);
     setNeedsPassword(false);
+    setDeviceLimit(false);
+    setLockedToken('');
     setPwInput('');
     setPwError('');
     setActiveSourceId(null);
@@ -108,8 +113,10 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
         setSourceLoading(false);
         setNeedsPassword(true);
         if (res.reason === 'device_limit') {
+          setDeviceLimit(true);
+          if (token) setLockedToken(token);
           import('@/hooks/use-toast').then(({ toast }) => {
-            toast({ title: 'Token sudah dipakai', description: 'Token satuan ini sudah digunakan di perangkat lain.', variant: 'destructive' });
+            toast({ title: 'Token sudah dipakai', description: 'Token ini sudah terikat ke perangkat lain. Reset perangkat untuk pindah.', variant: 'destructive' });
           });
         }
         return;
