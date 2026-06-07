@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { RotateCcw, Loader2, AlertTriangle } from 'lucide-react';
+import { RotateCcw, Loader2, AlertTriangle, Users, ShieldX } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -9,12 +9,18 @@ type Props =
   | { kind: 'show'; token: string; label?: string }
   | { kind: 'membership'; token: string; password: string; label?: string };
 
-type Quota = { used: number; max: number; remaining: number; eligible: boolean } | null;
+type Quota = {
+  used: number;
+  max: number;
+  remaining: number;
+  eligible: boolean;
+  reason?: string;
+} | null;
 
 /**
  * Banner + tombol reset perangkat (kuota maks 3×). Saat ditekan, semua perangkat
  * lama akan dilepas dan perangkat ini langsung jadi pemilik tunggal token.
- * Cocok ditempel di kartu show (token show) atau di halaman Profil (membership).
+ * Untuk token multi-device, banner info ditampilkan tanpa tombol reset.
  */
 export default function DeviceResetButton(props: Props) {
   const { kind, token } = props;
@@ -37,9 +43,9 @@ export default function DeviceResetButton(props: Props) {
           max: Number(data.max || 3),
           remaining: Number(data.remaining || 0),
           eligible: data.eligible !== false,
+          reason: data.reason,
         });
       } else {
-        // Hide banner if token can't be reset (multi-device, revoked, etc.)
         setQuota(null);
       }
     } catch {
@@ -52,7 +58,7 @@ export default function DeviceResetButton(props: Props) {
   useEffect(() => { void peek(); /* eslint-disable-next-line */ }, [token]);
 
   const doReset = async () => {
-    if (!quota || quota.remaining <= 0 || busy) return;
+    if (!quota || !quota.eligible || quota.remaining <= 0 || busy) return;
     const ok = window.confirm(
       'Yakin reset perangkat?\n\n' +
       'Perangkat lain yang sedang memakai token ini akan otomatis keluar dan token hanya bisa dipakai di perangkat ini.\n\n' +
@@ -101,6 +107,41 @@ export default function DeviceResetButton(props: Props) {
     );
   }
   if (!quota) return null;
+
+  // Multi-device banner — no reset button, just info.
+  if (quota.reason === 'multi_device') {
+    return (
+      <div className="rounded-md border-2 border-blue-500/40 bg-blue-500/10 p-2.5">
+        <div className="flex items-start gap-2 text-[11px] leading-snug">
+          <Users className="w-3.5 h-3.5 mt-0.5 shrink-0 text-blue-600 dark:text-blue-400" />
+          <div className="flex-1">
+            <div className="font-semibold text-blue-700 dark:text-blue-400">
+              Token Multi-Perangkat
+            </div>
+            <div className="text-muted-foreground">
+              Token ini sudah bisa dipakai di beberapa perangkat sekaligus, jadi tidak perlu (dan tidak bisa) direset manual. Untuk perubahan akses, hubungi admin.
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (quota.reason === 'revoked' || quota.reason === 'expired') {
+    return (
+      <div className="rounded-md border-2 border-destructive/40 bg-destructive/5 p-2.5">
+        <div className="flex items-start gap-2 text-[11px] leading-snug">
+          <ShieldX className="w-3.5 h-3.5 mt-0.5 shrink-0 text-destructive" />
+          <div className="flex-1">
+            <div className="font-semibold text-destructive">
+              {quota.reason === 'revoked' ? 'Token sudah dicabut admin' : 'Token sudah kedaluwarsa'}
+            </div>
+            <div className="text-muted-foreground">Hubungi admin untuk bantuan lanjutan.</div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const exhausted = quota.remaining <= 0;
 

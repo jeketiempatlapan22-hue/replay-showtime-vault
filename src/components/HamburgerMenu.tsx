@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Menu, X, Home, MessageCircle, Phone, Sun, Moon, Radio, LogIn, LogOut, User as UserIcon, Crown } from 'lucide-react';
+import { Menu, X, Home, MessageCircle, Phone, Sun, Moon, Radio, LogIn, LogOut, User as UserIcon, Crown, BookOpen } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -106,6 +106,15 @@ export default function HamburgerMenu({ whatsappNumber, whatsappLink, lightMode,
           >
             <Crown className="w-5 h-5 text-primary" />
             <span className="font-medium">Membership</span>
+          </Link>
+
+          <Link
+            to="/panduan"
+            onClick={() => setOpen(false)}
+            className="flex items-center gap-3 px-4 py-3 rounded-lg text-foreground hover:bg-secondary transition-colors"
+          >
+            <BookOpen className="w-5 h-5 text-primary" />
+            <span className="font-medium">Panduan</span>
           </Link>
 
 
