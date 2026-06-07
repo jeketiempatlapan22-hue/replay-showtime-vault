@@ -160,9 +160,35 @@ export default function ShowLiveControl({ showId, showTitle }: Props) {
         <div className="flex items-center justify-between p-3 rounded bg-card border border-border">
           <div>
             <Label className="text-sm">Sedang LIVE sekarang</Label>
-            <p className="text-[11px] text-muted-foreground">Hanya satu show dapat aktif sekaligus.</p>
+            <p className="text-[11px] text-muted-foreground">Perubahan langsung berlaku tanpa perlu Simpan. Mematikan juga menonaktifkan jadwal otomatis.</p>
           </div>
-          <Switch checked={isLive} onCheckedChange={setIsLive} />
+          <Switch
+            checked={isLive}
+            disabled={saving}
+            onCheckedChange={async (v) => {
+              const prevLive = isLive;
+              const prevAuto = autoSchedule;
+              setIsLive(v);
+              if (!v) setAutoSchedule(false);
+              setSaving(true);
+              try {
+                const { data, error } = await supabase.functions.invoke('manage-live', {
+                  body: {
+                    action: 'upsert_active_show',
+                    show: { id: showId, is_live: v, ...(v ? {} : { live_auto_schedule: false }) },
+                  },
+                });
+                if (error) throw error;
+                if (data?.error) throw new Error(data.error);
+                toast({ title: v ? 'Live diaktifkan' : 'Live dimatikan', description: v ? 'Show ini sekarang LIVE.' : 'Jadwal otomatis ikut dimatikan.' });
+              } catch (e: any) {
+                setIsLive(prevLive);
+                setAutoSchedule(prevAuto);
+                toast({ title: 'Gagal mengubah status live', description: e.message, variant: 'destructive' });
+              }
+              setSaving(false);
+            }}
+          />
         </div>
         <div className="flex items-center justify-between p-3 rounded bg-card border border-border">
           <div>
