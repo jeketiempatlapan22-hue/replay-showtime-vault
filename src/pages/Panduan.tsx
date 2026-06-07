@@ -13,6 +13,8 @@ import imgProjector from '@/assets/guide-projector.jpg';
 import imgRegister from '@/assets/guide-register.jpg';
 import imgCoin from '@/assets/guide-coin.jpg';
 import imgBuyShow from '@/assets/guide-buy-show.jpg';
+import imgLiveTv from '@/assets/guide-live-tv.jpg';
+import imgLiveProjector from '@/assets/guide-live-projector.jpg';
 
 type Guide = {
   id: string;
@@ -70,6 +72,40 @@ const GUIDES: Guide[] = [
     ],
     note: 'Untuk nobar besar, kabel HDMI lebih stabil dari wireless. Tes setup minimal 30 menit sebelum acara mulai.',
   },
+  {
+    id: 'live-tv',
+    title: 'Nonton Halaman Live di Smart TV',
+    icon: Tv,
+    image: imgLiveTv,
+    summary: 'Cara membuka halaman live show di Smart TV agar bisa ditonton di layar besar.',
+    steps: [
+      { title: 'Buka link/token live di HP dulu', desc: 'Pastikan link token live (atau sandi membership) sudah aktif & bisa diputar di HP terlebih dahulu — supaya verifikasi token tidak terkunci ke perangkat yang salah.' },
+      { title: 'Pilih cara casting ke TV', desc: 'Tiga opsi: (a) Cast/Mirror dari HP via Chromecast / AirPlay / Smart View, (b) Sambungkan HP/laptop ke TV pakai kabel HDMI + adapter USB-C/Lightning, atau (c) Buka langsung di browser bawaan Smart TV.' },
+      { title: 'Casting dari HP (Android/iPhone)', desc: 'Android: tarik panel notifikasi → ketuk "Cast / Screen Mirror" → pilih TV. iPhone: Control Center → "Screen Mirroring" → pilih Apple TV / AirPlay receiver.' },
+      { title: 'Kabel HDMI (paling stabil)', desc: 'Pakai adapter USB-C → HDMI (Android/iPhone 15+) atau Lightning → HDMI (iPhone lama). Colok ke port HDMI TV, ganti input TV ke HDMI tersebut.' },
+      { title: 'Buka halaman live & fullscreen', desc: 'Setelah tampil di TV, ketuk ikon fullscreen pada player. Jangan tekan "Watch on YouTube" — player sudah dikunci di website.' },
+      { title: 'Reset perangkat bila perlu', desc: 'Jika token live menolak dengan pesan "dipakai di perangkat lain", klik tombol Reset Perangkat di halaman akses, lalu reload di TV.' },
+    ],
+    note: 'Browser Smart TV sering tertinggal. Jika player tidak lancar, cara paling stabil adalah cast/mirror dari HP atau pakai kabel HDMI dari laptop.',
+  },
+  {
+    id: 'live-projector',
+    title: 'Nonton Halaman Live di Proyektor (Nobar)',
+    icon: Projector,
+    image: imgLiveProjector,
+    summary: 'Setup nonton bareng halaman live show menggunakan proyektor.',
+    steps: [
+      { title: 'Siapkan sumber video', desc: 'Pakai laptop / mini PC / Android TV Box yang stabil & terhubung internet WiFi atau LAN. Hindari pakai HP untuk sesi panjang (overheating).' },
+      { title: 'Sambungkan ke proyektor via HDMI', desc: 'Colok kabel HDMI dari laptop ke proyektor. Tekan Win+P (Windows) → Duplicate, atau di Mac: System Settings → Displays → Mirror.' },
+      { title: 'Atur resolusi & rasio 16:9', desc: 'Set resolusi 1920×1080 (Full HD) dan aspect ratio 16:9 di proyektor agar tidak terpotong atau gepeng.' },
+      { title: 'Buka halaman live di browser', desc: 'Buka website, masuk ke halaman live (lewat link token atau sandi member). Klik fullscreen di player, lalu tekan F11 di browser untuk fullscreen total.' },
+      { title: 'Atur audio ke speaker eksternal', desc: 'Proyektor speaker bawaan biasanya kecil. Hubungkan output 3.5mm laptop ke speaker bluetooth / soundbar / mixer untuk audio yang layak nobar.' },
+      { title: 'Cek koneksi & buffering', desc: 'Tes 30 menit sebelum acara: pastikan playback tidak buffering. Jika sering putus, pindah ke koneksi LAN kabel atau dekatkan router.' },
+      { title: 'Reset perangkat bila perlu', desc: 'Jika token live menolak dengan pesan "dipakai di perangkat lain", buka halaman akses di laptop yang sama lalu klik Reset Perangkat.' },
+    ],
+    note: 'JANGAN sentuh tombol playlist saat live sedang lancar — biarkan player di sumber default. Ganti playlist hanya jika sumber utama mati.',
+  },
+
   {
     id: 'register',
     title: 'Cara Daftar di Website',
