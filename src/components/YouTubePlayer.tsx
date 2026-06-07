@@ -250,19 +250,38 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
               <Lock className="w-6 h-6 text-primary" />
             </div>
             <div>
-              <p className="text-foreground font-semibold mb-1">Masukkan Sandi</p>
-              <p className="text-sm text-muted-foreground">Sesi sandi tidak ditemukan. Masukkan ulang untuk menonton.</p>
+              <p className="text-foreground font-semibold mb-1">
+                {deviceLimit ? 'Token Dipakai di Perangkat Lain' : 'Masukkan Sandi'}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                {deviceLimit
+                  ? 'Link token ini sudah terikat ke perangkat lain. Reset perangkat di bawah untuk pindah ke perangkat ini — perangkat lama otomatis keluar.'
+                  : 'Sesi sandi tidak ditemukan. Masukkan ulang untuk menonton.'}
+              </p>
             </div>
-            <div className="max-w-xs mx-auto space-y-2">
-              <Input type="password" placeholder="Sandi replay..." value={pwInput}
-                onChange={(e) => { setPwInput(e.target.value); setPwError(''); }}
-                onKeyDown={(e) => e.key === 'Enter' && handleSubmitPassword()} autoFocus />
-              {pwError && <p className="text-xs text-destructive">{pwError}</p>}
-              <Button className="w-full" onClick={handleSubmitPassword} disabled={pwChecking}>
-                {pwChecking ? 'Memeriksa...' : 'Buka Replay'}
+            {deviceLimit && lockedToken && (
+              <div className="max-w-xs mx-auto text-left">
+                <DeviceResetButton kind="show" token={lockedToken} />
+              </div>
+            )}
+            {!deviceLimit && (
+              <div className="max-w-xs mx-auto space-y-2">
+                <Input type="password" placeholder="Sandi replay..." value={pwInput}
+                  onChange={(e) => { setPwInput(e.target.value); setPwError(''); }}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSubmitPassword()} autoFocus />
+                {pwError && <p className="text-xs text-destructive">{pwError}</p>}
+                <Button className="w-full" onClick={handleSubmitPassword} disabled={pwChecking}>
+                  {pwChecking ? 'Memeriksa...' : 'Buka Replay'}
+                </Button>
+              </div>
+            )}
+            {deviceLimit && (
+              <Button variant="outline" size="sm" className="mt-2" onClick={() => window.location.reload()}>
+                Muat ulang setelah reset
               </Button>
-            </div>
+            )}
           </div>
+
         ) : sourceError ? (
           <div className="rounded-xl bg-destructive/10 border border-destructive/30 p-6 text-center">
             <p className="text-destructive font-medium">{sourceError}</p>
