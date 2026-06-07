@@ -480,7 +480,7 @@ function TokensPanel({ session }: { session: Session }) {
         </Button>
       </div>
       <p className="text-[11px] text-muted-foreground italic">
-        🔧 Reset = link tidak bisa dipakai lagi · 🚫 Blokir = perangkat user diblokir total · 🗑️ Hapus = link hilang permanen dari riwayat.
+        🔄 Reset = lepas perangkat (link tetap aktif, bisa dipakai di device baru, device lama otomatis keluar) · 🚫 Blokir = perangkat user diblokir total & link dimatikan · 🗑️ Hapus = link hilang permanen.
       </p>
 
       {loading ? (
