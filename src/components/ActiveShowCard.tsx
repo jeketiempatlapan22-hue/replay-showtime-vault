@@ -285,7 +285,7 @@ export default function ActiveShowCard({ show, index = 0 }: { show: ActiveShow; 
             )
           )}
           {replayMode ? (
-            purchasedToken ? (
+            purchasedToken || membershipToken ? (
               <Button className="w-full gap-2" variant="secondary" onClick={goReplay}>
                 <Play className="w-4 h-4" /> Tonton Replay
               </Button>
@@ -302,6 +302,10 @@ export default function ActiveShowCard({ show, index = 0 }: { show: ActiveShow; 
                 Tonton Replay
               </Button>
             )
+          ) : membershipToken && !isLiveNow ? (
+            <Button className="w-full gap-2 bg-red-600 hover:bg-red-700 text-white" onClick={goLive}>
+              <Radio className="w-4 h-4" /> Tonton Live (Member)
+            </Button>
           ) : purchasedToken ? (
             !isLiveNow && (
               <Button className="w-full gap-2" variant="secondary" onClick={goLive}>
