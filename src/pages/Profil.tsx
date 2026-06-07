@@ -342,6 +342,11 @@ export default function Profil() {
                       </div>
                     )}
 
+                    {isPaid && !tokenExpired && !m.revoked && m.token && m.password && (m.max_devices ?? 1) <= 1 && (
+                      <DeviceResetButton kind="membership" token={m.token} password={m.password} />
+                    )}
+
+
                     {isReserved && (
                       <p className="text-[10px] text-muted-foreground">
                         Selesaikan pembayaran QRIS sebelum slot dilepas. Kuota akan otomatis dikembalikan jika belum dibayar.
