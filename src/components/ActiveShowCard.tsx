@@ -14,6 +14,7 @@ import { getShowPurchase, setShowPurchase } from '@/lib/purchases';
 import { MEMBERSHIP_UPDATED_EVENT, readMembershipCredentials } from '@/lib/membershipAccess';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
+import DeviceResetButton from '@/components/DeviceResetButton';
 
 const CATEGORY_LABELS: Record<string, string> = {
   reguler: 'Reguler', sts: 'STS', last_show: 'Last Show', aniv: 'Anniversary', special: 'Show Spesial',
@@ -270,6 +271,12 @@ export default function ActiveShowCard({ show, index = 0 }: { show: ActiveShow; 
             </div>
           );
         })()}
+
+        {/* Reset perangkat untuk token show satuan */}
+        {purchasedToken && (
+          <DeviceResetButton kind="show" token={purchasedToken} />
+        )}
+
 
         {/* Action buttons */}
         <div className="pt-2 space-y-2">

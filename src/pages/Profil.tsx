@@ -10,6 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { saveMembershipCredentials } from '@/lib/membershipAccess';
+import DeviceResetButton from '@/components/DeviceResetButton';
 
 interface MyMembership {
   order_id: string;
@@ -340,6 +341,11 @@ export default function Profil() {
                         </div>
                       </div>
                     )}
+
+                    {isPaid && !tokenExpired && !m.revoked && m.token && m.password && (m.max_devices ?? 1) <= 1 && (
+                      <DeviceResetButton kind="membership" token={m.token} password={m.password} />
+                    )}
+
 
                     {isReserved && (
                       <p className="text-[10px] text-muted-foreground">

@@ -750,21 +750,12 @@ export default function Live() {
             <div className="text-3xl">⚠️</div>
             <h2 className="text-base sm:text-lg font-bold text-foreground">Tidak bisa membuka live</h2>
             <p className="text-sm text-muted-foreground whitespace-pre-line">{pwError}</p>
-            {resetInfo?.eligible && resetInfo.remaining > 0 && (
-              <div className="rounded-xl border border-primary/40 bg-primary/10 p-3 text-left space-y-2">
-                <p className="text-xs sm:text-sm text-foreground">
-                  Anda bisa <b>mereset token</b> agar berpindah ke perangkat ini. Sisa kesempatan reset manual: <b>{resetInfo.remaining}/{resetInfo.max}</b>.
-                </p>
-                <p className="text-[11px] text-muted-foreground">
-                  Setelah reset, perangkat lama otomatis keluar dan token hanya berlaku di perangkat ini.
-                </p>
-                <Button size="sm" className="w-full" disabled={resetting} onClick={doSelfResetToken}>
-                  {resetting ? 'Mereset…' : `Reset token & pindah ke perangkat ini (sisa ${resetInfo.remaining})`}
-                </Button>
-              </div>
-            )}
-            {resetInfo && !resetInfo.eligible && resetInfo.max > 0 && (
-              <p className="text-[11px] text-muted-foreground italic">Kuota reset manual habis ({resetInfo.max}×). Hubungi admin untuk reset.</p>
+            {resetInfo && resetInfo.max > 0 && (
+              <p className="text-[11px] text-muted-foreground italic">
+                {resetInfo.eligible && resetInfo.remaining > 0
+                  ? <>Anda bisa mereset perangkat dari halaman <b>Profil</b> (untuk membership) atau dari kartu show. Sisa kesempatan reset manual: <b>{resetInfo.remaining}/{resetInfo.max}</b>.</>
+                  : <>Kuota reset manual habis ({resetInfo.max}×). Hubungi admin untuk reset.</>}
+              </p>
             )}
             <div className="flex flex-col sm:flex-row gap-2 pt-1">
               <Button variant="outline" className="flex-1" onClick={() => { setPwError(''); setResetInfo(null); const t = search.get('t'); const mt = search.get('mtoken'); const mp = search.get('mp') || search.get('mpassword') || ''; if (mt) void doUnlock({ mtoken: mt, mpassword: mp }); else if (t) void doUnlock({ token: t }); }}>
@@ -825,15 +816,10 @@ export default function Live() {
                       </div>
                       {(membership.max_devices || 1) <= 1 && (
                         <div className="text-muted-foreground">
-                          Reset perangkat: <span className="font-mono text-foreground">{membership.resets_used}/{membership.resets_max}</span> terpakai · Sisa <span className="font-mono text-foreground">{membership.remaining}</span>
+                          Reset perangkat: <span className="font-mono text-foreground">{membership.resets_used}/{membership.resets_max}</span> terpakai · Sisa <span className="font-mono text-foreground">{membership.remaining}</span> · Reset bisa dilakukan dari halaman <b>Profil</b>.
                         </div>
                       )}
                     </div>
-                    {(membership.max_devices || 1) <= 1 && (!tokenInfo || (tokenInfo.kind !== 'public' && tokenInfo.max_devices <= 1)) && (
-                      <Button type="button" variant="outline" size="sm" onClick={handleSelfReset} disabled={membership.remaining <= 0}>
-                        Reset perangkat ini
-                      </Button>
-                    )}
                   </div>
                 )}
 
