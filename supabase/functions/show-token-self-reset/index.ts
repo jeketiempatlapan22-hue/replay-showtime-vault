@@ -25,6 +25,23 @@ Deno.serve(async (req) => {
 
     const { data: t } = await supabase
       .from("active_show_tokens").select("*").eq("token", token).maybeSingle();
+
+    // Peek mode: return metadata for any token so UI can render correct banner.
+    if (peek) {
+      if (!t) return json({ ok: false, reason: "token_not_found" });
+      const used = t.manual_resets_used || 0;
+      const max = t.manual_resets_max || 3;
+      const remaining = Math.max(0, max - used);
+      if (t.revoked) return json({ ok: true, peek: true, eligible: false, reason: "revoked", used, max, remaining: 0 });
+      if (t.expires_at && new Date(t.expires_at).getTime() < Date.now())
+        return json({ ok: true, peek: true, eligible: false, reason: "expired", used, max, remaining: 0 });
+      if ((t.max_devices || 1) > 1)
+        return json({ ok: true, peek: true, eligible: false, reason: "multi_device", used, max, remaining });
+      if (t.single_use)
+        return json({ ok: true, peek: true, eligible: false, reason: "single_use", used, max, remaining });
+      return json({ ok: true, peek: true, eligible: remaining > 0, used, max, remaining });
+    }
+
     if (!t) return json({ ok: false, reason: "token_not_found" });
     if (t.revoked) return json({ ok: false, reason: "revoked" });
     if ((t.max_devices || 1) > 1) return json({ ok: false, reason: "multi_device_no_reset" });
@@ -33,17 +50,11 @@ Deno.serve(async (req) => {
 
     const used = t.manual_resets_used || 0;
     const max = t.manual_resets_max || 3;
-    const remaining = Math.max(0, max - used);
-
-    if (peek) return json({ ok: true, peek: true, used, max, remaining, eligible: true });
-
     if (used >= max) return json({ ok: false, reason: "quota_exhausted", used, max, remaining: 0 });
 
-    // Wipe all bound devices, then bind the requesting browser as the new sole device.
     await supabase.from("active_show_token_devices").delete().eq("token_id", t.id);
     await supabase.from("active_show_token_devices").insert({ token_id: t.id, browser_id });
-    await supabase.from("active_show_tokens")
-      .update({ manual_resets_used: used + 1 }).eq("id", t.id);
+    await supabase.from("active_show_tokens").update({ manual_resets_used: used + 1 }).eq("id", t.id);
 
     return json({ ok: true, used: used + 1, max, remaining: max - (used + 1) });
   } catch {
