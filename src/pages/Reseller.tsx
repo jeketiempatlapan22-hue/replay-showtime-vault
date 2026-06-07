@@ -436,12 +436,11 @@ function TokensPanel({ session }: { session: Session }) {
     setBusyId(row.audit_id);
     try {
       if (kind === 'revoke') {
-        const { data, error } = await (supabase.rpc as any)('reseller_revoke_token', {
+        const { data, error } = await (supabase.rpc as any)('reseller_reset_token_devices', {
           _phone: session.phone, _pin: session.pin, _audit_id: row.audit_id,
         });
         if (error) throw error;
-        if (!data) throw new Error('Link tidak ditemukan');
-        toast({ title: '✅ Link direset', description: 'Link sudah tidak bisa dipakai.' });
+        toast({ title: '🔄 Link direset', description: `${data ?? 0} perangkat dilepas. Link bisa dipakai lagi di perangkat lain; perangkat lama otomatis keluar.` });
       } else if (kind === 'block') {
         const { data, error } = await (supabase.rpc as any)('reseller_block_token', {
           _phone: session.phone, _pin: session.pin, _audit_id: row.audit_id,
@@ -481,7 +480,7 @@ function TokensPanel({ session }: { session: Session }) {
         </Button>
       </div>
       <p className="text-[11px] text-muted-foreground italic">
-        🔧 Reset = link tidak bisa dipakai lagi · 🚫 Blokir = perangkat user diblokir total · 🗑️ Hapus = link hilang permanen dari riwayat.
+        🔄 Reset = lepas perangkat (link tetap aktif, bisa dipakai di device baru, device lama otomatis keluar) · 🚫 Blokir = perangkat user diblokir total & link dimatikan · 🗑️ Hapus = link hilang permanen.
       </p>
 
       {loading ? (
@@ -509,7 +508,7 @@ function TokensPanel({ session }: { session: Session }) {
             </div>
           </div>
           <div className="grid grid-cols-3 gap-1">
-            <Button size="sm" variant="outline" disabled={r.revoked || busyId === r.audit_id}
+            <Button size="sm" variant="outline" disabled={busyId === r.audit_id}
               onClick={() => setConfirm({ kind: 'revoke', row: r })}>
               <ShieldOff className="w-3.5 h-3.5 mr-1" />Reset
             </Button>
@@ -538,7 +537,7 @@ function TokensPanel({ session }: { session: Session }) {
                 ? <>Semua perangkat yang sudah membuka link <strong>{confirm.row.target_title}</strong> akan diblokir total dari website, dan link akan direset.</>
                 : confirm?.kind === 'delete'
                 ? <>Link <strong>{confirm.row.target_title}</strong> akan dihapus permanen dari riwayat & tidak bisa dipakai lagi. Tindakan tidak bisa dibatalkan.</>
-                : <>Link <strong>{confirm?.row.target_title}</strong> tidak akan bisa dipakai lagi. Tindakan tidak bisa dibatalkan.</>}
+                : <>Semua perangkat yang sedang memakai link <strong>{confirm?.row.target_title}</strong> akan dilepas & otomatis keluar. Link tetap aktif dan bisa dipakai lagi di perangkat lain.</>}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
