@@ -816,15 +816,10 @@ export default function Live() {
                       </div>
                       {(membership.max_devices || 1) <= 1 && (
                         <div className="text-muted-foreground">
-                          Reset perangkat: <span className="font-mono text-foreground">{membership.resets_used}/{membership.resets_max}</span> terpakai · Sisa <span className="font-mono text-foreground">{membership.remaining}</span>
+                          Reset perangkat: <span className="font-mono text-foreground">{membership.resets_used}/{membership.resets_max}</span> terpakai · Sisa <span className="font-mono text-foreground">{membership.remaining}</span> · Reset bisa dilakukan dari halaman <b>Profil</b>.
                         </div>
                       )}
                     </div>
-                    {(membership.max_devices || 1) <= 1 && (!tokenInfo || (tokenInfo.kind !== 'public' && tokenInfo.max_devices <= 1)) && (
-                      <Button type="button" variant="outline" size="sm" onClick={handleSelfReset} disabled={membership.remaining <= 0}>
-                        Reset perangkat ini
-                      </Button>
-                    )}
                   </div>
                 )}
 
