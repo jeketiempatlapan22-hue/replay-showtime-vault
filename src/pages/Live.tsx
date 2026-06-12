@@ -321,21 +321,26 @@ export default function Live() {
         } else {
           setPwError(reasonMessage(data?.reason));
         }
-        // Untuk device_limit pada token show (?t=), cek apakah masih ada kuota reset manual.
+        // Untuk device_limit, cek kuota reset manual baik untuk token show (?t=) maupun membership (?mtoken=).
         if (data?.reason === 'device_limit') {
           const tParam = search.get('t');
-          if (tParam) {
-            try {
+          const mtParam = search.get('mtoken');
+          const mpParam = search.get('mp') || search.get('mpassword') || '';
+          try {
+            if (tParam) {
               const { data: peek } = await supabase.functions.invoke('show-token-self-reset', {
                 body: { token: tParam, browser_id: getBrowserId(), peek: true },
               });
-              if (peek?.ok) {
-                setResetInfo({ remaining: Number(peek.remaining || 0), max: Number(peek.max || 3), eligible: true });
-              } else {
-                setResetInfo({ remaining: 0, max: 0, eligible: false });
-              }
-            } catch { setResetInfo(null); }
-          }
+              if (peek?.ok) setResetInfo({ remaining: Number(peek.remaining || 0), max: Number(peek.max || 3), eligible: peek.eligible !== false });
+              else setResetInfo({ remaining: 0, max: 0, eligible: false });
+            } else if (mtParam && mpParam) {
+              const { data: peek } = await supabase.functions.invoke('membership-self-reset', {
+                body: { mtoken: mtParam, mpassword: mpParam, browser_id: getBrowserId(), peek: true },
+              });
+              if (peek?.ok) setResetInfo({ remaining: Number(peek.remaining || 0), max: Number(peek.max || 3), eligible: peek.eligible !== false });
+              else setResetInfo({ remaining: 0, max: 0, eligible: false });
+            } else setResetInfo(null);
+          } catch { setResetInfo(null); }
         } else {
           setResetInfo(null);
         }
