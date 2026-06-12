@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useRef, useCallback, memo, lazy, Suspense } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Loader2, Users, Eye, PictureInPicture2 } from 'lucide-react';
+import { ArrowLeft, Loader2, Users, Eye, PictureInPicture2, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 import { supabase } from '@/integrations/supabase/client';
@@ -321,21 +321,26 @@ export default function Live() {
         } else {
           setPwError(reasonMessage(data?.reason));
         }
-        // Untuk device_limit pada token show (?t=), cek apakah masih ada kuota reset manual.
+        // Untuk device_limit, cek kuota reset manual baik untuk token show (?t=) maupun membership (?mtoken=).
         if (data?.reason === 'device_limit') {
           const tParam = search.get('t');
-          if (tParam) {
-            try {
+          const mtParam = search.get('mtoken');
+          const mpParam = search.get('mp') || search.get('mpassword') || '';
+          try {
+            if (tParam) {
               const { data: peek } = await supabase.functions.invoke('show-token-self-reset', {
                 body: { token: tParam, browser_id: getBrowserId(), peek: true },
               });
-              if (peek?.ok) {
-                setResetInfo({ remaining: Number(peek.remaining || 0), max: Number(peek.max || 3), eligible: true });
-              } else {
-                setResetInfo({ remaining: 0, max: 0, eligible: false });
-              }
-            } catch { setResetInfo(null); }
-          }
+              if (peek?.ok) setResetInfo({ remaining: Number(peek.remaining || 0), max: Number(peek.max || 3), eligible: peek.eligible !== false });
+              else setResetInfo({ remaining: 0, max: 0, eligible: false });
+            } else if (mtParam && mpParam) {
+              const { data: peek } = await supabase.functions.invoke('membership-self-reset', {
+                body: { mtoken: mtParam, mpassword: mpParam, browser_id: getBrowserId(), peek: true },
+              });
+              if (peek?.ok) setResetInfo({ remaining: Number(peek.remaining || 0), max: Number(peek.max || 3), eligible: peek.eligible !== false });
+              else setResetInfo({ remaining: 0, max: 0, eligible: false });
+            } else setResetInfo(null);
+          } catch { setResetInfo(null); }
         } else {
           setResetInfo(null);
         }
@@ -750,21 +755,44 @@ export default function Live() {
             <div className="text-3xl">⚠️</div>
             <h2 className="text-base sm:text-lg font-bold text-foreground">Tidak bisa membuka live</h2>
             <p className="text-sm text-muted-foreground whitespace-pre-line">{pwError}</p>
+
             {resetInfo && resetInfo.max > 0 && (
-              <p className="text-[11px] text-muted-foreground italic">
-                {resetInfo.eligible && resetInfo.remaining > 0
-                  ? <>Anda bisa mereset perangkat dari halaman <b>Profil</b> (untuk membership) atau dari kartu show. Sisa kesempatan reset manual: <b>{resetInfo.remaining}/{resetInfo.max}</b>.</>
-                  : <>Kuota reset manual habis ({resetInfo.max}×). Hubungi admin untuk reset.</>}
-              </p>
+              <div className={`rounded-lg border-2 p-3 text-left space-y-1.5 ${resetInfo.remaining > 0 ? 'border-amber-500/50 bg-amber-500/10' : 'border-destructive/50 bg-destructive/10'}`}>
+                <div className="flex items-center justify-between gap-2">
+                  <span className={`text-xs font-bold ${resetInfo.remaining > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-destructive'}`}>
+                    Kesempatan reset
+                  </span>
+                  <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded-full ${resetInfo.remaining > 0 ? 'bg-amber-500/20 text-amber-700 dark:text-amber-300' : 'bg-destructive/20 text-destructive'}`}>
+                    {resetInfo.remaining}/{resetInfo.max}
+                  </span>
+                </div>
+                <p className="text-[11px] text-muted-foreground leading-snug">
+                  {resetInfo.remaining > 0
+                    ? <>Ingin ganti perangkat? Klik tombol <b>Reset Token Link</b> di bawah. Perangkat lama otomatis keluar dan token hanya aktif di perangkat ini.</>
+                    : <>Kuota reset manual sudah habis ({resetInfo.max}×). Hubungi admin untuk bantuan pindah perangkat.</>}
+                </p>
+              </div>
             )}
+
             <div className="flex flex-col sm:flex-row gap-2 pt-1">
-              <Button variant="outline" className="flex-1" onClick={() => { setPwError(''); setResetInfo(null); const t = search.get('t'); const mt = search.get('mtoken'); const mp = search.get('mp') || search.get('mpassword') || ''; if (mt) void doUnlock({ mtoken: mt, mpassword: mp }); else if (t) void doUnlock({ token: t }); }}>
-                Coba lagi
-              </Button>
+              {resetInfo && resetInfo.max > 0 && resetInfo.remaining > 0 ? (
+                <Button
+                  className="flex-1 bg-amber-500 hover:bg-amber-600 text-white font-semibold gap-2"
+                  disabled={resetting}
+                  onClick={() => { const mt = search.get('mtoken'); if (mt) void handleSelfReset(); else void doSelfResetToken(); }}
+                >
+                  {resetting ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />}
+                  {resetting ? 'Mereset…' : `Reset Token Link (${resetInfo.remaining})`}
+                </Button>
+              ) : (
+                <Button variant="outline" className="flex-1" onClick={() => { setPwError(''); setResetInfo(null); const t = search.get('t'); const mt = search.get('mtoken'); const mp = search.get('mp') || search.get('mpassword') || ''; if (mt) void doUnlock({ mtoken: mt, mpassword: mp }); else if (t) void doUnlock({ token: t }); }}>
+                  Coba lagi
+                </Button>
+              )}
               <Button variant="secondary" className="flex-1" onClick={() => navigate(`/kunci${showId ? `?show=${showId}` : ''}`)}>
                 Masukkan sandi
               </Button>
-              <Button className="flex-1" onClick={() => navigate('/')}>Kembali</Button>
+              <Button className="flex-1 bg-amber-400 hover:bg-amber-500 text-black" onClick={() => navigate('/')}>Kembali</Button>
             </div>
           </div>
 
