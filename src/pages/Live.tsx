@@ -284,7 +284,24 @@ export default function Live() {
             const next = { ...prev, enabled: cfg.enabled, title: cfg.title, type: cfg.type };
             if (cfg.idn_show_id) next.idn_show_id = cfg.idn_show_id;
             if (!prev.url && cfg.url) next.url = cfg.url;
-            if ((!prev.sources || prev.sources.length === 0) && cfg.sources?.length) next.sources = cfg.sources;
+            // Merge playlist sources by URL: keep existing entries (so the
+            // active player tidak remount), append baru, dan refresh label.
+            // Hasilnya playlist baru yang ditambah admin langsung muncul
+            // sebagai chip tambahan secara realtime tanpa memutus live.
+            const prevSrcs = Array.isArray(prev.sources) ? prev.sources : [];
+            const newSrcs = Array.isArray(cfg.sources) ? cfg.sources : [];
+            if (newSrcs.length) {
+              const byUrl = new Map(newSrcs.map(s => [s.url, s]));
+              const merged = prevSrcs.map(s => {
+                const fresh = byUrl.get(s.url);
+                return fresh ? { ...s, label: fresh.label || s.label, type: fresh.type || s.type } : s;
+              });
+              const existingUrls = new Set(prevSrcs.map(s => s.url));
+              for (const s of newSrcs) {
+                if (!existingUrls.has(s.url)) merged.push(s);
+              }
+              next.sources = merged;
+            }
             try { sessionStorage.setItem(`${SS_KEY_BASE}${showId?'-'+showId:''}`, JSON.stringify(next)); } catch { /* ignore */ }
             return next;
           });
