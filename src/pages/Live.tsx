@@ -456,7 +456,14 @@ export default function Live() {
     const bid = getBrowserId();
     const cfgChannel = showId
       ? supabase.channel(`live-cfg:${showId}`)
-          .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'active_shows', filter: `id=eq.${showId}` }, () => { fetchStatus(); })
+          .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'active_shows', filter: `id=eq.${showId}` }, () => {
+            fetchStatus();
+            // Playlist/sources hanya bisa diambil via edge function unlock-live.
+            // Panggil silent agar chip playlist baru langsung muncul tanpa remount player.
+            if (tParam) void doUnlock({ token: tParam }, true);
+            else if (mtParam) void doUnlock({ mtoken: mtParam, mpassword: search.get('mp') || search.get('mpassword') || '' }, true);
+            else if (unlocked) void doUnlock({}, true);
+          })
           .subscribe()
       : supabase.channel('live-cfg:global')
           .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'live_config_private' }, () => { fetchStatus(); })
