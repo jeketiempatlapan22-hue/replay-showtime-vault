@@ -39,9 +39,6 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    const guard = await ipGuard(supabase, req, "verify-password", 20);
-    if (guard.blocked) return json(guard.body, guard.status);
-
     // Brute-force lockout (per replay+device)
     const lockId = `replaypw:${replay_id}:${browser_id || 'anon'}`;
     if (password) {
