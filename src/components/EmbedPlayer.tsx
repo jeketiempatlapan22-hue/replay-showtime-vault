@@ -24,7 +24,16 @@ interface YoutubePlayerApi {
   getDuration?: () => number;
   getCurrentTime?: () => number;
   seekTo?: (seconds: number, allowSeekAhead: boolean) => void;
+  setPlaybackQuality?: (quality: string) => void;
+  getPlaybackQuality?: () => string;
+  getAvailableQualityLevels?: () => string[];
+  getVideoLoadedFraction?: () => number;
 }
+
+// Ladder kualitas YouTube dari tertinggi ke terendah.
+// Dipakai untuk: (1) mengunci default ke resolusi tertinggi yang tersedia,
+// (2) menurunkan satu tingkat saat user mengalami buffering berulang.
+const YT_QUALITY_LADDER = ['highres', 'hd2160', 'hd1440', 'hd1080', 'hd720', 'large', 'medium', 'small', 'tiny'];
 
 interface YoutubeWindow extends Window {
   YT?: { Player: new (element: HTMLElement, options: Record<string, unknown>) => YoutubePlayerApi };
