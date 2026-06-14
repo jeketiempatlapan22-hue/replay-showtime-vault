@@ -24,7 +24,16 @@ interface YoutubePlayerApi {
   getDuration?: () => number;
   getCurrentTime?: () => number;
   seekTo?: (seconds: number, allowSeekAhead: boolean) => void;
+  setPlaybackQuality?: (quality: string) => void;
+  getPlaybackQuality?: () => string;
+  getAvailableQualityLevels?: () => string[];
+  getVideoLoadedFraction?: () => number;
 }
+
+// Ladder kualitas YouTube dari tertinggi ke terendah.
+// Dipakai untuk: (1) mengunci default ke resolusi tertinggi yang tersedia,
+// (2) menurunkan satu tingkat saat user mengalami buffering berulang.
+const YT_QUALITY_LADDER = ['highres', 'hd2160', 'hd1440', 'hd1080', 'hd720', 'large', 'medium', 'small', 'tiny'];
 
 interface YoutubeWindow extends Window {
   YT?: { Player: new (element: HTMLElement, options: Record<string, unknown>) => YoutubePlayerApi };
@@ -148,6 +157,37 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
   const liveActive = isLive || detectedLive;
   const liveEndedRef = useRef(false);
 
+  // Adaptive quality (replay only): mulai dari tertinggi yang tersedia,
+  // turun satu tingkat hanya jika user kena buffering berulang dalam window pendek.
+  const qualityCapIdxRef = useRef(0); // 0 = tertinggi di ladder yang tersedia
+  const availableQualitiesRef = useRef<string[]>([]);
+  const bufferEventsRef = useRef<number[]>([]);
+  const lastDowngradeAtRef = useRef(0);
+
+  const applyQualityCap = useCallback(() => {
+    const p = ytPlayerRef.current;
+    if (!p?.setPlaybackQuality) return;
+    const avail = availableQualitiesRef.current;
+    if (!avail.length) return;
+    const ordered = YT_QUALITY_LADDER.filter(q => avail.includes(q));
+    if (!ordered.length) return;
+    const idx = Math.min(qualityCapIdxRef.current, ordered.length - 1);
+    try { p.setPlaybackQuality(ordered[idx]); } catch { /* ignore */ }
+  }, []);
+
+  const refreshAvailableQualities = useCallback(() => {
+    const p = ytPlayerRef.current;
+    if (!p?.getAvailableQualityLevels) return;
+    try {
+      const levels = p.getAvailableQualityLevels() || [];
+      if (levels.length) {
+        availableQualitiesRef.current = levels;
+        applyQualityCap();
+      }
+    } catch { /* ignore */ }
+  }, [applyQualityCap]);
+
+
   const markReady = useCallback((value: boolean) => {
     readyRef.current = value;
     setReady(value);
@@ -210,6 +250,11 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
     userUnmutedRef.current = false;
     liveEndedRef.current = false;
     setDetectedLive(!!isLive);
+    // Reset adaptive-quality state untuk source baru.
+    qualityCapIdxRef.current = 0;
+    availableQualitiesRef.current = [];
+    bufferEventsRef.current = [];
+    lastDowngradeAtRef.current = 0;
 
     setDuration(0);
     setCurrentTime(0);
@@ -275,11 +320,42 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
                 autoMuteAppliedRef.current = true;
               }
               ytPlayerRef.current.playVideo?.();
+              // Coba kunci ke resolusi tertinggi (hanya untuk replay, bukan live).
+              if (!isLive) {
+                refreshAvailableQualities();
+                // Available levels sering baru terisi beberapa detik setelah ready.
+                setTimeout(refreshAvailableQualities, 1500);
+                setTimeout(refreshAvailableQualities, 4000);
+              }
             } catch { /* ignore */ }
+          },
+          onPlaybackQualityChange: () => {
+            // Re-cek list — kadang baru terisi setelah quality pertama dipilih.
+            if (!isLive) refreshAvailableQualities();
           },
           onStateChange: (e: { data: number }) => {
             if (e.data === 1 || e.data === 3) markReady(true);
             setIsPlaying(e.data === 1 || e.data === 3);
+            // Adaptive downgrade: state 3 = BUFFERING. Hitung kejadian buffering
+            // dalam 30 detik terakhir; jika ≥3 → turunkan 1 tingkat resolusi.
+            // Hanya berlaku untuk replay (bukan live) agar tidak ganggu Live.
+            if (e.data === 3 && !isLive) {
+              const now = Date.now();
+              const recent = bufferEventsRef.current.filter(t => now - t < 30000);
+              recent.push(now);
+              bufferEventsRef.current = recent;
+              const cooldownOk = now - lastDowngradeAtRef.current > 15000;
+              if (recent.length >= 3 && cooldownOk) {
+                const avail = availableQualitiesRef.current;
+                const ordered = YT_QUALITY_LADDER.filter(q => avail.includes(q));
+                if (ordered.length && qualityCapIdxRef.current < ordered.length - 1) {
+                  qualityCapIdxRef.current += 1;
+                  lastDowngradeAtRef.current = now;
+                  bufferEventsRef.current = [];
+                  applyQualityCap();
+                }
+              }
+            }
           },
           onError: () => {
             if (cancelled) return;
@@ -297,7 +373,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
       try { ytPlayerRef.current?.pauseVideo?.(); } catch { /* ignore */ }
       ytPlayerRef.current = null;
     };
-  }, [ytId, type, markReady]);
+  }, [ytId, type, markReady, isLive, refreshAvailableQualities, applyQualityCap]);
 
   // Cloudflare via Stream SDK postMessage (basic play/pause/volume via iframe contentWindow)
   const cfPost = (event: string, value?: number) => {
