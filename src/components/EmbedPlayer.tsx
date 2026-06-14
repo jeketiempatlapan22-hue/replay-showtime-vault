@@ -157,6 +157,37 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
   const liveActive = isLive || detectedLive;
   const liveEndedRef = useRef(false);
 
+  // Adaptive quality (replay only): mulai dari tertinggi yang tersedia,
+  // turun satu tingkat hanya jika user kena buffering berulang dalam window pendek.
+  const qualityCapIdxRef = useRef(0); // 0 = tertinggi di ladder yang tersedia
+  const availableQualitiesRef = useRef<string[]>([]);
+  const bufferEventsRef = useRef<number[]>([]);
+  const lastDowngradeAtRef = useRef(0);
+
+  const applyQualityCap = useCallback(() => {
+    const p = ytPlayerRef.current;
+    if (!p?.setPlaybackQuality) return;
+    const avail = availableQualitiesRef.current;
+    if (!avail.length) return;
+    const ordered = YT_QUALITY_LADDER.filter(q => avail.includes(q));
+    if (!ordered.length) return;
+    const idx = Math.min(qualityCapIdxRef.current, ordered.length - 1);
+    try { p.setPlaybackQuality(ordered[idx]); } catch { /* ignore */ }
+  }, []);
+
+  const refreshAvailableQualities = useCallback(() => {
+    const p = ytPlayerRef.current;
+    if (!p?.getAvailableQualityLevels) return;
+    try {
+      const levels = p.getAvailableQualityLevels() || [];
+      if (levels.length) {
+        availableQualitiesRef.current = levels;
+        applyQualityCap();
+      }
+    } catch { /* ignore */ }
+  }, [applyQualityCap]);
+
+
   const markReady = useCallback((value: boolean) => {
     readyRef.current = value;
     setReady(value);
