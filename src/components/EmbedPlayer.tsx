@@ -320,11 +320,42 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
                 autoMuteAppliedRef.current = true;
               }
               ytPlayerRef.current.playVideo?.();
+              // Coba kunci ke resolusi tertinggi (hanya untuk replay, bukan live).
+              if (!isLive) {
+                refreshAvailableQualities();
+                // Available levels sering baru terisi beberapa detik setelah ready.
+                setTimeout(refreshAvailableQualities, 1500);
+                setTimeout(refreshAvailableQualities, 4000);
+              }
             } catch { /* ignore */ }
+          },
+          onPlaybackQualityChange: () => {
+            // Re-cek list — kadang baru terisi setelah quality pertama dipilih.
+            if (!isLive) refreshAvailableQualities();
           },
           onStateChange: (e: { data: number }) => {
             if (e.data === 1 || e.data === 3) markReady(true);
             setIsPlaying(e.data === 1 || e.data === 3);
+            // Adaptive downgrade: state 3 = BUFFERING. Hitung kejadian buffering
+            // dalam 30 detik terakhir; jika ≥3 → turunkan 1 tingkat resolusi.
+            // Hanya berlaku untuk replay (bukan live) agar tidak ganggu Live.
+            if (e.data === 3 && !isLive) {
+              const now = Date.now();
+              const recent = bufferEventsRef.current.filter(t => now - t < 30000);
+              recent.push(now);
+              bufferEventsRef.current = recent;
+              const cooldownOk = now - lastDowngradeAtRef.current > 15000;
+              if (recent.length >= 3 && cooldownOk) {
+                const avail = availableQualitiesRef.current;
+                const ordered = YT_QUALITY_LADDER.filter(q => avail.includes(q));
+                if (ordered.length && qualityCapIdxRef.current < ordered.length - 1) {
+                  qualityCapIdxRef.current += 1;
+                  lastDowngradeAtRef.current = now;
+                  bufferEventsRef.current = [];
+                  applyQualityCap();
+                }
+              }
+            }
           },
           onError: () => {
             if (cancelled) return;
