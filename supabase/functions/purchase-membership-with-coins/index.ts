@@ -121,7 +121,7 @@ Deno.serve(async (req) => {
     // WA message
     const { data: settings } = await admin.from('site_settings').select('key,value').in('key', ['site_origin','wa_membership_template']);
     const sm = new Map((settings ?? []).map((s) => [s.key, s.value]));
-    const origin = (sm.get('site_origin') || 'https://replaytime.lovable.app').replace(/\/+$/, '');
+    const origin = (sm.get('site_origin') || 'https://realtime48stream.my.id').replace(/\/+$/, '');
     const tpl = sm.get('wa_membership_template') || DEFAULT_MEMBERSHIP_TPL;
     const link = `${origin}/live?mtoken=${encodeURIComponent(tok.token)}&mp=${encodeURIComponent(tok.password)}`;
     const expiresStr = new Date(tok.expires_at).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });

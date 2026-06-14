@@ -69,7 +69,7 @@ Deno.serve(async (req) => {
   const { data: settings } = await admin.from('site_settings').select('key,value')
     .in('key', ['site_origin', 'wa_membership_template', 'reseller_membership_replay_info']);
   const sm = new Map((settings ?? []).map((x: any) => [x.key, x.value]));
-  const origin = ((sm.get('site_origin') as string) || 'https://replaytime.lovable.app').replace(/\/+$/, '');
+  const origin = ((sm.get('site_origin') as string) || 'https://realtime48stream.my.id').replace(/\/+$/, '');
   const tpl = (sm.get('wa_membership_template') as string) || DEFAULT_TPL;
   const replayInfo = String(sm.get('reseller_membership_replay_info') || '').trim() || (pkg.replay_info || '');
 
