@@ -95,7 +95,7 @@ Deno.serve(async (req) => {
     }
     if (existingToken) {
       const { data: settings } = await admin.from('site_settings').select('key,value').eq('key', 'site_origin');
-      const origin = ((settings ?? [])[0]?.value || 'https://replaytime.lovable.app').replace(/\/+$/, '');
+      const origin = ((settings ?? [])[0]?.value || 'https://realtime48stream.my.id').replace(/\/+$/, '');
       const link = resolvedShowId && !resolvedReplayId
         ? `${origin}/live?show=${resolvedShowId}&t=${existingToken}`
         : `${origin}/akses?token=${existingToken}${resolvedReplayId ? `&replay=${resolvedReplayId}` : ''}`;
@@ -143,7 +143,7 @@ Deno.serve(async (req) => {
     // Build WA message via shared templates (editable di Admin → Pakasir).
     const { data: settings } = await admin.from('site_settings').select('key,value').in('key', ['site_origin','wa_message_template','wa_show_template']);
     const sm = new Map((settings ?? []).map((s) => [s.key, s.value]));
-    const origin = (sm.get('site_origin') || 'https://replaytime.lovable.app').replace(/\/+$/, '');
+    const origin = (sm.get('site_origin') || 'https://realtime48stream.my.id').replace(/\/+$/, '');
     const tpl = sm.get('wa_message_template') ||
       '🎬 *ReplayTime*\n━━━━━━━━━━━━━━\n\n🎤 *{title}*\n{date_line}🔗 *Link Akses*\n{link}\n{password_line}{live_link_block}━━━━━━━━━━━━━━\n✨ Selamat menonton! 💖';
     const showTpl = sm.get('wa_show_template') ||
@@ -169,7 +169,7 @@ Deno.serve(async (req) => {
     }
     if (isReplayOnlyPurchase) password = '';
     const dateStr = new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
-    const plainSite = (origin || 'https://replaytime.lovable.app').replace(/^https?:\/\//, '').replace(/\/+$/, '');
+    const plainSite = (origin || 'https://realtime48stream.my.id').replace(/^https?:\/\//, '').replace(/\/+$/, '');
     const fillTpl = (t: string, dateValue: string, linkValue: string, liveLinkValue: string) => t
       .replace(/\{date_line\}/g, dateValue ? `📅 ${dateValue}\n\n` : '')
       .replace(/\{password_line\}/g, password ? `🗝️ Sandi: *${password}*\n\n` : '')

@@ -184,7 +184,7 @@ Deno.serve(async (req) => {
     const { data: settings } = await admin
       .from('site_settings').select('key,value').in('key', ['site_origin','wa_membership_template']);
     const sm = new Map((settings ?? []).map((s) => [s.key, s.value]));
-    const origin = (sm.get('site_origin') || 'https://replaytime.lovable.app').replace(/\/+$/, '');
+    const origin = (sm.get('site_origin') || 'https://realtime48stream.my.id').replace(/\/+$/, '');
     const tpl = sm.get('wa_membership_template') ||
       '👑 *MEMBERSHIP AKTIF*\n\n📦 *{package_name}*\n📅 Berlaku hingga: {expires_at}\n\n🔗 *Link Akses:*\n{link}\n\n{replay_info_block}👤 Berlaku untuk *{max_devices} perangkat*.\n\n— *ReplayTime* 💖';
     const link = `${origin}/live?mtoken=${encodeURIComponent(tok.token)}&mp=${encodeURIComponent(tok.password)}`;
@@ -306,7 +306,7 @@ Deno.serve(async (req) => {
   const { data: settings } = await admin
     .from('site_settings').select('key,value').in('key', ['site_origin', 'wa_message_template', 'wa_show_template']);
   const sm = new Map((settings ?? []).map((s) => [s.key, s.value]));
-  const origin = (sm.get('site_origin') || 'https://replaytime.lovable.app').replace(/\/+$/, '');
+  const origin = (sm.get('site_origin') || 'https://realtime48stream.my.id').replace(/\/+$/, '');
   const tpl = sm.get('wa_message_template') ||
     '🎬 *ReplayTime*\n━━━━━━━━━━━━━━\n\n🎤 *{title}*\n{date_line}🔗 *Link Akses*\n{link}\n{password_line}{live_link_block}━━━━━━━━━━━━━━\n✨ Selamat menonton! 💖';
   const showTpl = sm.get('wa_show_template') ||
@@ -338,7 +338,7 @@ Deno.serve(async (req) => {
   if (isReplayOnlyPurchase) password = '';
 
   const dateStr = new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
-  const plainSite = (origin || 'https://replaytime.lovable.app').replace(/^https?:\/\//, '').replace(/\/+$/, '');
+  const plainSite = (origin || 'https://realtime48stream.my.id').replace(/^https?:\/\//, '').replace(/\/+$/, '');
   const fillTpl = (t: string, dateValue: string, linkValue: string, liveLinkValue: string) => t
     .replace(/\{date_line\}/g, dateValue ? `📅 ${dateValue}\n\n` : '')
     .replace(/\{password_line\}/g, password ? `🗝️ Sandi: *${password}*\n\n` : '')

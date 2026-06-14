@@ -56,7 +56,7 @@ Deno.serve(async (req) => {
 
   const { data: settings } = await admin.from('site_settings').select('key,value');
   const map = new Map((settings ?? []).map((s: any) => [s.key, s.value]));
-  const origin = ((map.get('site_origin') as string) || 'https://replaytime.lovable.app').replace(/\/+$/, '');
+  const origin = ((map.get('site_origin') as string) || 'https://realtime48stream.my.id').replace(/\/+$/, '');
   const siteOnly = origin.replace(/^https?:\/\//, '');
   const tpl = (map.get('wa_message_template') as string) || DEFAULT_WA_TPL;
 
