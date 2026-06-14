@@ -250,6 +250,11 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
     userUnmutedRef.current = false;
     liveEndedRef.current = false;
     setDetectedLive(!!isLive);
+    // Reset adaptive-quality state untuk source baru.
+    qualityCapIdxRef.current = 0;
+    availableQualitiesRef.current = [];
+    bufferEventsRef.current = [];
+    lastDowngradeAtRef.current = 0;
 
     setDuration(0);
     setCurrentTime(0);
