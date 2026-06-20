@@ -359,8 +359,8 @@ Deno.serve(async (req) => {
   const pendingSince = new Date(Date.now() - 2 * 24 * 3600_000).toISOString();
   const unsentSince = new Date(Date.now() - 30 * 24 * 3600_000).toISOString();
   const [{ data: paidUnsent, error: paidErr }, { data: pendingOrders, error: pendingErr }] = await Promise.all([
-    admin.from('orders').select('*').eq('status', 'paid').gte('created_at', unsentSince).order('paid_at', { ascending: false }).limit(2),
-    admin.from('orders').select('*').eq('status', 'pending').gte('created_at', pendingSince).order('created_at', { ascending: false }).limit(2),
+    admin.from('orders').select('*').eq('status', 'paid').is('token_sent_at', null).gte('created_at', unsentSince).order('paid_at', { ascending: false }).limit(15),
+    admin.from('orders').select('*').eq('status', 'pending').gte('created_at', pendingSince).order('created_at', { ascending: false }).limit(20),
   ]);
   const error = paidErr || pendingErr;
   if (error) return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: corsHeaders });
@@ -410,7 +410,7 @@ Deno.serve(async (req) => {
       .eq('kind', 'qris')
       .not('pakasir_order_id', 'is', null)
       .gte('created_at', pendingSince)
-      .order('created_at', { ascending: false }).limit(1);
+      .order('created_at', { ascending: false }).limit(10);
     for (const mo of mOrders ?? []) {
       try {
         // Skip jika sudah punya token & WA sudah pernah sukses (idempotent guard).
