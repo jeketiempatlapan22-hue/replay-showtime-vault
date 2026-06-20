@@ -410,7 +410,7 @@ Deno.serve(async (req) => {
       .eq('kind', 'qris')
       .not('pakasir_order_id', 'is', null)
       .gte('created_at', pendingSince)
-      .order('created_at', { ascending: false }).limit(1);
+      .order('created_at', { ascending: false }).limit(10);
     for (const mo of mOrders ?? []) {
       try {
         // Skip jika sudah punya token & WA sudah pernah sukses (idempotent guard).
