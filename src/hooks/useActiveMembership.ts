@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import {
   MEMBERSHIP_UPDATED_EVENT,
+  clearMembershipCredentials,
   readMembershipCredentials,
   saveMembershipCredentials,
 } from '@/lib/membershipAccess';
