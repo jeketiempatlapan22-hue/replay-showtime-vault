@@ -973,6 +973,59 @@ export type Database = {
         }
         Relationships: []
       }
+      membership_payment_proofs: {
+        Row: {
+          amount: number
+          created_at: string
+          email: string
+          expires_at: string
+          handled: boolean
+          id: string
+          image_path: string
+          note: string
+          order_id: string | null
+          package_name: string
+          phone: string
+          user_id: string | null
+        }
+        Insert: {
+          amount?: number
+          created_at?: string
+          email?: string
+          expires_at?: string
+          handled?: boolean
+          id?: string
+          image_path: string
+          note?: string
+          order_id?: string | null
+          package_name?: string
+          phone?: string
+          user_id?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          email?: string
+          expires_at?: string
+          handled?: boolean
+          id?: string
+          image_path?: string
+          note?: string
+          order_id?: string | null
+          package_name?: string
+          phone?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "membership_payment_proofs_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "membership_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       membership_token_devices: {
         Row: {
           browser_id: string
@@ -1624,6 +1677,10 @@ export type Database = {
         Args: { _phone?: string }
         Returns: number
       }
+      admin_delete_membership_proof: {
+        Args: { _id: string }
+        Returns: undefined
+      }
       admin_delete_membership_user: {
         Args: { _order_id: string }
         Returns: undefined
@@ -1852,6 +1909,29 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      admin_list_membership_proofs: {
+        Args: never
+        Returns: {
+          amount: number
+          created_at: string
+          email: string
+          expires_at: string
+          handled: boolean
+          id: string
+          image_path: string
+          note: string
+          order_id: string | null
+          package_name: string
+          phone: string
+          user_id: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "membership_payment_proofs"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       admin_list_membership_tokens: {
         Args: { _q?: string; _status?: string }
         Returns: {
@@ -1965,6 +2045,10 @@ export type Database = {
         Args: { _audit_id: string }
         Returns: boolean
       }
+      admin_set_proof_handled: {
+        Args: { _handled: boolean; _id: string }
+        Returns: undefined
+      }
       admin_unblock_ip: { Args: { _id: string }; Returns: boolean }
       admin_unblock_token: {
         Args: { _kind: string; _token_id: string }
@@ -1990,6 +2074,7 @@ export type Database = {
           seconds_remaining: number
         }[]
       }
+      cleanup_expired_membership_proofs: { Args: never; Returns: number }
       convert_show_to_replay: { Args: { _show_id: string }; Returns: string }
       credit_coin_topup_order: {
         Args: { _order_id: string }
