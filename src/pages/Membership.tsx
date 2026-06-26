@@ -217,6 +217,13 @@ export default function Membership() {
       </div>
 
       <div className="max-w-3xl mx-auto p-4 space-y-4">
+        {activeMembership && !showShop ? (
+          <MembershipDashboard membership={activeMembership} onShopMore={() => setShowShop(true)} />
+        ) : (
+        <>
+        {activeMembership && showShop && (
+          <Button variant="ghost" size="sm" onClick={() => setShowShop(false)} className="-mt-2"><ArrowLeft className="w-4 h-4 mr-1" /> Kembali ke dasbor membership</Button>
+        )}
         <Card className="bg-gradient-to-br from-primary/15 via-primary/5 to-transparent border-primary/30">
           <CardContent className="p-5 space-y-2">
             <div className="flex items-center gap-2 text-primary">
