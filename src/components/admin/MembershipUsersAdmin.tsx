@@ -325,10 +325,19 @@ export default function MembershipUsersAdmin() {
               <div><Label>Nomor WhatsApp</Label><Input value={createForm.phone} onChange={e => setCreateForm(f => ({ ...f, phone: e.target.value }))} placeholder="0812xxxx" /></div>
               <div>
                 <Label>Paket</Label>
-                <Select value={createForm.package_id} onValueChange={onPkgChange}>
-                  <SelectTrigger><SelectValue placeholder="Pilih paket" /></SelectTrigger>
-                  <SelectContent>{pkgs.map(p => <SelectItem key={p.id} value={p.id}>{p.name} ({p.duration_days}h)</SelectItem>)}</SelectContent>
-                </Select>
+                <select
+                  value={createForm.package_id}
+                  onChange={(e) => onPkgChange(e.target.value)}
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
+                >
+                  <option value="" disabled>{pkgs.length ? 'Pilih paket' : 'Memuat paket...'}</option>
+                  {pkgs.map((p) => (
+                    <option key={p.id} value={p.id}>{p.name} ({p.duration_days}h)</option>
+                  ))}
+                </select>
+                {pkgs.length === 0 && (
+                  <p className="text-[10px] text-muted-foreground mt-1">Belum ada paket. Buat dulu di menu “Paket Membership”.</p>
+                )}
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div><Label>Durasi (hari)</Label><Input type="number" min={1} value={createForm.days} onChange={e => setCreateForm(f => ({ ...f, days: parseInt(e.target.value)||1 }))} /></div>
