@@ -4,12 +4,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Switch } from '@/components/ui/switch';
-import { Copy, Edit2, Trash2, RotateCcw, Search, RefreshCw, Link2 } from 'lucide-react';
+import { Copy, Edit2, Trash2, RotateCcw, Search, RefreshCw, Link2, Plus, Send, Loader2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
 type Row = {
@@ -22,7 +23,20 @@ type Row = {
   devices_used: number; days_remaining: number | null; status: string;
 };
 
-const SITE = (typeof window !== 'undefined' ? window.location.origin : 'https://realtime48stream.my.id');
+type Pkg = {
+  id: string; name: string; duration_days: number;
+  max_devices: number; includes_replays: boolean; replay_info: string;
+};
+
+const SITE = 'https://realtime48stream.my.id';
+
+function normPhone(raw: string) {
+  const d = String(raw || '').replace(/\D/g, '');
+  if (!d) return '';
+  if (d.startsWith('0')) return '62' + d.slice(1);
+  if (d.startsWith('8')) return '62' + d;
+  return d;
+}
 
 export default function MembershipUsersAdmin() {
   const [rows, setRows] = useState<Row[]>([]);
@@ -30,7 +44,17 @@ export default function MembershipUsersAdmin() {
   const [q, setQ] = useState('');
   const [status, setStatus] = useState<'all'|'active'|'expired'|'revoked'>('all');
   const [edit, setEdit] = useState<Row | null>(null);
-  const [editForm, setEditForm] = useState<{ email: string; phone: string; expires_at: string; max_devices: number; includes_replays: boolean; revoked: boolean }>({ email: '', phone: '', expires_at: '', max_devices: 1, includes_replays: true, revoked: false });
+  const [editForm, setEditForm] = useState<{ email: string; phone: string; expires_at: string; max_devices: number; includes_replays: boolean; revoked: boolean; extend: number }>({ email: '', phone: '', expires_at: '', max_devices: 1, includes_replays: true, revoked: false, extend: 0 });
+  const [sendingId, setSendingId] = useState<string | null>(null);
+
+  // Create dialog state
+  const [pkgs, setPkgs] = useState<Pkg[]>([]);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [createForm, setCreateForm] = useState<{ email: string; phone: string; package_id: string; days: number; max_devices: number; includes_replays: boolean; replay_info: string }>({
+    email: '', phone: '', package_id: '', days: 30, max_devices: 1, includes_replays: true, replay_info: ''
+  });
+  const [createdInfo, setCreatedInfo] = useState<{ order_id: string; token_id: string; token: string; password: string; link: string; phone: string } | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -40,7 +64,16 @@ export default function MembershipUsersAdmin() {
     setRows((data || []) as any);
   };
 
+  const loadPkgs = async () => {
+    const { data } = await supabase
+      .from('membership_packages')
+      .select('id,name,duration_days,max_devices,includes_replays,replay_info')
+      .order('sort_order').order('created_at');
+    setPkgs((data || []) as Pkg[]);
+  };
+
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [status]);
+  useEffect(() => { void loadPkgs(); }, []);
 
   const copy = async (text: string, label: string) => {
     try { await navigator.clipboard.writeText(text); toast({ title: `${label} disalin` }); }
@@ -52,22 +85,25 @@ export default function MembershipUsersAdmin() {
   const openEdit = (r: Row) => {
     setEdit(r);
     setEditForm({
-      email: r.email || '',
-      phone: r.phone || '',
+      email: r.email || '', phone: r.phone || '',
       expires_at: r.expires_at ? new Date(r.expires_at).toISOString().slice(0,16) : '',
       max_devices: r.max_devices || 1,
-      includes_replays: r.includes_replays,
-      revoked: r.revoked,
+      includes_replays: r.includes_replays, revoked: r.revoked, extend: 0,
     });
   };
 
   const saveEdit = async () => {
     if (!edit) return;
+    let expiresIso: string | null = editForm.expires_at ? new Date(editForm.expires_at).toISOString() : null;
+    if (editForm.extend && editForm.extend > 0) {
+      const base = expiresIso && new Date(expiresIso).getTime() > Date.now() ? new Date(expiresIso).getTime() : Date.now();
+      expiresIso = new Date(base + editForm.extend * 86400_000).toISOString();
+    }
     const { error } = await supabase.rpc('admin_update_membership_user', {
       _order_id: edit.order_id,
       _email: editForm.email || null,
       _phone: editForm.phone || null,
-      _expires_at: editForm.expires_at ? new Date(editForm.expires_at).toISOString() : null,
+      _expires_at: expiresIso,
       _max_devices: editForm.max_devices,
       _includes_replays: editForm.includes_replays,
       _revoked: editForm.revoked,
@@ -82,7 +118,7 @@ export default function MembershipUsersAdmin() {
     if (!r.token_id) return;
     const { error } = await supabase.rpc('admin_reset_token_devices', { _kind: 'membership', _token_id: r.token_id });
     if (error) return toast({ title: 'Gagal reset', description: error.message, variant: 'destructive' });
-    toast({ title: 'Device direset', description: 'Kuota kembali ke 0.' });
+    toast({ title: 'Device direset' });
     load();
   };
 
@@ -91,6 +127,75 @@ export default function MembershipUsersAdmin() {
     if (error) return toast({ title: 'Gagal menghapus', description: error.message, variant: 'destructive' });
     toast({ title: 'User membership dihapus' });
     load();
+  };
+
+  const sendWa = async (tokenId: string | null, phoneOverride?: string) => {
+    if (!tokenId) return toast({ title: 'Tidak ada token', variant: 'destructive' });
+    setSendingId(tokenId);
+    try {
+      const { data, error } = await supabase.functions.invoke('send-membership-token-wa', {
+        body: { token_id: tokenId, phone: phoneOverride || undefined },
+      });
+      if (error) throw error;
+      const r: any = data;
+      if (r?.ok) toast({ title: 'Pesan WhatsApp terkirim' });
+      else toast({ title: 'Gagal kirim WA', description: JSON.stringify(r?.data || r), variant: 'destructive' });
+    } catch (e: any) {
+      toast({ title: 'Gagal kirim WA', description: String(e?.message || e), variant: 'destructive' });
+    } finally {
+      setSendingId(null);
+    }
+  };
+
+  const openCreate = () => {
+    setCreatedInfo(null);
+    setCreateForm({
+      email: '', phone: '', package_id: pkgs[0]?.id || '',
+      days: pkgs[0]?.duration_days || 30,
+      max_devices: pkgs[0]?.max_devices || 1,
+      includes_replays: pkgs[0]?.includes_replays ?? true,
+      replay_info: pkgs[0]?.replay_info || '',
+    });
+    setCreateOpen(true);
+  };
+
+  const onPkgChange = (id: string) => {
+    const p = pkgs.find(x => x.id === id);
+    setCreateForm(f => ({
+      ...f, package_id: id,
+      days: p?.duration_days || f.days,
+      max_devices: p?.max_devices || f.max_devices,
+      includes_replays: p?.includes_replays ?? f.includes_replays,
+      replay_info: p?.replay_info || f.replay_info,
+    }));
+  };
+
+  const submitCreate = async () => {
+    const email = createForm.email.trim().toLowerCase();
+    const phone = normPhone(createForm.phone);
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return toast({ title: 'Email tidak valid', variant: 'destructive' });
+    if (!/^62\d{8,13}$/.test(phone)) return toast({ title: 'Nomor WhatsApp tidak valid', variant: 'destructive' });
+    if (!createForm.package_id) return toast({ title: 'Pilih paket dulu', variant: 'destructive' });
+    if (!createForm.days || createForm.days < 1) return toast({ title: 'Durasi tidak valid', variant: 'destructive' });
+    setCreating(true);
+    try {
+      const { data, error } = await supabase.rpc('admin_create_membership_user', {
+        _email: email, _phone: phone, _package_id: createForm.package_id,
+        _days: createForm.days, _max_devices: createForm.max_devices,
+        _includes_replays: createForm.includes_replays, _replay_info: createForm.replay_info,
+      });
+      if (error) throw error;
+      const r: any = data;
+      if (!r?.ok) throw new Error(r?.error || 'gagal');
+      const link = `${SITE}/live?mtoken=${encodeURIComponent(r.token)}&mp=${encodeURIComponent(r.password)}`;
+      setCreatedInfo({ order_id: r.order_id, token_id: r.token_id, token: r.token, password: r.password, link, phone });
+      toast({ title: 'User membership dibuat' });
+      load();
+    } catch (e: any) {
+      toast({ title: 'Gagal membuat', description: String(e?.message || e), variant: 'destructive' });
+    } finally {
+      setCreating(false);
+    }
   };
 
   const filtered = useMemo(() => {
@@ -107,9 +212,12 @@ export default function MembershipUsersAdmin() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="font-sans text-base sm:text-lg flex items-center justify-between gap-2">
+        <CardTitle className="font-sans text-base sm:text-lg flex items-center justify-between gap-2 flex-wrap">
           <span>User Membership ({filtered.length})</span>
-          <Button size="sm" variant="outline" onClick={load} disabled={loading}><RefreshCw className={`w-4 h-4 mr-1 ${loading?'animate-spin':''}`} />Muat</Button>
+          <div className="flex gap-1.5">
+            <Button size="sm" onClick={openCreate}><Plus className="w-4 h-4 mr-1" />Buat User</Button>
+            <Button size="sm" variant="outline" onClick={load} disabled={loading}><RefreshCw className={`w-4 h-4 mr-1 ${loading?'animate-spin':''}`} />Muat</Button>
+          </div>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -154,6 +262,11 @@ export default function MembershipUsersAdmin() {
                 {r.token && <Button size="sm" variant="outline" onClick={() => copy(r.token, 'Token')}><Copy className="w-3.5 h-3.5 mr-1" />Token</Button>}
                 {r.password && <Button size="sm" variant="outline" onClick={() => copy(r.password, 'Sandi')}><Copy className="w-3.5 h-3.5 mr-1" />Sandi</Button>}
                 {r.token && <Button size="sm" variant="outline" onClick={() => copy(linkFor(r), 'Link')}><Link2 className="w-3.5 h-3.5 mr-1" />Link</Button>}
+                {r.token_id && r.phone && (
+                  <Button size="sm" variant="outline" onClick={() => sendWa(r.token_id, r.phone)} disabled={sendingId===r.token_id}>
+                    {sendingId===r.token_id ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <Send className="w-3.5 h-3.5 mr-1" />}Kirim WA
+                  </Button>
+                )}
                 <Button size="sm" variant="outline" onClick={() => openEdit(r)}><Edit2 className="w-3.5 h-3.5 mr-1" />Edit</Button>
                 {r.token_id && <Button size="sm" variant="outline" onClick={() => resetDevices(r)}><RotateCcw className="w-3.5 h-3.5 mr-1" />Reset</Button>}
                 <AlertDialog>
@@ -163,7 +276,7 @@ export default function MembershipUsersAdmin() {
                   <AlertDialogContent>
                     <AlertDialogHeader>
                       <AlertDialogTitle>Hapus user membership ini?</AlertDialogTitle>
-                      <AlertDialogDescription>Order dan token akan dihapus permanen. Aksi ini tidak bisa dibatalkan.</AlertDialogDescription>
+                      <AlertDialogDescription>Order dan token akan dihapus permanen.</AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                       <AlertDialogCancel>Batal</AlertDialogCancel>
@@ -178,6 +291,7 @@ export default function MembershipUsersAdmin() {
         </div>
       </CardContent>
 
+      {/* Edit dialog */}
       <Dialog open={!!edit} onOpenChange={(o) => !o && setEdit(null)}>
         <DialogContent>
           <DialogHeader><DialogTitle>Edit User Membership</DialogTitle></DialogHeader>
@@ -185,6 +299,7 @@ export default function MembershipUsersAdmin() {
             <div><Label>Email</Label><Input value={editForm.email} onChange={e => setEditForm(f => ({ ...f, email: e.target.value }))} /></div>
             <div><Label>Phone (628xxx)</Label><Input value={editForm.phone} onChange={e => setEditForm(f => ({ ...f, phone: e.target.value }))} /></div>
             <div><Label>Berakhir</Label><Input type="datetime-local" value={editForm.expires_at} onChange={e => setEditForm(f => ({ ...f, expires_at: e.target.value }))} /></div>
+            <div><Label>Perpanjang (+hari)</Label><Input type="number" min={0} value={editForm.extend} onChange={e => setEditForm(f => ({ ...f, extend: parseInt(e.target.value)||0 }))} /><p className="text-[10px] text-muted-foreground mt-1">Akan menambah N hari dari tanggal berakhir saat ini (atau dari sekarang bila sudah lewat).</p></div>
             <div><Label>Max Device</Label><Input type="number" min={1} value={editForm.max_devices} onChange={e => setEditForm(f => ({ ...f, max_devices: parseInt(e.target.value)||1 }))} /></div>
             <div className="flex items-center justify-between"><Label>Termasuk replay</Label><Switch checked={editForm.includes_replays} onCheckedChange={(v) => setEditForm(f => ({ ...f, includes_replays: v }))} /></div>
             <div className="flex items-center justify-between"><Label>Dicabut (revoked)</Label><Switch checked={editForm.revoked} onCheckedChange={(v) => setEditForm(f => ({ ...f, revoked: v }))} /></div>
@@ -193,6 +308,57 @@ export default function MembershipUsersAdmin() {
             <Button variant="outline" onClick={() => setEdit(null)}>Batal</Button>
             <Button onClick={saveEdit}>Simpan</Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create dialog */}
+      <Dialog open={createOpen} onOpenChange={(o) => { if (!creating) { setCreateOpen(o); if (!o) setCreatedInfo(null); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Buat User Membership Baru</DialogTitle>
+            <DialogDescription className="text-xs">Token link & order akan dibuat otomatis. Klik “Kirim WA” untuk mengirim ke user.</DialogDescription>
+          </DialogHeader>
+
+          {!createdInfo ? (
+            <div className="space-y-3">
+              <div><Label>Email user</Label><Input type="email" value={createForm.email} onChange={e => setCreateForm(f => ({ ...f, email: e.target.value }))} placeholder="nama@email.com" /></div>
+              <div><Label>Nomor WhatsApp</Label><Input value={createForm.phone} onChange={e => setCreateForm(f => ({ ...f, phone: e.target.value }))} placeholder="0812xxxx" /></div>
+              <div>
+                <Label>Paket</Label>
+                <Select value={createForm.package_id} onValueChange={onPkgChange}>
+                  <SelectTrigger><SelectValue placeholder="Pilih paket" /></SelectTrigger>
+                  <SelectContent>{pkgs.map(p => <SelectItem key={p.id} value={p.id}>{p.name} ({p.duration_days}h)</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div><Label>Durasi (hari)</Label><Input type="number" min={1} value={createForm.days} onChange={e => setCreateForm(f => ({ ...f, days: parseInt(e.target.value)||1 }))} /></div>
+                <div><Label>Max Device</Label><Input type="number" min={1} value={createForm.max_devices} onChange={e => setCreateForm(f => ({ ...f, max_devices: parseInt(e.target.value)||1 }))} /></div>
+              </div>
+              <div className="flex items-center justify-between"><Label>Termasuk replay</Label><Switch checked={createForm.includes_replays} onCheckedChange={(v) => setCreateForm(f => ({ ...f, includes_replays: v }))} /></div>
+              <div><Label>Info Replay (opsional)</Label><Textarea rows={3} value={createForm.replay_info} onChange={e => setCreateForm(f => ({ ...f, replay_info: e.target.value }))} placeholder="Sandi replay & info lain (sama seperti yang dikirim WA)" /></div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setCreateOpen(false)} disabled={creating}>Batal</Button>
+                <Button onClick={submitCreate} disabled={creating}>{creating ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Buat & Lanjut'}</Button>
+              </DialogFooter>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="rounded-md border border-green-500/40 bg-green-500/10 p-3 text-xs text-green-700 dark:text-green-300">
+                ✅ Membership berhasil dibuat. Klik “Kirim WA” untuk mengirim link & info ke {createdInfo.phone}.
+              </div>
+              <div className="space-y-1.5 text-xs">
+                <div><span className="text-muted-foreground">Token:</span> <span className="font-mono">{createdInfo.token}</span> <Button size="sm" variant="ghost" onClick={() => copy(createdInfo.token, 'Token')}><Copy className="w-3 h-3" /></Button></div>
+                <div><span className="text-muted-foreground">Sandi Replay:</span> <span className="font-mono">{createdInfo.password}</span> <Button size="sm" variant="ghost" onClick={() => copy(createdInfo.password, 'Sandi')}><Copy className="w-3 h-3" /></Button></div>
+                <div className="break-all"><span className="text-muted-foreground">Link:</span> <span className="font-mono">{createdInfo.link}</span> <Button size="sm" variant="ghost" onClick={() => copy(createdInfo.link, 'Link')}><Copy className="w-3 h-3" /></Button></div>
+              </div>
+              <DialogFooter className="gap-2">
+                <Button variant="outline" onClick={() => { setCreateOpen(false); setCreatedInfo(null); }}>Tutup</Button>
+                <Button onClick={() => sendWa(createdInfo.token_id, createdInfo.phone)} disabled={sendingId===createdInfo.token_id}>
+                  {sendingId===createdInfo.token_id ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Send className="w-4 h-4 mr-1" />}Kirim WA
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </Card>
