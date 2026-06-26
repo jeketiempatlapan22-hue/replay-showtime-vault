@@ -1,12 +1,25 @@
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Crown, Copy, Radio, Play, Sparkles, Calendar, ShieldCheck, KeyRound } from 'lucide-react';
+import { Crown, Copy, Radio, Play, Sparkles, Calendar, ShieldCheck, KeyRound, PackagePlus, ArrowRight, Coins, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import DeviceResetButton from '@/components/DeviceResetButton';
 import { siteLink } from '@/lib/siteOrigin';
+import { supabase } from '@/integrations/supabase/client';
 import type { ActiveMembership } from '@/hooks/useActiveMembership';
+
+interface OpenPkg {
+  id: string;
+  name: string;
+  duration_days: number;
+  price_idr: number;
+  price_coins: number;
+  quota_total: number;
+  quota_reserved: number;
+  status: string;
+}
 
 function fmtDate(iso: string | null) {
   if (!iso) return '-';
