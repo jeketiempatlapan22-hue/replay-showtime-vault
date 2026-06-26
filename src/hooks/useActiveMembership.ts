@@ -98,7 +98,13 @@ export function useActiveMembership(): { membership: ActiveMembership | null; lo
     void run();
     const onUpd = () => { void run(); };
     window.addEventListener(MEMBERSHIP_UPDATED_EVENT, onUpd);
-    return () => { cancelled = true; window.removeEventListener(MEMBERSHIP_UPDATED_EVENT, onUpd); };
+    // Auto-refresh tiap 60 detik supaya UI berpindah ke mode beli ketika expiry lewat.
+    const interval = window.setInterval(() => { void run(); }, 60_000);
+    return () => {
+      cancelled = true;
+      window.removeEventListener(MEMBERSHIP_UPDATED_EVENT, onUpd);
+      window.clearInterval(interval);
+    };
   }, [user?.id]);
 
   const refresh = () => {
