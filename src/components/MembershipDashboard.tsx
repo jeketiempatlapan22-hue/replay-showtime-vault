@@ -157,11 +157,77 @@ export default function MembershipDashboard({ membership, onShopMore }: { member
         </Card>
       )}
 
-      <div className="pt-1 text-center">
-        <Button variant="ghost" size="sm" onClick={onShopMore} className="text-xs text-muted-foreground">
-          Lihat paket membership lain
-        </Button>
-      </div>
+      {/* Banner perpanjang membership */}
+      <Card className="relative overflow-hidden border-2 border-amber-400/50 bg-gradient-to-br from-amber-500/15 via-primary/5 to-transparent">
+        <div className="absolute -bottom-10 -left-10 w-32 h-32 rounded-full bg-amber-400/20 blur-3xl pointer-events-none" />
+        <CardContent className="p-4 space-y-3 relative">
+          <div className="flex items-start gap-3">
+            <div className="shrink-0 w-10 h-10 rounded-lg bg-amber-500/20 flex items-center justify-center">
+              <PackagePlus className="w-5 h-5 text-amber-500" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="font-bold text-sm">Perpanjang Membership</h3>
+                {openPkgs.length > 0 && (
+                  <Badge className="bg-amber-500/20 text-amber-600 border-amber-500/30 hover:bg-amber-500/20 text-[10px]">
+                    {openPkgs.length} paket tersedia
+                  </Badge>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {openPkgs.length > 0
+                  ? 'Tambah durasi membership Anda dengan membeli paket baru yang admin buka. Token Anda tetap sama, durasi akan diperpanjang.'
+                  : 'Belum ada paket baru yang dibuka admin. Pantau halaman ini untuk update terbaru.'}
+              </p>
+            </div>
+          </div>
+
+          {openPkgs.length > 0 && (
+            <div className="space-y-1.5">
+              {openPkgs.slice(0, 3).map((p) => {
+                const remaining = Math.max(0, p.quota_total - p.quota_reserved);
+                return (
+                  <button
+                    key={p.id}
+                    onClick={onShopMore}
+                    className="w-full flex items-center gap-2 rounded-md bg-card/70 hover:bg-card border border-border hover:border-amber-400/50 px-3 py-2 text-left transition group"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="font-semibold text-sm truncate">{p.name}</div>
+                      <div className="text-[11px] text-muted-foreground flex items-center gap-2 flex-wrap">
+                        <span className="flex items-center gap-0.5"><Clock className="w-3 h-3" /> {p.duration_days} hari</span>
+                        <span>·</span>
+                        <span className="text-primary font-semibold">Rp {p.price_idr.toLocaleString('id-ID')}</span>
+                        {p.price_coins > 0 && (
+                          <>
+                            <span>·</span>
+                            <span className="flex items-center gap-0.5"><Coins className="w-3 h-3" /> {p.price_coins.toLocaleString('id-ID')}</span>
+                          </>
+                        )}
+                        <span>·</span>
+                        <span>{remaining} slot</span>
+                      </div>
+                    </div>
+                    <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-amber-500 transition shrink-0" />
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          <Button
+            onClick={onShopMore}
+            className="w-full gap-2 bg-amber-500 hover:bg-amber-600 text-white h-11"
+          >
+            <PackagePlus className="w-4 h-4" />
+            {openPkgs.length > 0 ? 'Lihat & Beli Paket Lainnya' : 'Buka Halaman Paket Membership'}
+          </Button>
+          <p className="text-[10px] text-center text-muted-foreground">
+            Pembelian paket baru akan menambah durasi membership Anda saat ini.
+          </p>
+        </CardContent>
+      </Card>
+
     </div>
   );
 }
