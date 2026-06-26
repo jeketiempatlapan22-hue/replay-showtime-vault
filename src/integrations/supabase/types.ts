@@ -1689,10 +1689,7 @@ export type Database = {
         }
         Returns: Json
       }
-      admin_delete_membership_proof: {
-        Args: { _id: string }
-        Returns: undefined
-      }
+      admin_delete_membership_proof: { Args: { _id: string }; Returns: string }
       admin_delete_membership_user: {
         Args: { _order_id: string }
         Returns: undefined
@@ -2090,7 +2087,12 @@ export type Database = {
           seconds_remaining: number
         }[]
       }
-      cleanup_expired_membership_proofs: { Args: never; Returns: number }
+      cleanup_expired_membership_proofs: {
+        Args: never
+        Returns: {
+          deleted_path: string
+        }[]
+      }
       convert_show_to_replay: { Args: { _show_id: string }; Returns: string }
       credit_coin_topup_order: {
         Args: { _order_id: string }
