@@ -65,12 +65,19 @@ export default function MembershipUsersAdmin() {
   };
 
   const loadPkgs = async () => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('membership_packages')
-      .select('id,name,duration_days,max_devices,includes_replays,replay_info')
-      .order('sort_order').order('created_at');
+      .select('id,name,duration_days,max_devices,includes_replays,replay_info,sort_order,created_at')
+      .order('sort_order', { ascending: true })
+      .order('created_at', { ascending: true });
+    if (error) {
+      toast({ title: 'Gagal memuat paket', description: error.message, variant: 'destructive' });
+      setPkgs([]);
+      return;
+    }
     setPkgs((data || []) as Pkg[]);
   };
+
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [status]);
   useEffect(() => { void loadPkgs(); }, []);
