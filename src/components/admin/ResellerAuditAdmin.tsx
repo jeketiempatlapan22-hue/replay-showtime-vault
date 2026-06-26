@@ -24,7 +24,8 @@ type StatRow = {
 type PendingAction =
   | { type: 'clear_log'; phone?: string; label?: string }
   | { type: 'reset_devices'; phone?: string; label?: string }
-  | { type: 'exhaust'; phone: string; label?: string };
+  | { type: 'exhaust'; phone: string; label?: string }
+  | { type: 'delete_entry'; phone: string; kind: 'show' | 'replay' | 'membership'; target_id: string | null; target_title: string };
 
 const kindBadge: Record<string, { label: string; cls: string }> = {
   show: { label: '📺 Show', cls: 'bg-red-500/15 text-red-500 border-red-500/30' },
