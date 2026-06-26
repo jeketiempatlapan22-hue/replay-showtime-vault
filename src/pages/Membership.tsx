@@ -311,6 +311,8 @@ export default function Membership() {
         <div className="flex items-center gap-2 text-[11px] text-muted-foreground justify-center pt-2">
           <ShieldCheck className="w-3.5 h-3.5" /> Pembayaran aman via QRIS · Token otomatis terkirim ke WhatsApp
         </div>
+        </>
+        )}
       </div>
 
       {/* Picker dialog: input email + phone + pilih metode */}
