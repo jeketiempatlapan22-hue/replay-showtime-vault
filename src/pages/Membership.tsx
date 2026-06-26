@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import QRCode from 'qrcode';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Crown, Coins, Loader2, CheckCircle2, Smartphone, Mail, Sparkles, ShieldCheck, Copy } from 'lucide-react';
+import { ArrowLeft, Crown, Coins, Loader2, CheckCircle2, Smartphone, Mail, Sparkles, ShieldCheck, Copy, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -12,6 +12,9 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { saveMembershipCredentials } from '@/lib/membershipAccess';
+import { useActiveMembership } from '@/hooks/useActiveMembership';
+import MembershipDashboard from '@/components/MembershipDashboard';
+import MembershipProofUpload from '@/components/MembershipProofUpload';
 
 interface Pkg {
   id: string;
