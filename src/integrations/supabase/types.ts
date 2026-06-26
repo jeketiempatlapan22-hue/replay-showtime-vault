@@ -1611,10 +1611,26 @@ export type Database = {
         Args: { _ip: unknown; _reason: string }
         Returns: string
       }
+      admin_block_token: {
+        Args: { _kind: string; _token_id: string }
+        Returns: number
+      }
+      admin_bulk_delete_expired_tokens: {
+        Args: { _ids?: string[]; _kind: string }
+        Returns: number
+      }
       admin_clear_live_messages: { Args: never; Returns: number }
       admin_clear_reseller_copy_log: {
         Args: { _phone?: string }
         Returns: number
+      }
+      admin_delete_membership_user: {
+        Args: { _order_id: string }
+        Returns: undefined
+      }
+      admin_delete_token: {
+        Args: { _kind: string; _token_id: string }
+        Returns: undefined
       }
       admin_delete_wa_outbox_for_orders: {
         Args: { _order_ids: string[] }
@@ -1836,6 +1852,75 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      admin_list_membership_tokens: {
+        Args: { _q?: string; _status?: string }
+        Returns: {
+          created_at: string
+          created_by: string
+          devices_used: number
+          duration_days: number
+          expires_at: string
+          id: string
+          includes_replays: boolean
+          label: string
+          max_devices: number
+          package_id: string
+          package_name: string
+          password: string
+          phone: string
+          revoked: boolean
+          starts_at: string
+          status: string
+          token: string
+        }[]
+      }
+      admin_list_membership_users: {
+        Args: { _q?: string; _status?: string }
+        Returns: {
+          amount: number
+          coin_amount: number
+          created_at: string
+          days_remaining: number
+          devices_used: number
+          duration_days: number
+          email: string
+          expires_at: string
+          includes_replays: boolean
+          kind: string
+          max_devices: number
+          order_id: string
+          package_id: string
+          package_name: string
+          paid_at: string
+          password: string
+          phone: string
+          revoked: boolean
+          starts_at: string
+          status: string
+          token: string
+          token_id: string
+          user_id: string
+        }[]
+      }
+      admin_list_show_tokens: {
+        Args: { _q?: string; _status?: string }
+        Returns: {
+          created_at: string
+          devices_used: number
+          expires_at: string
+          id: string
+          kind: string
+          label: string
+          max_devices: number
+          revoked: boolean
+          show_date: string
+          show_id: string
+          show_title: string
+          single_use: boolean
+          status: string
+          token: string
+        }[]
+      }
       admin_override_reseller_bill: {
         Args: { _amount: number; _bill_id: string }
         Returns: undefined
@@ -1872,11 +1957,31 @@ export type Database = {
         Args: { _phone?: string }
         Returns: number
       }
+      admin_reset_token_devices: {
+        Args: { _kind: string; _token_id: string }
+        Returns: number
+      }
       admin_revoke_reseller_token: {
         Args: { _audit_id: string }
         Returns: boolean
       }
       admin_unblock_ip: { Args: { _id: string }; Returns: boolean }
+      admin_unblock_token: {
+        Args: { _kind: string; _token_id: string }
+        Returns: number
+      }
+      admin_update_membership_user: {
+        Args: {
+          _email: string
+          _expires_at: string
+          _includes_replays: boolean
+          _max_devices: number
+          _order_id: string
+          _phone: string
+          _revoked: boolean
+        }
+        Returns: undefined
+      }
       check_login_lock: {
         Args: { _identifier: string }
         Returns: {
