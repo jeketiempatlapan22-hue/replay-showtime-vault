@@ -301,6 +301,14 @@ export default function Membership() {
                     <Button className="w-full" disabled={disabled} onClick={() => openPicker(p)}>
                       {closed ? 'Membership Ditutup' : soldOut ? 'Kuota Habis' : 'Beli Sekarang'}
                     </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full gap-1 border-amber-500/40 text-amber-700 dark:text-amber-400 hover:bg-amber-500/10"
+                      onClick={() => { setPicked(p); setOrderId(null); setOrderAmount(p.price_idr); setProofOpen(true); }}
+                    >
+                      <Upload className="w-3.5 h-3.5" /> Sudah Bayar? Kirim Bukti & Hubungi Admin
+                    </Button>
                   </CardContent>
                 </Card>
               );
