@@ -93,6 +93,7 @@ export function useActiveMembership(): { membership: ActiveMembership | null; lo
       const m = await fetchMembership();
       if (cancelled) return;
       if (m) saveMembershipCredentials(m.token, m.password);
+      else clearMembershipCredentials();
       notify(m);
       setLoading(false);
     };
