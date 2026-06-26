@@ -55,6 +55,9 @@ function normalizePhone(raw: string) {
 export default function Membership() {
   const navigate = useNavigate();
   const { user, loading } = useAuth();
+  const { membership: activeMembership, refresh: refreshMembership } = useActiveMembership();
+  const [showShop, setShowShop] = useState(false);
+  const [proofOpen, setProofOpen] = useState(false);
   const [pkgs, setPkgs] = useState<Pkg[]>([]);
   const [balance, setBalance] = useState(0);
   const [pkgsLoading, setPkgsLoading] = useState(true);
