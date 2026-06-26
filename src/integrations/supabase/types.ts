@@ -1697,6 +1697,10 @@ export type Database = {
         Args: { _order_id: string }
         Returns: undefined
       }
+      admin_delete_reseller_copy_entry: {
+        Args: { _kind: string; _phone: string; _target_id: string }
+        Returns: Json
+      }
       admin_delete_token: {
         Args: { _kind: string; _token_id: string }
         Returns: undefined
