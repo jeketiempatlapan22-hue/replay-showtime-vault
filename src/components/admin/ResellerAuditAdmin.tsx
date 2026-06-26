@@ -180,9 +180,24 @@ export default function ResellerAuditAdmin() {
                             <Badge variant="outline" className={`text-[10px] shrink-0 ${kb.cls}`}>{kb.label}</Badge>
                             <span className="text-sm truncate">{it.target_title || '—'}</span>
                           </div>
-                          <div className="flex items-center gap-1.5 shrink-0 max-w-[45%] sm:max-w-none">
+                          <div className="flex items-center gap-1.5 shrink-0 max-w-[55%] sm:max-w-none">
                             <span className="hidden min-[380px]:inline text-[10px] text-muted-foreground truncate">{fmtDate(it.last_copied)}</span>
                             <Badge className="text-[11px] font-semibold">{it.copies} link</Badge>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10 shrink-0"
+                              title="Hapus riwayat & link token untuk show ini"
+                              onClick={() => setPending({
+                                type: 'delete_entry',
+                                phone: g.phone,
+                                kind: it.kind,
+                                target_id: it.target_id,
+                                target_title: it.target_title || '—',
+                              })}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
                           </div>
                         </div>
                       );
