@@ -24,7 +24,8 @@ type StatRow = {
 type PendingAction =
   | { type: 'clear_log'; phone?: string; label?: string }
   | { type: 'reset_devices'; phone?: string; label?: string }
-  | { type: 'exhaust'; phone: string; label?: string };
+  | { type: 'exhaust'; phone: string; label?: string }
+  | { type: 'delete_entry'; phone: string; kind: 'show' | 'replay' | 'membership'; target_id: string | null; target_title: string };
 
 const kindBadge: Record<string, { label: string; cls: string }> = {
   show: { label: '📺 Show', cls: 'bg-red-500/15 text-red-500 border-red-500/30' },
@@ -77,6 +78,15 @@ export default function ResellerAuditAdmin() {
         const { data, error } = await supabase.rpc('admin_reset_reseller_token_devices', { _phone: pending.phone ?? null });
         if (error) throw error;
         toast({ title: `${data ?? 0} perangkat dilepas. Link bisa dipakai lagi di perangkat lain.` });
+      } else if (pending.type === 'delete_entry') {
+        const { data, error } = await supabase.rpc('admin_delete_reseller_copy_entry', {
+          _phone: pending.phone,
+          _kind: pending.kind,
+          _target_id: pending.target_id,
+        });
+        if (error) throw error;
+        const res = (data ?? {}) as { log_deleted?: number; tokens_deleted?: number };
+        toast({ title: `Riwayat dihapus`, description: `${res.log_deleted ?? 0} catatan & ${res.tokens_deleted ?? 0} link token dihapus.` });
       } else {
         const { data, error } = await supabase.rpc('admin_exhaust_reseller_tokens', { _phone: pending.phone });
         if (error) throw error;
@@ -101,6 +111,8 @@ export default function ResellerAuditAdmin() {
         ? (pending.phone
             ? `daftar perangkat semua link token milik +${pending.phone}. Link tetap aktif dan bisa dipakai lagi di perangkat lain.`
             : `daftar perangkat SEMUA link token reseller. Semua link tetap aktif.`)
+        : pending.type === 'delete_entry'
+        ? `riwayat & SEMUA link token "${pending.target_title}" milik +${pending.phone}. Link akan langsung hilang dari website.`
         : `SEMUA link token aktif +${pending.phone} (link akan tidak bisa dipakai lagi)`)
     : '';
 
@@ -168,9 +180,24 @@ export default function ResellerAuditAdmin() {
                             <Badge variant="outline" className={`text-[10px] shrink-0 ${kb.cls}`}>{kb.label}</Badge>
                             <span className="text-sm truncate">{it.target_title || '—'}</span>
                           </div>
-                          <div className="flex items-center gap-1.5 shrink-0 max-w-[45%] sm:max-w-none">
+                          <div className="flex items-center gap-1.5 shrink-0 max-w-[55%] sm:max-w-none">
                             <span className="hidden min-[380px]:inline text-[10px] text-muted-foreground truncate">{fmtDate(it.last_copied)}</span>
                             <Badge className="text-[11px] font-semibold">{it.copies} link</Badge>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10 shrink-0"
+                              title="Hapus riwayat & link token untuk show ini"
+                              onClick={() => setPending({
+                                type: 'delete_entry',
+                                phone: g.phone,
+                                kind: it.kind,
+                                target_id: it.target_id,
+                                target_title: it.target_title || '—',
+                              })}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
                           </div>
                         </div>
                       );
@@ -191,6 +218,8 @@ export default function ResellerAuditAdmin() {
                 ? 'Habiskan link token reseller?'
                 : pending?.type === 'reset_devices'
                 ? 'Reset perangkat link token?'
+                : pending?.type === 'delete_entry'
+                ? 'Hapus riwayat & link token show ini?'
                 : 'Konfirmasi hapus riwayat'}
             </AlertDialogTitle>
             <AlertDialogDescription>
