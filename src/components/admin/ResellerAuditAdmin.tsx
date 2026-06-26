@@ -78,6 +78,15 @@ export default function ResellerAuditAdmin() {
         const { data, error } = await supabase.rpc('admin_reset_reseller_token_devices', { _phone: pending.phone ?? null });
         if (error) throw error;
         toast({ title: `${data ?? 0} perangkat dilepas. Link bisa dipakai lagi di perangkat lain.` });
+      } else if (pending.type === 'delete_entry') {
+        const { data, error } = await supabase.rpc('admin_delete_reseller_copy_entry', {
+          _phone: pending.phone,
+          _kind: pending.kind,
+          _target_id: pending.target_id,
+        });
+        if (error) throw error;
+        const res = (data ?? {}) as { log_deleted?: number; tokens_deleted?: number };
+        toast({ title: `Riwayat dihapus`, description: `${res.log_deleted ?? 0} catatan & ${res.tokens_deleted ?? 0} link token dihapus.` });
       } else {
         const { data, error } = await supabase.rpc('admin_exhaust_reseller_tokens', { _phone: pending.phone });
         if (error) throw error;
