@@ -20,13 +20,13 @@ const DEFAULT_MEMBERSHIP_TPL =
 function renderMembershipPreview(tpl: string) {
   const vars = {
     package_name: 'Premium 30 Hari',
-    link: 'https://replaytime.lovable.app/live?mtoken=ABC123&mp=PASS9999',
+    link: 'https://realtime48stream.my.id/live?mtoken=ABC123&mp=PASS9999',
     password: 'PASS9999',
     expires_at: '24 Juni 2026',
     duration_days: '30',
     max_devices: '1',
     replay_info: 'Daftar replay yang termasuk:\n• Show A (12/05)\n• Show B (18/05)',
-    site: 'replaytime.lovable.app',
+    site: 'realtime48stream.my.id',
   };
   return tpl
     .replace(/\{replay_info_block\}\n?/g, vars.replay_info ? `🎬 *Info Replay:*\n${vars.replay_info}\n\n` : '')
@@ -38,9 +38,9 @@ function renderShowPreview(tpl: string) {
   const vars = {
     title: 'PASSION 200% - Ladies Night',
     date: '2026-05-19 19:00',
-    live_link: 'https://replaytime.lovable.app/live?show=3e6c0444&t=b390f1055',
+    live_link: 'https://realtime48stream.my.id/live?show=3e6c0444&t=b390f1055',
     password: 'Ladies',
-    site: 'replaytime.lovable.app',
+    site: 'realtime48stream.my.id',
   };
   return tpl
     .replace(/\{password_line\}\n?/g, vars.password ? `🗝️ Sandi: *${vars.password}*\n\n` : '')
@@ -51,11 +51,11 @@ function renderPreview(tpl: string) {
   const vars = {
     title: 'Show • Sample Konser',
     date: '15 Mei 2026',
-    link: 'https://replaytime.lovable.app/akses?token=abc123&replay=xyz',
-    live_link: 'https://replaytime.lovable.app/live?show=xyz&t=abc123',
+    link: 'https://realtime48stream.my.id/akses?token=abc123&replay=xyz',
+    live_link: 'https://realtime48stream.my.id/live?show=xyz&t=abc123',
     password: 'KONSER48',
     order_id: 'rt-demo-001',
-    site: 'https://replaytime.lovable.app',
+    site: 'https://realtime48stream.my.id',
   };
   return tpl
     .replace(/\{date_line\}\n?/g, vars.date ? `📅 ${vars.date}\n` : '')
@@ -348,7 +348,7 @@ export default function PakasirAdmin() {
               ['{password}', 'Sandi dari kartu show'],
               ['{password_line}', 'Baris sandi (🔐)'],
               ['{order_id}', 'Order ID Pakasir'],
-              ['{site}', 'replaytime.lovable.app'],
+              ['{site}', 'realtime48stream.my.id'],
             ].map(([k, d]) => (
               <code key={k} className="bg-muted/40 rounded px-1.5 py-1 text-foreground" title={d}>
                 {k} <span className="text-muted-foreground">— {d}</span>
@@ -404,7 +404,7 @@ export default function PakasirAdmin() {
               ['{live_link}', 'Link token Live'],
               ['{password}', 'Sandi live show'],
               ['{password_line}', 'Baris sandi (🗝️)'],
-              ['{site}', 'replaytime.lovable.app'],
+              ['{site}', 'realtime48stream.my.id'],
             ].map(([k, d]) => (
               <code key={k} className="bg-muted/40 rounded px-1.5 py-1 text-foreground" title={d}>
                 {k} <span className="text-muted-foreground">— {d}</span>
@@ -463,7 +463,7 @@ export default function PakasirAdmin() {
               ['{max_devices}', 'Jumlah perangkat'],
               ['{replay_info}', 'Info replay (teks mentah)'],
               ['{replay_info_block}', 'Blok info replay (🎬)'],
-              ['{site}', 'replaytime.lovable.app'],
+              ['{site}', 'realtime48stream.my.id'],
             ].map(([k, d]) => (
               <code key={k} className="bg-muted/40 rounded px-1.5 py-1 text-foreground" title={d}>
                 {k} <span className="text-muted-foreground">— {d}</span>
