@@ -49,6 +49,8 @@ export default function MembershipUsersAdmin() {
 
   // Create dialog state
   const [pkgs, setPkgs] = useState<Pkg[]>([]);
+  const [pkgLoading, setPkgLoading] = useState(false);
+  const [pkgError, setPkgError] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const [createForm, setCreateForm] = useState<{ email: string; phone: string; package_id: string; days: number; max_devices: number; includes_replays: boolean; replay_info: string }>({
@@ -65,17 +67,35 @@ export default function MembershipUsersAdmin() {
   };
 
   const loadPkgs = async () => {
+    setPkgLoading(true);
+    setPkgError(null);
     const { data, error } = await supabase
       .from('membership_packages')
       .select('id,name,duration_days,max_devices,includes_replays,replay_info,sort_order,created_at')
       .order('sort_order', { ascending: true })
       .order('created_at', { ascending: true });
+    setPkgLoading(false);
     if (error) {
+      setPkgError(error.message);
       toast({ title: 'Gagal memuat paket', description: error.message, variant: 'destructive' });
       setPkgs([]);
       return;
     }
-    setPkgs((data || []) as Pkg[]);
+    const list = (data || []) as Pkg[];
+    setPkgs(list);
+    setCreateForm(f => {
+      if (f.package_id && list.some(p => p.id === f.package_id)) return f;
+      const first = list[0];
+      if (!first) return f;
+      return {
+        ...f,
+        package_id: first.id,
+        days: first.duration_days || f.days,
+        max_devices: first.max_devices || f.max_devices,
+        includes_replays: first.includes_replays ?? f.includes_replays,
+        replay_info: first.replay_info || f.replay_info,
+      };
+    });
   };
 
 
@@ -340,12 +360,15 @@ export default function MembershipUsersAdmin() {
                   onChange={(e) => onPkgChange(e.target.value)}
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
                 >
-                  <option value="" disabled>{pkgs.length ? 'Pilih paket' : 'Memuat paket...'}</option>
+                  <option value="" disabled>{pkgLoading ? 'Memuat paket...' : 'Pilih paket'}</option>
                   {pkgs.map((p) => (
                     <option key={p.id} value={p.id}>{p.name} ({p.duration_days}h)</option>
                   ))}
                 </select>
-                {pkgs.length === 0 && (
+                {pkgError && (
+                  <p className="text-[10px] text-destructive mt-1">Gagal memuat paket: {pkgError}</p>
+                )}
+                {!pkgError && !pkgLoading && pkgs.length === 0 && (
                   <p className="text-[10px] text-muted-foreground mt-1">Belum ada paket. Buat dulu di menu “Paket Membership”.</p>
                 )}
               </div>
