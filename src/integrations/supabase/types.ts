@@ -1645,15 +1645,7 @@ export type Database = {
           related_order_id?: string | null
           status?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "wa_outbox_related_order_id_fkey"
-            columns: ["related_order_id"]
-            isOneToOne: false
-            referencedRelation: "orders"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
     }
     Views: {
