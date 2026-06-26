@@ -1,0 +1,1 @@
+ALTER TABLE public.wa_outbox DROP CONSTRAINT IF EXISTS wa_outbox_related_order_id_fkey;
