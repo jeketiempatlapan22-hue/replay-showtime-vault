@@ -386,6 +386,13 @@ export default function Membership() {
               </div>
               <div className="text-lg font-bold text-primary">Rp {orderAmount.toLocaleString('id-ID')}</div>
               <p className="text-xs text-muted-foreground">Scan QRIS untuk membayar. Link membership akan dikirim ke WhatsApp.</p>
+              <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-[11px] text-left space-y-1">
+                <p className="font-semibold text-amber-700 dark:text-amber-400">Sudah bayar tapi belum dapat link?</p>
+                <p className="text-muted-foreground">Upload bukti transfer/QRIS, lalu admin akan menghubungi Anda di WhatsApp.</p>
+                <Button size="sm" variant="outline" className="w-full gap-1 h-8 text-xs" onClick={() => setProofOpen(true)}>
+                  <Upload className="w-3 h-3" /> Kirim Bukti Transaksi
+                </Button>
+              </div>
             </div>
           )}
           {paid && (
@@ -393,7 +400,7 @@ export default function Membership() {
               <CheckCircle2 className="w-12 h-12 text-green-500 mx-auto" />
               <p className="font-semibold">Pembayaran berhasil!</p>
               <p className="text-xs text-muted-foreground">Cek WhatsApp Anda untuk link akses membership.</p>
-              <Button className="w-full" onClick={() => { setPayOpen(false); navigate('/live'); }}>Buka Live Sekarang</Button>
+              <Button className="w-full" onClick={() => { setPayOpen(false); refreshMembership(); navigate('/live'); }}>Buka Live Sekarang</Button>
             </div>
           )}
         </DialogContent>
