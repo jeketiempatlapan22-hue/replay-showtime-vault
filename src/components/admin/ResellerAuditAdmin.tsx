@@ -218,6 +218,8 @@ export default function ResellerAuditAdmin() {
                 ? 'Habiskan link token reseller?'
                 : pending?.type === 'reset_devices'
                 ? 'Reset perangkat link token?'
+                : pending?.type === 'delete_entry'
+                ? 'Hapus riwayat & link token show ini?'
                 : 'Konfirmasi hapus riwayat'}
             </AlertDialogTitle>
             <AlertDialogDescription>
