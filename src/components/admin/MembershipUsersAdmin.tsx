@@ -164,7 +164,10 @@ export default function MembershipUsersAdmin() {
       replay_info: pkgs[0]?.replay_info || '',
     });
     setCreateOpen(true);
+    // Refresh paket setiap kali dialog dibuka supaya tidak stuck "Memuat paket..."
+    void loadPkgs();
   };
+
 
   const onPkgChange = (id: string) => {
     const p = pkgs.find(x => x.id === id);
