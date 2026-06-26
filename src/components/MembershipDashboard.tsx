@@ -29,11 +29,31 @@ function fmtDate(iso: string | null) {
 export default function MembershipDashboard({ membership, onShopMore }: { membership: ActiveMembership; onShopMore: () => void }) {
   const navigate = useNavigate();
   const link = siteLink(`/live?mtoken=${encodeURIComponent(membership.token)}`);
+  const [openPkgs, setOpenPkgs] = useState<OpenPkg[]>([]);
+
+  useEffect(() => {
+    const load = async () => {
+      const { data } = await supabase
+        .from('membership_packages')
+        .select('id,name,duration_days,price_idr,price_coins,quota_total,quota_reserved,status,sort_order')
+        .eq('status', 'open')
+        .order('sort_order');
+      const list = ((data || []) as OpenPkg[]).filter((p) => (p.quota_total - p.quota_reserved) > 0);
+      setOpenPkgs(list);
+    };
+    void load();
+    const ch = supabase
+      .channel('membership-dashboard-pkgs')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'membership_packages' }, () => void load())
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, []);
 
   const copy = async (text: string, label: string) => {
     try { await navigator.clipboard.writeText(text); toast.success(`${label} disalin`); }
     catch { toast.error('Gagal menyalin'); }
   };
+
 
   // Progress bar
   let pct = 100;
