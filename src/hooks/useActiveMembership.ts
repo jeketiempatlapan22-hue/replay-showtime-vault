@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import {
   MEMBERSHIP_UPDATED_EVENT,
+  clearMembershipCredentials,
   readMembershipCredentials,
   saveMembershipCredentials,
 } from '@/lib/membershipAccess';
@@ -92,13 +93,20 @@ export function useActiveMembership(): { membership: ActiveMembership | null; lo
       const m = await fetchMembership();
       if (cancelled) return;
       if (m) saveMembershipCredentials(m.token, m.password);
+      else clearMembershipCredentials();
       notify(m);
       setLoading(false);
     };
     void run();
     const onUpd = () => { void run(); };
     window.addEventListener(MEMBERSHIP_UPDATED_EVENT, onUpd);
-    return () => { cancelled = true; window.removeEventListener(MEMBERSHIP_UPDATED_EVENT, onUpd); };
+    // Auto-refresh tiap 60 detik supaya UI berpindah ke mode beli ketika expiry lewat.
+    const interval = window.setInterval(() => { void run(); }, 60_000);
+    return () => {
+      cancelled = true;
+      window.removeEventListener(MEMBERSHIP_UPDATED_EVENT, onUpd);
+      window.clearInterval(interval);
+    };
   }, [user?.id]);
 
   const refresh = () => {

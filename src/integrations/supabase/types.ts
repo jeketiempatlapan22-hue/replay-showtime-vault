@@ -1677,6 +1677,18 @@ export type Database = {
         Args: { _phone?: string }
         Returns: number
       }
+      admin_create_membership_user: {
+        Args: {
+          _days: number
+          _email: string
+          _includes_replays?: boolean
+          _max_devices?: number
+          _package_id: string
+          _phone: string
+          _replay_info?: string
+        }
+        Returns: Json
+      }
       admin_delete_membership_proof: {
         Args: { _id: string }
         Returns: undefined
