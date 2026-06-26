@@ -424,15 +424,6 @@ export default function Membership() {
               </div>
             </div>
             <div className="space-y-1">
-              <Label className="text-xs">Sandi</Label>
-              <div className="flex gap-1">
-                <Input readOnly value={successPassword} className="font-mono text-xs" />
-                <Button size="icon" variant="outline" onClick={() => { navigator.clipboard.writeText(successPassword); toast.success('Sandi disalin'); }}>
-                  <Copy className="w-3.5 h-3.5" />
-                </Button>
-              </div>
-            </div>
-            <div className="space-y-1">
               <Label className="text-xs">Link Akses</Label>
               <div className="flex gap-1">
                 <Input readOnly value={successLink} className="text-xs" />
@@ -441,10 +432,20 @@ export default function Membership() {
                 </Button>
               </div>
             </div>
-            <Button className="w-full" onClick={() => { setSuccessOpen(false); navigate('/live'); }}>Buka Live Sekarang</Button>
+            <Button className="w-full" onClick={() => { setSuccessOpen(false); refreshMembership(); navigate('/live'); }}>Buka Live Sekarang</Button>
           </div>
         </DialogContent>
       </Dialog>
+
+      <MembershipProofUpload
+        open={proofOpen}
+        onOpenChange={setProofOpen}
+        orderId={orderId}
+        packageName={picked?.name || ''}
+        amount={orderAmount}
+        defaultEmail={email}
+        defaultPhone={phone}
+      />
     </div>
   );
 }
