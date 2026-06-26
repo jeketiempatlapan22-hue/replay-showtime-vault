@@ -62,8 +62,13 @@ export default function MembershipProofsAdmin() {
 
   const remove = async (r: Proof) => {
     if (!confirm('Hapus bukti ini?')) return;
-    const { error } = await supabase.rpc('admin_delete_membership_proof', { _id: r.id });
+    const { data: path, error } = await supabase.rpc('admin_delete_membership_proof', { _id: r.id });
     if (error) return toast({ title: 'Gagal', description: error.message, variant: 'destructive' });
+    // Remove the underlying storage object via Storage API (SQL cannot touch storage.objects).
+    const p = (path as unknown as string) || r.image_path;
+    if (p) {
+      try { await supabase.storage.from('membership-proofs').remove([p]); } catch { /* best-effort */ }
+    }
     setRows((x) => x.filter((y) => y.id !== r.id));
     toast({ title: 'Bukti dihapus' });
   };
