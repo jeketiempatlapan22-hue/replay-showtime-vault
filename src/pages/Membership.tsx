@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import QRCode from 'qrcode';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Crown, Coins, Loader2, CheckCircle2, Smartphone, Mail, Sparkles, ShieldCheck, Copy } from 'lucide-react';
+import { ArrowLeft, Crown, Coins, Loader2, CheckCircle2, Smartphone, Mail, Sparkles, ShieldCheck, Copy, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -12,6 +12,9 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { saveMembershipCredentials } from '@/lib/membershipAccess';
+import { useActiveMembership } from '@/hooks/useActiveMembership';
+import MembershipDashboard from '@/components/MembershipDashboard';
+import MembershipProofUpload from '@/components/MembershipProofUpload';
 
 interface Pkg {
   id: string;
@@ -52,6 +55,9 @@ function normalizePhone(raw: string) {
 export default function Membership() {
   const navigate = useNavigate();
   const { user, loading } = useAuth();
+  const { membership: activeMembership, refresh: refreshMembership } = useActiveMembership();
+  const [showShop, setShowShop] = useState(false);
+  const [proofOpen, setProofOpen] = useState(false);
   const [pkgs, setPkgs] = useState<Pkg[]>([]);
   const [balance, setBalance] = useState(0);
   const [pkgsLoading, setPkgsLoading] = useState(true);
@@ -211,6 +217,13 @@ export default function Membership() {
       </div>
 
       <div className="max-w-3xl mx-auto p-4 space-y-4">
+        {activeMembership && !showShop ? (
+          <MembershipDashboard membership={activeMembership} onShopMore={() => setShowShop(true)} />
+        ) : (
+        <>
+        {activeMembership && showShop && (
+          <Button variant="ghost" size="sm" onClick={() => setShowShop(false)} className="-mt-2"><ArrowLeft className="w-4 h-4 mr-1" /> Kembali ke dasbor membership</Button>
+        )}
         <Card className="bg-gradient-to-br from-primary/15 via-primary/5 to-transparent border-primary/30">
           <CardContent className="p-5 space-y-2">
             <div className="flex items-center gap-2 text-primary">
@@ -298,6 +311,8 @@ export default function Membership() {
         <div className="flex items-center gap-2 text-[11px] text-muted-foreground justify-center pt-2">
           <ShieldCheck className="w-3.5 h-3.5" /> Pembayaran aman via QRIS · Token otomatis terkirim ke WhatsApp
         </div>
+        </>
+        )}
       </div>
 
       {/* Picker dialog: input email + phone + pilih metode */}
@@ -371,6 +386,13 @@ export default function Membership() {
               </div>
               <div className="text-lg font-bold text-primary">Rp {orderAmount.toLocaleString('id-ID')}</div>
               <p className="text-xs text-muted-foreground">Scan QRIS untuk membayar. Link membership akan dikirim ke WhatsApp.</p>
+              <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-[11px] text-left space-y-1">
+                <p className="font-semibold text-amber-700 dark:text-amber-400">Sudah bayar tapi belum dapat link?</p>
+                <p className="text-muted-foreground">Upload bukti transfer/QRIS, lalu admin akan menghubungi Anda di WhatsApp.</p>
+                <Button size="sm" variant="outline" className="w-full gap-1 h-8 text-xs" onClick={() => setProofOpen(true)}>
+                  <Upload className="w-3 h-3" /> Kirim Bukti Transaksi
+                </Button>
+              </div>
             </div>
           )}
           {paid && (
@@ -378,7 +400,7 @@ export default function Membership() {
               <CheckCircle2 className="w-12 h-12 text-green-500 mx-auto" />
               <p className="font-semibold">Pembayaran berhasil!</p>
               <p className="text-xs text-muted-foreground">Cek WhatsApp Anda untuk link akses membership.</p>
-              <Button className="w-full" onClick={() => { setPayOpen(false); navigate('/live'); }}>Buka Live Sekarang</Button>
+              <Button className="w-full" onClick={() => { setPayOpen(false); refreshMembership(); navigate('/live'); }}>Buka Live Sekarang</Button>
             </div>
           )}
         </DialogContent>
@@ -402,15 +424,6 @@ export default function Membership() {
               </div>
             </div>
             <div className="space-y-1">
-              <Label className="text-xs">Sandi</Label>
-              <div className="flex gap-1">
-                <Input readOnly value={successPassword} className="font-mono text-xs" />
-                <Button size="icon" variant="outline" onClick={() => { navigator.clipboard.writeText(successPassword); toast.success('Sandi disalin'); }}>
-                  <Copy className="w-3.5 h-3.5" />
-                </Button>
-              </div>
-            </div>
-            <div className="space-y-1">
               <Label className="text-xs">Link Akses</Label>
               <div className="flex gap-1">
                 <Input readOnly value={successLink} className="text-xs" />
@@ -419,10 +432,20 @@ export default function Membership() {
                 </Button>
               </div>
             </div>
-            <Button className="w-full" onClick={() => { setSuccessOpen(false); navigate('/live'); }}>Buka Live Sekarang</Button>
+            <Button className="w-full" onClick={() => { setSuccessOpen(false); refreshMembership(); navigate('/live'); }}>Buka Live Sekarang</Button>
           </div>
         </DialogContent>
       </Dialog>
+
+      <MembershipProofUpload
+        open={proofOpen}
+        onOpenChange={setProofOpen}
+        orderId={orderId}
+        packageName={picked?.name || ''}
+        amount={orderAmount}
+        defaultEmail={email}
+        defaultPhone={phone}
+      />
     </div>
   );
 }

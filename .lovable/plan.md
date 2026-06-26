@@ -1,89 +1,123 @@
 ## Tujuan
-Tambah dua menu baru di Admin Panel tanpa menyentuh halaman Live (player & playlist) atau halaman lain yang sudah jalan:
+Beberapa perbaikan UX + fitur baru tanpa menyentuh halaman Live (player, playlist) dan aturan Fonnte:
+1. Hilangkan kolom/teks "Sandi" (selain "Sandi Replay") di alur membership.
+2. Halaman Membership jadi dashboard premium kalau user sudah punya membership aktif.
+3. Tombol "Beli" pada kartu show aktif berubah jadi "Tonton Live" untuk user login yang punya membership aktif.
+4. Upload bukti transaksi membership (fallback kalau Pakasir/Fonnte gagal).
+5. Admin panel: nomor WA admin yang bisa diubah + galeri bukti transaksi + auto-hapus 7 hari.
+6. Pastikan `realtime48stream.my.id` jadi domain utama di semua link (termasuk link replay personal).
 
-1. **User Membership** — daftar user yang sudah membeli & terkonfirmasi paket membership.
-2. **Token Factory** — pusat manajemen seluruh token (Show & Membership), dipisah aktif/kadaluarsa.
+---
 
-## 1. Menu "User Membership"
+## 1. Hapus sandi non-replay
+Hanya "Sandi Replay" yang boleh muncul. Sandi token membership untuk akses Live ditiadakan dari UI.
 
-Tab baru di `src/pages/Admin.tsx` → komponen baru `src/components/admin/MembershipUsersAdmin.tsx`.
+- `src/pages/Membership.tsx`: hapus tampilan `successPassword`, tetap simpan kredensial token saja.
+- `src/components/admin/MembershipUsersAdmin.tsx`: hapus tombol/baris "Sandi" (kunci 🔒).
+- `src/components/admin/MembershipOrdersDialog.tsx`: hapus kolom password jika ada.
+- Tetap simpan kolom DB `membership_tokens.password` (jangan diubah skema, dipakai logic lain) — hanya disembunyikan dari UI.
+- Khusus "Sandi Replay" (master/replay password) tetap ditampilkan di dashboard membership.
 
-Sumber data: `membership_orders` (status='paid') JOIN `membership_tokens` + `membership_packages`.
+## 2. Dashboard Membership Premium
+Di `src/pages/Membership.tsx`: deteksi `get_my_memberships()` → kalau ada baris `status='paid'` & belum expired & belum revoked, render `<MembershipDashboard />` ALIH-ALIH list paket.
 
-Per baris ditampilkan:
-- Email, Nomor HP, Nama paket, Tanggal beli (`paid_at`), Durasi, Berakhir (`expires_at`), Status (Aktif / Kadaluarsa / Dicabut), Sisa hari
-- Token + Password (tombol Copy untuk masing-masing & "Copy link login")
-- Sumber: QRIS / Koin
+Komponen baru `src/components/MembershipDashboard.tsx` menampilkan:
+- Nama paket, tanggal mulai, kadaluarsa, sisa hari (progress bar).
+- Token membership (mono, tombol Copy & tombol "Reset Perangkat" via `DeviceResetButton` yang sudah ada — kind=membership).
+- Sandi Replay (ambil dari `master_passwords` aktif atau `replay_info` paket — gunakan endpoint publik yang sudah ada `master_passwords` policy publik).
+- `replay_info` paket sebagai teks panduan.
+- Tombol primer **"Tonton Live"** → navigate ke `/live?mtoken=<token>`.
+- Tombol sekunder: "Lihat Replay" → `/`.
+- Auto-persist: panggil `saveMembershipCredentials(token)` saat dashboard mount supaya akses Live tetap mulus selama durasi.
 
-Aksi per baris:
-- **Edit**: ubah email, phone, expires_at, max_devices, includes_replays, revoked (dialog)
-- **Copy**: token, password, link login penuh
-- **Reset device**: hapus semua entri `membership_token_devices` untuk token tsb (kuota device → 0)
-- **Hapus**: hapus order + token terkait (konfirmasi AlertDialog)
+Tetap tampilkan tombol "Beli paket lain" kecil di bawah dashboard.
 
-Filter/cari: input pencarian (email / phone / token), filter status (Semua / Aktif / Kadaluarsa).
+## 3. Tombol "Tonton Live" pada Kartu Show Aktif untuk user membership login
+`src/components/ActiveShowCard.tsx` sudah punya logic membership token via `readMembershipCredentials()`. Tambah jalur baru:
+- Saat user login (`useAuth`) → query sekali `get_my_memberships()` (lewat hook ringan / context baru `useMembership()`); kalau ada membership aktif & token valid → simpan ke session via `saveMembershipCredentials` lalu render tombol merah "Tonton Live (Member)" yang sudah ada.
+- Hindari refactor besar — buat hook `src/hooks/useActiveMembership.ts` (cache di module-level + event `MEMBERSHIP_UPDATED_EVENT`).
 
-## 2. Menu "Token Factory"
+## 4. Upload Bukti Transaksi (Manual Confirm)
+Tambah jalur fallback di `BuyMembershipDialog` / sukses-state `Membership.tsx`:
+- Tombol "Pembayaran tidak terkonfirmasi? Kirim bukti manual" → modal:
+  - Field: WhatsApp, Email (prefilled).
+  - File picker gambar (max 2MB, jpg/png/webp).
+  - Upload ke storage bucket baru `membership-proofs` (private).
+  - Insert ke tabel baru `public.membership_payment_proofs` (order_id, user_id, email, phone, image_path, created_at, expires_at = now()+7d, handled boolean).
+  - Setelah sukses → redirect ke `https://wa.me/<admin_phone>?text=...` dengan ringkasan order.
 
-Tab baru → komponen baru `src/components/admin/TokenFactoryAdmin.tsx`.
+Pakai `site_settings.key = 'admin_wa_phone'` untuk nomor admin (default empty); admin bisa ubah di panel.
 
-Dua sub-tab utama (Tabs shadcn): **Token Show** dan **Token Membership**.
-Di dalam masing-masing ada sub-tab: **Aktif** dan **Kadaluarsa**.
+### Auto-delete 7 hari
+- DB function `cron_cleanup_membership_proofs()` (security definer) yang `DELETE` baris expired + drop file dari storage via `storage.delete_object` SQL helper (kita pakai `delete from storage.objects` lalu tabel sendiri).
+- Trigger jadwal via cron job (`pg_cron` extension sudah biasa ada) — kalau tidak, sederhana saja: jalankan janitor inline saat admin list proofs (`DELETE WHERE expires_at < now()`).
 
-### Token Show
-Sumber: `active_show_tokens` JOIN `active_shows` (judul, tanggal show). 
-- Aktif = `revoked=false` AND (`expires_at IS NULL` OR `expires_at > now()`)
-- Kadaluarsa = sebaliknya
-Kolom: Token, Show, Label, Devices terpakai/max, Dibuat, Kadaluarsa, Status.
+## 5. Admin Panel — Bukti Transaksi & Nomor Admin
+Komponen baru `src/components/admin/MembershipProofsAdmin.tsx`:
+- Tabel daftar bukti (gambar preview, email, phone, order, tanggal, sisa hari).
+- Tombol "Tandai selesai", "Hapus".
+- Auto-cleanup expired saat load (call RPC `admin_cleanup_membership_proofs`).
 
-### Token Membership
-Sumber: `membership_tokens` JOIN `membership_packages` + phone/email dari `membership_orders`.
-- Aktif = `revoked=false` AND `expires_at > now()`
-- Kadaluarsa = sebaliknya
-Kolom: Token, Paket, Phone, Devices terpakai/max, Mulai, Kadaluarsa, Status.
+Field "Nomor WA Admin" di `BotAdmin.tsx` atau `PakasirAdmin.tsx` (settings) — input + simpan ke `site_settings('admin_wa_phone')`. RPC kecil: `admin_set_setting(_key, _value)` (admin-only) atau reuse pola existing.
 
-### Aksi per baris (kedua jenis)
-- **Cari**: input search (token / label / phone / judul show)
-- **Reset device**: hapus row di `active_show_token_devices` / `membership_token_devices` untuk token tsb (kuota balik ke 0, bisa dipakai device lain)
-- **Blokir**: set `revoked=true` + insert `browser_id` yang pernah login ke `blocked_browsers`
-- **Buka blokir**: set `revoked=false` + hapus `blocked_browsers` terkait
-- **Hapus**: hapus row token (cascade ke devices)
+Tambahkan tab baru di `src/pages/Admin.tsx`: "Bukti Transaksi".
 
-### Bulk action (khusus tab Kadaluarsa)
-- Checkbox select-all + per row
-- Tombol "Hapus terpilih" dan "Hapus semua kadaluarsa" (AlertDialog konfirmasi)
+### Migration (SQL)
+```sql
+-- table
+create table public.membership_payment_proofs (
+  id uuid primary key default gen_random_uuid(),
+  order_id uuid references public.membership_orders(id) on delete set null,
+  user_id uuid,
+  email text,
+  phone text,
+  image_path text not null,
+  note text default '',
+  handled boolean default false,
+  created_at timestamptz not null default now(),
+  expires_at timestamptz not null default (now() + interval '7 days')
+);
+grant select,insert,update,delete on public.membership_payment_proofs to authenticated;
+grant all on public.membership_payment_proofs to service_role;
+alter table public.membership_payment_proofs enable row level security;
+create policy "own insert" on public.membership_payment_proofs
+  for insert to authenticated with check (user_id = auth.uid() or user_id is null);
+create policy "admin all" on public.membership_payment_proofs
+  for all to authenticated using (public.has_role(auth.uid(),'admin'));
 
-## Backend (RPC migration baru)
+-- RPCs
+create or replace function public.admin_list_membership_proofs() returns setof public.membership_payment_proofs
+  language plpgsql stable security definer set search_path=public as $$
+begin
+  if not public.has_role(auth.uid(),'admin') then raise exception 'forbidden'; end if;
+  delete from public.membership_payment_proofs where expires_at < now();
+  return query select * from public.membership_payment_proofs order by created_at desc;
+end $$;
+-- + admin_handle_proof / admin_delete_proof / admin_set_setting
+```
 
-Tambah security-definer functions (admin-only via `has_role`) di satu migration. Tidak mengubah tabel/skema yang ada, hanya menambah fungsi:
+Storage bucket `membership-proofs` (private) via tool `supabase--storage_create_bucket`. RLS storage.objects: insert oleh authenticated dengan bucket_id check; select/delete admin saja.
 
-- `admin_list_membership_users(_q text, _status text)` → join orders+tokens+packages
-- `admin_update_membership_user(_order_id, _email, _phone, _expires_at, _max_devices, _includes_replays, _revoked)`
-- `admin_delete_membership_user(_order_id)` — hapus order + token + devices
-- `admin_list_show_tokens(_q, _status)` 
-- `admin_list_membership_tokens(_q, _status)`
-- `admin_reset_token_devices(_kind text, _token_id uuid)` — kind: 'show'|'membership'
-- `admin_block_token(_kind, _token_id)` — revoke + push browser_ids ke blocked_browsers
-- `admin_unblock_token(_kind, _token_id)` — un-revoke + bersihkan blocked_browsers terkait
-- `admin_delete_token(_kind, _token_id)`
-- `admin_bulk_delete_expired_tokens(_kind, _ids uuid[] DEFAULT NULL)` — jika `_ids` null → hapus seluruh yang expired
-
-Semua dipanggil dari client via `supabase.rpc(...)`. Tidak ada edge function baru yang dibutuhkan.
-
-## Integrasi UI
-`src/pages/Admin.tsx`:
-- Tambah dua tab key: `mb_users`, `token_factory`
-- Tambah entri di sidebar menu + label map (header)
-- Tambah `<TabsContent>` masing-masing dengan komponen baru
-- TIDAK mengubah konfigurasi/tab lain
-
-## Jaminan keamanan area lain
-- Tidak menyentuh: `src/pages/Live.tsx`, `EmbedPlayer`, playlist, edge functions yang berhubungan dengan delivery (fonnte, poll, dsb).
-- Migration hanya `CREATE OR REPLACE FUNCTION` — tidak ALTER/DROP tabel atau policy yang ada.
-- Tidak mengubah struktur token yang sedang dipakai user — hanya menambah aksi admin.
+## 6. Domain Utama
+Verifikasi semua sumber sudah `realtime48stream.my.id`. Tambahan kecil:
+- Pastikan `BuyShowDialog` / dialog token success / banner "Salin Link" memakai `site_origin` setting (lewat env atau public select), bukan `window.location.origin`. Buat helper `src/lib/siteOrigin.ts` yang return constant `https://realtime48stream.my.id` (sinkron dengan `main.tsx` PRIMARY_HOST) supaya tetap konsisten saat user buka via subdomain preview.
+- Update `MembershipUsersAdmin` & `Membership.tsx` & `ActiveShowCard` & `ReplayCardComponent` agar pakai helper ini saat menyusun link copy (link replay token personal juga).
 
 ## File yang akan dibuat/diubah
-- BARU: `src/components/admin/MembershipUsersAdmin.tsx`
-- BARU: `src/components/admin/TokenFactoryAdmin.tsx`
-- BARU: migration SQL berisi RPC admin di atas
-- UBAH: `src/pages/Admin.tsx` (hanya menambah tab + import; isi tab lain tidak diubah)
+- BARU: `src/components/MembershipDashboard.tsx`
+- BARU: `src/components/admin/MembershipProofsAdmin.tsx`
+- BARU: `src/components/MembershipProofUpload.tsx` (modal upload bukti)
+- BARU: `src/hooks/useActiveMembership.ts`
+- BARU: `src/lib/siteOrigin.ts`
+- BARU: migration SQL (tabel + RPC + cleanup)
+- BARU: storage bucket `membership-proofs` (via tool)
+- UBAH: `src/pages/Membership.tsx` (render dashboard, hapus password UI, integrasi upload)
+- UBAH: `src/pages/Admin.tsx` (tab Bukti Transaksi + field Nomor WA Admin)
+- UBAH: `src/components/admin/MembershipUsersAdmin.tsx` (hapus sandi)
+- UBAH: `src/components/ActiveShowCard.tsx` (tombol live untuk member login)
+- UBAH: `src/components/ReplayCardComponent.tsx` & banner copy lain → pakai `siteOrigin()`
+
+## Jaminan area aman
+- TIDAK menyentuh: `src/pages/Live.tsx`, `EmbedPlayer`, playlist, dan edge functions Fonnte (`send-wa`, `fonnte-webhook`, `resend-*`, `poll-pending-orders`).
+- Tidak mengubah skema `membership_tokens` (kolom password tetap ada — hanya disembunyikan).
+- Tidak mengubah aturan reseller atau show token.
