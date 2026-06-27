@@ -46,6 +46,14 @@ export default function ShowOrdersResendDialog({ open, onOpenChange, showId, sho
   };
 
   const isFonnteTimeout = (value: unknown) => /timed out|TimeoutError|abort/i.test(stringifyError(value));
+  const normalizeWa = (raw: string) => {
+    const d = String(raw || '').replace(/\D/g, '');
+    if (d.startsWith('0')) return '62' + d.slice(1);
+    if (d.startsWith('62')) return d;
+    if (d.startsWith('8')) return '62' + d;
+    return d;
+  };
+  const isValidWa = (value: string) => /^628\d{8,11}$/.test(normalizeWa(value));
 
   const load = async () => {
     if (!showId) return;
@@ -142,8 +150,19 @@ export default function ShowOrdersResendDialog({ open, onOpenChange, showId, sho
     }
     // Auto-force untuk order belum lunas atau saat Shift+klik.
     const force = shiftForce || (row?.status !== 'paid');
+    let phoneOverride = '';
+    if (row && !isValidWa(row.user_phone)) {
+      const input = prompt(`Nomor WA order ini tidak valid untuk Fonnte: ${row.user_phone}\n\nMasukkan nomor WhatsApp yang benar (contoh 0812xxxx / 62812xxxx):`);
+      if (!input) return;
+      const norm = normalizeWa(input);
+      if (!/^628\d{8,11}$/.test(norm)) {
+        toast({ title: 'Nomor WA masih tidak valid', description: 'Gunakan nomor Indonesia aktif, contoh 62812xxxx.', variant: 'destructive' });
+        return;
+      }
+      phoneOverride = norm;
+    }
     setSending((p) => ({ ...p, [id]: true }));
-    const { data, error } = await supabase.functions.invoke('resend-show-wa', { body: { order_id: id, force } });
+    const { data, error } = await supabase.functions.invoke('resend-show-wa', { body: { order_id: id, force, phone_override: phoneOverride || undefined } });
     setSending((p) => ({ ...p, [id]: false }));
     if (error) { toast({ title: 'Gagal', description: error.message, variant: 'destructive' }); return; }
     const r = (data as any)?.results?.[0];
@@ -292,12 +311,14 @@ export default function ShowOrdersResendDialog({ open, onOpenChange, showId, sho
                   ? 'bg-destructive/15 text-destructive border-destructive/30'
                   : 'bg-muted text-muted-foreground';
               const wLabel = w === 'sent' ? 'WA TERKIRIM' : w === 'failed' ? 'WA GAGAL' : 'BELUM DIKIRIM';
+              const phoneInvalid = !isValidWa(r.user_phone);
               return (
                 <div key={r.id} className="border border-border rounded-md p-2 flex items-start gap-2 flex-wrap">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <span className="font-mono">{r.user_phone}</span>
                       <button title="Salin nomor" onClick={() => copyPhone(r.user_phone)}><Copy className="w-3 h-3 text-muted-foreground hover:text-primary" /></button>
+                      {phoneInvalid && <Badge variant="destructive" className="text-[10px]">NOMOR TIDAK VALID</Badge>}
                     </div>
                     <div className="text-[11px] text-muted-foreground truncate">{r.item_title}</div>
                     <div className="text-[11px] text-muted-foreground">
