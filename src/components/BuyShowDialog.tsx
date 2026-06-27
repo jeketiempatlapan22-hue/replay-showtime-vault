@@ -443,7 +443,11 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
               <CheckCircle2 className="w-12 h-12 text-green-500" />
               <p className="text-base font-semibold text-foreground">Pembayaran Berhasil!</p>
               <p className="text-xs text-muted-foreground text-center">
-                {waSent === false ? 'WhatsApp sedang lambat, gunakan link akses di bawah ini.' : 'Token akses dikirim via WhatsApp dan juga tersedia di bawah ini.'}
+                {waSent === true
+                  ? 'Token akses dikirim via WhatsApp dan juga tersedia di bawah ini.'
+                  : waSent === false
+                    ? 'WhatsApp gagal/lambat, gunakan link akses di bawah ini.'
+                    : 'Token akses tersedia di bawah ini. Jika WhatsApp belum masuk, salin link token atau hubungi admin.'}
               </p>
             </div>
             {accessToken && (
