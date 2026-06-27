@@ -19,8 +19,10 @@ const validEmail = (e: string) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(e);
 
 async function sendFonnteOnce(phone: string, message: string) {
   const tok = Deno.env.get('FONNTE_TOKEN'); if (!tok) return { ok: false, data: { error: 'no_token' } };
+  const target = normalizePhone(phone);
+  if (!/^628\d{8,11}$/.test(target)) return { ok: false, data: { error: 'invalid_phone_for_fonnte', target } };
   const form = new FormData();
-  form.append('target', normalizePhone(phone)); form.append('message', message); form.append('countryCode', '62');
+  form.append('target', target); form.append('message', message); form.append('countryCode', '62');
   try {
     const res = await fetch('https://api.fonnte.com/send', { method: 'POST', headers: { Authorization: tok }, body: form, signal: AbortSignal.timeout(8000) });
     const data = await res.json().catch(() => ({}));

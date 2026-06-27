@@ -79,8 +79,10 @@ async function ensurePurchaseToken(admin: ReturnType<typeof createClient>, order
 async function sendFonnteOnce(phone: string, message: string, timeoutMs: number) {
   const token = Deno.env.get('FONNTE_TOKEN');
   if (!token) return { ok: false, data: { error: 'no token' } };
+  const target = normalizePhone(phone);
+  if (!/^628\d{8,11}$/.test(target)) return { ok: false, data: { error: 'invalid_phone_for_fonnte', target } };
   const form = new FormData();
-  form.append('target', normalizePhone(phone));
+  form.append('target', target);
   form.append('message', message);
   form.append('countryCode', '62');
   try {
