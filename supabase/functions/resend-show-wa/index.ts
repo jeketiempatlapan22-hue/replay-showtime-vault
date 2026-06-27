@@ -178,7 +178,7 @@ Deno.serve(async (req) => {
         return new Response(JSON.stringify({ error: 'phone_and_show_id_required' }), { status: 400, headers: corsHeaders });
       }
       const phone = phoneRaw.replace(/\D/g, '').replace(/^0/, '62');
-      if (!/^62[0-9]{8,13}$/.test(phone)) {
+      if (!/^628[0-9]{8,11}$/.test(phone)) {
         return new Response(JSON.stringify({ error: 'invalid_phone' }), { status: 400, headers: corsHeaders });
       }
       const { data: show } = await admin.from('active_shows')

@@ -182,7 +182,7 @@ export default function ShowOrdersResendDialog({ open, onOpenChange, showId, sho
 
   const sendManual = async () => {
     const phoneDigits = manualPhone.replace(/\D/g, '').replace(/^0/, '62');
-    if (!/^62[0-9]{8,13}$/.test(phoneDigits)) {
+    if (!/^628[0-9]{8,11}$/.test(phoneDigits)) {
       toast({ title: 'Nomor tidak valid', description: 'Format: 628xxxxxxxxx', variant: 'destructive' });
       return;
     }
