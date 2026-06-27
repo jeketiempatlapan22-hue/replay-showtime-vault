@@ -17,7 +17,9 @@ function normalizePhone(raw: string) {
 }
 
 function validPhone(p: string) {
-  return /^62\d{8,13}$/.test(p);
+  // Fonnte rejects over-long targets. Indonesian mobile WA numbers should be
+  // 628 + 8–11 digits (total 11–14 digits), not arbitrary 62-prefixed input.
+  return /^628\d{8,11}$/.test(p);
 }
 
 function genOrderId() {

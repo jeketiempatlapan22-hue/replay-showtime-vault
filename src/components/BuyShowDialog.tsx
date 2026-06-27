@@ -147,6 +147,7 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
         if (row?.status === 'paid' && row?.access_token) {
           const tok = row.access_token || '';
           setAccessToken(tok);
+          setWaSent(row.token_sent_at ? true : false);
           persistPaid(tok);
           setStatus('paid');
         }
@@ -157,11 +158,12 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
     let tick = 0;
     const poll = setInterval(async () => {
       tick++;
-      const { data } = await supabase.from('orders').select('status, access_token').eq('id', orderId).maybeSingle();
+      const { data } = await supabase.from('orders').select('status, access_token, token_sent_at').eq('id', orderId).maybeSingle();
       setLastChecked(Date.now());
       if (data?.status === 'paid' && (data as any).access_token) {
         const tok = (data as any).access_token || '';
         setAccessToken(tok);
+        setWaSent((data as any).token_sent_at ? true : false);
         persistPaid(tok);
         setStatus('paid');
         return;
@@ -195,7 +197,7 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
   const handleCreate = async () => {
     // QRIS tidak wajib login — siapa pun yang punya nomor HP boleh membayar.
     const norm = normalizePhone(phone);
-    if (!/^62\d{8,13}$/.test(norm)) {
+    if (!/^628\d{8,11}$/.test(norm)) {
       toast.error('Nomor WhatsApp tidak valid. Contoh: 0812xxxx');
       return;
     }
@@ -247,7 +249,7 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
       return;
     }
     const norm = normalizePhone(phone);
-    if (!/^62\d{8,13}$/.test(norm)) {
+    if (!/^628\d{8,11}$/.test(norm)) {
       toast.error('Nomor WhatsApp tidak valid.');
       return;
     }
@@ -273,7 +275,7 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
       persistPaid(r.access_token || '');
       setCoinBalance(r.new_balance ?? Math.max(0, coinBalance - coinPrice));
       setStatus('paid');
-      toast.success('Pembelian berhasil! Token dikirim via WhatsApp.');
+      toast.success(r.sent === false ? 'Pembelian berhasil! WA gagal/lambat, salin link token di bawah.' : 'Pembelian berhasil! Token dikirim via WhatsApp.');
     } catch (e: any) {
       toast.error(e?.message || 'Gagal memproses pembelian');
     } finally {
@@ -441,7 +443,11 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
               <CheckCircle2 className="w-12 h-12 text-green-500" />
               <p className="text-base font-semibold text-foreground">Pembayaran Berhasil!</p>
               <p className="text-xs text-muted-foreground text-center">
-                {waSent === false ? 'WhatsApp sedang lambat, gunakan link akses di bawah ini.' : 'Token akses dikirim via WhatsApp dan juga tersedia di bawah ini.'}
+                {waSent === true
+                  ? 'Token akses dikirim via WhatsApp dan juga tersedia di bawah ini.'
+                  : waSent === false
+                    ? 'WhatsApp gagal/lambat, gunakan link akses di bawah ini.'
+                    : 'Token akses tersedia di bawah ini. Jika WhatsApp belum masuk, salin link token atau hubungi admin.'}
               </p>
             </div>
             {accessToken && (

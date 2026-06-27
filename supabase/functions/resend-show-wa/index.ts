@@ -20,8 +20,10 @@ function normalizePhone(raw: string) {
 async function sendFonnteOnce(phone: string, message: string, timeoutMs: number) {
   const tok = Deno.env.get('FONNTE_TOKEN');
   if (!tok) return { ok: false, data: { error: 'no_token' } };
+  const target = normalizePhone(phone);
+  if (!/^628\d{8,11}$/.test(target)) return { ok: false, data: { error: 'invalid_phone_for_fonnte', target } };
   const form = new FormData();
-  form.append('target', normalizePhone(phone));
+  form.append('target', target);
   form.append('message', message);
   form.append('countryCode', '62');
   try {
@@ -178,7 +180,7 @@ Deno.serve(async (req) => {
         return new Response(JSON.stringify({ error: 'phone_and_show_id_required' }), { status: 400, headers: corsHeaders });
       }
       const phone = phoneRaw.replace(/\D/g, '').replace(/^0/, '62');
-      if (!/^62[0-9]{8,13}$/.test(phone)) {
+      if (!/^628[0-9]{8,11}$/.test(phone)) {
         return new Response(JSON.stringify({ error: 'invalid_phone' }), { status: 400, headers: corsHeaders });
       }
       const { data: show } = await admin.from('active_shows')
@@ -220,6 +222,12 @@ Deno.serve(async (req) => {
       ? body.order_ids.filter((x: unknown) => typeof x === 'string')
       : (body.order_id ? [String(body.order_id)] : []);
     const force: boolean = body.force === true;
+    const phoneOverride = ids.length === 1 && body.phone_override
+      ? normalizePhone(String(body.phone_override))
+      : '';
+    if (phoneOverride && !/^628\d{8,11}$/.test(phoneOverride)) {
+      return new Response(JSON.stringify({ error: 'invalid_phone_override' }), { status: 400, headers: corsHeaders });
+    }
     if (ids.length === 0) {
       return new Response(JSON.stringify({ error: 'no_order_ids' }), { status: 400, headers: corsHeaders });
     }
@@ -232,6 +240,15 @@ Deno.serve(async (req) => {
       try {
         const { data: order } = await admin.from('orders').select('*').eq('id', oid).maybeSingle();
         if (!order) { results.push({ id: oid, error: 'not_found' }); continue; }
+        const sendPhone = phoneOverride || normalizePhone(order.user_phone || '');
+        if (!/^628\d{8,11}$/.test(sendPhone)) {
+          results.push({ id: oid, error: JSON.stringify({ error: 'invalid_phone_for_fonnte', target: sendPhone }) });
+          continue;
+        }
+        if (phoneOverride && phoneOverride !== order.user_phone) {
+          await admin.from('orders').update({ user_phone: phoneOverride }).eq('id', order.id);
+          order.user_phone = phoneOverride;
+        }
         // Non-paid orders only proceed when admin explicitly uses `force`.
         // Coin top-ups are never delivered without real payment.
         if (order.status !== 'paid' && !force) {
@@ -248,13 +265,13 @@ Deno.serve(async (req) => {
           if (order.show_id && !order.replay_id) {
             await admin.from('active_show_tokens').insert({
               show_id: order.show_id, token: newTok,
-              label: `${labelPrefix}:${order.user_phone || ''}`.slice(0, 120),
+              label: `${labelPrefix}:${sendPhone}`.slice(0, 120),
               kind: 'personal', max_devices: 1, revoked: false,
             });
           } else if (order.replay_id) {
             await admin.from('replay_personal_tokens').insert({
               replay_id: order.replay_id, token: newTok,
-              label: `${labelPrefix}:${order.user_phone || ''}`.slice(0, 120),
+              label: `${labelPrefix}:${sendPhone}`.slice(0, 120),
               max_devices: 1, revoked: false,
             });
           }
@@ -273,9 +290,9 @@ Deno.serve(async (req) => {
         }
         const message = await buildMessage(admin, order);
         const paused = ids.length > 1 && await isFonntePaused(admin);
-        const sent = paused ? { ok: false, data: { error: 'fonnte_timeout_pause' } } : await sendFonnte(order.user_phone, message);
+        const sent = paused ? { ok: false, data: { error: 'fonnte_timeout_pause' } } : await sendFonnte(sendPhone, message);
         await admin.from('wa_outbox').insert({
-          phone: order.user_phone, message, status: sent.ok ? 'sent' : 'failed',
+          phone: sendPhone, message, status: sent.ok ? 'sent' : 'failed',
           error: sent.ok ? null : JSON.stringify(sent.data),
           related_order_id: order.id, fonnte_response: sent.data as Record<string, unknown>,
         });
@@ -286,13 +303,13 @@ Deno.serve(async (req) => {
               ? `${(await admin.from('site_settings').select('value').eq('key', 'site_origin').maybeSingle()).data?.value || 'https://realtime48stream.my.id'}/live?show=${order.show_id}&t=${order.access_token}`
               : `${(await admin.from('site_settings').select('value').eq('key', 'site_origin').maybeSingle()).data?.value || 'https://realtime48stream.my.id'}/akses?token=${order.access_token}${order.replay_id ? `&replay=${order.replay_id}` : ''}`;
             await admin.from('token_deliveries').insert({
-              phone: order.user_phone, replay_id: order.replay_id, replay_title: order.item_title,
+              phone: sendPhone, replay_id: order.replay_id, replay_title: order.item_title,
               order_id: order.id, access_token: order.access_token,
               link, source: 'admin-resend', requested_by: 'resend-show-wa',
             });
           }
         }
-        results.push({ id: oid, sent: sent.ok, phone: order.user_phone, error: sent.ok ? null : JSON.stringify(sent.data).slice(0, 200) });
+        results.push({ id: oid, sent: sent.ok, phone: sendPhone, error: sent.ok ? null : JSON.stringify(sent.data).slice(0, 200) });
       } catch (e) {
         results.push({ id: oid, error: String(e) });
       }
