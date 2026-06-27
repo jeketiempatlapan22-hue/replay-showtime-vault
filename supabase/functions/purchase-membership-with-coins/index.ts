@@ -14,7 +14,7 @@ function normalizePhone(raw: string) {
   if (d.startsWith('8')) return '62' + d;
   return d;
 }
-const validPhone = (p: string) => /^62\d{8,13}$/.test(p);
+const validPhone = (p: string) => /^628\d{8,11}$/.test(p);
 const validEmail = (e: string) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(e);
 
 async function sendFonnteOnce(phone: string, message: string) {
