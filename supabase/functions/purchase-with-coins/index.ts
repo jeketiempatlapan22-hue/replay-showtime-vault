@@ -14,7 +14,7 @@ function normalizePhone(raw: string) {
   if (d.startsWith('8')) return '62' + d;
   return d;
 }
-function validPhone(p: string) { return /^62\d{8,13}$/.test(p); }
+function validPhone(p: string) { return /^628\d{8,11}$/.test(p); }
 function genToken() { return crypto.randomUUID().replace(/-/g, '').slice(0, 24); }
 
 async function sendFonnteOnce(phone: string, message: string) {
