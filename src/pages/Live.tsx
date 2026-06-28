@@ -480,16 +480,45 @@ export default function Live() {
       })
       .subscribe();
 
-    // Token revalidation: 5 minutes is plenty — realtime channel already kicks revoked/blocked users instantly.
-    // Lower frequency dramatically reduces edge-function load at 1000+ concurrent viewers.
+    // Realtime kick: jika admin DELETE / UPDATE (revoked) token user, langsung paksa keluar.
+    const kickOut = (reason: 'revoked' | 'token_not_found') => {
+      try { sessionStorage.removeItem(`${SS_KEY_BASE}${showId?'-'+showId:''}`); } catch { /* ignore */ }
+      clearMembershipCredentials();
+      setUnlocked(null);
+      navigate(`/kunci?reason=${reason}${showId ? `&show=${showId}` : ''}`, { replace: true });
+    };
+    const showTokChannel = tParam
+      ? supabase.channel(`live-tok:${tParam.slice(0, 16)}`)
+          .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'active_show_tokens', filter: `token=eq.${tParam}` }, () => kickOut('token_not_found'))
+          .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'active_show_tokens', filter: `token=eq.${tParam}` }, (payload: any) => {
+            if (payload?.new?.revoked) kickOut('revoked');
+          })
+          .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'active_show_token_devices', filter: `browser_id=eq.${bid}` }, () => {
+            // Device user dihapus admin → revalidate; jika sudah tidak boleh, akan dilempar ke /kunci.
+            if (tParam) void doUnlock({ token: tParam }, true);
+          })
+          .subscribe()
+      : null;
+    const memTokChannel = mtParam
+      ? supabase.channel(`live-mtok:${mtParam.slice(0, 16)}`)
+          .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'membership_tokens', filter: `token=eq.${mtParam}` }, () => kickOut('token_not_found'))
+          .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'membership_tokens', filter: `token=eq.${mtParam}` }, (payload: any) => {
+            if (payload?.new?.revoked) kickOut('revoked');
+          })
+          .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'membership_token_devices', filter: `browser_id=eq.${bid}` }, () => {
+            void doUnlock({ mtoken: mtParam, mpassword: search.get('mp') || search.get('mpassword') || '' }, true);
+          })
+          .subscribe()
+      : null;
+
+    // Fallback revalidate setiap 45 detik jika websocket realtime terputus.
     const revalidate = window.setInterval(() => {
       if (document.visibilityState !== 'visible') return;
       if (tParam) void doUnlock({ token: tParam }, true);
       else if (mtParam) void doUnlock({ mtoken: mtParam, mpassword: search.get('mp') || search.get('mpassword') || '' }, true);
-    }, 300000);
+    }, 45000);
 
     // Status fallback: realtime UPDATE channel already covers admin changes instantly.
-    // Polling kept as a slow safety net (3 minutes) for users with flaky websockets.
     const statusPoll = window.setInterval(() => {
       if (document.visibilityState !== 'visible') return;
       void fetchStatus();
@@ -500,6 +529,8 @@ export default function Live() {
       window.clearInterval(statusPoll);
       supabase.removeChannel(cfgChannel);
       supabase.removeChannel(tokChannel);
+      if (showTokChannel) supabase.removeChannel(showTokChannel);
+      if (memTokChannel) supabase.removeChannel(memTokChannel);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
