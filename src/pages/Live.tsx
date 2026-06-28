@@ -529,6 +529,8 @@ export default function Live() {
       window.clearInterval(statusPoll);
       supabase.removeChannel(cfgChannel);
       supabase.removeChannel(tokChannel);
+      if (showTokChannel) supabase.removeChannel(showTokChannel);
+      if (memTokChannel) supabase.removeChannel(memTokChannel);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
