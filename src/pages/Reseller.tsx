@@ -474,7 +474,13 @@ function TokensPanel({ session }: { session: Session }) {
           _phone: session.phone, _pin: session.pin, _audit_id: row.audit_id,
         });
         if (error) throw error;
-        toast({ title: '🚫 Perangkat diblokir', description: `${data ?? 0} perangkat diblokir & link direset.` });
+        toast({ title: '🚫 Perangkat diblokir', description: `${data ?? 0} perangkat diblokir & link dimatikan.` });
+      } else if (kind === 'unblock') {
+        const { data, error } = await (supabase.rpc as any)('reseller_unblock_token', {
+          _phone: session.phone, _pin: session.pin, _audit_id: row.audit_id,
+        });
+        if (error) throw error;
+        toast({ title: '✅ Blokir dibuka', description: `${data ?? 0} perangkat kembali diizinkan & link aktif kembali.` });
       } else {
         const { data, error } = await (supabase.rpc as any)('reseller_delete_token', {
           _phone: session.phone, _pin: session.pin, _audit_id: row.audit_id,
