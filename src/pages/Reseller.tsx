@@ -595,7 +595,7 @@ function TokensPanel({ session }: { session: Session }) {
             <AlertDialogAction
               onClick={(e) => { e.preventDefault(); void doAction(); }}
               disabled={!!busyId}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              className={confirm?.kind === 'unblock' ? '' : 'bg-destructive text-destructive-foreground hover:bg-destructive/90'}
             >
               {busyId ? 'Memproses…' : 'Ya, lanjutkan'}
             </AlertDialogAction>
