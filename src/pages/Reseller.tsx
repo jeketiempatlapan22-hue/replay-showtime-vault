@@ -118,17 +118,25 @@ function LoginCard({ onLogin }: { onLogin: (s: Session) => void }) {
 }
 
 function TokenResultDialog({
-  open, onOpenChange, link, message, title, extra, copyCount, onCopied,
+  open, onOpenChange, link, message: initialMessage, title, extra, copyCount, onCopied,
 }: { open: boolean; onOpenChange: (v: boolean) => void; link: string; message: string; title: string; extra?: string; copyCount: number; onCopied: () => void }) {
-  const copy = async (text: string, label: string) => {
+  const [message, setMessage] = useState(initialMessage);
+  const [editing, setEditing] = useState(false);
+  const [justCopied, setJustCopied] = useState(false);
+  useEffect(() => { setMessage(initialMessage); setEditing(false); }, [initialMessage, open]);
+
+  const copyAll = async () => {
     try {
-      await navigator.clipboard.writeText(text);
+      await navigator.clipboard.writeText(message);
       onCopied();
-      toast({ title: `✅ ${label} tersalin`, description: `Total salin untuk ini: ${copyCount + 1}x` });
+      setJustCopied(true);
+      setTimeout(() => setJustCopied(false), 1500);
+      toast({ title: `✅ Link + pesan tersalin`, description: `Total salin untuk ini: ${copyCount + 1}x` });
     } catch {
       toast({ title: 'Gagal menyalin', variant: 'destructive' });
     }
   };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
@@ -137,24 +145,43 @@ function TokenResultDialog({
         </DialogHeader>
         <div className="space-y-3">
           <div className="rounded-lg border border-primary/40 bg-primary/10 px-3 py-2 flex items-center justify-between gap-2">
-            <span className="text-xs font-semibold text-primary">✅ Link tersalin ke clipboard</span>
+            <span className="text-xs font-semibold text-primary">✅ Otomatis tersalin ke clipboard</span>
             <Badge className="text-[11px]">{copyCount}x salin</Badge>
           </div>
           {extra && <p className="text-xs text-muted-foreground">{extra}</p>}
+
           <div className="space-y-1">
             <Label className="text-xs">Link Akses</Label>
-            <div className="flex gap-1">
-              <Input readOnly value={link} className="font-mono text-xs" />
-              <Button size="icon" variant="outline" onClick={() => copy(link, 'Link')}><Copy className="w-4 h-4" /></Button>
-            </div>
+            <Input readOnly value={link} className="font-mono text-xs" onFocus={(e) => e.currentTarget.select()} />
           </div>
+
           <div className="space-y-1">
-            <Label className="text-xs">Pesan WA</Label>
-            <pre className="whitespace-pre-wrap break-words text-xs font-mono bg-secondary/40 border border-border rounded-lg p-3 max-h-64 overflow-y-auto">{message}</pre>
-            <Button onClick={() => copy(message, 'Pesan')} className="w-full"><Copy className="w-4 h-4 mr-2" />Salin Pesan</Button>
+            <div className="flex items-center justify-between">
+              <Label className="text-xs">Pesan WA (link sudah termasuk di dalam)</Label>
+              <Button
+                type="button" size="sm" variant="ghost" className="h-7 px-2 text-xs"
+                onClick={() => setEditing((v) => !v)}
+              >
+                {editing ? <><Check className="w-3.5 h-3.5 mr-1" />Selesai</> : <><Pencil className="w-3.5 h-3.5 mr-1" />Edit Pesan</>}
+              </Button>
+            </div>
+            {editing ? (
+              <Textarea
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                className="text-xs font-mono min-h-[240px]"
+              />
+            ) : (
+              <pre className="whitespace-pre-wrap break-words text-xs font-mono bg-secondary/40 border border-border rounded-lg p-3 max-h-64 overflow-y-auto">{message}</pre>
+            )}
           </div>
-          <p className="text-[11px] text-muted-foreground italic">
-            ⚠️ Token hanya berlaku selama masa berlaku & hanya untuk target yang dipilih.
+
+          <Button onClick={copyAll} size="lg" className="w-full text-base">
+            {justCopied ? <><Check className="w-5 h-5 mr-2" />Tersalin!</> : <><Copy className="w-5 h-5 mr-2" />Salin Link + Pesan</>}
+          </Button>
+
+          <p className="text-[11px] text-muted-foreground italic text-center">
+            🔢 Setiap klik tombol salin akan menambah jumlah salin & masuk tagihan.
           </p>
         </div>
       </DialogContent>
