@@ -439,7 +439,7 @@ function TokensPanel({ session }: { session: Session }) {
   const [loading, setLoading] = useState(false);
   const [q, setQ] = useState('');
   const [debouncedQ, setDebouncedQ] = useState('');
-  const [confirm, setConfirm] = useState<{ kind: 'revoke' | 'block' | 'delete'; row: TokenRow } | null>(null);
+  const [confirm, setConfirm] = useState<{ kind: 'revoke' | 'block' | 'unblock' | 'delete'; row: TokenRow } | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
   useEffect(() => {
