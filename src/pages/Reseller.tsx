@@ -514,7 +514,7 @@ function TokensPanel({ session }: { session: Session }) {
         </Button>
       </div>
       <p className="text-[11px] text-muted-foreground italic">
-        🔄 Reset = lepas perangkat (link tetap aktif, bisa dipakai di device baru, device lama otomatis keluar) · 🚫 Blokir = perangkat user diblokir total & link dimatikan · 🗑️ Hapus = link hilang permanen.
+        🔄 Reset = lepas semua perangkat, link tetap aktif · 🚫 Blokir = perangkat user diblokir & link dimatikan · ✅ Buka Blokir = kembalikan akses · 🗑️ Hapus = link hilang permanen. Setiap baris di sini adalah 1 token unik untuk 1 user.
       </p>
 
       {loading ? (
