@@ -541,18 +541,31 @@ function TokensPanel({ session }: { session: Session }) {
               <p className="text-[10px] text-muted-foreground font-mono truncate">{r.token.slice(0, 16)}…</p>
             </div>
           </div>
-          <div className="grid grid-cols-3 gap-1">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-1">
             <Button size="sm" variant="outline" disabled={busyId === r.audit_id}
               onClick={() => setConfirm({ kind: 'revoke', row: r })}>
-              <ShieldOff className="w-3.5 h-3.5 mr-1" />Reset
+              <RotateCcw className="w-3.5 h-3.5 mr-1" />Reset
             </Button>
-            <Button size="sm" variant="destructive" disabled={r.device_count === 0 || busyId === r.audit_id}
-              onClick={() => setConfirm({ kind: 'block', row: r })}>
-              <Ban className="w-3.5 h-3.5 mr-1" />Blokir
-            </Button>
-            <Button size="sm" variant="outline" className="text-destructive hover:text-destructive" disabled={busyId === r.audit_id}
+            {r.revoked ? (
+              <Button size="sm" variant="outline" className="text-emerald-600 hover:text-emerald-700" disabled={busyId === r.audit_id}
+                onClick={() => setConfirm({ kind: 'unblock', row: r })}>
+                <ShieldOff className="w-3.5 h-3.5 mr-1" />Buka Blokir
+              </Button>
+            ) : (
+              <Button size="sm" variant="destructive" disabled={r.device_count === 0 || busyId === r.audit_id}
+                onClick={() => setConfirm({ kind: 'block', row: r })}>
+                <Ban className="w-3.5 h-3.5 mr-1" />Blokir
+              </Button>
+            )}
+            <Button size="sm" variant="outline" className="text-destructive hover:text-destructive col-span-2 sm:col-span-1" disabled={busyId === r.audit_id}
               onClick={() => setConfirm({ kind: 'delete', row: r })}>
               <Trash2 className="w-3.5 h-3.5 mr-1" />Hapus
+            </Button>
+            <Button size="sm" variant="ghost" className="col-span-2 sm:col-span-1"
+              onClick={async () => {
+                try { await navigator.clipboard.writeText(r.token); toast({ title: 'Token disalin' }); } catch { /* ignore */ }
+              }}>
+              <Copy className="w-3.5 h-3.5 mr-1" />Token
             </Button>
           </div>
         </div>
