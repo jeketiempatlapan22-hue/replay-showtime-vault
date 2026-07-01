@@ -576,12 +576,15 @@ function TokensPanel({ session }: { session: Session }) {
           <AlertDialogHeader>
             <AlertDialogTitle>
               {confirm?.kind === 'block' ? 'Blokir perangkat?'
+                : confirm?.kind === 'unblock' ? 'Buka blokir perangkat?'
                 : confirm?.kind === 'delete' ? 'Hapus link permanen?'
                 : 'Reset link?'}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {confirm?.kind === 'block'
-                ? <>Semua perangkat yang sudah membuka link <strong>{confirm.row.target_title}</strong> akan diblokir total dari website, dan link akan direset.</>
+                ? <>Semua perangkat yang sudah membuka link <strong>{confirm.row.target_title}</strong> akan diblokir total dari website, dan link akan dimatikan.</>
+                : confirm?.kind === 'unblock'
+                ? <>Semua perangkat yang tadinya diblokir untuk link <strong>{confirm.row.target_title}</strong> akan diizinkan kembali & link diaktifkan lagi.</>
                 : confirm?.kind === 'delete'
                 ? <>Link <strong>{confirm.row.target_title}</strong> akan dihapus permanen dari riwayat & tidak bisa dipakai lagi. Tindakan tidak bisa dibatalkan.</>
                 : <>Semua perangkat yang sedang memakai link <strong>{confirm?.row.target_title}</strong> akan dilepas & otomatis keluar. Link tetap aktif dan bisa dipakai lagi di perangkat lain.</>}
