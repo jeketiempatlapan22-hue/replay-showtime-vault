@@ -2369,6 +2369,10 @@ export type Database = {
         Args: { _audit_id: string; _phone: string; _pin: string }
         Returns: boolean
       }
+      reseller_unblock_token: {
+        Args: { _audit_id: string; _phone: string; _pin: string }
+        Returns: number
+      }
       reseller_verify: {
         Args: { _phone: string; _pin: string }
         Returns: boolean
