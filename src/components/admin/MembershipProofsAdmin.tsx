@@ -134,22 +134,35 @@ export default function MembershipProofsAdmin() {
                   <div className="p-3 space-y-1.5 text-xs">
                     <div className="flex items-center gap-1 flex-wrap">
                       <Badge variant={r.handled ? 'default' : 'secondary'}>{r.handled ? 'Selesai' : 'Baru'}</Badge>
+                      <Badge variant="outline">{r.order_id ? 'Membership' : r.show_order_id ? 'Show/Replay' : 'Tanpa order'}</Badge>
                       <Badge variant="outline">{r.package_name || 'Paket -'}</Badge>
                       {r.amount > 0 && <Badge variant="outline">Rp {r.amount.toLocaleString('id-ID')}</Badge>}
                     </div>
                     <div>📧 {r.email}</div>
                     <div>📱 <a href={`https://wa.me/${r.phone}`} target="_blank" rel="noreferrer" className="text-primary underline">{r.phone}</a></div>
-                    {r.order_id && <div className="font-mono text-[10px] truncate">Order: {r.order_id}</div>}
+                    {r.order_id && <div className="font-mono text-[10px] truncate">Order Membership: {r.order_id}</div>}
+                    {r.show_order_id && <div className="font-mono text-[10px] truncate">Order Show: {r.show_order_id}</div>}
                     {r.note && <div className="text-muted-foreground italic">"{r.note}"</div>}
                     <div className="text-muted-foreground">{new Date(r.created_at).toLocaleString('id-ID')}</div>
                     <div className="flex gap-1 flex-wrap pt-1">
+                      {(r.order_id || r.show_order_id) && (
+                        <Button
+                          size="sm"
+                          className="h-7 text-[11px] bg-emerald-600 hover:bg-emerald-700 text-white"
+                          onClick={() => approveAndSend(r)}
+                          disabled={!!approving[r.id]}
+                        >
+                          {approving[r.id] ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Send className="w-3 h-3 mr-1" />}
+                          Setujui & Kirim Token
+                        </Button>
+                      )}
                       {urls[r.id] && (
                         <a href={urls[r.id]} target="_blank" rel="noreferrer">
                           <Button size="sm" variant="outline" className="h-7 text-[11px]"><ExternalLink className="w-3 h-3 mr-1" />Buka</Button>
                         </a>
                       )}
                       <Button size="sm" variant="outline" className="h-7 text-[11px]" onClick={() => setHandled(r, !r.handled)}>
-                        <CheckCircle2 className="w-3 h-3 mr-1" />{r.handled ? 'Buka lagi' : 'Selesai'}
+                        <CheckCircle2 className="w-3 h-3 mr-1" />{r.handled ? 'Buka lagi' : 'Tandai selesai'}
                       </Button>
                       <Button size="sm" variant="destructive" className="h-7 text-[11px]" onClick={() => remove(r)}>
                         <Trash2 className="w-3 h-3 mr-1" />Hapus
