@@ -394,7 +394,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
       try { ytPlayerRef.current?.pauseVideo?.(); } catch { /* ignore */ }
       ytPlayerRef.current = null;
     };
-  }, [ytId, type, markReady, isLive, refreshAvailableQualities, applyQualityCap]);
+  }, [ytId, type, markReady, isLive, refreshAvailableQualities, applyQualityCap, disableCaptions]);
 
   // Cloudflare via Stream SDK postMessage (basic play/pause/volume via iframe contentWindow)
   const cfPost = (event: string, value?: number) => {
