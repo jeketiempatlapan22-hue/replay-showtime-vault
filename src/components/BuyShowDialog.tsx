@@ -436,6 +436,9 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
               className="flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground hover:text-primary hover:underline">
               <MessageCircle className="w-3 h-3" /> Pembayaran bermasalah? Hubungi admin
             </a>
+            <Button variant="outline" size="sm" className="w-full gap-1.5" onClick={() => setProofOpen(true)}>
+              <Upload className="w-3.5 h-3.5" /> Sudah bayar? Kirim bukti transfer
+            </Button>
           </div>
         )}
 
