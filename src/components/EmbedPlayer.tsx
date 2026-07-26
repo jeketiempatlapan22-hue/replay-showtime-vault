@@ -28,6 +28,8 @@ interface YoutubePlayerApi {
   getPlaybackQuality?: () => string;
   getAvailableQualityLevels?: () => string[];
   getVideoLoadedFraction?: () => number;
+  unloadModule?: (module: string) => void;
+  setOption?: (module: string, option: string, value: unknown) => void;
 }
 
 // Ladder kualitas YouTube dari tertinggi ke terendah.
@@ -188,6 +190,16 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
   }, [applyQualityCap]);
 
 
+  // Matikan subtitle YouTube (captions) — dipanggil di beberapa titik karena YT
+  // kadang mereload modul caption setelah quality switch / play.
+  const disableCaptions = useCallback(() => {
+    const p = ytPlayerRef.current;
+    if (!p) return;
+    try { p.unloadModule?.('captions'); } catch { /* ignore */ }
+    try { p.unloadModule?.('cc'); } catch { /* ignore */ }
+    try { p.setOption?.('captions', 'track', {}); } catch { /* ignore */ }
+  }, []);
+
   const markReady = useCallback((value: boolean) => {
     readyRef.current = value;
     setReady(value);
@@ -320,6 +332,12 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
                 autoMuteAppliedRef.current = true;
               }
               ytPlayerRef.current.playVideo?.();
+              // Matikan subtitle di replay (jangan sentuh Live).
+              if (!isLive) {
+                disableCaptions();
+                setTimeout(disableCaptions, 1500);
+                setTimeout(disableCaptions, 4000);
+              }
               // Coba kunci ke resolusi tertinggi (hanya untuk replay, bukan live).
               if (!isLive) {
                 refreshAvailableQualities();
@@ -331,11 +349,14 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
           },
           onPlaybackQualityChange: () => {
             // Re-cek list — kadang baru terisi setelah quality pertama dipilih.
-            if (!isLive) refreshAvailableQualities();
+            if (!isLive) { refreshAvailableQualities(); disableCaptions(); }
           },
           onStateChange: (e: { data: number }) => {
             if (e.data === 1 || e.data === 3) markReady(true);
             setIsPlaying(e.data === 1 || e.data === 3);
+            // Setiap kali mulai PLAYING di replay, matikan captions lagi
+            // (YT kadang me-reload modul caption saat transisi).
+            if (e.data === 1 && !isLive) disableCaptions();
             // Adaptive downgrade: state 3 = BUFFERING. Hitung kejadian buffering
             // dalam 30 detik terakhir; jika ≥3 → turunkan 1 tingkat resolusi.
             // Hanya berlaku untuk replay (bukan live) agar tidak ganggu Live.
@@ -373,7 +394,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
       try { ytPlayerRef.current?.pauseVideo?.(); } catch { /* ignore */ }
       ytPlayerRef.current = null;
     };
-  }, [ytId, type, markReady, isLive, refreshAvailableQualities, applyQualityCap]);
+  }, [ytId, type, markReady, isLive, refreshAvailableQualities, applyQualityCap, disableCaptions]);
 
   // Cloudflare via Stream SDK postMessage (basic play/pause/volume via iframe contentWindow)
   const cfPost = (event: string, value?: number) => {
@@ -543,7 +564,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
   };
 
   const ytEmbedUrl = ytId
-    ? `https://www.youtube-nocookie.com/embed/${ytId}?rel=0&modestbranding=1&playsinline=1&autoplay=1&mute=1&controls=0&fs=0&iv_load_policy=3&disablekb=1&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`
+    ? `https://www.youtube-nocookie.com/embed/${ytId}?rel=0&modestbranding=1&playsinline=1&autoplay=1&mute=1&controls=0&fs=0&iv_load_policy=3&cc_load_policy=0&cc_lang_pref=none&hl=id&disablekb=1&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`
     : '';
   const cfEmbedUrl = cfUid
     ? `https://iframe.videodelivery.net/${cfUid}?autoplay=true&controls=false&preload=auto&muted=true`

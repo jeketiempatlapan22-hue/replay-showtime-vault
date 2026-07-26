@@ -986,6 +986,7 @@ export type Database = {
           order_id: string | null
           package_name: string
           phone: string
+          show_order_id: string | null
           user_id: string | null
         }
         Insert: {
@@ -1000,6 +1001,7 @@ export type Database = {
           order_id?: string | null
           package_name?: string
           phone?: string
+          show_order_id?: string | null
           user_id?: string | null
         }
         Update: {
@@ -1014,6 +1016,7 @@ export type Database = {
           order_id?: string | null
           package_name?: string
           phone?: string
+          show_order_id?: string | null
           user_id?: string | null
         }
         Relationships: [
@@ -1022,6 +1025,13 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "membership_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "membership_payment_proofs_show_order_id_fkey"
+            columns: ["show_order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
             referencedColumns: ["id"]
           },
         ]
@@ -1928,6 +1938,7 @@ export type Database = {
           order_id: string | null
           package_name: string
           phone: string
+          show_order_id: string | null
           user_id: string | null
         }[]
         SetofOptions: {

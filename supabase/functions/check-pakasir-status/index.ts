@@ -287,11 +287,15 @@ Deno.serve(async (req) => {
 
     const alreadySent = order.token_sent_at && await hasSentWa(admin, order.id);
 
-    const verified = await verifyPakasirPaid(apiKey, slug, order.pakasir_order_id || '', Number(order.amount || 0));
-    if (!verified.paid) {
-      return new Response(JSON.stringify({ ok: true, status: verified.status || 'pending' }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+    // Kalau order sudah ditandai paid oleh admin (approve manual bukti transaksi),
+    // lewati verifikasi Pakasir agar finalize + kirim WA tetap jalan.
+    if (order.status !== 'paid') {
+      const verified = await verifyPakasirPaid(apiKey, slug, order.pakasir_order_id || '', Number(order.amount || 0));
+      if (!verified.paid) {
+        return new Response(JSON.stringify({ ok: true, status: verified.status || 'pending' }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
     }
 
     if (order.status === 'paid' && alreadySent) {

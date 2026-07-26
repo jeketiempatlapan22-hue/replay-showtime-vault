@@ -9,8 +9,9 @@ import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
-import { Loader2, CheckCircle2, Copy, Smartphone, ExternalLink, MessageCircle, AlertTriangle, Coins, Lock } from 'lucide-react';
+import { Loader2, CheckCircle2, Copy, Smartphone, ExternalLink, MessageCircle, AlertTriangle, Coins, Lock, Upload } from 'lucide-react';
 import { setShowPurchase, setReplayPurchase } from '@/lib/purchases';
+import MembershipProofUpload from '@/components/MembershipProofUpload';
 
 interface Props {
   open: boolean;
@@ -48,6 +49,7 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
   const [now, setNow] = useState(Date.now());
   const [lastChecked, setLastChecked] = useState<number>(0);
   const [staticQrisUrl, setStaticQrisUrl] = useState<string>('');
+  const [proofOpen, setProofOpen] = useState(false);
   const [ownerWa, setOwnerWa] = useState<string>('6288809048431');
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
@@ -434,6 +436,9 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
               className="flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground hover:text-primary hover:underline">
               <MessageCircle className="w-3 h-3" /> Pembayaran bermasalah? Hubungi admin
             </a>
+            <Button variant="outline" size="sm" className="w-full gap-1.5" onClick={() => setProofOpen(true)}>
+              <Upload className="w-3.5 h-3.5" /> Sudah bayar? Kirim bukti transfer
+            </Button>
           </div>
         )}
 
@@ -528,11 +533,24 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
               </a>
             </Button>
 
-            <Button variant="outline" className="w-full" onClick={() => setStatus('form')}>
+            <Button variant="outline" className="w-full gap-1.5" onClick={() => setProofOpen(true)}>
+              <Upload className="w-4 h-4" /> Kirim Bukti Transfer
+            </Button>
+
+            <Button variant="ghost" className="w-full" onClick={() => setStatus('form')}>
               Coba QRIS dinamis lagi
             </Button>
           </div>
         )}
+        <MembershipProofUpload
+          open={proofOpen}
+          onOpenChange={setProofOpen}
+          showOrderId={orderId}
+          packageName={itemTitle}
+          amount={totalPayment || amount}
+          defaultEmail={''}
+          defaultPhone={phone}
+        />
       </DialogContent>
     </Dialog>
   );

@@ -4,12 +4,12 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, RefreshCw, Trash2, CheckCircle2, ExternalLink, Save, Phone } from 'lucide-react';
+import { Loader2, RefreshCw, Trash2, CheckCircle2, ExternalLink, Save, Phone, Send } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
 type Proof = {
-  id: string; order_id: string | null; user_id: string | null;
+  id: string; order_id: string | null; show_order_id: string | null; user_id: string | null;
   email: string; phone: string; package_name: string; amount: number;
   image_path: string; note: string; handled: boolean;
   created_at: string; expires_at: string;
@@ -18,6 +18,7 @@ type Proof = {
 export default function MembershipProofsAdmin() {
   const [rows, setRows] = useState<Proof[]>([]);
   const [loading, setLoading] = useState(false);
+  const [approving, setApproving] = useState<Record<string, boolean>>({});
   const [urls, setUrls] = useState<Record<string, string>>({});
   const [adminWa, setAdminWa] = useState('');
   const [savingWa, setSavingWa] = useState(false);
@@ -59,6 +60,28 @@ export default function MembershipProofsAdmin() {
     if (error) return toast({ title: 'Gagal', description: error.message, variant: 'destructive' });
     setRows((x) => x.map((y) => (y.id === r.id ? { ...y, handled: h } : y)));
   };
+
+  const approveAndSend = async (r: Proof) => {
+    if (!r.order_id && !r.show_order_id) {
+      toast({ title: 'Bukti tanpa order', description: 'Bukti ini tidak terhubung ke order manapun — aktifkan manual di menu order/token.', variant: 'destructive' });
+      return;
+    }
+    setApproving((s) => ({ ...s, [r.id]: true }));
+    const { data, error } = await supabase.functions.invoke('admin-approve-proof', { body: { proof_id: r.id } });
+    setApproving((s) => ({ ...s, [r.id]: false }));
+    if (error) return toast({ title: 'Gagal setujui', description: error.message, variant: 'destructive' });
+    const res = data as { ok?: boolean; order_kind?: string; finalize?: { sent?: boolean; status?: string; error?: string } };
+    const sent = res?.finalize?.sent;
+    setRows((x) => x.map((y) => (y.id === r.id ? { ...y, handled: true } : y)));
+    if (sent) {
+      toast({ title: 'Disetujui & WA terkirim', description: `${res.order_kind === 'membership' ? 'Membership' : 'Show/Replay'} aktif — token dikirim ke ${r.phone}.` });
+    } else if (res?.finalize?.error) {
+      toast({ title: 'Order ditandai paid, WA gagal', description: String(res.finalize.error), variant: 'destructive' });
+    } else {
+      toast({ title: 'Disetujui', description: 'Order ditandai paid. WA sedang diproses / tertunda — cek log.' });
+    }
+  };
+
 
   const remove = async (r: Proof) => {
     if (!confirm('Hapus bukti ini?')) return;
@@ -111,22 +134,35 @@ export default function MembershipProofsAdmin() {
                   <div className="p-3 space-y-1.5 text-xs">
                     <div className="flex items-center gap-1 flex-wrap">
                       <Badge variant={r.handled ? 'default' : 'secondary'}>{r.handled ? 'Selesai' : 'Baru'}</Badge>
+                      <Badge variant="outline">{r.order_id ? 'Membership' : r.show_order_id ? 'Show/Replay' : 'Tanpa order'}</Badge>
                       <Badge variant="outline">{r.package_name || 'Paket -'}</Badge>
                       {r.amount > 0 && <Badge variant="outline">Rp {r.amount.toLocaleString('id-ID')}</Badge>}
                     </div>
                     <div>📧 {r.email}</div>
                     <div>📱 <a href={`https://wa.me/${r.phone}`} target="_blank" rel="noreferrer" className="text-primary underline">{r.phone}</a></div>
-                    {r.order_id && <div className="font-mono text-[10px] truncate">Order: {r.order_id}</div>}
+                    {r.order_id && <div className="font-mono text-[10px] truncate">Order Membership: {r.order_id}</div>}
+                    {r.show_order_id && <div className="font-mono text-[10px] truncate">Order Show: {r.show_order_id}</div>}
                     {r.note && <div className="text-muted-foreground italic">"{r.note}"</div>}
                     <div className="text-muted-foreground">{new Date(r.created_at).toLocaleString('id-ID')}</div>
                     <div className="flex gap-1 flex-wrap pt-1">
+                      {(r.order_id || r.show_order_id) && (
+                        <Button
+                          size="sm"
+                          className="h-7 text-[11px] bg-emerald-600 hover:bg-emerald-700 text-white"
+                          onClick={() => approveAndSend(r)}
+                          disabled={!!approving[r.id]}
+                        >
+                          {approving[r.id] ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Send className="w-3 h-3 mr-1" />}
+                          Setujui & Kirim Token
+                        </Button>
+                      )}
                       {urls[r.id] && (
                         <a href={urls[r.id]} target="_blank" rel="noreferrer">
                           <Button size="sm" variant="outline" className="h-7 text-[11px]"><ExternalLink className="w-3 h-3 mr-1" />Buka</Button>
                         </a>
                       )}
                       <Button size="sm" variant="outline" className="h-7 text-[11px]" onClick={() => setHandled(r, !r.handled)}>
-                        <CheckCircle2 className="w-3 h-3 mr-1" />{r.handled ? 'Buka lagi' : 'Selesai'}
+                        <CheckCircle2 className="w-3 h-3 mr-1" />{r.handled ? 'Buka lagi' : 'Tandai selesai'}
                       </Button>
                       <Button size="sm" variant="destructive" className="h-7 text-[11px]" onClick={() => remove(r)}>
                         <Trash2 className="w-3 h-3 mr-1" />Hapus

@@ -11,6 +11,7 @@ interface Props {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   orderId?: string | null;
+  showOrderId?: string | null;
   packageName?: string;
   amount?: number;
   defaultEmail?: string;
@@ -25,7 +26,7 @@ function normalizePhone(raw: string) {
   return d;
 }
 
-export default function MembershipProofUpload({ open, onOpenChange, orderId, packageName = '', amount = 0, defaultEmail = '', defaultPhone = '' }: Props) {
+export default function MembershipProofUpload({ open, onOpenChange, orderId, showOrderId, packageName = '', amount = 0, defaultEmail = '', defaultPhone = '' }: Props) {
   const [email, setEmail] = useState(defaultEmail);
   const [phone, setPhone] = useState(defaultPhone);
   const [note, setNote] = useState('');
@@ -70,6 +71,7 @@ export default function MembershipProofUpload({ open, onOpenChange, orderId, pac
 
       const { error: insErr } = await supabase.from('membership_payment_proofs').insert({
         order_id: orderId || null,
+        show_order_id: showOrderId || null,
         user_id: userId,
         email: e,
         phone: ph,
@@ -77,7 +79,7 @@ export default function MembershipProofUpload({ open, onOpenChange, orderId, pac
         amount,
         image_path: name,
         note: note.trim(),
-      });
+      } as never);
       if (insErr) throw insErr;
 
       toast.success('Bukti terkirim. Diarahkan ke WhatsApp admin…');
