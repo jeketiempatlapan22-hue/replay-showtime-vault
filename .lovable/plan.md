@@ -1,62 +1,55 @@
-# Rencana: Admin Buat User Membership Manual
+## Masalah 1 — Approve bukti transaksi tidak mengaktifkan membership & tidak mengirim WA
 
-Fitur baru di tab **User Membership** pada Admin Panel, tanpa menyentuh halaman Live, player, playlist, dan aturan Fonnte.
+**Diagnosa (terverifikasi)**
+- Tombol "Selesai" di admin panel (`MembershipProofsAdmin.tsx`) hanya memanggil RPC `admin_set_proof_handled` yang isinya cuma `UPDATE handled = true`. Tidak ada finalize order, tidak ada issue token, tidak ada trigger WA.
+- Flow paid asli ada di edge function `check-pakasir-status` (branch membership + branch show): mark paid → `finalize_membership_order` / `ensurePurchaseToken` → kirim Fonnte → catat ke `wa_outbox`, `token_deliveries`, dan `wa_sent_at/token_sent_at`.
+- Table `membership_payment_proofs.order_id` FK ke `membership_orders`. Untuk show belum ada kolomnya sehingga bukti show tidak bisa di-approve otomatis.
 
-## 1. Tombol "Buat User Membership" (Admin)
-Di `MembershipUsersAdmin.tsx`, tambah tombol "+ Buat Membership" di header. Membuka dialog dengan field:
-- Email user
-- Nomor WhatsApp (auto-normalisasi 62xxx)
-- Pilih paket (dropdown dari `membership_packages`)
-- Durasi (hari) — **bisa diubah bebas oleh admin**, default ikut paket
-- Max devices (prefill dari paket, editable)
-- Termasuk replay (toggle, prefill paket)
-- Info replay (textarea, prefill `reseller_membership_replay_info` / paket)
-- Catatan opsional
+**Perbaikan**
 
-Saat disubmit → panggil RPC baru `admin_create_membership_user` yang:
-1. Generate `token` (12 char) dan `password` (sandi replay 8 char) unik.
-2. Insert ke `membership_tokens` dengan `starts_at = now()`, `expires_at = now() + durasi`, paket, max_devices, includes_replays, replay_info.
-3. Insert ke `membership_orders` status `paid` (kind=`membership`), `paid_at = now()`, link ke token & paket, simpan email + phone.
-4. Catat ke `admin_action_logs`.
-5. Return `{ token, password, link, message, order_id }`.
+1. **Migrasi DB** — perluas `membership_payment_proofs`:
+   - Tambah kolom `show_order_id uuid REFERENCES public.orders(id) ON DELETE SET NULL` (nullable).
+   - Update RPC `admin_list_membership_proofs` agar ikut me-return kolom baru.
 
-Link memakai `siteOrigin.ts` → `https://realtime48stream.my.id/live?mtoken=...&mp=...`.
+2. **Edge function baru `admin-approve-proof`** (verify_jwt=false, cek admin via `has_role` pakai user JWT dari header):
+   - Input: `{ proof_id }`.
+   - Ambil proof; jika `order_id` (membership) → set `membership_orders.status='paid'`, `paid_at=now()`, lalu panggil `finalize_membership_order`, susun pesan pakai template `wa_membership_template` + link `/live?mtoken=...&mp=...`, kirim via Fonnte, tulis `wa_outbox` + `token_deliveries`, set `wa_sent_at`.
+   - Jika `show_order_id` → panggil logika serupa branch show di `check-pakasir-status` (`ensurePurchaseToken`, update `orders.status='paid'`, kirim WA pakai `wa_message_template` / `wa_show_template`, set `token_sent_at`).
+   - Selalu set `membership_payment_proofs.handled=true` di akhir jika sukses.
+   - Idempoten: skip finalize/WA jika sudah `paid` + `wa_sent_at/token_sent_at`.
+   - Kembalikan `{ ok, sent, token, order_kind }`.
 
-## 2. Tombol Kirim WA
-Setelah create sukses dialog menampilkan preview pesan + tombol **Kirim WA**. Juga tambah tombol **Kirim WA** di tiap baris list user membership (di samping Edit/Reset/Hapus).
+3. **UI admin (`MembershipProofsAdmin.tsx`)**
+   - Ganti tombol "Selesai" menjadi tombol utama **"Setujui & Kirim Token"** (hijau) yang memanggil `admin-approve-proof`. Tampilkan spinner + toast hasil ("Membership aktif & WA terkirim" / "Gagal kirim WA — cek log").
+   - Sisakan tombol kecil "Tandai selesai manual" untuk kasus admin memang sudah proses di luar sistem (memanggil RPC lama).
+   - Setelah sukses, refresh row → badge jadi "Selesai".
 
-- Memakai fungsi edge yang sudah ada: `send-membership-token-wa` (dipakai oleh flow pembelian normal) supaya template pesan **identik** dengan user yang membeli via web (mengambil `wa_membership_template` dari `site_settings`, mengisi `{package_name} {link} {expires_at} {duration_days} {max_devices} {replay_info_block}`).
-- Tambah/ pastikan fungsi menerima `order_id` ATAU `token_id` dan langsung kirim ke phone tersimpan. Bypass pause/circuit-breaker untuk trigger manual admin (sudah pola yang ada).
-- Toast tampilkan response Fonnte mentah bila gagal.
+4. **Upload bukti untuk show** (`BuyShowDialog.tsx` + `MembershipProofUpload.tsx`)
+   - Tambah prop `showOrderId` pada komponen upload; jika diisi, insert `show_order_id` alih-alih `order_id`.
+   - Munculkan tombol "Kirim bukti transaksi" di `BuyShowDialog` setelah user klik bayar QRIS/manual, seperti pada flow membership.
 
-## 3. Edit Durasi per User (sudah ada — diperluas)
-Form Edit yang sudah ada di `MembershipUsersAdmin` sudah mendukung ubah `expires_at`. Tambah field "Perpanjang +N hari" sebagai helper cepat (geser `expires_at = max(now, current_expires) + N hari`). Tetap pakai RPC `admin_update_membership_user` yang sudah ada.
+## Masalah 2 — Replay YouTube selalu memunculkan subtitle
 
-## 4. Penanganan Expiry untuk User
-Tujuan: token kadaluarsa benar-benar tidak bisa dipakai, dan halaman `/membership` kembali ke mode "Beli Membership".
+**Diagnosa (terverifikasi)** — di `EmbedPlayer.tsx` baris 546 URL embed tidak memiliki `cc_load_policy=0` maupun `cc_lang_pref`, sehingga caption otomatis muncul ketika default track ada.
 
-- `useActiveMembership.ts` sudah filter `expires_at > now()` → cukup. Tambahkan auto-refresh tiap 60 detik supaya UI berpindah ke mode beli begitu lewat expiry tanpa reload.
-- `MembershipDashboard.tsx`: ketika `days_remaining <= 0` atau `expires_at <= now()`, tampilkan banner "Membership berakhir" dan tombol "Beli Membership Lagi" yang membuka daftar paket (set state `showPackages=true` di `Membership.tsx`).
-- Bersihkan `localStorage` credential lama via `clearMembershipCredentials()` saat expired.
-- Pastikan gate akses Live: server-side cek `expires_at > now() AND NOT revoked` di RPC `unlock_membership_token` / fungsi `unlock-live` (verifikasi singkat; tidak ubah aturan player Live). Jika sudah benar, tidak ada perubahan; jika tidak, tambah filter expiry (tanpa mengubah logika player).
+**Perbaikan (`EmbedPlayer.tsx`)**
+- Tambah `cc_load_policy=0&cc_lang_pref=none&hl=id` pada query string embed YouTube.
+- Setelah `onReady`, panggil `player.unloadModule?.('captions')` dan `player.unloadModule?.('cc')`; sebagai jaring pengaman panggil juga saat `onPlaybackQualityChange` dan `onStateChange` (state 1 = PLAYING) — YouTube kadang me-reload modul caption setelah quality switch.
+- Tidak mengubah aturan player Live: patch hanya dilakukan ketika `!isLive` (subtitle Live tetap apa adanya biar tidak ganggu halaman live).
 
-## 5. File Yang Diubah / Dibuat
+## Masalah 3 — Resolusi tertinggi + downgrade adaptif saat buffering
 
-**Migrasi baru** `supabase/migrations/20260617_admin_create_membership.sql`:
-- RPC `admin_create_membership_user(_email, _phone, _package_id, _days, _max_devices, _includes_replays, _replay_info, _note)` → SECURITY DEFINER, cek `has_role(auth.uid(),'admin')`, return JSON.
-- (jika perlu) tambah index pada `membership_orders(token_id)`.
+Logika ini sudah ada di `EmbedPlayer.tsx` (lihat `YT_QUALITY_LADDER`, `applyQualityCap`, `bufferEventsRef`, cooldown 15 dtk, threshold 3 buffer / 30 dtk untuk turun 1 tingkat). Tidak perlu perubahan tambahan; hanya dipastikan tetap aktif setelah patch subtitle.
 
-**Edge function**:
-- `supabase/functions/send-membership-token-wa/index.ts` — pastikan dapat dipanggil ulang oleh admin dengan `order_id`, tetap pakai template `wa_membership_template`.
+## Halaman yang tidak disentuh
 
-**Frontend**:
-- `src/components/admin/MembershipUsersAdmin.tsx` — dialog create + tombol Kirim WA + tombol Perpanjang.
-- `src/components/MembershipDashboard.tsx` — handling expired + tombol beli lagi.
-- `src/pages/Membership.tsx` — refresh expiry, tampilkan paket saat expired.
-- `src/hooks/useActiveMembership.ts` — polling/refresh tiap 60 dtk.
+`src/pages/Live.tsx`, `HlsPlayer.tsx`, aturan playlist Live, serta path Live di `EmbedPlayer` (kondisi `isLive` dipertahankan).
 
-## 6. Yang TIDAK Disentuh
-- Halaman `/live` (player, playlist, viewer count, aturan kualitas).
-- Logika Fonnte (circuit breaker, polling, webhook).
-- Edge functions lain di luar `send-membership-token-wa`.
-- Template pesan WA (hanya menggunakan yang sudah ada di `site_settings.wa_membership_template`).
+## Detail teknis singkat
+
+- Auth admin di edge function baru: buat client dengan header `Authorization` user, `getUser()` lalu cek `user_roles` role='admin'. Untuk aksi DB dipakai service-role client (bypass RLS) mirip pola `check-pakasir-status`.
+- Fungsi helper `sendFonnte`, `isFonntePaused`, `shouldDelayWaRetry` dipindah/di-duplikasi ke edge function baru (kode kecil, tidak layak refactor shared).
+- Perubahan URL YouTube contoh:
+  ```text
+  https://www.youtube-nocookie.com/embed/<id>?rel=0&modestbranding=1&playsinline=1&autoplay=1&mute=1&controls=0&fs=0&iv_load_policy=3&cc_load_policy=0&cc_lang_pref=none&hl=id&disablekb=1&enablejsapi=1&origin=<origin>
+  ```
