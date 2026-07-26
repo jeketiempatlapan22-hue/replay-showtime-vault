@@ -61,6 +61,28 @@ export default function MembershipProofsAdmin() {
     setRows((x) => x.map((y) => (y.id === r.id ? { ...y, handled: h } : y)));
   };
 
+  const approveAndSend = async (r: Proof) => {
+    if (!r.order_id && !r.show_order_id) {
+      toast({ title: 'Bukti tanpa order', description: 'Bukti ini tidak terhubung ke order manapun — aktifkan manual di menu order/token.', variant: 'destructive' });
+      return;
+    }
+    setApproving((s) => ({ ...s, [r.id]: true }));
+    const { data, error } = await supabase.functions.invoke('admin-approve-proof', { body: { proof_id: r.id } });
+    setApproving((s) => ({ ...s, [r.id]: false }));
+    if (error) return toast({ title: 'Gagal setujui', description: error.message, variant: 'destructive' });
+    const res = data as { ok?: boolean; order_kind?: string; finalize?: { sent?: boolean; status?: string; error?: string } };
+    const sent = res?.finalize?.sent;
+    setRows((x) => x.map((y) => (y.id === r.id ? { ...y, handled: true } : y)));
+    if (sent) {
+      toast({ title: 'Disetujui & WA terkirim', description: `${res.order_kind === 'membership' ? 'Membership' : 'Show/Replay'} aktif — token dikirim ke ${r.phone}.` });
+    } else if (res?.finalize?.error) {
+      toast({ title: 'Order ditandai paid, WA gagal', description: String(res.finalize.error), variant: 'destructive' });
+    } else {
+      toast({ title: 'Disetujui', description: 'Order ditandai paid. WA sedang diproses / tertunda — cek log.' });
+    }
+  };
+
+
   const remove = async (r: Proof) => {
     if (!confirm('Hapus bukti ini?')) return;
     const { data: path, error } = await supabase.rpc('admin_delete_membership_proof', { _id: r.id });
