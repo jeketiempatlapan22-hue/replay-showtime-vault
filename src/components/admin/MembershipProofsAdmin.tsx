@@ -18,6 +18,7 @@ type Proof = {
 export default function MembershipProofsAdmin() {
   const [rows, setRows] = useState<Proof[]>([]);
   const [loading, setLoading] = useState(false);
+  const [approving, setApproving] = useState<Record<string, boolean>>({});
   const [urls, setUrls] = useState<Record<string, string>>({});
   const [adminWa, setAdminWa] = useState('');
   const [savingWa, setSavingWa] = useState(false);
