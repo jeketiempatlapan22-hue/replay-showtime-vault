@@ -26,7 +26,7 @@ function normalizePhone(raw: string) {
   return d;
 }
 
-export default function MembershipProofUpload({ open, onOpenChange, orderId, packageName = '', amount = 0, defaultEmail = '', defaultPhone = '' }: Props) {
+export default function MembershipProofUpload({ open, onOpenChange, orderId, showOrderId, packageName = '', amount = 0, defaultEmail = '', defaultPhone = '' }: Props) {
   const [email, setEmail] = useState(defaultEmail);
   const [phone, setPhone] = useState(defaultPhone);
   const [note, setNote] = useState('');
