@@ -11,6 +11,7 @@ interface Props {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   orderId?: string | null;
+  showOrderId?: string | null;
   packageName?: string;
   amount?: number;
   defaultEmail?: string;
