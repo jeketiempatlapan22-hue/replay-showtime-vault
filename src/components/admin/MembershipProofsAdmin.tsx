@@ -4,12 +4,12 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, RefreshCw, Trash2, CheckCircle2, ExternalLink, Save, Phone } from 'lucide-react';
+import { Loader2, RefreshCw, Trash2, CheckCircle2, ExternalLink, Save, Phone, Send } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
 type Proof = {
-  id: string; order_id: string | null; user_id: string | null;
+  id: string; order_id: string | null; show_order_id: string | null; user_id: string | null;
   email: string; phone: string; package_name: string; amount: number;
   image_path: string; note: string; handled: boolean;
   created_at: string; expires_at: string;
