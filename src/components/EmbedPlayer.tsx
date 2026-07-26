@@ -28,6 +28,8 @@ interface YoutubePlayerApi {
   getPlaybackQuality?: () => string;
   getAvailableQualityLevels?: () => string[];
   getVideoLoadedFraction?: () => number;
+  unloadModule?: (module: string) => void;
+  setOption?: (module: string, option: string, value: unknown) => void;
 }
 
 // Ladder kualitas YouTube dari tertinggi ke terendah.
