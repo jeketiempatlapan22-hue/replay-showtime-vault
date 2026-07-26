@@ -548,7 +548,7 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
           showOrderId={orderId}
           packageName={itemTitle}
           amount={totalPayment || amount}
-          defaultEmail={email}
+          defaultEmail={''}
           defaultPhone={phone}
         />
       </DialogContent>
