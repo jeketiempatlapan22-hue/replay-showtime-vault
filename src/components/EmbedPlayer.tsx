@@ -332,6 +332,12 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
                 autoMuteAppliedRef.current = true;
               }
               ytPlayerRef.current.playVideo?.();
+              // Matikan subtitle di replay (jangan sentuh Live).
+              if (!isLive) {
+                disableCaptions();
+                setTimeout(disableCaptions, 1500);
+                setTimeout(disableCaptions, 4000);
+              }
               // Coba kunci ke resolusi tertinggi (hanya untuk replay, bukan live).
               if (!isLive) {
                 refreshAvailableQualities();
@@ -343,11 +349,14 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
           },
           onPlaybackQualityChange: () => {
             // Re-cek list — kadang baru terisi setelah quality pertama dipilih.
-            if (!isLive) refreshAvailableQualities();
+            if (!isLive) { refreshAvailableQualities(); disableCaptions(); }
           },
           onStateChange: (e: { data: number }) => {
             if (e.data === 1 || e.data === 3) markReady(true);
             setIsPlaying(e.data === 1 || e.data === 3);
+            // Setiap kali mulai PLAYING di replay, matikan captions lagi
+            // (YT kadang me-reload modul caption saat transisi).
+            if (e.data === 1 && !isLive) disableCaptions();
             // Adaptive downgrade: state 3 = BUFFERING. Hitung kejadian buffering
             // dalam 30 detik terakhir; jika ≥3 → turunkan 1 tingkat resolusi.
             // Hanya berlaku untuk replay (bukan live) agar tidak ganggu Live.
