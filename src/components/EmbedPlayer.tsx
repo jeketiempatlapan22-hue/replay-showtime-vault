@@ -190,6 +190,16 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
   }, [applyQualityCap]);
 
 
+  // Matikan subtitle YouTube (captions) — dipanggil di beberapa titik karena YT
+  // kadang mereload modul caption setelah quality switch / play.
+  const disableCaptions = useCallback(() => {
+    const p = ytPlayerRef.current;
+    if (!p) return;
+    try { p.unloadModule?.('captions'); } catch { /* ignore */ }
+    try { p.unloadModule?.('cc'); } catch { /* ignore */ }
+    try { p.setOption?.('captions', 'track', {}); } catch { /* ignore */ }
+  }, []);
+
   const markReady = useCallback((value: boolean) => {
     readyRef.current = value;
     setReady(value);
