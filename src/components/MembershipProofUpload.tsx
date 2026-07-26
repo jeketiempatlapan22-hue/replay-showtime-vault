@@ -71,6 +71,7 @@ export default function MembershipProofUpload({ open, onOpenChange, orderId, sho
 
       const { error: insErr } = await supabase.from('membership_payment_proofs').insert({
         order_id: orderId || null,
+        show_order_id: showOrderId || null,
         user_id: userId,
         email: e,
         phone: ph,
@@ -78,7 +79,7 @@ export default function MembershipProofUpload({ open, onOpenChange, orderId, sho
         amount,
         image_path: name,
         note: note.trim(),
-      });
+      } as never);
       if (insErr) throw insErr;
 
       toast.success('Bukti terkirim. Diarahkan ke WhatsApp admin…');
