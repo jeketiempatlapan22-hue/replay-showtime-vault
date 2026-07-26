@@ -533,11 +533,24 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
               </a>
             </Button>
 
-            <Button variant="outline" className="w-full" onClick={() => setStatus('form')}>
+            <Button variant="outline" className="w-full gap-1.5" onClick={() => setProofOpen(true)}>
+              <Upload className="w-4 h-4" /> Kirim Bukti Transfer
+            </Button>
+
+            <Button variant="ghost" className="w-full" onClick={() => setStatus('form')}>
               Coba QRIS dinamis lagi
             </Button>
           </div>
         )}
+        <MembershipProofUpload
+          open={proofOpen}
+          onOpenChange={setProofOpen}
+          showOrderId={orderId}
+          packageName={itemTitle}
+          amount={totalPayment || amount}
+          defaultEmail={email}
+          defaultPhone={phone}
+        />
       </DialogContent>
     </Dialog>
   );
