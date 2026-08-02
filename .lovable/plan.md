@@ -1,55 +1,44 @@
-## Masalah 1 — Approve bukti transaksi tidak mengaktifkan membership & tidak mengirim WA
+# Perbaikan Pengiriman Token, Bukti Transaksi, Tanggal Replay & Menu Replay Off
 
-**Diagnosa (terverifikasi)**
-- Tombol "Selesai" di admin panel (`MembershipProofsAdmin.tsx`) hanya memanggil RPC `admin_set_proof_handled` yang isinya cuma `UPDATE handled = true`. Tidak ada finalize order, tidak ada issue token, tidak ada trigger WA.
-- Flow paid asli ada di edge function `check-pakasir-status` (branch membership + branch show): mark paid → `finalize_membership_order` / `ensurePurchaseToken` → kirim Fonnte → catat ke `wa_outbox`, `token_deliveries`, dan `wa_sent_at/token_sent_at`.
-- Table `membership_payment_proofs.order_id` FK ke `membership_orders`. Untuk show belum ada kolomnya sehingga bukti show tidak bisa di-approve otomatis.
+## 1. Token tidak terkirim saat user bayar (real-time)
 
-**Perbaikan**
+Kondisi sekarang (terverifikasi):
+- `pakasir-webhook` sudah memverifikasi ulang ke Pakasir dan mengirim WA, tapi jalur cadangan `poll-pending-orders` hanya memindai order `paid` yang `token_sent_at` kosong dengan limit 15 dan hanya untuk rentang waktu tertentu.
+- `sendFonnte` di `pakasir-webhook` hanya 1 percobaan dengan timeout 10 detik, jadi satu timeout = token tidak terkirim dan tidak ada antrian ulang otomatis.
 
-1. **Migrasi DB** — perluas `membership_payment_proofs`:
-   - Tambah kolom `show_order_id uuid REFERENCES public.orders(id) ON DELETE SET NULL` (nullable).
-   - Update RPC `admin_list_membership_proofs` agar ikut me-return kolom baru.
+Perbaikan:
+- Perketat konfirmasi Pakasir: setelah webhook masuk, selalu panggil ulang `transactiondetail` (sudah ada) dan simpan hasil verifikasi di order; jika `paid`, langsung terbitkan token + kirim WA di background (`EdgeRuntime.waitUntil`) sehingga webhook tetap balas cepat.
+- Retry berlapis di `pakasir-webhook` dan `check-pakasir-status`: percobaan Fonnte 10s → 20s → 32s sebelum dianggap gagal; kalau tetap gagal, order ditandai `paid` tapi `token_sent_at` tetap kosong dan dicatat error ke `wa_outbox`.
+- Perbesar cakupan `poll-pending-orders`: limit paid-unsent dinaikkan (15 → 100), jendela waktu diperluas, dan order paid-unsent selalu dicoba ulang tiap eksekusi cron sampai `wa_outbox` punya baris `sent`.
+- Frontend polling status pembayaran (`check-pakasir-status`) tetap seperti sekarang, hanya ikut memicu pengiriman ulang jika token belum terkirim.
 
-2. **Edge function baru `admin-approve-proof`** (verify_jwt=false, cek admin via `has_role` pakai user JWT dari header):
-   - Input: `{ proof_id }`.
-   - Ambil proof; jika `order_id` (membership) → set `membership_orders.status='paid'`, `paid_at=now()`, lalu panggil `finalize_membership_order`, susun pesan pakai template `wa_membership_template` + link `/live?mtoken=...&mp=...`, kirim via Fonnte, tulis `wa_outbox` + `token_deliveries`, set `wa_sent_at`.
-   - Jika `show_order_id` → panggil logika serupa branch show di `check-pakasir-status` (`ensurePurchaseToken`, update `orders.status='paid'`, kirim WA pakai `wa_message_template` / `wa_show_template`, set `token_sent_at`).
-   - Selalu set `membership_payment_proofs.handled=true` di akhir jika sukses.
-   - Idempoten: skip finalize/WA jika sudah `paid` + `wa_sent_at/token_sent_at`.
-   - Kembalikan `{ ok, sent, token, order_kind }`.
+## 2. Menu Bukti Transaksi — tombol setujui & kirim WA
 
-3. **UI admin (`MembershipProofsAdmin.tsx`)**
-   - Ganti tombol "Selesai" menjadi tombol utama **"Setujui & Kirim Token"** (hijau) yang memanggil `admin-approve-proof`. Tampilkan spinner + toast hasil ("Membership aktif & WA terkirim" / "Gagal kirim WA — cek log").
-   - Sisakan tombol kecil "Tandai selesai manual" untuk kasus admin memang sudah proses di luar sistem (memanggil RPC lama).
-   - Setelah sukses, refresh row → badge jadi "Selesai".
+Tombol "Setujui & Kirim Token" sudah ada di `MembershipProofsAdmin.tsx` untuk bukti yang punya `order_id`/`show_order_id`. Yang ditambahkan:
+- Bukti tanpa order (upload manual murni) mendapat form kecil: pilih jenis (Show / Replay / Membership), pilih show/replay/paket, lalu tombol **Setujui & Kirim via WhatsApp**. Edge function `admin-approve-proof` diperluas untuk membuat order + token dari input ini, sehingga token otomatis muncul di daftar token show (`active_show_tokens` / `replay_personal_tokens`) atau membership (`membership_tokens`) dan tampil di Token Factory / User Membership.
+- Setelah sukses, kartu bukti menampilkan token yang dibuat + status WA (terkirim / gagal) dan tombol "Kirim ulang WA".
 
-4. **Upload bukti untuk show** (`BuyShowDialog.tsx` + `MembershipProofUpload.tsx`)
-   - Tambah prop `showOrderId` pada komponen upload; jika diisi, insert `show_order_id` alih-alih `order_id`.
-   - Munculkan tombol "Kirim bukti transaksi" di `BuyShowDialog` setelah user klik bayar QRIS/manual, seperti pada flow membership.
+## 3. Tanggal pada pesan token replay
 
-## Masalah 2 — Replay YouTube selalu memunculkan subtitle
+Terverifikasi: di `check-pakasir-status` (dan poller) cabang replay memakai `new Date()` (tanggal pembelian); hanya cabang show yang memakai `show_date`.
 
-**Diagnosa (terverifikasi)** — di `EmbedPlayer.tsx` baris 546 URL embed tidak memiliki `cc_load_policy=0` maupun `cc_lang_pref`, sehingga caption otomatis muncul ketika default track ada.
+Perbaikan: untuk order replay, ambil `replays.date` (+ `show_time`) dan pakai itu sebagai `{date}` / `{date_line}` di template pesan. Jika data replay tidak ada, baru fallback ke tanggal sekarang. Perubahan diterapkan konsisten di `check-pakasir-status`, `pakasir-webhook`, `poll-pending-orders`, dan `resend-show-wa`.
 
-**Perbaikan (`EmbedPlayer.tsx`)**
-- Tambah `cc_load_policy=0&cc_lang_pref=none&hl=id` pada query string embed YouTube.
-- Setelah `onReady`, panggil `player.unloadModule?.('captions')` dan `player.unloadModule?.('cc')`; sebagai jaring pengaman panggil juga saat `onPlaybackQualityChange` dan `onStateChange` (state 1 = PLAYING) — YouTube kadang me-reload modul caption setelah quality switch.
-- Tidak mengubah aturan player Live: patch hanya dilakukan ketika `!isLive` (subtitle Live tetap apa adanya biar tidak ganggu halaman live).
+## 4. Menu "Replay Off" di admin panel
 
-## Masalah 3 — Resolusi tertinggi + downgrade adaptif saat buffering
+Migrasi DB pada tabel `replays`:
+- `is_offline boolean not null default false`
+- `offline_reason text not null default ''`
+- `offline_at timestamptz`
 
-Logika ini sudah ada di `EmbedPlayer.tsx` (lihat `YT_QUALITY_LADDER`, `applyQualityCap`, `bufferEventsRef`, cooldown 15 dtk, threshold 3 buffer / 30 dtk untuk turun 1 tingkat). Tidak perlu perubahan tambahan; hanya dipastikan tetap aktif setelah patch subtitle.
+Perilaku:
+- `getReplays()` (landing page) memfilter `is_offline = false`, jadi replay bermasalah hilang dari daftar kartu.
+- Admin dapat menandai replay off manual (tombol di daftar replay admin), dan `get-replay-source` otomatis menandai off bila sumber YouTube/m3u8 tidak valid atau kosong.
+- Menu baru **Replay Off** di admin panel: daftar replay off + alasan, form isi ulang **ID/URL YouTube atau URL m3u8/sumber lain**, tombol "Aktifkan kembali" yang menyimpan sumber baru, mengosongkan `is_offline`, dan replay langsung muncul kembali di landing page (realtime channel `replays` sudah ada).
 
-## Halaman yang tidak disentuh
+## Detail teknis
 
-`src/pages/Live.tsx`, `HlsPlayer.tsx`, aturan playlist Live, serta path Live di `EmbedPlayer` (kondisi `isLive` dipertahankan).
-
-## Detail teknis singkat
-
-- Auth admin di edge function baru: buat client dengan header `Authorization` user, `getUser()` lalu cek `user_roles` role='admin'. Untuk aksi DB dipakai service-role client (bypass RLS) mirip pola `check-pakasir-status`.
-- Fungsi helper `sendFonnte`, `isFonntePaused`, `shouldDelayWaRetry` dipindah/di-duplikasi ke edge function baru (kode kecil, tidak layak refactor shared).
-- Perubahan URL YouTube contoh:
-  ```text
-  https://www.youtube-nocookie.com/embed/<id>?rel=0&modestbranding=1&playsinline=1&autoplay=1&mute=1&controls=0&fs=0&iv_load_policy=3&cc_load_policy=0&cc_lang_pref=none&hl=id&disablekb=1&enablejsapi=1&origin=<origin>
-  ```
+- Migrasi: `ALTER TABLE public.replays ADD COLUMN ...` + update RPC `admin_get_replays` (kolom baru ikut terbawa otomatis karena `SETOF replays`).
+- `admin-approve-proof`: tambah input opsional `{ kind, target_id, phone, email, duration_days }` untuk bukti tanpa order; tetap cek `has_role(auth.uid(),'admin')`.
+- File yang disentuh: `supabase/functions/{pakasir-webhook,check-pakasir-status,poll-pending-orders,admin-approve-proof,resend-show-wa,get-replay-source}/index.ts`, `src/lib/store.ts`, `src/components/admin/MembershipProofsAdmin.tsx`, komponen baru `src/components/admin/ReplayOffAdmin.tsx`, dan registrasi menu di `src/pages/Admin.tsx`.
+- Tidak menyentuh `src/pages/Live.tsx`, `HlsPlayer.tsx`, maupun aturan player/playlist live.
