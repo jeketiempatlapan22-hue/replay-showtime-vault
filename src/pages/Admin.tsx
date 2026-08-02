@@ -11,6 +11,7 @@ import MembershipPackagesAdmin from '@/components/admin/MembershipPackagesAdmin'
 import MembershipUsersAdmin from '@/components/admin/MembershipUsersAdmin';
 import TokenFactoryAdmin from '@/components/admin/TokenFactoryAdmin';
 import MembershipProofsAdmin from '@/components/admin/MembershipProofsAdmin';
+import ReplayOffAdmin from '@/components/admin/ReplayOffAdmin';
 import PakasirAdmin from '@/components/admin/PakasirAdmin';
 import CoinAdmin from '@/components/admin/CoinAdmin';
 import UserManagement from '@/components/admin/UserManagement';
@@ -661,6 +662,7 @@ export default function Admin() {
                 { v: 'token_factory', label: 'Token Factory', Icon: Key },
                 { v: 'mb_packages', label: 'Paket Membership', Icon: Sparkles },
                 { v: 'mb_proofs', label: 'Bukti Transaksi', Icon: Upload },
+                { v: 'replay_off', label: 'Replay Off', Icon: Eye },
                 { v: 'pakasir', label: 'Pakasir Webhook', Icon: Settings },
                 { v: 'coins', label: 'Koin', Icon: Sparkles },
                 { v: 'users', label: 'Manajemen User', Icon: Users },
@@ -683,7 +685,7 @@ export default function Admin() {
           </SheetContent>
         </Sheet>
         <Button variant="ghost" size="icon" onClick={() => navigate('/')} className="shrink-0" title="Beranda"><ArrowLeft className="w-5 h-5" /></Button>
-        <h1 className="text-base sm:text-xl font-bold font-sans text-foreground flex-1 min-w-0 truncate">Admin · {({ replays: 'Replay', shows: 'Streaming Show', members: 'Member', bot: 'Bot WA', history: 'Riwayat', reseller_audit: 'Audit Reseller', reseller_billing: 'Tagihan Reseller', reseller_pricing: 'Harga Reseller', membership: 'Membership Token', mb_users: 'User Membership', token_factory: 'Token Factory', mb_packages: 'Paket Membership', mb_proofs: 'Bukti Transaksi', pakasir: 'Pakasir Webhook', coins: 'Koin', users: 'Manajemen User', preview: 'Preview', comments: 'Komentar', security: 'Blokir', ip_manager: 'IP & Rate Limit', settings: 'Setelan' } as Record<string, string>)[activeTab]}</h1>
+        <h1 className="text-base sm:text-xl font-bold font-sans text-foreground flex-1 min-w-0 truncate">Admin · {({ replays: 'Replay', shows: 'Streaming Show', members: 'Member', bot: 'Bot WA', history: 'Riwayat', reseller_audit: 'Audit Reseller', reseller_billing: 'Tagihan Reseller', reseller_pricing: 'Harga Reseller', membership: 'Membership Token', mb_users: 'User Membership', token_factory: 'Token Factory', mb_packages: 'Paket Membership', mb_proofs: 'Bukti Transaksi', replay_off: 'Replay Off', pakasir: 'Pakasir Webhook', coins: 'Koin', users: 'Manajemen User', preview: 'Preview', comments: 'Komentar', security: 'Blokir', ip_manager: 'IP & Rate Limit', settings: 'Setelan' } as Record<string, string>)[activeTab]}</h1>
         <div className="flex items-center gap-1 sm:gap-2 shrink-0">
           <Button size="sm" onClick={() => { resetForm(); setShowAddDialog(true); }} className="text-xs sm:text-sm">
             <Plus className="w-4 h-4 sm:mr-1" /> <span className="hidden sm:inline">Tambah</span>
@@ -695,7 +697,7 @@ export default function Admin() {
       <div className="w-full max-w-6xl mx-auto px-2 sm:px-4 py-4 overflow-x-hidden">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="hidden">
-            <TabsTrigger value="replays" /><TabsTrigger value="shows" /><TabsTrigger value="members" /><TabsTrigger value="bot" /><TabsTrigger value="history" /><TabsTrigger value="reseller_audit" /><TabsTrigger value="reseller_billing" /><TabsTrigger value="reseller_pricing" /><TabsTrigger value="membership" /><TabsTrigger value="mb_users" /><TabsTrigger value="token_factory" /><TabsTrigger value="mb_packages" /><TabsTrigger value="mb_proofs" /><TabsTrigger value="pakasir" /><TabsTrigger value="coins" /><TabsTrigger value="users" /><TabsTrigger value="preview" /><TabsTrigger value="comments" /><TabsTrigger value="security" /><TabsTrigger value="ip_manager" /><TabsTrigger value="settings" />
+            <TabsTrigger value="replays" /><TabsTrigger value="shows" /><TabsTrigger value="members" /><TabsTrigger value="bot" /><TabsTrigger value="history" /><TabsTrigger value="reseller_audit" /><TabsTrigger value="reseller_billing" /><TabsTrigger value="reseller_pricing" /><TabsTrigger value="membership" /><TabsTrigger value="mb_users" /><TabsTrigger value="token_factory" /><TabsTrigger value="mb_packages" /><TabsTrigger value="mb_proofs" /><TabsTrigger value="replay_off" /><TabsTrigger value="pakasir" /><TabsTrigger value="coins" /><TabsTrigger value="users" /><TabsTrigger value="preview" /><TabsTrigger value="comments" /><TabsTrigger value="security" /><TabsTrigger value="ip_manager" /><TabsTrigger value="settings" />
           </TabsList>
 
           <TabsContent value="bot"><BotAdmin /></TabsContent>
@@ -708,6 +710,7 @@ export default function Admin() {
           <TabsContent value="token_factory"><TokenFactoryAdmin /></TabsContent>
           <TabsContent value="mb_packages"><MembershipPackagesAdmin /></TabsContent>
           <TabsContent value="mb_proofs"><MembershipProofsAdmin /></TabsContent>
+          <TabsContent value="replay_off"><ReplayOffAdmin /></TabsContent>
           <TabsContent value="pakasir"><PakasirAdmin /></TabsContent>
           <TabsContent value="coins"><CoinAdmin /></TabsContent>
           <TabsContent value="users"><UserManagement /></TabsContent>
