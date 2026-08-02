@@ -15,12 +15,17 @@ type Proof = {
   created_at: string; expires_at: string;
 };
 
+type Opt = { id: string; label: string };
+
 export default function MembershipProofsAdmin() {
   const [rows, setRows] = useState<Proof[]>([]);
   const [loading, setLoading] = useState(false);
   const [approving, setApproving] = useState<Record<string, boolean>>({});
   const [urls, setUrls] = useState<Record<string, string>>({});
   const [adminWa, setAdminWa] = useState('');
+  const [manual, setManual] = useState<Record<string, { kind: string; target: string }>>({});
+  const [targets, setTargets] = useState<{ shows: Opt[]; replays: Opt[]; packages: Opt[] }>({ shows: [], replays: [], packages: [] });
+  const [results, setResults] = useState<Record<string, string>>({});
   const [savingWa, setSavingWa] = useState(false);
 
   const load = async () => {
@@ -44,7 +49,20 @@ export default function MembershipProofsAdmin() {
     setAdminWa(String((data as any)?.value || ''));
   };
 
-  useEffect(() => { void load(); void loadWa(); }, []);
+  const loadTargets = async () => {
+    const [sh, rp, pk] = await Promise.all([
+      (supabase as any).rpc('admin_get_active_shows'),
+      (supabase as any).rpc('admin_get_replays'),
+      (supabase as any).rpc('admin_get_membership_packages'),
+    ]);
+    setTargets({
+      shows: ((sh.data || []) as any[]).map((x) => ({ id: x.id, label: `${x.title} • ${x.show_date}` })),
+      replays: ((rp.data || []) as any[]).map((x) => ({ id: x.id, label: `${x.title} • ${x.date}` })),
+      packages: ((pk.data || []) as any[]).map((x) => ({ id: x.id, label: `${x.name} • ${x.duration_days} hari` })),
+    });
+  };
+
+  useEffect(() => { void load(); void loadWa(); void loadTargets(); }, []);
 
   const saveWa = async () => {
     setSavingWa(true);
@@ -62,16 +80,21 @@ export default function MembershipProofsAdmin() {
   };
 
   const approveAndSend = async (r: Proof) => {
-    if (!r.order_id && !r.show_order_id) {
-      toast({ title: 'Bukti tanpa order', description: 'Bukti ini tidak terhubung ke order manapun — aktifkan manual di menu order/token.', variant: 'destructive' });
+    const m = manual[r.id];
+    if (!r.order_id && !r.show_order_id && !(m?.kind && m?.target)) {
+      toast({ title: 'Pilih jenis & target', description: 'Bukti ini belum terhubung ke order — pilih Show/Replay/Membership dulu.', variant: 'destructive' });
       return;
     }
     setApproving((s) => ({ ...s, [r.id]: true }));
-    const { data, error } = await supabase.functions.invoke('admin-approve-proof', { body: { proof_id: r.id } });
+    const { data, error } = await supabase.functions.invoke('admin-approve-proof', {
+      body: { proof_id: r.id, kind: m?.kind, target_id: m?.target, phone: r.phone, email: r.email },
+    });
     setApproving((s) => ({ ...s, [r.id]: false }));
     if (error) return toast({ title: 'Gagal setujui', description: error.message, variant: 'destructive' });
     const res = data as { ok?: boolean; order_kind?: string; finalize?: { sent?: boolean; status?: string; error?: string } };
     const sent = res?.finalize?.sent;
+    const tokenVal = (res?.finalize as any)?.access_token || (res?.finalize as any)?.token || '';
+    if (tokenVal) setResults((x) => ({ ...x, [r.id]: String(tokenVal) }));
     setRows((x) => x.map((y) => (y.id === r.id ? { ...y, handled: true } : y)));
     if (sent) {
       toast({ title: 'Disetujui & WA terkirim', description: `${res.order_kind === 'membership' ? 'Membership' : 'Show/Replay'} aktif — token dikirim ke ${r.phone}.` });
@@ -144,8 +167,36 @@ export default function MembershipProofsAdmin() {
                     {r.show_order_id && <div className="font-mono text-[10px] truncate">Order Show: {r.show_order_id}</div>}
                     {r.note && <div className="text-muted-foreground italic">"{r.note}"</div>}
                     <div className="text-muted-foreground">{new Date(r.created_at).toLocaleString('id-ID')}</div>
+                    {results[r.id] && (
+                      <div className="font-mono text-[10px] break-all bg-secondary rounded px-2 py-1">Token: {results[r.id]}</div>
+                    )}
+                    {!r.order_id && !r.show_order_id && (
+                      <div className="grid grid-cols-2 gap-1 pt-1">
+                        <select
+                          className="h-8 rounded-md border border-input bg-background px-1 text-[11px]"
+                          value={manual[r.id]?.kind || ''}
+                          onChange={(e) => setManual((s) => ({ ...s, [r.id]: { kind: e.target.value, target: '' } }))}
+                        >
+                          <option value="">Jenis…</option>
+                          <option value="show">Show</option>
+                          <option value="replay">Replay</option>
+                          <option value="membership">Membership</option>
+                        </select>
+                        <select
+                          className="h-8 rounded-md border border-input bg-background px-1 text-[11px]"
+                          value={manual[r.id]?.target || ''}
+                          disabled={!manual[r.id]?.kind}
+                          onChange={(e) => setManual((s) => ({ ...s, [r.id]: { kind: s[r.id]?.kind || '', target: e.target.value } }))}
+                        >
+                          <option value="">Pilih…</option>
+                          {(manual[r.id]?.kind === 'show' ? targets.shows : manual[r.id]?.kind === 'replay' ? targets.replays : manual[r.id]?.kind === 'membership' ? targets.packages : []).map((o) => (
+                            <option key={o.id} value={o.id}>{o.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
                     <div className="flex gap-1 flex-wrap pt-1">
-                      {(r.order_id || r.show_order_id) && (
+                      {(r.order_id || r.show_order_id || (manual[r.id]?.kind && manual[r.id]?.target)) && (
                         <Button
                           size="sm"
                           className="h-7 text-[11px] bg-emerald-600 hover:bg-emerald-700 text-white"

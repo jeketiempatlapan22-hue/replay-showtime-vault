@@ -54,6 +54,60 @@ Deno.serve(async (req) => {
     let orderKind: 'membership' | 'show' | null = null;
     let orderIdToPoll: string | null = null;
 
+    // Bukti tanpa order: admin memilih jenis + target, order dibuat di sini.
+    const manualKind = String((body as any).kind || '');
+    const targetId = String((body as any).target_id || '');
+    const manualPhone = String((body as any).phone || proof.phone || '').replace(/\D/g, '');
+    const manualEmail = String((body as any).email || proof.email || '');
+
+    if (!proof.order_id && !proof.show_order_id && manualKind && targetId) {
+      if (manualKind === 'membership') {
+        const { data: pkg } = await admin
+          .from('membership_packages').select('id,name,price_idr,pakasir_amount').eq('id', targetId).maybeSingle();
+        if (!pkg) {
+          return new Response(JSON.stringify({ error: 'package_not_found' }), { status: 404, headers: corsHeaders });
+        }
+        const { data: mo, error: moErr } = await admin.from('membership_orders').insert({
+          package_id: pkg.id,
+          user_id: proof.user_id,
+          email: manualEmail,
+          phone: manualPhone,
+          kind: 'qris',
+          amount: Number(pkg.pakasir_amount || pkg.price_idr || 0),
+          status: 'reserved',
+          reserved_until: new Date(Date.now() + 3600_000).toISOString(),
+        }).select('id').single();
+        if (moErr || !mo) {
+          return new Response(JSON.stringify({ error: 'create_membership_order_failed', detail: moErr?.message }), { status: 500, headers: corsHeaders });
+        }
+        await admin.from('membership_payment_proofs').update({ order_id: mo.id }).eq('id', proof.id);
+        proof.order_id = mo.id;
+      } else if (manualKind === 'show' || manualKind === 'replay') {
+        const isShow = manualKind === 'show';
+        const { data: target } = isShow
+          ? await admin.from('active_shows').select('id,title,price_show').eq('id', targetId).maybeSingle()
+          : await admin.from('replays').select('id,title').eq('id', targetId).maybeSingle();
+        if (!target) {
+          return new Response(JSON.stringify({ error: 'target_not_found' }), { status: 404, headers: corsHeaders });
+        }
+        const { data: so, error: soErr } = await admin.from('orders').insert({
+          user_id: proof.user_id,
+          user_phone: manualPhone,
+          show_id: isShow ? targetId : null,
+          replay_id: isShow ? null : targetId,
+          item_title: (target as any).title || '',
+          amount: Number(proof.amount || (target as any).price_show || 0),
+          status: 'pending',
+          kind: isShow ? 'show' : 'replay_only',
+        }).select('id').single();
+        if (soErr || !so) {
+          return new Response(JSON.stringify({ error: 'create_show_order_failed', detail: soErr?.message }), { status: 500, headers: corsHeaders });
+        }
+        await admin.from('membership_payment_proofs').update({ show_order_id: so.id }).eq('id', proof.id);
+        proof.show_order_id = so.id;
+      }
+    }
+
     // Membership branch
     if (proof.order_id) {
       orderKind = 'membership';
@@ -86,6 +140,7 @@ Deno.serve(async (req) => {
     } else {
       return new Response(JSON.stringify({ error: 'proof_has_no_order' }), { status: 400, headers: corsHeaders });
     }
+
 
     // Delegate finalize + WA send to check-pakasir-status (uses service role internally).
     let finalize: unknown = null;

@@ -1352,8 +1352,11 @@ export type Database = {
           featured_member: string
           id: string
           image_url: string
+          is_offline: boolean
           lineup: string[]
           m3u8_url: string
+          offline_at: string | null
+          offline_reason: string
           password: string
           price_coins: number
           show_name: string
@@ -1374,8 +1377,11 @@ export type Database = {
           featured_member?: string
           id?: string
           image_url?: string
+          is_offline?: boolean
           lineup?: string[]
           m3u8_url?: string
+          offline_at?: string | null
+          offline_reason?: string
           password: string
           price_coins?: number
           show_name?: string
@@ -1396,8 +1402,11 @@ export type Database = {
           featured_member?: string
           id?: string
           image_url?: string
+          is_offline?: boolean
           lineup?: string[]
           m3u8_url?: string
+          offline_at?: string | null
+          offline_reason?: string
           password?: string
           price_coins?: number
           show_name?: string
@@ -1848,8 +1857,11 @@ export type Database = {
           featured_member: string
           id: string
           image_url: string
+          is_offline: boolean
           lineup: string[]
           m3u8_url: string
+          offline_at: string | null
+          offline_reason: string
           password: string
           price_coins: number
           show_name: string
@@ -2057,12 +2069,25 @@ export type Database = {
         Args: { _kind: string; _token_id: string }
         Returns: number
       }
+      admin_restore_replay_source: {
+        Args: {
+          _m3u8_url?: string
+          _replay_id: string
+          _source_type: string
+          _youtube_id?: string
+        }
+        Returns: undefined
+      }
       admin_revoke_reseller_token: {
         Args: { _audit_id: string }
         Returns: boolean
       }
       admin_set_proof_handled: {
         Args: { _handled: boolean; _id: string }
+        Returns: undefined
+      }
+      admin_set_replay_offline: {
+        Args: { _offline: boolean; _reason?: string; _replay_id: string }
         Returns: undefined
       }
       admin_unblock_ip: { Args: { _id: string }; Returns: boolean }

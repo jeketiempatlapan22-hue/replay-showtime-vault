@@ -100,6 +100,19 @@ Deno.serve(async (req) => {
       await supabase.rpc('record_login_attempt', { _identifier: lockId, _success: true });
     }
 
+    // Auto-flag replay tanpa sumber video → masuk menu "Replay Off" di admin panel.
+    const hasSources = Array.isArray(replay.sources) && replay.sources.length > 0;
+    const hasYt = String(replay.youtube_id || "").trim() !== "";
+    const hasUrl = String(replay.m3u8_url || "").trim() !== "";
+    if (!hasSources && !hasYt && !hasUrl) {
+      await supabase.from("replays").update({
+        is_offline: true,
+        offline_reason: "Sumber video kosong / tidak tersedia",
+        offline_at: new Date().toISOString(),
+      }).eq("id", replay_id);
+      return json({ valid: false, reason: "source_unavailable" }, 404);
+    }
+
     return json({
       valid: true,
       youtube_id: replay.youtube_id || "",
@@ -107,6 +120,7 @@ Deno.serve(async (req) => {
       source_type: replay.source_type || "youtube",
       sources: Array.isArray(replay.sources) ? replay.sources : [],
     });
+
   } catch {
     return json({ valid: false }, 500);
   }
