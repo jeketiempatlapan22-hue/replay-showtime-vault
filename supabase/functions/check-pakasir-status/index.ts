@@ -100,7 +100,7 @@ async function sendFonnteOnce(phone: string, message: string, timeoutMs: number)
 }
 
 async function sendFonnte(phone: string, message: string) {
-  const attempts = [10000];
+  const attempts = [10000, 20000, 32000];
   let last: { ok: boolean; data: unknown } = { ok: false, data: { error: 'no_attempt' } };
   for (let i = 0; i < attempts.length; i++) {
     last = await sendFonnteOnce(phone, message, attempts[i]);
@@ -391,7 +391,18 @@ Deno.serve(async (req) => {
       password = String(rep?.password || '').trim();
     }
 
-    const dateStr = new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
+    // Tanggal pesan untuk order replay mengikuti tanggal replay, bukan tanggal pembelian.
+  let replayDate = '';
+  if (order.replay_id) {
+    const { data: repRow } = await admin
+      .from('replays').select('date,show_time').eq('id', order.replay_id).maybeSingle();
+    if ((repRow as any)?.date) {
+      const rd = String((repRow as any).date);
+      const rt = String((repRow as any).show_time || '').slice(0, 5);
+      replayDate = rt ? `${rd} ${rt}` : rd;
+    }
+  }
+  const dateStr = replayDate || new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
     const plainSite = origin.replace(/^https?:\/\//, '').replace(/\/+$/, '');
     const fillTpl = (t: string, dateValue: string, linkValue: string, liveLinkValue: string) => t
       .replace(/\{date_line\}/g, dateValue ? `📅 ${dateValue}\n\n` : '')

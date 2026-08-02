@@ -109,7 +109,7 @@ async function sendFonnteOnce(phone: string, message: string, timeoutMs: number)
 }
 
 async function sendFonnte(phone: string, message: string) {
-  const attempts = [10000];
+  const attempts = [10000, 20000, 32000];
   let last: { ok: boolean; data: unknown } = { ok: false, data: { error: 'no_attempt' } };
   for (let i = 0; i < attempts.length; i++) {
     last = await sendFonnteOnce(phone, message, attempts[i]);
@@ -251,7 +251,18 @@ async function processOrder(admin: ReturnType<typeof createClient>, order: any, 
     void rep;
   }
 
-  const dateStr = new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
+  // Tanggal pesan untuk order replay mengikuti tanggal replay, bukan tanggal pembelian.
+  let replayDate = '';
+  if (order.replay_id) {
+    const { data: repRow } = await admin
+      .from('replays').select('date,show_time').eq('id', order.replay_id).maybeSingle();
+    if ((repRow as any)?.date) {
+      const rd = String((repRow as any).date);
+      const rt = String((repRow as any).show_time || '').slice(0, 5);
+      replayDate = rt ? `${rd} ${rt}` : rd;
+    }
+  }
+  const dateStr = replayDate || new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
   const plainSite = origin.replace(/^https?:\/\//, '').replace(/\/+$/, '');
 
   const fillTpl = (t: string, dateValue: string, linkValue: string, liveLinkValue: string) => t
@@ -361,8 +372,8 @@ Deno.serve(async (req) => {
   const pendingSince = new Date(Date.now() - 2 * 24 * 3600_000).toISOString();
   const unsentSince = new Date(Date.now() - 30 * 24 * 3600_000).toISOString();
   const [{ data: paidUnsent, error: paidErr }, { data: pendingOrders, error: pendingErr }] = await Promise.all([
-    admin.from('orders').select('*').eq('status', 'paid').is('token_sent_at', null).gte('created_at', unsentSince).order('paid_at', { ascending: false }).limit(15),
-    admin.from('orders').select('*').eq('status', 'pending').gte('created_at', pendingSince).order('created_at', { ascending: false }).limit(20),
+    admin.from('orders').select('*').eq('status', 'paid').is('token_sent_at', null).gte('created_at', unsentSince).order('paid_at', { ascending: false }).limit(100),
+    admin.from('orders').select('*').eq('status', 'pending').gte('created_at', pendingSince).order('created_at', { ascending: false }).limit(40),
   ]);
   const error = paidErr || pendingErr;
   if (error) return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: corsHeaders });
@@ -397,7 +408,7 @@ Deno.serve(async (req) => {
   // - Maks 5 percobaan pengiriman WA per order.
   // - Backoff bertingkat (menit sejak last attempt): 1, 5, 15, 60, 360.
   // - Dedup: jika order sudah punya token & wa_sent_at, skip.
-  const MAX_WA_ATTEMPTS = 3;
+  const MAX_WA_ATTEMPTS = 5;
   const BACKOFF_MIN = [0, 1, 5, 15, 60, 360]; // index = attempts done
   const memResults: any[] = [];
   if (Date.now() - startedAt > 10_000) {
@@ -412,7 +423,7 @@ Deno.serve(async (req) => {
       .eq('kind', 'qris')
       .not('pakasir_order_id', 'is', null)
       .gte('created_at', pendingSince)
-      .order('created_at', { ascending: false }).limit(10);
+      .order('created_at', { ascending: false }).limit(40);
     for (const mo of mOrders ?? []) {
       try {
         // Skip jika sudah punya token & WA sudah pernah sukses (idempotent guard).
