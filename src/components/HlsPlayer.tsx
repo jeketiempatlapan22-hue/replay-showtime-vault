@@ -138,7 +138,9 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
     const hasAirplay = typeof video.webkitShowPlaybackTargetPicker === 'function'
       || (typeof (window as any).WebKitPlaybackTargetAvailabilityEvent !== 'undefined');
     const hasRemote = !!video.remote && typeof video.remote.prompt === 'function';
-    setCastSupported(hasAirplay || hasRemote);
+    const googleCast = isGoogleCastCapable();
+    setCastSupported(hasAirplay || hasRemote || googleCast);
+    if (googleCast) setCastAvailable(true);
     let watchId: number | null = null;
     const onAirplayAvail = (e: Event & { availability?: string }) => {
       setCastAvailable(e.availability === 'available');
@@ -162,22 +164,65 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
     };
   }, [src]);
 
-  const showCastPicker = useCallback(() => {
-    const video = videoRef.current as (HTMLVideoElement & {
-      webkitShowPlaybackTargetPicker?: () => void;
-      remote?: { prompt?: () => Promise<void> };
-    }) | null;
-    if (!video) return;
-    try {
-      if (typeof video.webkitShowPlaybackTargetPicker === 'function') {
-        video.webkitShowPlaybackTargetPicker();
+  const srcRef = useRef(src);
+  useEffect(() => { srcRef.current = src; }, [src]);
+
+  const showCastPicker = useCallback(async () => {
+    // 1) Google Cast (Chromecast) untuk Chromium — kirim URL stream langsung ke TV.
+    if (isGoogleCastCapable()) {
+      const ok = await castMedia({
+        url: srcRef.current,
+        title,
+        isLive: isLiveRef.current,
+      });
+      if (ok) {
+        setCasting(true);
+        try { videoRef.current?.pause(); } catch { /* ignore */ }
         return;
       }
-      if (video.remote?.prompt) {
-        void video.remote.prompt().catch(() => {});
-      }
+    }
+    // 2) AirPlay / Remote Playback bawaan browser.
+    showNativePicker(videoRef.current);
+  }, [title]);
+
+  const stopCasting = useCallback(() => {
+    stopCastSession();
+    setCasting(false);
+    try { void videoRef.current?.play(); } catch { /* ignore */ }
+  }, []);
+
+  const copyTvLink = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
     } catch { /* ignore */ }
   }, []);
+
+  // Mode TV: layar penuh + layar tidak boleh mati.
+  useEffect(() => {
+    if (!tvMode) {
+      wakeLockRef.current?.release();
+      wakeLockRef.current = null;
+      return;
+    }
+    let cancelled = false;
+    void requestWakeLock().then((lock) => {
+      if (cancelled) { lock?.release(); return; }
+      wakeLockRef.current = lock;
+    });
+    const onVis = () => {
+      if (document.visibilityState === 'visible' && tvMode && !wakeLockRef.current) {
+        void requestWakeLock().then((lock) => { wakeLockRef.current = lock; });
+      }
+    };
+    document.addEventListener('visibilitychange', onVis);
+    return () => {
+      cancelled = true;
+      document.removeEventListener('visibilitychange', onVis);
+      wakeLockRef.current?.release();
+      wakeLockRef.current = null;
+    };
+  }, [tvMode]);
+
 
 
   useEffect(() => {
