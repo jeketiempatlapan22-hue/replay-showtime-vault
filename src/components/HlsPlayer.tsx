@@ -49,6 +49,10 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
   const onFatalErrorRef = useRef(onFatalError);
   const initialLiveEdgeSyncRef = useRef(false);
   const headersRef = useRef<Record<string, string> | undefined>(headers);
+  const abrGuardRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const abrStateRef = useRef({ healthySince: 0, capIndex: -1, lastAdjust: 0 });
+  const wakeLockRef = useRef<{ release: () => void } | null>(null);
+
 
   const initialVolume = (() => { try { const v = parseFloat(localStorage.getItem('replaytime-volume') || ''); return isFinite(v) ? Math.max(0, Math.min(1, v)) : 1; } catch { return 1; } })();
   // Default unmuted; one-time per session, clear stale persisted mute so user starts with sound on.
