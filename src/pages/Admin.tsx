@@ -1175,6 +1175,7 @@ export default function Admin() {
           </TabsContent>
 
           <TabsContent value="settings" className="space-y-4">
+            <DataExportAdmin />
             {/* Theme */}
             <Card>
               <CardHeader><CardTitle className="font-sans text-base sm:text-lg flex items-center gap-2"><Palette className="w-5 h-5 text-primary" />Tema</CardTitle></CardHeader>
