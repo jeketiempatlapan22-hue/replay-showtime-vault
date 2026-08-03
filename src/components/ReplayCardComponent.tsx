@@ -339,3 +339,6 @@ function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWatch, onUnlockAn
     </div>
   );
 }
+
+export default memo(ReplayCardComponent);
+
