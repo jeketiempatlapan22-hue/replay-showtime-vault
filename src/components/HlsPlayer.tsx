@@ -951,7 +951,18 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
     );
   }
 
+  const netTier = !netStats || netStats.kbps <= 0
+    ? null
+    : netStats.kbps >= 5000
+      ? { label: 'Sangat Baik', bars: 4, tone: 'text-emerald-400' }
+      : netStats.kbps >= 2500
+        ? { label: 'Baik', bars: 3, tone: 'text-emerald-400' }
+        : netStats.kbps >= 1200
+          ? { label: 'Sedang', bars: 2, tone: 'text-amber-400' }
+          : { label: 'Lemah', bars: 1, tone: 'text-red-400' };
+
   return (
+    <>
     <div
       ref={containerRef}
       className={`relative w-full overflow-hidden rounded-xl bg-black group/player ${isFullscreen ? 'h-dvh' : ''} ${showControls || !isPlaying ? '' : 'cursor-none'}`}
