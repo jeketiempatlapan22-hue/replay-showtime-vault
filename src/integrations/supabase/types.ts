@@ -1726,9 +1726,8 @@ export type Database = {
         Returns: number
       }
       admin_export_auth_users: {
-        Args: never
+        Args: { _admin_id: string }
         Returns: {
-          confirmation_token: string
           created_at: string
           email: string
           email_confirmed_at: string
@@ -1740,7 +1739,6 @@ export type Database = {
           phone_confirmed_at: string
           raw_app_meta_data: Json
           raw_user_meta_data: Json
-          recovery_token: string
           updated_at: string
         }[]
       }
