@@ -1095,17 +1095,54 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
               </div>
             )}
 
-            {castSupported && castAvailable && (
+            <div className="relative">
               <button
                 type="button"
-                onClick={(e) => { e.stopPropagation(); showCastPicker(); resetHideTimer(); }}
-                className="p-2 text-white hover:text-primary transition-colors"
-                aria-label="Hubungkan ke TV / Proyektor (AirPlay / Cast)"
+                onClick={(e) => { e.stopPropagation(); setShowTvMenu(v => !v); resetHideTimer(); }}
+                className={`p-2 transition-colors ${casting || tvMode ? 'text-primary' : 'text-white hover:text-primary'}`}
+                aria-label="Hubungkan ke TV / Proyektor"
                 title="Hubungkan ke TV / Proyektor"
               >
                 <Cast className="w-5 h-5" />
               </button>
-            )}
+              {showTvMenu && (
+                <div
+                  className="absolute bottom-12 right-0 z-30 w-60 rounded-lg border border-white/15 bg-black/90 backdrop-blur p-1.5 text-xs text-white shadow-xl"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {castSupported && castAvailable && !casting && (
+                    <button type="button" className="w-full text-left px-2.5 py-2 rounded hover:bg-white/10"
+                      onClick={() => { void showCastPicker(); setShowTvMenu(false); resetHideTimer(); }}>
+                      Hubungkan ke TV (Cast / AirPlay)
+                    </button>
+                  )}
+                  {casting && (
+                    <button type="button" className="w-full text-left px-2.5 py-2 rounded hover:bg-white/10 text-primary"
+                      onClick={() => { stopCasting(); setShowTvMenu(false); }}>
+                      Hentikan Cast ke TV
+                    </button>
+                  )}
+                  <button type="button" className="w-full text-left px-2.5 py-2 rounded hover:bg-white/10"
+                    onClick={() => {
+                      const next = !tvMode;
+                      setTvMode(next);
+                      if (next && !isFullscreenActive()) requestFs(containerRef.current, videoRef.current);
+                      setShowTvMenu(false);
+                      resetHideTimer();
+                    }}>
+                    {tvMode ? 'Matikan Mode TV' : 'Mode TV (layar penuh, tidak redup)'}
+                  </button>
+                  <button type="button" className="w-full text-left px-2.5 py-2 rounded hover:bg-white/10"
+                    onClick={() => { void copyTvLink(); setShowTvMenu(false); resetHideTimer(); }}>
+                    Salin link untuk browser TV
+                  </button>
+                  <p className="px-2.5 py-1.5 text-[10px] text-white/60 leading-relaxed">
+                    Tempel link di browser Smart TV / proyektor, atau gunakan Cast bila TV mendukung Chromecast.
+                  </p>
+                </div>
+              )}
+            </div>
+
             <button type="button" onClick={(e) => { e.stopPropagation(); toggleFullscreen(); resetHideTimer(); }} className="p-2 text-white hover:text-primary transition-colors" aria-label="Fullscreen">
               {isFullscreen ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
             </button>
