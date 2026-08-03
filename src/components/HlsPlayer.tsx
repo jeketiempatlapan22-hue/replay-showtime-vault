@@ -94,6 +94,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
   const [casting, setCasting] = useState(false);
   const [tvMode, setTvMode] = useState(false);
   const [showTvMenu, setShowTvMenu] = useState(false);
+  const [netStats, setNetStats] = useState<{ kbps: number; buffer: number; recommendedHeight: number | null } | null>(null);
 
 
   // Expose PiP API to parent
@@ -569,8 +570,41 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
       abrGuardRef.current = setInterval(() => {
         if (!hls || !video) return;
         persistBandwidth();
-        // Mode manual: jangan ganggu pilihan user.
-        if (userQualityRef.current) return;
+
+        // Ukur kekuatan jaringan untuk ditampilkan ke user (selalu, termasuk mode manual).
+        let bufferAhead = 0;
+        try {
+          const t = video.currentTime;
+          for (let i = 0; i < video.buffered.length; i++) {
+            if (video.buffered.start(i) <= t + 0.25 && video.buffered.end(i) > t) {
+              bufferAhead = video.buffered.end(i) - t;
+              break;
+            }
+          }
+        } catch { /* ignore */ }
+        const bwKbps = Math.round((hls.bandwidthEstimate || 0) / 1000);
+        const bestFit = (hls.levels || [])
+          .map(l => ({ h: l.height || 0, b: l.bitrate || 0 }))
+          .filter(l => l.h > 0 && l.b > 0 && l.b * 1.35 <= (hls.bandwidthEstimate || 0))
+          .sort((a, b) => b.h - a.h)[0];
+        setNetStats({
+          kbps: bwKbps,
+          buffer: Math.round(bufferAhead),
+          recommendedHeight: bestFit?.h ?? null,
+        });
+
+        // Mode manual: kunci pilihan user, jangan pernah ubah sendiri.
+        if (userQualityRef.current) {
+          try {
+            const target = hls.levels.findIndex(l => l.height === userQualityRef.current);
+            if (target >= 0) {
+              if (hls.autoLevelCapping !== target) hls.autoLevelCapping = target;
+              if (hls.loadLevel !== target) hls.loadLevel = target;
+              if (hls.nextLevel !== target && hls.currentLevel !== target) hls.nextLevel = target;
+            }
+          } catch { /* ignore */ }
+          return;
+        }
         const levelCount = hls.levels?.length || 0;
         if (levelCount < 2) return;
 
@@ -917,7 +951,18 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
     );
   }
 
+  const netTier = !netStats || netStats.kbps <= 0
+    ? null
+    : netStats.kbps >= 5000
+      ? { label: 'Sangat Baik', bars: 4, tone: 'text-emerald-400' }
+      : netStats.kbps >= 2500
+        ? { label: 'Baik', bars: 3, tone: 'text-emerald-400' }
+        : netStats.kbps >= 1200
+          ? { label: 'Sedang', bars: 2, tone: 'text-amber-400' }
+          : { label: 'Lemah', bars: 1, tone: 'text-red-400' };
+
   return (
+    <>
     <div
       ref={containerRef}
       className={`relative w-full overflow-hidden rounded-xl bg-black group/player ${isFullscreen ? 'h-dvh' : ''} ${showControls || !isPlaying ? '' : 'cursor-none'}`}
@@ -1150,6 +1195,44 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
         </div>
       </div>
     </div>
+
+    {!isFullscreen && (
+      <div className="mt-2 rounded-lg border border-border bg-card/70 px-3 py-2 text-xs">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <span className="flex items-center gap-1.5">
+            <span className="flex items-end gap-[2px] h-3.5">
+              {[1, 2, 3, 4].map(i => (
+                <span
+                  key={i}
+                  className={`w-[3px] rounded-sm ${netTier && i <= netTier.bars ? 'bg-current' : 'bg-muted-foreground/30'} ${netTier ? netTier.tone : ''}`}
+                  style={{ height: `${i * 25}%` }}
+                />
+              ))}
+            </span>
+            <span className={`font-semibold ${netTier ? netTier.tone : 'text-muted-foreground'}`}>
+              Jaringan: {netTier ? netTier.label : 'Mengukur…'}
+            </span>
+          </span>
+          {netStats && netStats.kbps > 0 && (
+            <span className="text-muted-foreground">
+              {netStats.kbps >= 1000 ? `${(netStats.kbps / 1000).toFixed(1)} Mbps` : `${netStats.kbps} Kbps`} · buffer {netStats.buffer}s
+            </span>
+          )}
+          <span className="text-muted-foreground">
+            Resolusi: {currentQuality === -1 ? `Auto${autoActiveLabel ? ` (${autoActiveLabel})` : ''}` : `${qualities.find(q => q.index === currentQuality)?.label || '-'} (dikunci)`}
+          </span>
+        </div>
+        <p className="mt-1 text-[11px] text-muted-foreground leading-relaxed">
+          {netStats?.recommendedHeight
+            ? `Rekomendasi untuk jaringan Anda: ${netStats.recommendedHeight}p. `
+            : ''}
+          {currentQuality === -1
+            ? 'Mode Auto menyesuaikan resolusi otomatis. Pilih resolusi di ikon gear untuk menguncinya.'
+            : 'Resolusi terkunci — tidak akan berubah sendiri sampai Anda menggantinya lagi.'}
+        </p>
+      </div>
+    )}
+    </>
   );
 });
 
