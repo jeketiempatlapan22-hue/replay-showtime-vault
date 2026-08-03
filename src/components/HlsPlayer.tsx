@@ -700,6 +700,8 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
 
     return () => {
       if (stallWatchdogRef.current) clearInterval(stallWatchdogRef.current);
+      if (abrGuardRef.current) { clearInterval(abrGuardRef.current); abrGuardRef.current = null; }
+
       stallWatchdogRef.current = null;
       if (nativeLoadedHandler) video.removeEventListener('loadedmetadata', nativeLoadedHandler);
       if (nativeErrorHandler) video.removeEventListener('error', nativeErrorHandler);
