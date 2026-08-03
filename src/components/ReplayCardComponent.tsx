@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Lock, Unlock, Play, Calendar, Users, Tag, Star, Tv, Bookmark, BookmarkCheck, ShoppingCart, Copy } from 'lucide-react';
+import { memo, useEffect, useState } from 'react';
+import { Lock, Unlock, Play, Calendar, Users, Tag, Star, Tv, Bookmark, BookmarkCheck, ShoppingCart, Copy, Crown } from 'lucide-react';
 import { type ReplayRow, verifyPassword } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,6 +9,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import BuyShowDialog from '@/components/BuyShowDialog';
 import { getReplayPurchase } from '@/lib/purchases';
 import { toast } from '@/hooks/use-toast';
+import { useActiveMembership } from '@/hooks/useActiveMembership';
+import { isReplayCoveredByMembership } from '@/lib/membershipReplayAccess';
+
 
 const CRITERIA_LABELS: Record<string, string> = {
   reguler: 'Reguler', sts: 'STS', last_show: 'Last Show', aniv: 'Anniversary', special: 'Show Spesial',
@@ -37,7 +40,7 @@ function highlightText(text: string, query: string) {
 
 const REPLAY_DEFAULT_PRICE = 2000;
 
-export default function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWatch, onUnlockAndWatch, index = 0, isBookmarked, onToggleBookmark, searchQuery = '' }: Props) {
+function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWatch, onUnlockAndWatch, index = 0, isBookmarked, onToggleBookmark, searchQuery = '' }: Props) {
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -63,6 +66,10 @@ export default function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWa
     };
   }, [replay.id]);
 
+  const { membership } = useActiveMembership();
+  const membershipCovered = isReplayCoveredByMembership(replay.date, membership);
+  const membershipActiveButOutside = !!membership?.token && !membershipCovered && !!membership?.includes_replays;
+
   const isPurchased = !!purchasedToken;
 
   // After purchase, treat as unlocked & store token in sessionStorage so player can fetch source.
@@ -72,6 +79,21 @@ export default function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWa
       if (!isUnlocked) onUnlock(replay.id);
     }
   }, [isPurchased, purchasedToken, replay.id, isUnlocked, onUnlock]);
+
+  // Membership aktif: simpan token membership agar player bisa mengambil sumber replay.
+  useEffect(() => {
+    if (!membershipCovered || !membership?.token) return;
+    try { sessionStorage.setItem(`replaytime-tok-${replay.id}`, membership.token); } catch { /* ignore */ }
+  }, [membershipCovered, membership?.token, replay.id]);
+
+  const watchWithMembership = () => {
+    if (membership?.token) {
+      try { sessionStorage.setItem(`replaytime-tok-${replay.id}`, membership.token); } catch { /* ignore */ }
+    }
+    if (onUnlockAndWatch) onUnlockAndWatch(replay);
+    else { onUnlock(replay.id); onWatch(replay); }
+  };
+
 
   const accessLink = purchasedToken
     ? `${window.location.origin}/akses?token=${purchasedToken}&replay=${replay.id}`
@@ -135,12 +157,16 @@ export default function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWa
           <img
             src={thumbnailUrl}
             alt={replay.title}
+            width={640}
+            height={360}
             loading="lazy"
             decoding="async"
+            fetchPriority={index < 3 ? 'auto' : 'low'}
             onLoad={() => setImgLoaded(true)}
             onError={() => setImgLoaded(true)}
             className={`w-full h-full object-cover group-hover:scale-105 transition-all duration-500 ${imgLoaded ? 'opacity-100' : 'opacity-0'}`}
           />
+
           {!isUnlocked && (
             <div className="absolute inset-0 bg-background/70 backdrop-blur-sm flex items-center justify-center">
               <Lock className="w-10 h-10 text-primary animate-pulse" />
@@ -220,7 +246,19 @@ export default function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWa
           </div>
 
 
-          {isPurchased ? (
+          {membershipCovered ? (
+            <div className="space-y-2 mt-2">
+              <Button type="button" className="w-full" onClick={watchWithMembership}>
+                <Play className="w-4 h-4 mr-2" /> Tonton Replay
+              </Button>
+              <div className="rounded-md border border-primary/30 bg-primary/10 p-2 flex items-center gap-1.5">
+                <Crown className="w-3.5 h-3.5 text-primary shrink-0" />
+                <span className="text-[10px] text-primary font-semibold">
+                  Termasuk Membership {membership?.package_name ? `· ${membership.package_name}` : ''}
+                </span>
+              </div>
+            </div>
+          ) : isPurchased ? (
             <div className="space-y-2 mt-2">
               <Button type="button" className="w-full" onClick={() => onWatch(replay)}>
                 <Play className="w-4 h-4 mr-2" /> Tonton Replay
@@ -247,6 +285,11 @@ export default function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWa
             </Button>
           ) : (
             <div className="space-y-2 mt-2">
+              {membershipActiveButOutside && (
+                <div className="rounded-md border border-border bg-muted/30 p-2 text-[10px] text-muted-foreground">
+                  Replay ini di luar periode membership kamu, jadi masih perlu dibeli terpisah.
+                </div>
+              )}
               <div className="rounded-md border border-primary/20 bg-primary/5 p-2.5 space-y-1">
                 <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Harga Replay</div>
                 <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -265,6 +308,7 @@ export default function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWa
               </Button>
             </div>
           )}
+
         </div>
       </div>
 
@@ -299,3 +343,6 @@ export default function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWa
     </div>
   );
 }
+
+export default memo(ReplayCardComponent);
+

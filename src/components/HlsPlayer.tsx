@@ -3,6 +3,8 @@ import Hls from 'hls.js';
 import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, RotateCcw, RotateCw, Loader2, Settings, Check, Cast } from 'lucide-react';
 import { isFullscreenActive, onFullscreenChange, requestFs, exitFs } from '@/lib/fullscreen';
 import LiveWatermark from '@/components/LiveWatermark';
+import { castMedia, isGoogleCastCapable, requestWakeLock, showNativePicker, stopCastSession } from '@/lib/cast';
+
 
 interface Props {
   src: string;
@@ -49,6 +51,10 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
   const onFatalErrorRef = useRef(onFatalError);
   const initialLiveEdgeSyncRef = useRef(false);
   const headersRef = useRef<Record<string, string> | undefined>(headers);
+  const abrGuardRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const abrStateRef = useRef({ healthySince: 0, capIndex: -1, lastAdjust: 0 });
+  const wakeLockRef = useRef<{ release: () => void } | null>(null);
+
 
   const initialVolume = (() => { try { const v = parseFloat(localStorage.getItem('replaytime-volume') || ''); return isFinite(v) ? Math.max(0, Math.min(1, v)) : 1; } catch { return 1; } })();
   // Default unmuted; one-time per session, clear stale persisted mute so user starts with sound on.
@@ -85,6 +91,10 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
   const [needsUnmute, setNeedsUnmute] = useState(false);
   const [castSupported, setCastSupported] = useState(false);
   const [castAvailable, setCastAvailable] = useState(false);
+  const [casting, setCasting] = useState(false);
+  const [tvMode, setTvMode] = useState(false);
+  const [showTvMenu, setShowTvMenu] = useState(false);
+
 
   // Expose PiP API to parent
   useImperativeHandle(ref, () => ({
@@ -130,7 +140,9 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
     const hasAirplay = typeof video.webkitShowPlaybackTargetPicker === 'function'
       || (typeof (window as any).WebKitPlaybackTargetAvailabilityEvent !== 'undefined');
     const hasRemote = !!video.remote && typeof video.remote.prompt === 'function';
-    setCastSupported(hasAirplay || hasRemote);
+    const googleCast = isGoogleCastCapable();
+    setCastSupported(hasAirplay || hasRemote || googleCast);
+    if (googleCast) setCastAvailable(true);
     let watchId: number | null = null;
     const onAirplayAvail = (e: Event & { availability?: string }) => {
       setCastAvailable(e.availability === 'available');
@@ -154,22 +166,65 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
     };
   }, [src]);
 
-  const showCastPicker = useCallback(() => {
-    const video = videoRef.current as (HTMLVideoElement & {
-      webkitShowPlaybackTargetPicker?: () => void;
-      remote?: { prompt?: () => Promise<void> };
-    }) | null;
-    if (!video) return;
-    try {
-      if (typeof video.webkitShowPlaybackTargetPicker === 'function') {
-        video.webkitShowPlaybackTargetPicker();
+  const srcRef = useRef(src);
+  useEffect(() => { srcRef.current = src; }, [src]);
+
+  const showCastPicker = useCallback(async () => {
+    // 1) Google Cast (Chromecast) untuk Chromium — kirim URL stream langsung ke TV.
+    if (isGoogleCastCapable()) {
+      const ok = await castMedia({
+        url: srcRef.current,
+        title,
+        isLive: isLiveRef.current,
+      });
+      if (ok) {
+        setCasting(true);
+        try { videoRef.current?.pause(); } catch { /* ignore */ }
         return;
       }
-      if (video.remote?.prompt) {
-        void video.remote.prompt().catch(() => {});
-      }
+    }
+    // 2) AirPlay / Remote Playback bawaan browser.
+    showNativePicker(videoRef.current);
+  }, [title]);
+
+  const stopCasting = useCallback(() => {
+    stopCastSession();
+    setCasting(false);
+    try { void videoRef.current?.play(); } catch { /* ignore */ }
+  }, []);
+
+  const copyTvLink = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
     } catch { /* ignore */ }
   }, []);
+
+  // Mode TV: layar penuh + layar tidak boleh mati.
+  useEffect(() => {
+    if (!tvMode) {
+      wakeLockRef.current?.release();
+      wakeLockRef.current = null;
+      return;
+    }
+    let cancelled = false;
+    void requestWakeLock().then((lock) => {
+      if (cancelled) { lock?.release(); return; }
+      wakeLockRef.current = lock;
+    });
+    const onVis = () => {
+      if (document.visibilityState === 'visible' && tvMode && !wakeLockRef.current) {
+        void requestWakeLock().then((lock) => { wakeLockRef.current = lock; });
+      }
+    };
+    document.addEventListener('visibilitychange', onVis);
+    return () => {
+      cancelled = true;
+      document.removeEventListener('visibilitychange', onVis);
+      wakeLockRef.current?.release();
+      wakeLockRef.current = null;
+    };
+  }, [tvMode]);
+
 
 
   useEffect(() => {
@@ -256,7 +311,22 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
     const liveSyncCount = isVeryWeak ? 10 : isWeak ? 7 : 4;
     const liveMaxLatencyCount = isVeryWeak ? 36 : isWeak ? 28 : 16;
     const stallRecoveryMs = isWeak ? 9000 : 14000;
-    const initialBwEstimate = isVeryWeak ? 220_000 : isWeak ? 450_000 : 900_000;
+    // Estimasi bandwidth awal: pakai pengukuran nyata dari sesi sebelumnya bila ada,
+    // supaya sesi baru langsung mulai pada level yang realistis (bukan tebakan statis).
+    const profileEstimate = isVeryWeak ? 220_000 : isWeak ? 450_000 : 900_000;
+    const savedBw = (() => {
+      try {
+        const raw = JSON.parse(localStorage.getItem('replaytime-bw-estimate') || 'null') as { bw?: number; at?: number } | null;
+        if (!raw?.bw || !raw?.at) return null;
+        // Estimasi kedaluwarsa setelah 12 jam (jaringan user bisa berubah).
+        if (Date.now() - raw.at > 12 * 3600 * 1000) return null;
+        return Math.max(120_000, Math.min(12_000_000, raw.bw));
+      } catch { return null; }
+    })();
+    const initialBwEstimate = savedBw
+      ? Math.round(savedBw * 0.85) // konservatif: 85% dari pengukuran terakhir
+      : profileEstimate;
+
     // Adaptive buffer sizing: give bad networks a larger forward cushion, while
     // keeping low-memory devices conservative so the page itself stays responsive.
     const bufferProfile = lowMem
@@ -481,6 +551,80 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
           }
         }
       });
+
+      // Simpan estimasi bandwidth nyata agar sesi berikutnya mulai di level yang tepat.
+      const persistBandwidth = () => {
+        try {
+          const bw = hls?.bandwidthEstimate;
+          if (typeof bw === 'number' && isFinite(bw) && bw > 50_000) {
+            localStorage.setItem('replaytime-bw-estimate', JSON.stringify({ bw: Math.round(bw), at: Date.now() }));
+          }
+        } catch { /* ignore */ }
+      };
+
+      // Penjaga ABR: naikkan kualitas hanya bertahap saat buffer benar-benar sehat,
+      // dan turunkan cepat begitu buffer menipis — supaya jaringan kecil tidak lag.
+      if (abrGuardRef.current) clearInterval(abrGuardRef.current);
+      abrStateRef.current = { healthySince: 0, capIndex: -1, lastAdjust: 0 };
+      abrGuardRef.current = setInterval(() => {
+        if (!hls || !video) return;
+        persistBandwidth();
+        // Mode manual: jangan ganggu pilihan user.
+        if (userQualityRef.current) return;
+        const levelCount = hls.levels?.length || 0;
+        if (levelCount < 2) return;
+
+        const now = Date.now();
+        const state = abrStateRef.current;
+        let ahead = 0;
+        try {
+          const t = video.currentTime;
+          for (let i = 0; i < video.buffered.length; i++) {
+            if (video.buffered.start(i) <= t + 0.25 && video.buffered.end(i) > t) {
+              ahead = video.buffered.end(i) - t;
+              break;
+            }
+          }
+        } catch { /* ignore */ }
+
+        const currentIdx = hls.currentLevel >= 0 ? hls.currentLevel : 0;
+        const cap = state.capIndex >= 0 ? state.capIndex : levelCount - 1;
+        const lowBuffer = isWeak ? 5 : 4;
+        const healthyBuffer = isWeak ? 14 : 10;
+
+        // Buffer menipis / sedang buffering → turunkan batas satu tingkat segera.
+        if ((ahead < lowBuffer || video.readyState < 3) && !video.paused) {
+          state.healthySince = 0;
+          const nextCap = Math.max(0, Math.min(cap, currentIdx) - 1);
+          if (nextCap !== state.capIndex && now - state.lastAdjust > 4000) {
+            state.capIndex = nextCap;
+            state.lastAdjust = now;
+            try { hls.autoLevelCapping = nextCap; } catch { /* ignore */ }
+          }
+          return;
+        }
+
+        // Buffer sehat stabil → longgarkan batas satu tingkat saja (naik perlahan).
+        if (ahead >= healthyBuffer) {
+          if (!state.healthySince) state.healthySince = now;
+          const stableMs = isWeak ? 30_000 : 20_000;
+          if (now - state.healthySince >= stableMs && now - state.lastAdjust > stableMs) {
+            const nextCap = state.capIndex < 0 ? -1 : Math.min(levelCount - 1, state.capIndex + 1);
+            state.lastAdjust = now;
+            state.healthySince = now;
+            if (nextCap >= levelCount - 1 || nextCap < 0) {
+              state.capIndex = -1;
+              try { hls.autoLevelCapping = -1; } catch { /* ignore */ }
+            } else {
+              state.capIndex = nextCap;
+              try { hls.autoLevelCapping = nextCap; } catch { /* ignore */ }
+            }
+          }
+        } else {
+          state.healthySince = 0;
+        }
+      }, 5000);
+
       hls.on(Hls.Events.ERROR, (_, data) => {
         if (data.details === Hls.ErrorDetails.MANIFEST_LOAD_ERROR && data.response?.code && data.response.code >= 400) {
           setError('Sumber video tidak dapat diakses. Mencoba player lain…');
@@ -556,6 +700,8 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
 
     return () => {
       if (stallWatchdogRef.current) clearInterval(stallWatchdogRef.current);
+      if (abrGuardRef.current) { clearInterval(abrGuardRef.current); abrGuardRef.current = null; }
+
       stallWatchdogRef.current = null;
       if (nativeLoadedHandler) video.removeEventListener('loadedmetadata', nativeLoadedHandler);
       if (nativeErrorHandler) video.removeEventListener('error', nativeErrorHandler);
@@ -949,17 +1095,54 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
               </div>
             )}
 
-            {castSupported && castAvailable && (
+            <div className="relative">
               <button
                 type="button"
-                onClick={(e) => { e.stopPropagation(); showCastPicker(); resetHideTimer(); }}
-                className="p-2 text-white hover:text-primary transition-colors"
-                aria-label="Hubungkan ke TV / Proyektor (AirPlay / Cast)"
+                onClick={(e) => { e.stopPropagation(); setShowTvMenu(v => !v); resetHideTimer(); }}
+                className={`p-2 transition-colors ${casting || tvMode ? 'text-primary' : 'text-white hover:text-primary'}`}
+                aria-label="Hubungkan ke TV / Proyektor"
                 title="Hubungkan ke TV / Proyektor"
               >
                 <Cast className="w-5 h-5" />
               </button>
-            )}
+              {showTvMenu && (
+                <div
+                  className="absolute bottom-12 right-0 z-30 w-60 rounded-lg border border-white/15 bg-black/90 backdrop-blur p-1.5 text-xs text-white shadow-xl"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {castSupported && castAvailable && !casting && (
+                    <button type="button" className="w-full text-left px-2.5 py-2 rounded hover:bg-white/10"
+                      onClick={() => { void showCastPicker(); setShowTvMenu(false); resetHideTimer(); }}>
+                      Hubungkan ke TV (Cast / AirPlay)
+                    </button>
+                  )}
+                  {casting && (
+                    <button type="button" className="w-full text-left px-2.5 py-2 rounded hover:bg-white/10 text-primary"
+                      onClick={() => { stopCasting(); setShowTvMenu(false); }}>
+                      Hentikan Cast ke TV
+                    </button>
+                  )}
+                  <button type="button" className="w-full text-left px-2.5 py-2 rounded hover:bg-white/10"
+                    onClick={() => {
+                      const next = !tvMode;
+                      setTvMode(next);
+                      if (next && !isFullscreenActive()) requestFs(containerRef.current, videoRef.current);
+                      setShowTvMenu(false);
+                      resetHideTimer();
+                    }}>
+                    {tvMode ? 'Matikan Mode TV' : 'Mode TV (layar penuh, tidak redup)'}
+                  </button>
+                  <button type="button" className="w-full text-left px-2.5 py-2 rounded hover:bg-white/10"
+                    onClick={() => { void copyTvLink(); setShowTvMenu(false); resetHideTimer(); }}>
+                    Salin link untuk browser TV
+                  </button>
+                  <p className="px-2.5 py-1.5 text-[10px] text-white/60 leading-relaxed">
+                    Tempel link di browser Smart TV / proyektor, atau gunakan Cast bila TV mendukung Chromecast.
+                  </p>
+                </div>
+              )}
+            </div>
+
             <button type="button" onClick={(e) => { e.stopPropagation(); toggleFullscreen(); resetHideTimer(); }} className="p-2 text-white hover:text-primary transition-colors" aria-label="Fullscreen">
               {isFullscreen ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
             </button>

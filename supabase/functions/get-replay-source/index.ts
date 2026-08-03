@@ -76,7 +76,55 @@ Deno.serve(async (req) => {
             valid = true;
           }
         }
+
+        // 3) membership token — berlaku untuk replay yang tanggalnya berada
+        // dalam periode membership (starts_at .. expires_at) dan paket
+        // membership memang mencakup replay.
+        if (!valid) {
+          const { data: mt } = await supabase
+            .from("membership_tokens")
+            .select("id, revoked, starts_at, expires_at, includes_replays, max_devices")
+            .eq("token", access_token)
+            .maybeSingle();
+          if (mt && !mt.revoked) {
+            const now = Date.now();
+            const startsAt = mt.starts_at ? new Date(mt.starts_at).getTime() : 0;
+            const expiresAt = mt.expires_at ? new Date(mt.expires_at).getTime() : Number.POSITIVE_INFINITY;
+            if (now > expiresAt) return json({ valid: false, reason: "expired" }, 403);
+            if (!mt.includes_replays) return json({ valid: false, reason: "membership_no_replays" }, 403);
+
+            const replayTime = new Date(`${replay.date}T12:00:00Z`).getTime();
+            const inPeriod = Number.isFinite(replayTime)
+              && replayTime >= (startsAt ? startsAt - 24 * 3600 * 1000 : 0)
+              && replayTime <= (Number.isFinite(expiresAt) ? expiresAt : replayTime);
+            if (!inPeriod) return json({ valid: false, reason: "outside_membership_period" }, 403);
+
+            if (!browser_id) return json({ valid: false, reason: "no_device" }, 403);
+            const maxDevices = Math.max(1, Number(mt.max_devices || 1));
+            const { data: existingDev } = await supabase
+              .from("membership_token_devices")
+              .select("id").eq("token_id", mt.id).eq("browser_id", browser_id).maybeSingle();
+            if (existingDev) {
+              await supabase.from("membership_token_devices")
+                .update({ last_seen: new Date().toISOString() }).eq("id", existingDev.id);
+              valid = true;
+            } else {
+              const { count } = await supabase
+                .from("membership_token_devices").select("id", { count: "exact", head: true }).eq("token_id", mt.id);
+              if ((count ?? 0) >= maxDevices) return json({ valid: false, reason: "device_limit" }, 403);
+              const { error: insErr } = await supabase
+                .from("membership_token_devices").insert({ token_id: mt.id, browser_id });
+              if (insErr) {
+                const { data: re } = await supabase.from("membership_token_devices")
+                  .select("id").eq("token_id", mt.id).eq("browser_id", browser_id).maybeSingle();
+                if (!re) return json({ valid: false, reason: "device_limit" }, 403);
+              }
+              valid = true;
+            }
+          }
+        }
       }
+
     } else if (password) {
       valid = replay.password === password;
       if (!valid) {
