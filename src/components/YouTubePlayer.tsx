@@ -1,4 +1,6 @@
-import { ArrowLeft, Maximize, Minimize, Eye, Loader2, Lock, PictureInPicture2, ListVideo } from 'lucide-react';
+import { ArrowLeft, Maximize, Minimize, Eye, Loader2, Lock, PictureInPicture2, ListVideo, Cast } from 'lucide-react';
+import { showNativePicker } from '@/lib/cast';
+
 import { useState, useRef, useCallback, useEffect, useMemo, lazy, Suspense } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
