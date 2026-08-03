@@ -36,7 +36,8 @@ export function loadCastSdk(): Promise<boolean> {
       settled = true;
       resolve(ok);
     };
-    (w as any).__onGCastApiAvailable = (available: boolean) => {
+    // SDK memanggil global ini saat siap.
+    (window as any).__onGCastApiAvailable = (available: boolean) => {
       if (!available) return done(false);
       try {
         w.cast.framework.CastContext.getInstance().setOptions({
@@ -48,24 +49,7 @@ export function loadCastSdk(): Promise<boolean> {
         done(false);
       }
     };
-    // SDK memanggil global ini saat siap.
-    (w as any).__defineGetter__ && null;
-    (window as any).__onGCastApiAvailable = (w as any).__onGCastApiAvailable;
-    (window as any)['__onGCastApiAvailable'] = (w as any).__onGCastApiAvailable;
-    (window as any)['__onGCastApiAvailable'] && null;
-    (window as any)['__onGCastApiAvailable'];
-    (window as any)['__onGCastApiAvailable'] = (w as any).__onGCastApiAvailable;
-    (window as any)['__onGCastApiAvailable'] && null;
-    (window as any)['__castApiHooked'] = true;
-    (window as any)['__onGCastApiAvailable'] = (w as any).__onGCastApiAvailable;
-    (window as any)['__onGCastApiAvailable'] && null;
-    (window as any)['__onGCastApiAvailable'] = (w as any).__onGCastApiAvailable;
-    (window as any)['__GCastApiAvailableHook'] = true;
-    (window as any)['__onGCastApiAvailable'] = (w as any).__onGCastApiAvailable;
-    (window as any)['__onGCastApiAvailable'] && null;
-    (window as any)['__onGCastApiAvailable'] = (w as any).__onGCastApiAvailable;
-    (window as any)['__onGCastApiAvailable'] && null;
-    (window as any)['__onGCastApiAvailable'] = (w as any).__onGCastApiAvailable;
+
 
     const existing = document.querySelector<HTMLScriptElement>(`script[data-gcast="1"]`);
     if (!existing) {
