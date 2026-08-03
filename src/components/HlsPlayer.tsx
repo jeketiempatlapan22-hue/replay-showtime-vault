@@ -551,6 +551,80 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
           }
         }
       });
+
+      // Simpan estimasi bandwidth nyata agar sesi berikutnya mulai di level yang tepat.
+      const persistBandwidth = () => {
+        try {
+          const bw = hls?.bandwidthEstimate;
+          if (typeof bw === 'number' && isFinite(bw) && bw > 50_000) {
+            localStorage.setItem('replaytime-bw-estimate', JSON.stringify({ bw: Math.round(bw), at: Date.now() }));
+          }
+        } catch { /* ignore */ }
+      };
+
+      // Penjaga ABR: naikkan kualitas hanya bertahap saat buffer benar-benar sehat,
+      // dan turunkan cepat begitu buffer menipis — supaya jaringan kecil tidak lag.
+      if (abrGuardRef.current) clearInterval(abrGuardRef.current);
+      abrStateRef.current = { healthySince: 0, capIndex: -1, lastAdjust: 0 };
+      abrGuardRef.current = setInterval(() => {
+        if (!hls || !video) return;
+        persistBandwidth();
+        // Mode manual: jangan ganggu pilihan user.
+        if (userQualityRef.current) return;
+        const levelCount = hls.levels?.length || 0;
+        if (levelCount < 2) return;
+
+        const now = Date.now();
+        const state = abrStateRef.current;
+        let ahead = 0;
+        try {
+          const t = video.currentTime;
+          for (let i = 0; i < video.buffered.length; i++) {
+            if (video.buffered.start(i) <= t + 0.25 && video.buffered.end(i) > t) {
+              ahead = video.buffered.end(i) - t;
+              break;
+            }
+          }
+        } catch { /* ignore */ }
+
+        const currentIdx = hls.currentLevel >= 0 ? hls.currentLevel : 0;
+        const cap = state.capIndex >= 0 ? state.capIndex : levelCount - 1;
+        const lowBuffer = isWeak ? 5 : 4;
+        const healthyBuffer = isWeak ? 14 : 10;
+
+        // Buffer menipis / sedang buffering → turunkan batas satu tingkat segera.
+        if ((ahead < lowBuffer || video.readyState < 3) && !video.paused) {
+          state.healthySince = 0;
+          const nextCap = Math.max(0, Math.min(cap, currentIdx) - 1);
+          if (nextCap !== state.capIndex && now - state.lastAdjust > 4000) {
+            state.capIndex = nextCap;
+            state.lastAdjust = now;
+            try { hls.autoLevelCapping = nextCap; } catch { /* ignore */ }
+          }
+          return;
+        }
+
+        // Buffer sehat stabil → longgarkan batas satu tingkat saja (naik perlahan).
+        if (ahead >= healthyBuffer) {
+          if (!state.healthySince) state.healthySince = now;
+          const stableMs = isWeak ? 30_000 : 20_000;
+          if (now - state.healthySince >= stableMs && now - state.lastAdjust > stableMs) {
+            const nextCap = state.capIndex < 0 ? -1 : Math.min(levelCount - 1, state.capIndex + 1);
+            state.lastAdjust = now;
+            state.healthySince = now;
+            if (nextCap >= levelCount - 1 || nextCap < 0) {
+              state.capIndex = -1;
+              try { hls.autoLevelCapping = -1; } catch { /* ignore */ }
+            } else {
+              state.capIndex = nextCap;
+              try { hls.autoLevelCapping = nextCap; } catch { /* ignore */ }
+            }
+          }
+        } else {
+          state.healthySince = 0;
+        }
+      }, 5000);
+
       hls.on(Hls.Events.ERROR, (_, data) => {
         if (data.details === Hls.ErrorDetails.MANIFEST_LOAD_ERROR && data.response?.code && data.response.code >= 400) {
           setError('Sumber video tidak dapat diakses. Mencoba player lain…');
