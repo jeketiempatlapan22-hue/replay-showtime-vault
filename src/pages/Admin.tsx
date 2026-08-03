@@ -19,6 +19,7 @@ import ReplayPersonalTokensDialog from '@/components/admin/ReplayPersonalTokensD
 import ShowLiveControl from '@/components/admin/ShowLiveControl';
 import BulkShowImport from '@/components/admin/BulkShowImport';
 import IpManager from '@/components/admin/IpManager';
+import DataExportAdmin from '@/components/admin/DataExportAdmin';
 import { getMembers, upsertMember, deleteMember, uploadMemberPhoto, type Member } from '@/lib/members';
 import { getActiveShows, upsertActiveShow, deleteActiveShow, type ActiveShow } from '@/lib/activeShows';
 import { Switch } from '@/components/ui/switch';
