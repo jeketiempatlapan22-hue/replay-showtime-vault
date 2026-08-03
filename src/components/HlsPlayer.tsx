@@ -311,7 +311,22 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
     const liveSyncCount = isVeryWeak ? 10 : isWeak ? 7 : 4;
     const liveMaxLatencyCount = isVeryWeak ? 36 : isWeak ? 28 : 16;
     const stallRecoveryMs = isWeak ? 9000 : 14000;
-    const initialBwEstimate = isVeryWeak ? 220_000 : isWeak ? 450_000 : 900_000;
+    // Estimasi bandwidth awal: pakai pengukuran nyata dari sesi sebelumnya bila ada,
+    // supaya sesi baru langsung mulai pada level yang realistis (bukan tebakan statis).
+    const profileEstimate = isVeryWeak ? 220_000 : isWeak ? 450_000 : 900_000;
+    const savedBw = (() => {
+      try {
+        const raw = JSON.parse(localStorage.getItem('replaytime-bw-estimate') || 'null') as { bw?: number; at?: number } | null;
+        if (!raw?.bw || !raw?.at) return null;
+        // Estimasi kedaluwarsa setelah 12 jam (jaringan user bisa berubah).
+        if (Date.now() - raw.at > 12 * 3600 * 1000) return null;
+        return Math.max(120_000, Math.min(12_000_000, raw.bw));
+      } catch { return null; }
+    })();
+    const initialBwEstimate = savedBw
+      ? Math.round(savedBw * 0.85) // konservatif: 85% dari pengukuran terakhir
+      : profileEstimate;
+
     // Adaptive buffer sizing: give bad networks a larger forward cushion, while
     // keeping low-memory devices conservative so the page itself stays responsive.
     const bufferProfile = lowMem
