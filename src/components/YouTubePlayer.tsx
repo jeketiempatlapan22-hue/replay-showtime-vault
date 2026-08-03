@@ -46,6 +46,8 @@ function buildSources(source: ReplaySource | null, replay: ReplayRow): PlaylistS
 
 export default function YouTubePlayer({ replay, onBack }: Props) {
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showTvMenu, setShowTvMenu] = useState(false);
+
   const [viewCount, setViewCount] = useState(replay.view_count ?? 0);
   const [hlsFailed, setHlsFailed] = useState(false);
   const [source, setSource] = useState<ReplaySource | null>(null);
