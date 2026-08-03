@@ -242,7 +242,19 @@ function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWatch, onUnlockAn
           </div>
 
 
-          {isPurchased ? (
+          {membershipCovered ? (
+            <div className="space-y-2 mt-2">
+              <Button type="button" className="w-full" onClick={watchWithMembership}>
+                <Play className="w-4 h-4 mr-2" /> Tonton Replay
+              </Button>
+              <div className="rounded-md border border-primary/30 bg-primary/10 p-2 flex items-center gap-1.5">
+                <Crown className="w-3.5 h-3.5 text-primary shrink-0" />
+                <span className="text-[10px] text-primary font-semibold">
+                  Termasuk Membership {membership?.package_name ? `· ${membership.package_name}` : ''}
+                </span>
+              </div>
+            </div>
+          ) : isPurchased ? (
             <div className="space-y-2 mt-2">
               <Button type="button" className="w-full" onClick={() => onWatch(replay)}>
                 <Play className="w-4 h-4 mr-2" /> Tonton Replay
@@ -269,6 +281,11 @@ function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWatch, onUnlockAn
             </Button>
           ) : (
             <div className="space-y-2 mt-2">
+              {membershipActiveButOutside && (
+                <div className="rounded-md border border-border bg-muted/30 p-2 text-[10px] text-muted-foreground">
+                  Replay ini di luar periode membership kamu, jadi masih perlu dibeli terpisah.
+                </div>
+              )}
               <div className="rounded-md border border-primary/20 bg-primary/5 p-2.5 space-y-1">
                 <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Harga Replay</div>
                 <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -287,6 +304,7 @@ function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWatch, onUnlockAn
               </Button>
             </div>
           )}
+
         </div>
       </div>
 
