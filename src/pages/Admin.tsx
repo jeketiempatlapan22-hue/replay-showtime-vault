@@ -19,6 +19,7 @@ import ReplayPersonalTokensDialog from '@/components/admin/ReplayPersonalTokensD
 import ShowLiveControl from '@/components/admin/ShowLiveControl';
 import BulkShowImport from '@/components/admin/BulkShowImport';
 import IpManager from '@/components/admin/IpManager';
+import DataExportAdmin from '@/components/admin/DataExportAdmin';
 import { getMembers, upsertMember, deleteMember, uploadMemberPhoto, type Member } from '@/lib/members';
 import { getActiveShows, upsertActiveShow, deleteActiveShow, type ActiveShow } from '@/lib/activeShows';
 import { Switch } from '@/components/ui/switch';
@@ -1175,6 +1176,7 @@ export default function Admin() {
           </TabsContent>
 
           <TabsContent value="settings" className="space-y-4">
+            <DataExportAdmin />
             {/* Theme */}
             <Card>
               <CardHeader><CardTitle className="font-sans text-base sm:text-lg flex items-center gap-2"><Palette className="w-5 h-5 text-primary" />Tema</CardTitle></CardHeader>
