@@ -90,9 +90,14 @@ export default function ReplayOffAdmin() {
         <CardHeader>
           <CardTitle className="font-sans text-base sm:text-lg flex items-center justify-between gap-2">
             <span className="flex items-center gap-2"><VideoOff className="w-5 h-5" />Replay Off ({offRows.length})</span>
-            <Button size="sm" variant="outline" onClick={load} disabled={loading}><RefreshCw className={`w-4 h-4 mr-1 ${loading ? 'animate-spin' : ''}`} />Muat</Button>
+            <span className="flex gap-2">
+              <Button size="sm" variant="secondary" onClick={scan} disabled={scanning}>
+                {scanning ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <ScanSearch className="w-4 h-4 mr-1" />}Scan Ban
+              </Button>
+              <Button size="sm" variant="outline" onClick={load} disabled={loading}><RefreshCw className={`w-4 h-4 mr-1 ${loading ? 'animate-spin' : ''}`} />Muat</Button>
+            </span>
           </CardTitle>
-          <p className="text-[11px] text-muted-foreground">Replay dengan sumber video bermasalah / kena banned tidak tampil di daftar replay user. Isi sumber baru lalu aktifkan kembali.</p>
+          <p className="text-[11px] text-muted-foreground">Replay dengan sumber video bermasalah / kena banned tidak tampil di daftar replay user. Klik "Scan Ban" untuk memeriksa semua video YouTube (dihapus, private, atau embed diblokir) lalu isi sumber baru dan aktifkan kembali.</p>
         </CardHeader>
         <CardContent className="space-y-3">
           {offRows.length === 0 ? (
