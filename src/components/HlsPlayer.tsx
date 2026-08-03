@@ -94,6 +94,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
   const [casting, setCasting] = useState(false);
   const [tvMode, setTvMode] = useState(false);
   const [showTvMenu, setShowTvMenu] = useState(false);
+  const [netStats, setNetStats] = useState<{ kbps: number; buffer: number; recommendedHeight: number | null } | null>(null);
 
 
   // Expose PiP API to parent
