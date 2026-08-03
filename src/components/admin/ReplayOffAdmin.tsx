@@ -31,6 +31,22 @@ export default function ReplayOffAdmin() {
 
   useEffect(() => { void load(); }, []);
 
+  const [scanning, setScanning] = useState(false);
+  const scan = async () => {
+    setScanning(true);
+    const { data, error } = await supabase.functions.invoke('scan-replay-sources', { body: {} });
+    setScanning(false);
+    if (error) return toast({ title: 'Scan gagal', description: error.message, variant: 'destructive' });
+    const flagged = (data as any)?.flagged?.length ?? 0;
+    toast({
+      title: flagged > 0 ? `${flagged} replay ditandai off` : 'Semua replay aman',
+      description: flagged > 0
+        ? (data as any).flagged.map((f: any) => f.title).join(', ')
+        : `Dicek ${(data as any)?.checked ?? 0} video YouTube, semuanya masih bisa diputar.`,
+    });
+    if (flagged > 0) void load();
+  };
+
   const offRows = useMemo(() => rows.filter((r) => r.is_offline), [rows]);
   const onRows = useMemo(() => {
     const t = q.trim().toLowerCase();
