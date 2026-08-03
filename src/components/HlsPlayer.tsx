@@ -89,6 +89,10 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
   const [needsUnmute, setNeedsUnmute] = useState(false);
   const [castSupported, setCastSupported] = useState(false);
   const [castAvailable, setCastAvailable] = useState(false);
+  const [casting, setCasting] = useState(false);
+  const [tvMode, setTvMode] = useState(false);
+  const [showTvMenu, setShowTvMenu] = useState(false);
+
 
   // Expose PiP API to parent
   useImperativeHandle(ref, () => ({
