@@ -121,9 +121,11 @@ Deno.serve(async (req) => {
       storage,
       data,
       notes: [
-        'Sandi login akun user tidak bisa diekspor (disimpan sebagai hash satu arah).',
-        'Sandi replay, sandi master bulanan, sandi live, dan PIN bot admin ikut terekspor.',
+        'auth_users berisi hash sandi (bcrypt) di kolom encrypted_password — impor kolom ini ke auth.users projek baru agar user login dengan sandi yang sama.',
+        'Hash tidak bisa dibaca sebagai teks asli, tapi cukup untuk memindahkan akun tanpa reset sandi.',
+        'Sandi replay, sandi master bulanan, sandi live, dan PIN bot admin ikut terekspor sebagai teks.',
       ],
+
     });
   } catch (e) {
     return json({ error: String((e as Error).message || e) }, 500);
