@@ -1195,6 +1195,44 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
         </div>
       </div>
     </div>
+
+    {!isFullscreen && (
+      <div className="mt-2 rounded-lg border border-border bg-card/70 px-3 py-2 text-xs">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <span className="flex items-center gap-1.5">
+            <span className="flex items-end gap-[2px] h-3.5">
+              {[1, 2, 3, 4].map(i => (
+                <span
+                  key={i}
+                  className={`w-[3px] rounded-sm ${netTier && i <= netTier.bars ? 'bg-current' : 'bg-muted-foreground/30'} ${netTier ? netTier.tone : ''}`}
+                  style={{ height: `${i * 25}%` }}
+                />
+              ))}
+            </span>
+            <span className={`font-semibold ${netTier ? netTier.tone : 'text-muted-foreground'}`}>
+              Jaringan: {netTier ? netTier.label : 'Mengukur…'}
+            </span>
+          </span>
+          {netStats && netStats.kbps > 0 && (
+            <span className="text-muted-foreground">
+              {netStats.kbps >= 1000 ? `${(netStats.kbps / 1000).toFixed(1)} Mbps` : `${netStats.kbps} Kbps`} · buffer {netStats.buffer}s
+            </span>
+          )}
+          <span className="text-muted-foreground">
+            Resolusi: {currentQuality === -1 ? `Auto${autoActiveLabel ? ` (${autoActiveLabel})` : ''}` : `${qualities.find(q => q.index === currentQuality)?.label || '-'} (dikunci)`}
+          </span>
+        </div>
+        <p className="mt-1 text-[11px] text-muted-foreground leading-relaxed">
+          {netStats?.recommendedHeight
+            ? `Rekomendasi untuk jaringan Anda: ${netStats.recommendedHeight}p. `
+            : ''}
+          {currentQuality === -1
+            ? 'Mode Auto menyesuaikan resolusi otomatis. Pilih resolusi di ikon gear untuk menguncinya.'
+            : 'Resolusi terkunci — tidak akan berubah sendiri sampai Anda menggantinya lagi.'}
+        </p>
+      </div>
+    )}
+    </>
   );
 });
 
