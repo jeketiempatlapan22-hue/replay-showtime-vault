@@ -569,8 +569,41 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
       abrGuardRef.current = setInterval(() => {
         if (!hls || !video) return;
         persistBandwidth();
-        // Mode manual: jangan ganggu pilihan user.
-        if (userQualityRef.current) return;
+
+        // Ukur kekuatan jaringan untuk ditampilkan ke user (selalu, termasuk mode manual).
+        let bufferAhead = 0;
+        try {
+          const t = video.currentTime;
+          for (let i = 0; i < video.buffered.length; i++) {
+            if (video.buffered.start(i) <= t + 0.25 && video.buffered.end(i) > t) {
+              bufferAhead = video.buffered.end(i) - t;
+              break;
+            }
+          }
+        } catch { /* ignore */ }
+        const bwKbps = Math.round((hls.bandwidthEstimate || 0) / 1000);
+        const bestFit = (hls.levels || [])
+          .map(l => ({ h: l.height || 0, b: l.bitrate || 0 }))
+          .filter(l => l.h > 0 && l.b > 0 && l.b * 1.35 <= (hls.bandwidthEstimate || 0))
+          .sort((a, b) => b.h - a.h)[0];
+        setNetStats({
+          kbps: bwKbps,
+          buffer: Math.round(bufferAhead),
+          recommendedHeight: bestFit?.h ?? null,
+        });
+
+        // Mode manual: kunci pilihan user, jangan pernah ubah sendiri.
+        if (userQualityRef.current) {
+          try {
+            const target = hls.levels.findIndex(l => l.height === userQualityRef.current);
+            if (target >= 0) {
+              if (hls.autoLevelCapping !== target) hls.autoLevelCapping = target;
+              if (hls.loadLevel !== target) hls.loadLevel = target;
+              if (hls.nextLevel !== target && hls.currentLevel !== target) hls.nextLevel = target;
+            }
+          } catch { /* ignore */ }
+          return;
+        }
         const levelCount = hls.levels?.length || 0;
         if (levelCount < 2) return;
 
