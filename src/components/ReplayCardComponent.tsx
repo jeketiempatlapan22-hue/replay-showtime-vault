@@ -66,6 +66,10 @@ function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWatch, onUnlockAn
     };
   }, [replay.id]);
 
+  const { membership } = useActiveMembership();
+  const membershipCovered = isReplayCoveredByMembership(replay.date, membership);
+  const membershipActiveButOutside = !!membership?.token && !membershipCovered && !!membership?.includes_replays;
+
   const isPurchased = !!purchasedToken;
 
   // After purchase, treat as unlocked & store token in sessionStorage so player can fetch source.
@@ -75,6 +79,21 @@ function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWatch, onUnlockAn
       if (!isUnlocked) onUnlock(replay.id);
     }
   }, [isPurchased, purchasedToken, replay.id, isUnlocked, onUnlock]);
+
+  // Membership aktif: simpan token membership agar player bisa mengambil sumber replay.
+  useEffect(() => {
+    if (!membershipCovered || !membership?.token) return;
+    try { sessionStorage.setItem(`replaytime-tok-${replay.id}`, membership.token); } catch { /* ignore */ }
+  }, [membershipCovered, membership?.token, replay.id]);
+
+  const watchWithMembership = () => {
+    if (membership?.token) {
+      try { sessionStorage.setItem(`replaytime-tok-${replay.id}`, membership.token); } catch { /* ignore */ }
+    }
+    if (onUnlockAndWatch) onUnlockAndWatch(replay);
+    else { onUnlock(replay.id); onWatch(replay); }
+  };
+
 
   const accessLink = purchasedToken
     ? `${window.location.origin}/akses?token=${purchasedToken}&replay=${replay.id}`
