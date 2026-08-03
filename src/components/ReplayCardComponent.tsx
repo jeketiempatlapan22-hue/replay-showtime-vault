@@ -157,12 +157,16 @@ function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWatch, onUnlockAn
           <img
             src={thumbnailUrl}
             alt={replay.title}
+            width={640}
+            height={360}
             loading="lazy"
             decoding="async"
+            fetchPriority={index < 3 ? 'auto' : 'low'}
             onLoad={() => setImgLoaded(true)}
             onError={() => setImgLoaded(true)}
             className={`w-full h-full object-cover group-hover:scale-105 transition-all duration-500 ${imgLoaded ? 'opacity-100' : 'opacity-0'}`}
           />
+
           {!isUnlocked && (
             <div className="absolute inset-0 bg-background/70 backdrop-blur-sm flex items-center justify-center">
               <Lock className="w-10 h-10 text-primary animate-pulse" />
