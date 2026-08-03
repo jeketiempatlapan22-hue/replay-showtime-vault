@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, RefreshCw, PowerOff, Power, VideoOff } from 'lucide-react';
+import { Loader2, RefreshCw, PowerOff, Power, VideoOff, ScanSearch } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { getReplaysAdmin, type ReplayRow } from '@/lib/store';
@@ -30,6 +30,22 @@ export default function ReplayOffAdmin() {
   };
 
   useEffect(() => { void load(); }, []);
+
+  const [scanning, setScanning] = useState(false);
+  const scan = async () => {
+    setScanning(true);
+    const { data, error } = await supabase.functions.invoke('scan-replay-sources', { body: {} });
+    setScanning(false);
+    if (error) return toast({ title: 'Scan gagal', description: error.message, variant: 'destructive' });
+    const flagged = (data as any)?.flagged?.length ?? 0;
+    toast({
+      title: flagged > 0 ? `${flagged} replay ditandai off` : 'Semua replay aman',
+      description: flagged > 0
+        ? (data as any).flagged.map((f: any) => f.title).join(', ')
+        : `Dicek ${(data as any)?.checked ?? 0} video YouTube, semuanya masih bisa diputar.`,
+    });
+    if (flagged > 0) void load();
+  };
 
   const offRows = useMemo(() => rows.filter((r) => r.is_offline), [rows]);
   const onRows = useMemo(() => {
@@ -74,9 +90,14 @@ export default function ReplayOffAdmin() {
         <CardHeader>
           <CardTitle className="font-sans text-base sm:text-lg flex items-center justify-between gap-2">
             <span className="flex items-center gap-2"><VideoOff className="w-5 h-5" />Replay Off ({offRows.length})</span>
-            <Button size="sm" variant="outline" onClick={load} disabled={loading}><RefreshCw className={`w-4 h-4 mr-1 ${loading ? 'animate-spin' : ''}`} />Muat</Button>
+            <span className="flex gap-2">
+              <Button size="sm" variant="secondary" onClick={scan} disabled={scanning}>
+                {scanning ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <ScanSearch className="w-4 h-4 mr-1" />}Scan Ban
+              </Button>
+              <Button size="sm" variant="outline" onClick={load} disabled={loading}><RefreshCw className={`w-4 h-4 mr-1 ${loading ? 'animate-spin' : ''}`} />Muat</Button>
+            </span>
           </CardTitle>
-          <p className="text-[11px] text-muted-foreground">Replay dengan sumber video bermasalah / kena banned tidak tampil di daftar replay user. Isi sumber baru lalu aktifkan kembali.</p>
+          <p className="text-[11px] text-muted-foreground">Replay dengan sumber video bermasalah / kena banned tidak tampil di daftar replay user. Klik "Scan Ban" untuk memeriksa semua video YouTube (dihapus, private, atau embed diblokir) lalu isi sumber baru dan aktifkan kembali.</p>
         </CardHeader>
         <CardContent className="space-y-3">
           {offRows.length === 0 ? (

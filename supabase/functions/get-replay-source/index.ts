@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { isYouTubeVideoPlayable } from "../_shared/yt-check.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -152,13 +153,26 @@ Deno.serve(async (req) => {
     const hasSources = Array.isArray(replay.sources) && replay.sources.length > 0;
     const hasYt = String(replay.youtube_id || "").trim() !== "";
     const hasUrl = String(replay.m3u8_url || "").trim() !== "";
-    if (!hasSources && !hasYt && !hasUrl) {
+    const markOffline = async (reason: string) => {
       await supabase.from("replays").update({
         is_offline: true,
-        offline_reason: "Sumber video kosong / tidak tersedia",
+        offline_reason: reason,
         offline_at: new Date().toISOString(),
       }).eq("id", replay_id);
+    };
+
+    if (!hasSources && !hasYt && !hasUrl) {
+      await markOffline("Sumber video kosong / tidak tersedia");
       return json({ valid: false, reason: "source_unavailable" }, 404);
+    }
+
+    // Deteksi video YouTube yang dihapus / kena ban / embed diblokir.
+    if (!hasSources && !hasUrl && hasYt) {
+      const check = await isYouTubeVideoPlayable(String(replay.youtube_id));
+      if (!check.ok) {
+        await markOffline(check.reason);
+        return json({ valid: false, reason: "source_unavailable", detail: check.reason }, 404);
+      }
     }
 
     return json({
