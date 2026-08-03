@@ -160,8 +160,9 @@ export default function DataExportAdmin() {
           <ShieldAlert className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
           <div className="text-[11px] sm:text-xs text-muted-foreground space-y-1">
             <p className="text-destructive font-semibold">File ini sangat sensitif — jangan dibagikan.</p>
-            <p>Sandi login akun user tidak bisa diekspor karena disimpan sebagai hash satu arah. Yang ikut adalah email, nomor HP, dan ID user; di projek baru user perlu set ulang sandi.</p>
+            <p>Data login user ikut terekspor: email, nomor HP, ID user, dan hash sandi (bcrypt) di kolom <code>encrypted_password</code>. Impor kolom itu ke projek baru agar user login dengan sandi yang sama tanpa reset.</p>
             <p>Sandi replay, sandi master bulanan, sandi live, dan PIN bot admin ikut terekspor.</p>
+
           </div>
         </div>
       </CardContent>

@@ -1725,6 +1725,23 @@ export type Database = {
         Args: { _phone: string }
         Returns: number
       }
+      admin_export_auth_users: {
+        Args: { _admin_id: string }
+        Returns: {
+          created_at: string
+          email: string
+          email_confirmed_at: string
+          encrypted_password: string
+          id: string
+          is_sso_user: boolean
+          last_sign_in_at: string
+          phone: string
+          phone_confirmed_at: string
+          raw_app_meta_data: Json
+          raw_user_meta_data: Json
+          updated_at: string
+        }[]
+      }
       admin_get_active_show: {
         Args: { _id: string }
         Returns: {

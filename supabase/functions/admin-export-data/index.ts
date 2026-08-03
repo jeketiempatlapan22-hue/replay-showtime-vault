@@ -58,26 +58,42 @@ Deno.serve(async (req) => {
       counts[t] = rows.length;
     }
 
-    // Auth users (email / phone / metadata). Passwords are hashed one-way and cannot be exported.
+    // Auth users, including bcrypt password hashes so accounts can be migrated
+    // to another project with the SAME login password.
     const authUsers: any[] = [];
+    const { data: rawUsers, error: rawErr } = await admin.rpc('admin_export_auth_users', { _admin_id: uid });
+    if (rawErr) errors['auth_users_raw'] = rawErr.message;
+    const rawMap = new Map<string, any>((rawUsers || []).map((u: any) => [u.id, u]));
+    counts['auth_users_with_password_hash'] = (rawUsers || []).filter((u: any) => u.encrypted_password).length;
+
     for (let page = 1; page <= 20; page++) {
       const { data: list, error } = await admin.auth.admin.listUsers({ page, perPage: 200 });
       if (error) { errors['auth_users'] = error.message; break; }
       const users = list?.users || [];
-      authUsers.push(...users.map((u: any) => ({
-        id: u.id,
-        email: u.email,
-        phone: u.phone,
-        created_at: u.created_at,
-        last_sign_in_at: u.last_sign_in_at,
-        email_confirmed_at: u.email_confirmed_at,
-        providers: u.app_metadata?.providers ?? [],
-        user_metadata: u.user_metadata ?? {},
-      })));
+      authUsers.push(...users.map((u: any) => {
+        const raw = rawMap.get(u.id) || {};
+        return {
+          id: u.id,
+          email: u.email,
+          phone: u.phone || raw.phone || null,
+          encrypted_password: raw.encrypted_password ?? null,
+          created_at: u.created_at,
+          updated_at: raw.updated_at ?? null,
+          last_sign_in_at: u.last_sign_in_at,
+          email_confirmed_at: u.email_confirmed_at,
+          phone_confirmed_at: raw.phone_confirmed_at ?? null,
+          providers: u.app_metadata?.providers ?? [],
+          user_metadata: u.user_metadata ?? {},
+          app_metadata: u.app_metadata ?? {},
+        };
+      }));
       if (users.length < 200) break;
     }
+    // Fallback: if listUsers failed entirely, use the raw rows.
+    if (!authUsers.length && rawUsers?.length) authUsers.push(...rawUsers);
     data['auth_users'] = authUsers;
     counts['auth_users'] = authUsers.length;
+
 
     // Storage file listings (public URLs)
     const storage: Record<string, any[]> = {};
@@ -105,9 +121,11 @@ Deno.serve(async (req) => {
       storage,
       data,
       notes: [
-        'Sandi login akun user tidak bisa diekspor (disimpan sebagai hash satu arah).',
-        'Sandi replay, sandi master bulanan, sandi live, dan PIN bot admin ikut terekspor.',
+        'auth_users berisi hash sandi (bcrypt) di kolom encrypted_password — impor kolom ini ke auth.users projek baru agar user login dengan sandi yang sama.',
+        'Hash tidak bisa dibaca sebagai teks asli, tapi cukup untuk memindahkan akun tanpa reset sandi.',
+        'Sandi replay, sandi master bulanan, sandi live, dan PIN bot admin ikut terekspor sebagai teks.',
       ],
+
     });
   } catch (e) {
     return json({ error: String((e as Error).message || e) }, 500);
