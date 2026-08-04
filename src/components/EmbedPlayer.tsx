@@ -582,9 +582,21 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
     else exitFs();
   };
 
+  // Origin hanya dikirim jika benar-benar valid. Di iframe sandbox/webview,
+  // window.location.origin bisa bernilai "null" → YouTube menolak (Error 153) & layar hitam.
+  const safeOrigin = (() => {
+    try {
+      const o = window.location.origin;
+      return /^https?:\/\/[^/]+$/.test(o) ? o : '';
+    } catch { return ''; }
+  })();
+  const ytBaseParams = 'rel=0&modestbranding=1&playsinline=1&autoplay=1&mute=1&controls=0&fs=0&iv_load_policy=3&cc_load_policy=0&hl=id&disablekb=1';
   const ytEmbedUrl = ytId
-    ? `https://www.youtube-nocookie.com/embed/${ytId}?rel=0&modestbranding=1&playsinline=1&autoplay=1&mute=1&controls=0&fs=0&iv_load_policy=3&cc_load_policy=0&cc_lang_pref=none&hl=id&disablekb=1&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`
+    ? plainMode
+      ? `https://www.youtube-nocookie.com/embed/${ytId}?${ytBaseParams}`
+      : `https://www.youtube-nocookie.com/embed/${ytId}?${ytBaseParams}&enablejsapi=1${safeOrigin ? `&origin=${encodeURIComponent(safeOrigin)}` : ''}`
     : '';
+
   const cfEmbedUrl = cfUid
     ? `https://iframe.videodelivery.net/${cfUid}?autoplay=true&controls=false&preload=auto&muted=true`
     : '';
