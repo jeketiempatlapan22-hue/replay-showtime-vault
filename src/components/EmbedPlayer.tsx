@@ -255,8 +255,26 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
   const ytId = type === 'youtube' ? extractYoutubeId(source) : '';
   const cfUid = type === 'cloudflare' ? extractCloudflareUid(source) : '';
 
+  // Lazy-load iframe: player baru dimuat ketika container mendekati viewport,
+  // sehingga kartu/section yang belum terlihat tidak membebani browser.
+  const [inView, setInView] = useState(false);
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    if (typeof IntersectionObserver === 'undefined') { setInView(true); return; }
+    const io = new IntersectionObserver((entries) => {
+      if (entries.some(e => e.isIntersecting)) {
+        setInView(true);
+        io.disconnect();
+      }
+    }, { rootMargin: '300px 0px' });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
   useEffect(() => { mutedRef.current = muted; }, [muted]);
   useEffect(() => { volumeRef.current = volume; }, [volume]);
+
 
   // YouTube: tampilkan iframe langsung agar tidak blank/stuck, lalu attach IFrame API ke iframe yang sama
   // untuk kontrol replay (seek, durasi, play/pause, mute) saat API sudah siap.
