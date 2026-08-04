@@ -611,10 +611,19 @@ export default function Index() {
           })()}
 
           {!loading && visibleCount < totalFiltered && (
-            <div ref={sentinelRef} className="flex justify-center py-8">
-              <Loader2 className="w-6 h-6 text-primary animate-spin" />
+            <div ref={sentinelRef} className="space-y-6 py-4">
+              {/* Placeholder konsisten: kartu skeleton saat batch berikutnya dimuat */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6" aria-hidden={!loadingMore}>
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <ReplayCardSkeleton key={i} />
+                ))}
+              </div>
+              <div className="flex justify-center">
+                <Loader2 className="w-6 h-6 text-primary animate-spin" />
+              </div>
             </div>
           )}
+
           <BotCommandsPublic />
 
         </main>
