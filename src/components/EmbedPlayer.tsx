@@ -269,8 +269,12 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
       }
     }, { rootMargin: '300px 0px' });
     io.observe(el);
-    return () => io.disconnect();
+    // Safety net: bila observer tidak pernah memicu (container tersembunyi/nol ukuran),
+    // tetap muat player agar tidak stuck di placeholder.
+    const safety = setTimeout(() => setInView(true), 1500);
+    return () => { io.disconnect(); clearTimeout(safety); };
   }, []);
+
 
   useEffect(() => { mutedRef.current = muted; }, [muted]);
   useEffect(() => { volumeRef.current = volume; }, [volume]);
