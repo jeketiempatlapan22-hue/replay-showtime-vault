@@ -685,7 +685,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
         </div>
       )}
 
-      {showHint && (
+      {showHint && !plainMode && (
         <button
           onClick={(e) => { e.stopPropagation(); toggleMute(); }}
           className="absolute top-3 left-1/2 -translate-x-1/2 z-20 px-4 py-2 rounded-full bg-primary text-primary-foreground text-xs font-semibold shadow-lg animate-fade-in"
