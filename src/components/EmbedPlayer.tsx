@@ -297,7 +297,9 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
     setDuration(0);
     setCurrentTime(0);
     if (ytFallbackTimerRef.current) clearTimeout(ytFallbackTimerRef.current);
+    if (!inView) return;
     if (type !== 'youtube') {
+
       const id = setTimeout(() => { markReady(true); setIsPlaying(true); }, 400);
       return () => clearTimeout(id);
     }
