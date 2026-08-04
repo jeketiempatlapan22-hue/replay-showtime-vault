@@ -12,7 +12,7 @@ import ActiveShowsSection from '@/components/ActiveShowsSection';
 import BotCommandsPublic from '@/components/BotCommandsPublic';
 // Lazy-load player + komentar — chunk berat hanya dimuat saat user membuka replay.
 const YouTubePlayer = lazy(() => import('@/components/YouTubePlayer'));
-import { getReplaysByMonth, getReplays, getSettings } from '@/lib/store';
+import { getReplays, getSettings } from '@/lib/store';
 import { type ReplayRow } from '@/lib/store';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -92,21 +92,39 @@ export default function Index() {
     });
   }, []);
 
+  const refreshingRef = useRef(false);
   const refreshReplays = useCallback(async () => {
-    const [grouped, replays] = await Promise.all([getReplaysByMonth(), getReplays()]);
-    setAllGrouped(grouped);
+    // Cegah refresh bertumpuk (realtime bisa mengirim banyak event beruntun).
+    if (refreshingRef.current) return;
+    refreshingRef.current = true;
+    try {
+      const replays = await getReplays();
+      const grouped: Record<string, ReplayRow[]> = {};
+      for (const r of replays) {
+        const d = new Date(r.date);
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        if (!grouped[key]) grouped[key] = [];
+        grouped[key].push(r);
+      }
+      setAllGrouped(grouped);
 
-    // Realtime notification for new replays
-    if (prevReplayCountRef.current > 0 && replays.length > prevReplayCountRef.current) {
-      const newCount = replays.length - prevReplayCountRef.current;
-      toast({
-        title: '🎬 Replay Baru!',
-        description: `${newCount} replay baru telah ditambahkan.`,
-      });
+      // Realtime notification for new replays
+      if (prevReplayCountRef.current > 0 && replays.length > prevReplayCountRef.current) {
+        const newCount = replays.length - prevReplayCountRef.current;
+        toast({
+          title: '🎬 Replay Baru!',
+          description: `${newCount} replay baru telah ditambahkan.`,
+        });
+      }
+      prevReplayCountRef.current = replays.length;
+      setAllReplays(replays);
+    } catch (e) {
+      console.warn('[Index] refreshReplays failed:', e);
+    } finally {
+      refreshingRef.current = false;
     }
-    prevReplayCountRef.current = replays.length;
-    setAllReplays(replays);
   }, []);
+
 
   useEffect(() => {
     let cancelled = false;
@@ -301,6 +319,33 @@ export default function Index() {
     sortMode === 'oldest' ? a.localeCompare(b) : b.localeCompare(a)
   );
 
+  const totalFiltered = useMemo(
+    () => Object.values(grouped).reduce((sum, arr) => sum + arr.length, 0),
+    [grouped],
+  );
+
+  // Render bertahap (infinite scroll) — cegah ratusan kartu dipasang sekaligus.
+  const PAGE_SIZE = 18;
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [searchQuery, criteriaFilter, sortMode, showBookmarksOnly]);
+
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el || visibleCount >= totalFiltered) return;
+    const io = new IntersectionObserver((entries) => {
+      if (entries.some(e => e.isIntersecting)) {
+        setVisibleCount(c => Math.min(c + PAGE_SIZE, totalFiltered));
+      }
+    }, { rootMargin: '600px 0px' });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [visibleCount, totalFiltered]);
+
+
   const handleUnlock = useCallback((id: string) => {
     setUnlockedIds(prev => new Set(prev).add(id));
   }, []);
@@ -483,40 +528,56 @@ export default function Index() {
             </div>
           )}
 
-          {sortedMonths.map(monthKey => {
-            const [year, month] = monthKey.split('-');
-            const monthName = MONTH_NAMES[month] || month;
+          {(() => {
+            // Render bertahap: hanya sebagian kartu yang dipasang ke DOM agar
+            // browser (terutama mobile) tidak kehabisan memori dan me-reload tab.
+            let remaining = visibleCount;
+            const sections: JSX.Element[] = [];
+            for (const monthKey of sortedMonths) {
+              if (remaining <= 0) break;
+              const [year, month] = monthKey.split('-');
+              const monthName = MONTH_NAMES[month] || month;
+              const items = grouped[monthKey].slice(0, remaining);
+              remaining -= items.length;
+              sections.push(
+                <section key={monthKey} className="mb-12">
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="h-px flex-1 bg-gradient-to-r from-transparent via-primary/40 to-transparent" />
+                    <h2 className="text-2xl md:text-3xl font-bold text-primary whitespace-nowrap">
+                      ☪ {monthName} {year}
+                    </h2>
+                    <div className="h-px flex-1 bg-gradient-to-r from-transparent via-primary/40 to-transparent" />
+                  </div>
 
-            return (
-              <section key={monthKey} className="mb-12">
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="h-px flex-1 bg-gradient-to-r from-transparent via-primary/40 to-transparent" />
-                  <h2 className="text-2xl md:text-3xl font-bold text-primary whitespace-nowrap">
-                    ☪ {monthName} {year}
-                  </h2>
-                  <div className="h-px flex-1 bg-gradient-to-r from-transparent via-primary/40 to-transparent" />
-                </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {items.map((replay, i) => (
+                      <ReplayCardComponent
+                        key={replay.id}
+                        replay={replay}
+                        isUnlocked={unlockedIds.has(replay.id)}
+                        onUnlock={handleUnlock}
+                        onWatch={handleOpenPlayer}
+                        onUnlockAndWatch={handleUnlockAndWatch}
+                        index={Math.min(i, 5)}
+                        isBookmarked={bookmarks.has(replay.id)}
+                        onToggleBookmark={toggleBookmark}
+                        searchQuery={searchQuery}
+                      />
+                    ))}
+                  </div>
+                </section>
+              );
+            }
+            return sections;
+          })()}
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {grouped[monthKey].map((replay, i) => (
-                    <ReplayCardComponent
-                      key={replay.id}
-                      replay={replay}
-                      isUnlocked={unlockedIds.has(replay.id)}
-                      onUnlock={handleUnlock}
-                      onWatch={handleOpenPlayer}
-                      onUnlockAndWatch={handleUnlockAndWatch}
-                      index={i}
-                      isBookmarked={bookmarks.has(replay.id)}
-                      onToggleBookmark={toggleBookmark}
-                      searchQuery={searchQuery}
-                    />
-                  ))}
-                </div>
-              </section>
-            );
-          })}
+          {!loading && visibleCount < totalFiltered && (
+            <div ref={sentinelRef} className="flex justify-center py-8">
+              <Loader2 className="w-6 h-6 text-primary animate-spin" />
+            </div>
+          )}
           <BotCommandsPublic />
+
         </main>
       </div>
 
