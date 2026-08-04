@@ -387,11 +387,21 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
               }
             }
           },
-          onError: () => {
+          onError: (e?: { data?: number }) => {
             if (cancelled) return;
+            const code = Number(e?.data ?? 0);
+            // 153 = konfigurasi pemutar (origin) ditolak, 101/150 = embed dibatasi.
+            // Muat ulang sebagai embed polos tanpa JS API agar video tetap tampil.
+            if ((code === 153 || code === 101 || code === 150) && !plainModeRef.current) {
+              plainModeRef.current = true;
+              setPlainMode(true);
+              markReady(false);
+              return;
+            }
             markReady(true);
             setIsPlaying(true);
           },
+
         },
       });
     };
