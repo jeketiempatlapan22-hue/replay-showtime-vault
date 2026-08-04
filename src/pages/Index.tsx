@@ -328,22 +328,46 @@ export default function Index() {
   const PAGE_SIZE = 18;
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const sentinelRef = useRef<HTMLDivElement>(null);
+  const loadLockRef = useRef(false);
+  const loadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     setVisibleCount(PAGE_SIZE);
+    loadLockRef.current = false;
+    if (loadTimerRef.current) { clearTimeout(loadTimerRef.current); loadTimerRef.current = null; }
   }, [searchQuery, criteriaFilter, sortMode, showBookmarksOnly]);
 
   useEffect(() => {
     const el = sentinelRef.current;
     if (!el || visibleCount >= totalFiltered) return;
-    const io = new IntersectionObserver((entries) => {
-      if (entries.some(e => e.isIntersecting)) {
+
+    // Debounce + lock: saat scroll cepat, observer bisa memicu berkali-kali.
+    // Lock memastikan hanya satu penambahan batch yang dieksekusi, jadi
+    // urutan kartu tetap stabil dan tidak melompat.
+    const requestMore = () => {
+      if (loadLockRef.current) return;
+      loadLockRef.current = true;
+      loadTimerRef.current = setTimeout(() => {
+        loadTimerRef.current = null;
         setVisibleCount(c => Math.min(c + PAGE_SIZE, totalFiltered));
-      }
+        // Lepas lock setelah render batch selesai agar batch berikutnya
+        // hanya jalan bila sentinel masih terlihat.
+        requestAnimationFrame(() => {
+          setTimeout(() => { loadLockRef.current = false; }, 250);
+        });
+      }, 180);
+    };
+
+    const io = new IntersectionObserver((entries) => {
+      if (entries.some(e => e.isIntersecting)) requestMore();
     }, { rootMargin: '600px 0px' });
     io.observe(el);
-    return () => io.disconnect();
+    return () => {
+      io.disconnect();
+      if (loadTimerRef.current) { clearTimeout(loadTimerRef.current); loadTimerRef.current = null; }
+    };
   }, [visibleCount, totalFiltered]);
+
 
 
   const handleUnlock = useCallback((id: string) => {

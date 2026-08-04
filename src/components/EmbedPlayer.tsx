@@ -158,6 +158,11 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
   const [detectedLive, setDetectedLive] = useState<boolean>(!!isLive);
   const liveActive = isLive || detectedLive;
   const liveEndedRef = useRef(false);
+  // Fallback embed sederhana (tanpa JS API / origin) bila YouTube menolak konfigurasi
+  // pemutar (error 153 / 101 / 150) sehingga video tidak muncul sama sekali.
+  const [plainMode, setPlainMode] = useState(false);
+  const plainModeRef = useRef(false);
+
 
   // Adaptive quality (replay only): mulai dari tertinggi yang tersedia,
   // turun satu tingkat hanya jika user kena buffering berulang dalam window pendek.
@@ -261,7 +266,10 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
     autoMuteAppliedRef.current = false;
     userUnmutedRef.current = false;
     liveEndedRef.current = false;
+    plainModeRef.current = false;
+    setPlainMode(false);
     setDetectedLive(!!isLive);
+
     // Reset adaptive-quality state untuk source baru.
     qualityCapIdxRef.current = 0;
     availableQualitiesRef.current = [];
@@ -290,8 +298,9 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
     }, 700);
 
     const init = () => {
-      if (cancelled || !iframeRef.current) return;
+      if (cancelled || !iframeRef.current || plainModeRef.current) return;
       if (initialized) return;
+
       const YT = (window as YoutubeWindow).YT;
       if (!YT?.Player) { setTimeout(init, 200); return; }
       initialized = true;
@@ -378,11 +387,21 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
               }
             }
           },
-          onError: () => {
+          onError: (e?: { data?: number }) => {
             if (cancelled) return;
+            const code = Number(e?.data ?? 0);
+            // 153 = konfigurasi pemutar (origin) ditolak, 101/150 = embed dibatasi.
+            // Muat ulang sebagai embed polos tanpa JS API agar video tetap tampil.
+            if ((code === 153 || code === 101 || code === 150) && !plainModeRef.current) {
+              plainModeRef.current = true;
+              setPlainMode(true);
+              markReady(false);
+              return;
+            }
             markReady(true);
             setIsPlaying(true);
           },
+
         },
       });
     };
@@ -563,9 +582,23 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
     else exitFs();
   };
 
+  // Origin hanya dikirim jika benar-benar valid. Di iframe sandbox/webview,
+  // window.location.origin bisa bernilai "null" → YouTube menolak (Error 153) & layar hitam.
+  const safeOrigin = (() => {
+    try {
+      const o = window.location.origin;
+      return /^https?:\/\/[^/]+$/.test(o) ? o : '';
+    } catch { return ''; }
+  })();
+  const ytBaseParams = 'rel=0&modestbranding=1&playsinline=1&autoplay=1&mute=1&controls=0&fs=0&iv_load_policy=3&cc_load_policy=0&hl=id&disablekb=1';
+  const ytPlainParams = 'rel=0&modestbranding=1&playsinline=1&autoplay=1&mute=1&iv_load_policy=3&cc_load_policy=0&hl=id';
   const ytEmbedUrl = ytId
-    ? `https://www.youtube-nocookie.com/embed/${ytId}?rel=0&modestbranding=1&playsinline=1&autoplay=1&mute=1&controls=0&fs=0&iv_load_policy=3&cc_load_policy=0&cc_lang_pref=none&hl=id&disablekb=1&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`
+    ? plainMode
+      ? `https://www.youtube-nocookie.com/embed/${ytId}?${ytPlainParams}`
+      : `https://www.youtube-nocookie.com/embed/${ytId}?${ytBaseParams}&enablejsapi=1${safeOrigin ? `&origin=${encodeURIComponent(safeOrigin)}` : ''}`
     : '';
+
+
   const cfEmbedUrl = cfUid
     ? `https://iframe.videodelivery.net/${cfUid}?autoplay=true&controls=false&preload=auto&muted=true`
     : '';
@@ -591,10 +624,11 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
         ytId ? (
           <iframe
             ref={iframeRef}
+            key={plainMode ? 'plain' : 'api'}
             id={ytIframeId}
             src={ytEmbedUrl}
             onLoad={handleFrameLoaded}
-            className="absolute inset-0 w-full h-full pointer-events-none"
+            className={`absolute inset-0 w-full h-full ${plainMode ? '' : 'pointer-events-none'}`}
             title={title}
             allow="autoplay; encrypted-media; picture-in-picture; fullscreen; accelerometer; gyroscope"
             allowFullScreen
@@ -604,6 +638,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
             fetchpriority="high"
             style={{ border: 0, willChange: 'transform' }}
           />
+
         ) : (
           <div className="absolute inset-0 flex items-center justify-center bg-black text-white/80 text-sm px-4 text-center">
             Link YouTube tidak valid. Hubungi admin untuk memeriksa sumber.
@@ -633,10 +668,13 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
       )}
 
       {/* Click-shield over iframe — single tap toggles controls visibility instead of clicking through to YouTube logo. */}
-      <div
-        className="absolute inset-0 z-[5]"
-        onClick={(e) => { e.preventDefault(); toggleControls(); }}
-      />
+      {!plainMode && (
+        <div
+          className="absolute inset-0 z-[5]"
+          onClick={(e) => { e.preventDefault(); toggleControls(); }}
+        />
+      )}
+
 
       {watermark && <LiveWatermark code={watermark} />}
 
@@ -647,7 +685,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
         </div>
       )}
 
-      {showHint && (
+      {showHint && !plainMode && (
         <button
           onClick={(e) => { e.stopPropagation(); toggleMute(); }}
           className="absolute top-3 left-1/2 -translate-x-1/2 z-20 px-4 py-2 rounded-full bg-primary text-primary-foreground text-xs font-semibold shadow-lg animate-fade-in"
@@ -659,8 +697,9 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
       {/* Controls */}
       <div
         className={`absolute inset-x-0 bottom-0 z-10 px-2 sm:px-3 pb-2 sm:pb-3 pt-8 bg-gradient-to-t from-black/80 to-transparent transition-opacity duration-300 ${
-          showControls || !isPlaying ? 'opacity-100' : 'opacity-0 pointer-events-none'
+          plainMode ? 'hidden' : showControls || !isPlaying ? 'opacity-100' : 'opacity-0 pointer-events-none'
         }`}
+
         style={{ touchAction: 'manipulation' }}
         onClick={(e) => e.stopPropagation()}
       >
