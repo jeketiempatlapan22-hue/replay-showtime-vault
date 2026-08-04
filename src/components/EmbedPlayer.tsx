@@ -624,10 +624,11 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
         ytId ? (
           <iframe
             ref={iframeRef}
+            key={plainMode ? 'plain' : 'api'}
             id={ytIframeId}
             src={ytEmbedUrl}
             onLoad={handleFrameLoaded}
-            className="absolute inset-0 w-full h-full pointer-events-none"
+            className={`absolute inset-0 w-full h-full ${plainMode ? '' : 'pointer-events-none'}`}
             title={title}
             allow="autoplay; encrypted-media; picture-in-picture; fullscreen; accelerometer; gyroscope"
             allowFullScreen
@@ -637,6 +638,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
             fetchpriority="high"
             style={{ border: 0, willChange: 'transform' }}
           />
+
         ) : (
           <div className="absolute inset-0 flex items-center justify-center bg-black text-white/80 text-sm px-4 text-center">
             Link YouTube tidak valid. Hubungi admin untuk memeriksa sumber.
