@@ -330,10 +330,16 @@ export default function Index() {
   const sentinelRef = useRef<HTMLDivElement>(null);
   const loadLockRef = useRef(false);
   const loadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Cancel token: setiap perubahan filter/pencarian menaikkan generasi sehingga
+  // batch yang masih tertunda dibatalkan dan tidak pernah masuk dengan urutan salah.
+  const loadGenRef = useRef(0);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   useEffect(() => {
+    loadGenRef.current += 1;
     setVisibleCount(PAGE_SIZE);
     loadLockRef.current = false;
+    setLoadingMore(false);
     if (loadTimerRef.current) { clearTimeout(loadTimerRef.current); loadTimerRef.current = null; }
   }, [searchQuery, criteriaFilter, sortMode, showBookmarksOnly]);
 
@@ -341,19 +347,27 @@ export default function Index() {
     const el = sentinelRef.current;
     if (!el || visibleCount >= totalFiltered) return;
 
-    // Debounce + lock: saat scroll cepat, observer bisa memicu berkali-kali.
-    // Lock memastikan hanya satu penambahan batch yang dieksekusi, jadi
-    // urutan kartu tetap stabil dan tidak melompat.
+    const gen = loadGenRef.current;
+
+    // Debounce + lock + cancel token: saat scroll cepat, observer bisa memicu
+    // berkali-kali. Lock memastikan hanya satu batch yang dieksekusi, dan token
+    // generasi membatalkan batch tertunda saat filter/pencarian berubah.
     const requestMore = () => {
-      if (loadLockRef.current) return;
+      if (loadLockRef.current || gen !== loadGenRef.current) return;
       loadLockRef.current = true;
+      setLoadingMore(true);
       loadTimerRef.current = setTimeout(() => {
         loadTimerRef.current = null;
+        if (gen !== loadGenRef.current) { loadLockRef.current = false; setLoadingMore(false); return; }
         setVisibleCount(c => Math.min(c + PAGE_SIZE, totalFiltered));
         // Lepas lock setelah render batch selesai agar batch berikutnya
         // hanya jalan bila sentinel masih terlihat.
         requestAnimationFrame(() => {
-          setTimeout(() => { loadLockRef.current = false; }, 250);
+          setTimeout(() => {
+            if (gen !== loadGenRef.current) return;
+            loadLockRef.current = false;
+            setLoadingMore(false);
+          }, 250);
         });
       }, 180);
     };
@@ -367,6 +381,7 @@ export default function Index() {
       if (loadTimerRef.current) { clearTimeout(loadTimerRef.current); loadTimerRef.current = null; }
     };
   }, [visibleCount, totalFiltered]);
+
 
 
 
