@@ -158,6 +158,11 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
   const [detectedLive, setDetectedLive] = useState<boolean>(!!isLive);
   const liveActive = isLive || detectedLive;
   const liveEndedRef = useRef(false);
+  // Fallback embed sederhana (tanpa JS API / origin) bila YouTube menolak konfigurasi
+  // pemutar (error 153 / 101 / 150) sehingga video tidak muncul sama sekali.
+  const [plainMode, setPlainMode] = useState(false);
+  const plainModeRef = useRef(false);
+
 
   // Adaptive quality (replay only): mulai dari tertinggi yang tersedia,
   // turun satu tingkat hanya jika user kena buffering berulang dalam window pendek.
