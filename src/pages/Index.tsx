@@ -483,40 +483,56 @@ export default function Index() {
             </div>
           )}
 
-          {sortedMonths.map(monthKey => {
-            const [year, month] = monthKey.split('-');
-            const monthName = MONTH_NAMES[month] || month;
+          {(() => {
+            // Render bertahap: hanya sebagian kartu yang dipasang ke DOM agar
+            // browser (terutama mobile) tidak kehabisan memori dan me-reload tab.
+            let remaining = visibleCount;
+            const sections: JSX.Element[] = [];
+            for (const monthKey of sortedMonths) {
+              if (remaining <= 0) break;
+              const [year, month] = monthKey.split('-');
+              const monthName = MONTH_NAMES[month] || month;
+              const items = grouped[monthKey].slice(0, remaining);
+              remaining -= items.length;
+              sections.push(
+                <section key={monthKey} className="mb-12">
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="h-px flex-1 bg-gradient-to-r from-transparent via-primary/40 to-transparent" />
+                    <h2 className="text-2xl md:text-3xl font-bold text-primary whitespace-nowrap">
+                      ☪ {monthName} {year}
+                    </h2>
+                    <div className="h-px flex-1 bg-gradient-to-r from-transparent via-primary/40 to-transparent" />
+                  </div>
 
-            return (
-              <section key={monthKey} className="mb-12">
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="h-px flex-1 bg-gradient-to-r from-transparent via-primary/40 to-transparent" />
-                  <h2 className="text-2xl md:text-3xl font-bold text-primary whitespace-nowrap">
-                    ☪ {monthName} {year}
-                  </h2>
-                  <div className="h-px flex-1 bg-gradient-to-r from-transparent via-primary/40 to-transparent" />
-                </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {items.map((replay, i) => (
+                      <ReplayCardComponent
+                        key={replay.id}
+                        replay={replay}
+                        isUnlocked={unlockedIds.has(replay.id)}
+                        onUnlock={handleUnlock}
+                        onWatch={handleOpenPlayer}
+                        onUnlockAndWatch={handleUnlockAndWatch}
+                        index={Math.min(i, 5)}
+                        isBookmarked={bookmarks.has(replay.id)}
+                        onToggleBookmark={toggleBookmark}
+                        searchQuery={searchQuery}
+                      />
+                    ))}
+                  </div>
+                </section>
+              );
+            }
+            return sections;
+          })()}
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {grouped[monthKey].map((replay, i) => (
-                    <ReplayCardComponent
-                      key={replay.id}
-                      replay={replay}
-                      isUnlocked={unlockedIds.has(replay.id)}
-                      onUnlock={handleUnlock}
-                      onWatch={handleOpenPlayer}
-                      onUnlockAndWatch={handleUnlockAndWatch}
-                      index={i}
-                      isBookmarked={bookmarks.has(replay.id)}
-                      onToggleBookmark={toggleBookmark}
-                      searchQuery={searchQuery}
-                    />
-                  ))}
-                </div>
-              </section>
-            );
-          })}
+          {!loading && visibleCount < totalFiltered && (
+            <div ref={sentinelRef} className="flex justify-center py-8">
+              <Loader2 className="w-6 h-6 text-primary animate-spin" />
+            </div>
+          )}
           <BotCommandsPublic />
+
         </main>
       </div>
 
