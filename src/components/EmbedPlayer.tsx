@@ -298,8 +298,9 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
     }, 700);
 
     const init = () => {
-      if (cancelled || !iframeRef.current) return;
+      if (cancelled || !iframeRef.current || plainModeRef.current) return;
       if (initialized) return;
+
       const YT = (window as YoutubeWindow).YT;
       if (!YT?.Player) { setTimeout(init, 200); return; }
       initialized = true;
