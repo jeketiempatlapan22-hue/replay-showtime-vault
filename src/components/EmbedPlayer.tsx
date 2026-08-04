@@ -697,8 +697,9 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
       {/* Controls */}
       <div
         className={`absolute inset-x-0 bottom-0 z-10 px-2 sm:px-3 pb-2 sm:pb-3 pt-8 bg-gradient-to-t from-black/80 to-transparent transition-opacity duration-300 ${
-          showControls || !isPlaying ? 'opacity-100' : 'opacity-0 pointer-events-none'
+          plainMode ? 'hidden' : showControls || !isPlaying ? 'opacity-100' : 'opacity-0 pointer-events-none'
         }`}
+
         style={{ touchAction: 'manipulation' }}
         onClick={(e) => e.stopPropagation()}
       >
