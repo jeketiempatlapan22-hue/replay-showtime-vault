@@ -12,7 +12,7 @@ import ActiveShowsSection from '@/components/ActiveShowsSection';
 import BotCommandsPublic from '@/components/BotCommandsPublic';
 // Lazy-load player + komentar — chunk berat hanya dimuat saat user membuka replay.
 const YouTubePlayer = lazy(() => import('@/components/YouTubePlayer'));
-import { getReplaysByMonth, getReplays, getSettings } from '@/lib/store';
+import { getReplays, getSettings } from '@/lib/store';
 import { type ReplayRow } from '@/lib/store';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
