@@ -626,7 +626,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
   // Stable iframe id required so YT.Player can reliably attach to the existing iframe.
   const ytIframeId = ytId ? `yt-embed-${ytId}` : 'yt-embed';
 
-  const showSpinner = !ready && (
+  const showSpinner = inView && !ready && (
     (type === 'youtube' && !!ytId) ||
     (type === 'cloudflare' && !!cfUid)
   );
@@ -640,7 +640,9 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
       onMouseMove={resetHideTimer}
       onTouchStart={resetHideTimer}
     >
-      {type === 'youtube' ? (
+      {!inView ? (
+        <div className="absolute inset-0 bg-muted/20 animate-pulse" aria-hidden />
+      ) : type === 'youtube' ? (
         ytId ? (
           <iframe
             ref={iframeRef}
@@ -686,6 +688,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
           </div>
         )
       )}
+
 
       {/* Click-shield over iframe — single tap toggles controls visibility instead of clicking through to YouTube logo. */}
       {!plainMode && (
