@@ -255,8 +255,30 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
   const ytId = type === 'youtube' ? extractYoutubeId(source) : '';
   const cfUid = type === 'cloudflare' ? extractCloudflareUid(source) : '';
 
+  // Lazy-load iframe: player baru dimuat ketika container mendekati viewport,
+  // sehingga kartu/section yang belum terlihat tidak membebani browser.
+  const [inView, setInView] = useState(false);
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    if (typeof IntersectionObserver === 'undefined') { setInView(true); return; }
+    const io = new IntersectionObserver((entries) => {
+      if (entries.some(e => e.isIntersecting)) {
+        setInView(true);
+        io.disconnect();
+      }
+    }, { rootMargin: '300px 0px' });
+    io.observe(el);
+    // Safety net: bila observer tidak pernah memicu (container tersembunyi/nol ukuran),
+    // tetap muat player agar tidak stuck di placeholder.
+    const safety = setTimeout(() => setInView(true), 1500);
+    return () => { io.disconnect(); clearTimeout(safety); };
+  }, []);
+
+
   useEffect(() => { mutedRef.current = muted; }, [muted]);
   useEffect(() => { volumeRef.current = volume; }, [volume]);
+
 
   // YouTube: tampilkan iframe langsung agar tidak blank/stuck, lalu attach IFrame API ke iframe yang sama
   // untuk kontrol replay (seek, durasi, play/pause, mute) saat API sudah siap.
@@ -279,7 +301,9 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
     setDuration(0);
     setCurrentTime(0);
     if (ytFallbackTimerRef.current) clearTimeout(ytFallbackTimerRef.current);
+    if (!inView) return;
     if (type !== 'youtube') {
+
       const id = setTimeout(() => { markReady(true); setIsPlaying(true); }, 400);
       return () => clearTimeout(id);
     }
@@ -413,7 +437,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
       try { ytPlayerRef.current?.pauseVideo?.(); } catch { /* ignore */ }
       ytPlayerRef.current = null;
     };
-  }, [ytId, type, markReady, isLive, refreshAvailableQualities, applyQualityCap, disableCaptions]);
+  }, [ytId, type, inView, markReady, isLive, refreshAvailableQualities, applyQualityCap, disableCaptions]);
 
   // Cloudflare via Stream SDK postMessage (basic play/pause/volume via iframe contentWindow)
   const cfPost = (event: string, value?: number) => {
@@ -606,7 +630,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
   // Stable iframe id required so YT.Player can reliably attach to the existing iframe.
   const ytIframeId = ytId ? `yt-embed-${ytId}` : 'yt-embed';
 
-  const showSpinner = !ready && (
+  const showSpinner = inView && !ready && (
     (type === 'youtube' && !!ytId) ||
     (type === 'cloudflare' && !!cfUid)
   );
@@ -620,7 +644,9 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
       onMouseMove={resetHideTimer}
       onTouchStart={resetHideTimer}
     >
-      {type === 'youtube' ? (
+      {!inView ? (
+        <div className="absolute inset-0 bg-muted/20 animate-pulse" aria-hidden />
+      ) : type === 'youtube' ? (
         ytId ? (
           <iframe
             ref={iframeRef}
@@ -666,6 +692,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
           </div>
         )
       )}
+
 
       {/* Click-shield over iframe — single tap toggles controls visibility instead of clicking through to YouTube logo. */}
       {!plainMode && (

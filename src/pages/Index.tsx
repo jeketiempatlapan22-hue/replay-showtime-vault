@@ -330,10 +330,16 @@ export default function Index() {
   const sentinelRef = useRef<HTMLDivElement>(null);
   const loadLockRef = useRef(false);
   const loadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Cancel token: setiap perubahan filter/pencarian menaikkan generasi sehingga
+  // batch yang masih tertunda dibatalkan dan tidak pernah masuk dengan urutan salah.
+  const loadGenRef = useRef(0);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   useEffect(() => {
+    loadGenRef.current += 1;
     setVisibleCount(PAGE_SIZE);
     loadLockRef.current = false;
+    setLoadingMore(false);
     if (loadTimerRef.current) { clearTimeout(loadTimerRef.current); loadTimerRef.current = null; }
   }, [searchQuery, criteriaFilter, sortMode, showBookmarksOnly]);
 
@@ -341,19 +347,27 @@ export default function Index() {
     const el = sentinelRef.current;
     if (!el || visibleCount >= totalFiltered) return;
 
-    // Debounce + lock: saat scroll cepat, observer bisa memicu berkali-kali.
-    // Lock memastikan hanya satu penambahan batch yang dieksekusi, jadi
-    // urutan kartu tetap stabil dan tidak melompat.
+    const gen = loadGenRef.current;
+
+    // Debounce + lock + cancel token: saat scroll cepat, observer bisa memicu
+    // berkali-kali. Lock memastikan hanya satu batch yang dieksekusi, dan token
+    // generasi membatalkan batch tertunda saat filter/pencarian berubah.
     const requestMore = () => {
-      if (loadLockRef.current) return;
+      if (loadLockRef.current || gen !== loadGenRef.current) return;
       loadLockRef.current = true;
+      setLoadingMore(true);
       loadTimerRef.current = setTimeout(() => {
         loadTimerRef.current = null;
+        if (gen !== loadGenRef.current) { loadLockRef.current = false; setLoadingMore(false); return; }
         setVisibleCount(c => Math.min(c + PAGE_SIZE, totalFiltered));
         // Lepas lock setelah render batch selesai agar batch berikutnya
         // hanya jalan bila sentinel masih terlihat.
         requestAnimationFrame(() => {
-          setTimeout(() => { loadLockRef.current = false; }, 250);
+          setTimeout(() => {
+            if (gen !== loadGenRef.current) return;
+            loadLockRef.current = false;
+            setLoadingMore(false);
+          }, 250);
         });
       }, 180);
     };
@@ -367,6 +381,7 @@ export default function Index() {
       if (loadTimerRef.current) { clearTimeout(loadTimerRef.current); loadTimerRef.current = null; }
     };
   }, [visibleCount, totalFiltered]);
+
 
 
 
@@ -427,7 +442,16 @@ export default function Index() {
       >
         <div className={displayedReplay ? 'block' : 'hidden'}>
           {displayedReplay && (
-            <Suspense fallback={<div className="flex items-center justify-center py-20"><Loader2 className="w-10 h-10 text-primary animate-spin" /></div>}>
+            <Suspense fallback={
+              <div className="max-w-5xl mx-auto p-4 space-y-4">
+                <div className="w-full aspect-video rounded-xl bg-muted/30 animate-pulse flex items-center justify-center">
+                  <Loader2 className="w-10 h-10 text-primary animate-spin" />
+                </div>
+                <div className="h-6 w-2/3 rounded bg-muted/30 animate-pulse" />
+                <div className="h-4 w-1/3 rounded bg-muted/30 animate-pulse" />
+              </div>
+            }>
+
               <YouTubePlayer replay={displayedReplay} onBack={handleClosePlayer} />
             </Suspense>
           )}
@@ -596,10 +620,19 @@ export default function Index() {
           })()}
 
           {!loading && visibleCount < totalFiltered && (
-            <div ref={sentinelRef} className="flex justify-center py-8">
-              <Loader2 className="w-6 h-6 text-primary animate-spin" />
+            <div ref={sentinelRef} className="space-y-6 py-4">
+              {/* Placeholder konsisten: kartu skeleton saat batch berikutnya dimuat */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6" aria-hidden={!loadingMore}>
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <ReplayCardSkeleton key={i} />
+                ))}
+              </div>
+              <div className="flex justify-center">
+                <Loader2 className="w-6 h-6 text-primary animate-spin" />
+              </div>
             </div>
           )}
+
           <BotCommandsPublic />
 
         </main>
