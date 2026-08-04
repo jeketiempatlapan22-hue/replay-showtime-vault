@@ -591,11 +591,13 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
     } catch { return ''; }
   })();
   const ytBaseParams = 'rel=0&modestbranding=1&playsinline=1&autoplay=1&mute=1&controls=0&fs=0&iv_load_policy=3&cc_load_policy=0&hl=id&disablekb=1';
+  const ytPlainParams = 'rel=0&modestbranding=1&playsinline=1&autoplay=1&mute=1&iv_load_policy=3&cc_load_policy=0&hl=id';
   const ytEmbedUrl = ytId
     ? plainMode
-      ? `https://www.youtube-nocookie.com/embed/${ytId}?${ytBaseParams}`
+      ? `https://www.youtube-nocookie.com/embed/${ytId}?${ytPlainParams}`
       : `https://www.youtube-nocookie.com/embed/${ytId}?${ytBaseParams}&enablejsapi=1${safeOrigin ? `&origin=${encodeURIComponent(safeOrigin)}` : ''}`
     : '';
+
 
   const cfEmbedUrl = cfUid
     ? `https://iframe.videodelivery.net/${cfUid}?autoplay=true&controls=false&preload=auto&muted=true`
