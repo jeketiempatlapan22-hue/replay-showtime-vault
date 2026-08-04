@@ -92,21 +92,39 @@ export default function Index() {
     });
   }, []);
 
+  const refreshingRef = useRef(false);
   const refreshReplays = useCallback(async () => {
-    const [grouped, replays] = await Promise.all([getReplaysByMonth(), getReplays()]);
-    setAllGrouped(grouped);
+    // Cegah refresh bertumpuk (realtime bisa mengirim banyak event beruntun).
+    if (refreshingRef.current) return;
+    refreshingRef.current = true;
+    try {
+      const replays = await getReplays();
+      const grouped: Record<string, ReplayRow[]> = {};
+      for (const r of replays) {
+        const d = new Date(r.date);
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        if (!grouped[key]) grouped[key] = [];
+        grouped[key].push(r);
+      }
+      setAllGrouped(grouped);
 
-    // Realtime notification for new replays
-    if (prevReplayCountRef.current > 0 && replays.length > prevReplayCountRef.current) {
-      const newCount = replays.length - prevReplayCountRef.current;
-      toast({
-        title: '🎬 Replay Baru!',
-        description: `${newCount} replay baru telah ditambahkan.`,
-      });
+      // Realtime notification for new replays
+      if (prevReplayCountRef.current > 0 && replays.length > prevReplayCountRef.current) {
+        const newCount = replays.length - prevReplayCountRef.current;
+        toast({
+          title: '🎬 Replay Baru!',
+          description: `${newCount} replay baru telah ditambahkan.`,
+        });
+      }
+      prevReplayCountRef.current = replays.length;
+      setAllReplays(replays);
+    } catch (e) {
+      console.warn('[Index] refreshReplays failed:', e);
+    } finally {
+      refreshingRef.current = false;
     }
-    prevReplayCountRef.current = replays.length;
-    setAllReplays(replays);
   }, []);
+
 
   useEffect(() => {
     let cancelled = false;
