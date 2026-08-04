@@ -668,10 +668,13 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
       )}
 
       {/* Click-shield over iframe — single tap toggles controls visibility instead of clicking through to YouTube logo. */}
-      <div
-        className="absolute inset-0 z-[5]"
-        onClick={(e) => { e.preventDefault(); toggleControls(); }}
-      />
+      {!plainMode && (
+        <div
+          className="absolute inset-0 z-[5]"
+          onClick={(e) => { e.preventDefault(); toggleControls(); }}
+        />
+      )}
+
 
       {watermark && <LiveWatermark code={watermark} />}
 
