@@ -442,7 +442,16 @@ export default function Index() {
       >
         <div className={displayedReplay ? 'block' : 'hidden'}>
           {displayedReplay && (
-            <Suspense fallback={<div className="flex items-center justify-center py-20"><Loader2 className="w-10 h-10 text-primary animate-spin" /></div>}>
+            <Suspense fallback={
+              <div className="max-w-5xl mx-auto p-4 space-y-4">
+                <div className="w-full aspect-video rounded-xl bg-muted/30 animate-pulse flex items-center justify-center">
+                  <Loader2 className="w-10 h-10 text-primary animate-spin" />
+                </div>
+                <div className="h-6 w-2/3 rounded bg-muted/30 animate-pulse" />
+                <div className="h-4 w-1/3 rounded bg-muted/30 animate-pulse" />
+              </div>
+            }>
+
               <YouTubePlayer replay={displayedReplay} onBack={handleClosePlayer} />
             </Suspense>
           )}
