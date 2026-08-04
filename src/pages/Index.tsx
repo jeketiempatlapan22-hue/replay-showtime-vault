@@ -301,6 +301,33 @@ export default function Index() {
     sortMode === 'oldest' ? a.localeCompare(b) : b.localeCompare(a)
   );
 
+  const totalFiltered = useMemo(
+    () => Object.values(grouped).reduce((sum, arr) => sum + arr.length, 0),
+    [grouped],
+  );
+
+  // Render bertahap (infinite scroll) — cegah ratusan kartu dipasang sekaligus.
+  const PAGE_SIZE = 18;
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [searchQuery, criteriaFilter, sortMode, showBookmarksOnly]);
+
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el || visibleCount >= totalFiltered) return;
+    const io = new IntersectionObserver((entries) => {
+      if (entries.some(e => e.isIntersecting)) {
+        setVisibleCount(c => Math.min(c + PAGE_SIZE, totalFiltered));
+      }
+    }, { rootMargin: '600px 0px' });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [visibleCount, totalFiltered]);
+
+
   const handleUnlock = useCallback((id: string) => {
     setUnlockedIds(prev => new Set(prev).add(id));
   }, []);
