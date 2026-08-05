@@ -41,14 +41,19 @@ export default function BulkShowImport({ onImported }: Props) {
   })), [parsed, aliasPrefix, defPassword, defPriceShow, defPriceReplay, defCoinsShow, defCoinsReplay]);
 
   const handleParse = () => {
-    const out = parseBulkText(text);
-    if (out.length === 0) {
-      toast({ title: 'Tidak ada show terdeteksi', description: 'Periksa format tanggal & jam.', variant: 'destructive' });
+    const { shows, warnings: warns } = parseBulkText(text);
+    setWarnings(warns);
+    if (shows.length === 0) {
+      toast({ title: 'Tidak ada show terdeteksi', description: warns[0] || 'Periksa format tanggal & jam.', variant: 'destructive' });
       return;
     }
-    setParsed(out);
-    toast({ title: `${out.length} show terdeteksi` });
+    setParsed(shows);
+    toast({
+      title: `${shows.length} show terdeteksi`,
+      description: warns.length ? `${warns.length} peringatan — cek daftar di bawah.` : undefined,
+    });
   };
+
 
   const updateRow = (idx: number, patch: Partial<ParsedShow>) => {
     setParsed(prev => prev.map((s, i) => i === idx ? { ...s, ...patch } : s));
