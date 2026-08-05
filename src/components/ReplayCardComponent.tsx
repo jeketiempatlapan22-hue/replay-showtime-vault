@@ -1,6 +1,6 @@
 import { memo, useEffect, useState } from 'react';
 import { Lock, Unlock, Play, Calendar, Users, Tag, Star, Tv, Bookmark, BookmarkCheck, ShoppingCart, Copy, Crown } from 'lucide-react';
-import { type ReplayRow, verifyPassword } from '@/lib/store';
+import { type ReplayRow, verifyPasswordDetailed } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import MemberAvatar from '@/components/MemberAvatar';
@@ -115,12 +115,17 @@ function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWatch, onUnlockAn
     }
 
     setChecking(true);
-    const valid = await verifyPassword(replay.id, trimmedPassword);
+    const res = await verifyPasswordDetailed(replay.id, trimmedPassword);
     setChecking(false);
-    if (valid) {
+    if (res.valid) {
       // Persist password for this replay so the player can fetch the source
       try {
         sessionStorage.setItem(`replaytime-pw-${replay.id}`, trimmedPassword);
+        // Buang token lama yang mungkin sudah tidak valid agar player memakai sandi ini.
+        const stale = sessionStorage.getItem(`replaytime-tok-${replay.id}`);
+        if (stale && stale !== purchasedToken && stale !== membership?.token) {
+          sessionStorage.removeItem(`replaytime-tok-${replay.id}`);
+        }
       } catch { /* ignore */ }
       setShowPasswordDialog(false);
       setPassword('');
@@ -130,9 +135,12 @@ function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWatch, onUnlockAn
       } else {
         onUnlock(replay.id);
       }
+    } else if (res.reason === 'rate_limited') {
+      setError('Terlalu banyak percobaan. Tunggu sebentar lalu coba lagi.');
     } else {
       setError('Sandi salah! Coba lagi.');
     }
+
   };
 
   const formattedDate = new Date(replay.date).toLocaleDateString('id-ID', {

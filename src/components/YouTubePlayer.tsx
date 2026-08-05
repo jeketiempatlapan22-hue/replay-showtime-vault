@@ -107,29 +107,42 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
       return;
     }
 
-    getReplaySource(replay.id, token ? { accessToken: token } : { password }).then((res) => {
-      if (cancelled) return;
-      if (!res.data) {
-        try {
-          sessionStorage.removeItem(`replaytime-pw-${replay.id}`);
-          sessionStorage.removeItem(`replaytime-tok-${replay.id}`);
-        } catch { /* ignore */ }
-        setSourceLoading(false);
-        setNeedsPassword(true);
-        if (res.reason === 'device_limit') {
-          setDeviceLimit(true);
-          if (token) setLockedToken(token);
-          import('@/hooks/use-toast').then(({ toast }) => {
-            toast({ title: 'Token sudah dipakai', description: 'Token ini sudah terikat ke perangkat lain. Reset perangkat untuk pindah.', variant: 'destructive' });
-          });
+    // Coba semua kredensial yang tersedia (token lalu sandi, atau sebaliknya).
+    // Token yang basi/terikat perangkat lain tidak boleh membatalkan sandi yang valid.
+    (async () => {
+      const attempts: Array<{ kind: 'token' | 'password'; run: () => Promise<Awaited<ReturnType<typeof getReplaySource>>> }> = [];
+      if (token) attempts.push({ kind: 'token', run: () => getReplaySource(replay.id, { accessToken: token }) });
+      if (password) attempts.push({ kind: 'password', run: () => getReplaySource(replay.id, { password }) });
+
+      let lastReason: string | undefined;
+      for (const attempt of attempts) {
+        const res = await attempt.run();
+        if (cancelled) return;
+        if (res.data) {
+          setSource(res.data);
+          setSourceLoading(false);
+          return;
         }
-        return;
+        lastReason = res.reason || lastReason;
       }
-      setSource(res.data);
+
+      try {
+        sessionStorage.removeItem(`replaytime-pw-${replay.id}`);
+        sessionStorage.removeItem(`replaytime-tok-${replay.id}`);
+      } catch { /* ignore */ }
       setSourceLoading(false);
-    });
+      setNeedsPassword(true);
+      if (lastReason === 'device_limit') {
+        setDeviceLimit(true);
+        if (token) setLockedToken(token);
+        import('@/hooks/use-toast').then(({ toast }) => {
+          toast({ title: 'Token sudah dipakai', description: 'Token ini sudah terikat ke perangkat lain. Reset perangkat untuk pindah.', variant: 'destructive' });
+        });
+      }
+    })();
 
     return () => { cancelled = true; };
+
   }, [replay.id]);
 
   const sources = useMemo(() => buildSources(source, replay), [source, replay]);
@@ -176,9 +189,14 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
       setSource(res.data);
       setNeedsPassword(false);
       setPwInput('');
+    } else if (res.reason === 'rate_limited') {
+      setPwError('Terlalu banyak percobaan. Tunggu beberapa saat lalu coba lagi.');
+    } else if (res.reason === 'source_unavailable') {
+      setPwError('Sandi benar, tetapi sumber video sedang tidak tersedia. Hubungi admin.');
     } else {
       setPwError('Sandi salah. Coba lagi.');
     }
+
   };
 
   useEffect(() => {
