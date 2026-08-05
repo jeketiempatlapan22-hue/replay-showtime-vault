@@ -1,6 +1,6 @@
 import { memo, useEffect, useState } from 'react';
 import { Lock, Unlock, Play, Calendar, Users, Tag, Star, Tv, Bookmark, BookmarkCheck, ShoppingCart, Copy, Crown } from 'lucide-react';
-import { type ReplayRow, verifyPassword } from '@/lib/store';
+import { type ReplayRow, verifyPasswordDetailed } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import MemberAvatar from '@/components/MemberAvatar';

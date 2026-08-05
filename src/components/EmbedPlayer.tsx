@@ -257,11 +257,20 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
 
   // Lazy-load iframe: player baru dimuat ketika container mendekati viewport,
   // sehingga kartu/section yang belum terlihat tidak membebani browser.
+  // Player utama (replay/live) hampir selalu langsung terlihat, jadi kita cek
+  // posisi secara sinkron dulu agar embed tampil tanpa jeda.
   const [inView, setInView] = useState(false);
   useEffect(() => {
     const el = containerRef.current;
-    if (!el) return;
-    if (typeof IntersectionObserver === 'undefined') { setInView(true); return; }
+    if (!el) { setInView(true); return; }
+    const nearViewport = () => {
+      const r = el.getBoundingClientRect();
+      const h = window.innerHeight || document.documentElement.clientHeight || 0;
+      // Elemen dengan ukuran 0 (belum layout) juga dianggap perlu dimuat.
+      if (r.width === 0 && r.height === 0) return true;
+      return r.top < h + 300 && r.bottom > -300;
+    };
+    if (nearViewport() || typeof IntersectionObserver === 'undefined') { setInView(true); return; }
     const io = new IntersectionObserver((entries) => {
       if (entries.some(e => e.isIntersecting)) {
         setInView(true);
@@ -271,9 +280,10 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
     io.observe(el);
     // Safety net: bila observer tidak pernah memicu (container tersembunyi/nol ukuran),
     // tetap muat player agar tidak stuck di placeholder.
-    const safety = setTimeout(() => setInView(true), 1500);
+    const safety = setTimeout(() => setInView(true), 1200);
     return () => { io.disconnect(); clearTimeout(safety); };
   }, []);
+
 
 
   useEffect(() => { mutedRef.current = muted; }, [muted]);
