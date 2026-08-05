@@ -71,6 +71,9 @@ function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWatch, onUnlockAn
   const membershipActiveButOutside = !!membership?.token && !membershipCovered && !!membership?.includes_replays;
 
   const isPurchased = !!purchasedToken;
+  useEffect(() => {
+    if (isPurchased && !isUnlocked) onUnlock(replay.id);
+  }, [isPurchased, isUnlocked, replay.id, onUnlock]);
 
 
 
@@ -261,7 +264,7 @@ function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWatch, onUnlockAn
             </div>
           ) : isPurchased ? (
             <div className="space-y-2 mt-2">
-              <Button type="button" className="w-full" onClick={() => onWatch(replay)}>
+              <Button type="button" className="w-full" onClick={() => { if (purchasedToken) { try { sessionStorage.setItem(, purchasedToken); } catch {} } onWatch(replay); }}>
                 <Play className="w-4 h-4 mr-2" /> Tonton Replay
               </Button>
               <div className="rounded-md border-2 border-primary/40 bg-primary/10 p-2 space-y-1.5">
@@ -281,7 +284,7 @@ function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWatch, onUnlockAn
               </div>
             </div>
           ) : isUnlocked ? (
-            <Button type="button" className="w-full mt-2" onClick={() => onWatch(replay)}>
+            <Button type="button" className="w-full mt-2" onClick={() => { if (purchasedToken) { try { sessionStorage.setItem(, purchasedToken); } catch {} } onWatch(replay); }}>
               <Play className="w-4 h-4 mr-2" /> Tonton Sekarang
             </Button>
           ) : (
