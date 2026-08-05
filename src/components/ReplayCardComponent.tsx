@@ -293,7 +293,7 @@ function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWatch, onUnlockAn
               </div>
             </div>
           ) : isUnlocked ? (
-            <Button type="button" className="w-full mt-2" onClick={() => { if (purchasedToken) { try { sessionStorage.setItem(, purchasedToken); } catch {} } onWatch(replay); }}>
+            <Button type="button" className="w-full mt-2" onClick={() => onWatch(replay)}>
               <Play className="w-4 h-4 mr-2" /> Tonton Sekarang
             </Button>
           ) : (
