@@ -264,7 +264,16 @@ function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWatch, onUnlockAn
             </div>
           ) : isPurchased ? (
             <div className="space-y-2 mt-2">
-              <Button type="button" className="w-full" onClick={() => { if (purchasedToken) { try { sessionStorage.setItem(, purchasedToken); } catch {} } onWatch(replay); }}>
+              <Button
+                type="button"
+                className="w-full"
+                onClick={() => {
+                  if (purchasedToken) {
+                    try { sessionStorage.setItem(`replaytime-tok-${replay.id}`, purchasedToken); } catch { /* ignore */ }
+                  }
+                  onWatch(replay);
+                }}
+              >
                 <Play className="w-4 h-4 mr-2" /> Tonton Replay
               </Button>
               <div className="rounded-md border-2 border-primary/40 bg-primary/10 p-2 space-y-1.5">
