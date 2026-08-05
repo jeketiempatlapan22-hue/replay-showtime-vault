@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import {
@@ -141,6 +141,6 @@ export function useActiveMembership(): { membership: ActiveMembership | null; lo
     void loadMembership(sharedUserId, true);
   };
 
-  return { membership, loading, refresh };
+  return useMemo(() => ({ membership, loading, refresh }), [membership, loading]);
 
 }
