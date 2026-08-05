@@ -17,6 +17,7 @@ import { type ReplayRow } from '@/lib/store';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { useAutoHideOnInteraction } from '@/hooks/useAutoHideOnInteraction';
+import { useActiveMembership } from '@/hooks/useActiveMembership';
 
 const MONTH_NAMES: Record<string, string> = {
   '01': 'Januari', '02': 'Februari', '03': 'Maret', '04': 'April',
@@ -65,6 +66,9 @@ export default function Index() {
   const [waNumber, setWaNumber] = useState('');
   const [waLink, setWaLink] = useState('');
   const navVisible = useAutoHideOnInteraction(!watchingReplay, 3000);
+  // Satu subscription membership untuk seluruh landing page. Jangan membuat
+  // subscription auth/RPC baru pada setiap kartu replay.
+  const { membership } = useActiveMembership();
 
   // Filters & sorting
   const [criteriaFilter, setCriteriaFilter] = useState('');
@@ -610,6 +614,7 @@ export default function Index() {
                         isBookmarked={bookmarks.has(replay.id)}
                         onToggleBookmark={toggleBookmark}
                         searchQuery={searchQuery}
+                        membership={membership}
                       />
                     ))}
                   </div>

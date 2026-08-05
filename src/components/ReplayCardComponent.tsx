@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import BuyShowDialog from '@/components/BuyShowDialog';
 import { getReplayPurchase } from '@/lib/purchases';
 import { toast } from '@/hooks/use-toast';
-import { useActiveMembership } from '@/hooks/useActiveMembership';
+import type { ActiveMembership } from '@/hooks/useActiveMembership';
 import { isReplayCoveredByMembership } from '@/lib/membershipReplayAccess';
 
 
@@ -27,6 +27,7 @@ interface Props {
   isBookmarked?: boolean;
   onToggleBookmark?: (id: string) => void;
   searchQuery?: string;
+  membership?: ActiveMembership | null;
 }
 
 function highlightText(text: string, query: string) {
@@ -40,7 +41,7 @@ function highlightText(text: string, query: string) {
 
 const REPLAY_DEFAULT_PRICE = 2000;
 
-function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWatch, onUnlockAndWatch, index = 0, isBookmarked, onToggleBookmark, searchQuery = '' }: Props) {
+function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWatch, onUnlockAndWatch, index = 0, isBookmarked, onToggleBookmark, searchQuery = '', membership = null }: Props) {
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -66,7 +67,6 @@ function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWatch, onUnlockAn
     };
   }, [replay.id]);
 
-  const { membership } = useActiveMembership();
   const membershipCovered = isReplayCoveredByMembership(replay.date, membership);
   const membershipActiveButOutside = !!membership?.token && !membershipCovered && !!membership?.includes_replays;
 
@@ -244,11 +244,16 @@ function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWatch, onUnlockAn
               style={{ WebkitOverflowScrolling: 'touch' }}
             >
               <ul className="flex gap-2 w-max py-1 list-none m-0 p-0">
-                {replay.lineup.map((member, i) => (
+                {replay.lineup.slice(0, 6).map((member, i) => (
                   <li key={i} className="snap-start">
                     <MemberAvatar name={member} size={40} />
                   </li>
                 ))}
+                {replay.lineup.length > 6 && (
+                  <li className="snap-start flex items-center justify-center min-w-10 h-10 rounded-full border border-primary/30 bg-secondary text-xs font-semibold text-muted-foreground">
+                    +{replay.lineup.length - 6}
+                  </li>
+                )}
               </ul>
             </div>
           </div>
