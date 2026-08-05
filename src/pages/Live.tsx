@@ -330,8 +330,23 @@ export default function Live() {
           // Hard-kick player but stay on page to surface the pause notice
           setUnlocked(null);
           setPwError(data?.pause_message?.trim() || reasonMessage('membership_paused'));
+        } else if (reason === 'device_limit' && data?.soft !== true) {
+          // Token 1-perangkat: setelah user melakukan reset di perangkat baru, ikatan
+          // perangkat lama dihapus. Perangkat lama harus benar-benar dikeluarkan.
+          // Konfirmasi ulang dulu (4 detik) agar tidak salah-kick karena race sesaat.
+          await new Promise((r) => setTimeout(r, 4000));
+          const { data: recheck } = await supabase.functions.invoke('unlock-live', {
+            body: { ...opts, browser_id: getBrowserId(), show_id: showId || undefined, silent: true },
+          });
+          if (recheck?.valid !== true && recheck?.reason === 'device_limit') {
+            setUnlocked(null);
+            setMembership(null);
+            try { sessionStorage.removeItem(`${SS_KEY_BASE}${showId?'-'+showId:''}`); } catch { /* ignore */ }
+            navigate(`/kunci?reason=device_limit${showId ? `&show=${showId}` : ''}`, { replace: true });
+          }
         }
-        // device_limit / off / network: ignore silently — keep user inside.
+        // off / network: ignore silently — keep user inside.
+
       } else {
         if (data?.reason === 'membership_paused') {
           setPwError(data?.pause_message?.trim() || reasonMessage('membership_paused'));
