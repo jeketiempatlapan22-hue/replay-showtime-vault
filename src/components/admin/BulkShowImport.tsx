@@ -155,6 +155,15 @@ export default function BulkShowImport({ onImported }: Props) {
               aliasPrefix={aliasPrefix} setAliasPrefix={setAliasPrefix}
             />
 
+            {warnings.length > 0 && (
+              <div className="p-3 rounded-lg border border-destructive/40 bg-destructive/10 space-y-1">
+                <p className="text-xs font-semibold text-destructive">Perlu diperiksa ({warnings.length}):</p>
+                <ul className="list-disc pl-4 space-y-0.5">
+                  {warnings.map((w, k) => <li key={k} className="text-[11px] text-destructive">{w}</li>)}
+                </ul>
+              </div>
+            )}
+
             <div className="space-y-3">
               <p className="text-sm font-medium">Preview ({preview.length} show) — bisa diedit per baris:</p>
               {preview.map((s, idx) => (
