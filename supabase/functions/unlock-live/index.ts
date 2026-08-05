@@ -15,9 +15,15 @@ async function bindMembershipDevice(supabase: any, tokenRow: any, browser_id: st
   const { data: existing } = await supabase
     .from("membership_token_devices").select("id").eq("token_id", tokenRow.id).eq("browser_id", browser_id).maybeSingle();
   if (existing) {
+    if (max === 1) {
+      // Membership 1-perangkat: buang ikatan perangkat lain yang tersisa.
+      await supabase.from("membership_token_devices")
+        .delete().eq("token_id", tokenRow.id).neq("browser_id", browser_id);
+    }
     await supabase.from("membership_token_devices").update({ last_seen: new Date().toISOString() }).eq("id", existing.id);
     return { ok: true };
   }
+
   const { count } = await supabase
     .from("membership_token_devices").select("id", { count: "exact", head: true }).eq("token_id", tokenRow.id);
   if ((count || 0) >= max) {
@@ -193,7 +199,13 @@ Deno.serve(async (req) => {
         }
         const { data: existing } = await supabase
           .from("active_show_token_devices").select("id").eq("token_id", t.id).eq("browser_id", browser_id).maybeSingle();
+        if (existing && (t.max_devices || 1) === 1) {
+          // Token 1-perangkat: pastikan hanya ada satu ikatan perangkat.
+          await supabase.from("active_show_token_devices")
+            .delete().eq("token_id", t.id).neq("browser_id", browser_id);
+        }
         if (!existing) {
+
           const { count } = await supabase
             .from("active_show_token_devices").select("id", { count: "exact", head: true }).eq("token_id", t.id);
           const isMulti = (t.max_devices || 1) > 1;
