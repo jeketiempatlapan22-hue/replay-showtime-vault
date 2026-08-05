@@ -193,7 +193,13 @@ Deno.serve(async (req) => {
         }
         const { data: existing } = await supabase
           .from("active_show_token_devices").select("id").eq("token_id", t.id).eq("browser_id", browser_id).maybeSingle();
+        if (existing && (t.max_devices || 1) === 1) {
+          // Token 1-perangkat: pastikan hanya ada satu ikatan perangkat.
+          await supabase.from("active_show_token_devices")
+            .delete().eq("token_id", t.id).neq("browser_id", browser_id);
+        }
         if (!existing) {
+
           const { count } = await supabase
             .from("active_show_token_devices").select("id", { count: "exact", head: true }).eq("token_id", t.id);
           const isMulti = (t.max_devices || 1) > 1;
