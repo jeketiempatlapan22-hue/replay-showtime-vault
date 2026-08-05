@@ -235,17 +235,13 @@ function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWatch, onUnlockAn
               style={{ WebkitOverflowScrolling: 'touch' }}
             >
               <ul className="flex gap-2 w-max py-1 list-none m-0 p-0">
-                {replay.lineup.slice(0, 6).map((member, i) => (
+                {replay.lineup.map((member, i) => (
                   <li key={i} className="snap-start">
                     <MemberAvatar name={member} size={40} />
                   </li>
                 ))}
-                {replay.lineup.length > 6 && (
-                  <li className="snap-start flex items-center justify-center min-w-10 h-10 rounded-full border border-primary/30 bg-secondary text-xs font-semibold text-muted-foreground">
-                    +{replay.lineup.length - 6}
-                  </li>
-                )}
               </ul>
+
             </div>
           </div>
 
