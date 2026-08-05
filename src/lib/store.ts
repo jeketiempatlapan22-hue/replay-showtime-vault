@@ -45,6 +45,19 @@ export interface ReplaySource {
   sources: PlaylistSource[];
 }
 
+// supabase-js mengembalikan `error` (bukan data) untuk respons non-2xx dari
+// edge function, sehingga body JSON (`reason`) hilang. Helper ini membaca
+// kembali body respons agar alasan gagal (device_limit / expired / dll) tetap terbaca.
+async function readFunctionErrorBody(error: unknown): Promise<any | null> {
+  try {
+    const res = (error as { context?: Response })?.context;
+    if (res && typeof (res as Response).json === 'function') {
+      return await (res as Response).clone().json();
+    }
+  } catch { /* ignore */ }
+  return null;
+}
+
 export async function getReplaySource(
   replayId: string,
   opts: { password?: string; accessToken?: string },
@@ -60,7 +73,11 @@ export async function getReplaySource(
       } catch { /* ignore */ }
     }
     const { data, error } = await supabase.functions.invoke('get-replay-source', { body });
-    if (error || !data?.valid) return { data: null, reason: data?.reason };
+    if (error) {
+      const errBody = await readFunctionErrorBody(error);
+      return { data: null, reason: errBody?.reason };
+    }
+    if (!data?.valid) return { data: null, reason: data?.reason };
     return {
       data: {
         youtube_id: data.youtube_id || '',
@@ -73,6 +90,7 @@ export async function getReplaySource(
     return { data: null };
   }
 }
+
 
 export async function setReplayAccessToken(id: string, token: string | null) {
   const { error } = await supabase.from('replays').update({ access_token: token } as any).eq('id', id);
