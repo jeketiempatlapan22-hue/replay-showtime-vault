@@ -45,6 +45,12 @@ export function useDevToolsDetector(onDetect: () => void) {
 
     const trigger = async (reason: string) => {
       if (alreadyTriggered) return;
+      // Jangan pernah memutus user yang sedang menonton.
+      try {
+        if (location.pathname.startsWith('/live')) return;
+        const vids = Array.from(document.querySelectorAll('video'));
+        if (vids.some(v => !v.paused && !v.ended)) return;
+      } catch { /* ignore */ }
       alreadyTriggered = true;
       if (intervalId) clearInterval(intervalId);
       try {
@@ -68,7 +74,13 @@ export function useDevToolsDetector(onDetect: () => void) {
       if (shouldSkipDetection()) { positiveStreak = 0; return; }
       if (sizeOpen()) {
         positiveStreak += 1;
-        if (positiveStreak >= CONFIRM_COUNT) trigger('devtools_size_detected');
+        // Heuristik ukuran jendela TIDAK lagi memblokir user: TV, proyektor, split-screen,
+        // dan browser dengan toolbar tambahan sering memicu false positive sehingga user
+        // tiba-tiba terlempar keluar saat menonton. Cukup catat di console.
+        if (positiveStreak >= CONFIRM_COUNT) {
+          positiveStreak = 0;
+          console.warn('[guard] window size anomaly (ignored)');
+        }
       } else {
         positiveStreak = 0;
       }

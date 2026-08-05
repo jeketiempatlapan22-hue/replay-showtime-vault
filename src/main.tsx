@@ -40,9 +40,42 @@ window.addEventListener('unhandledrejection', (event) => {
   }
 });
 
-// Force cache busting: when a new build is deployed, unregister SW, clear all caches, and hard-reload once.
+// Cache busting saat build baru dirilis — TAPI jangan pernah me-reload halaman
+// saat user sedang menonton (live/replay). Reload mendadak inilah yang membuat
+// beberapa user merasa website "refresh sendiri" di tengah tontonan.
 const BUILD_KEY = 'app_build_id';
 const RELOAD_FLAG = 'app_build_reloaded';
+
+function isWatching(): boolean {
+  try {
+    if (location.pathname.startsWith('/live')) return true;
+    const vids = Array.from(document.querySelectorAll('video'));
+    if (vids.some(v => !v.paused && !v.ended && v.readyState > 2)) return true;
+    // Player YouTube/embed aktif di DOM
+    if (document.querySelector('iframe[src*="youtube"], iframe[src*="youtube-nocookie"]')) return true;
+  } catch { /* ignore */ }
+  return false;
+}
+
+function reloadWhenIdle(done: () => void) {
+  // Reload hanya ketika user tidak sedang menonton, atau saat tab disembunyikan.
+  const tryReload = () => {
+    if (!isWatching() || document.visibilityState === 'hidden') {
+      cleanup();
+      done();
+    }
+  };
+  const timer = window.setInterval(tryReload, 30_000);
+  const onVis = () => { if (document.visibilityState === 'hidden') tryReload(); };
+  const cleanup = () => {
+    window.clearInterval(timer);
+    document.removeEventListener('visibilitychange', onVis);
+  };
+  document.addEventListener('visibilitychange', onVis);
+  // Cek pertama setelah app sempat render (jangan langsung reload saat mount).
+  window.setTimeout(tryReload, 4000);
+}
+
 if (typeof window !== 'undefined') {
   try {
     const current = __APP_BUILD_ID__;
@@ -51,7 +84,7 @@ if (typeof window !== 'undefined') {
       sessionStorage.setItem(RELOAD_FLAG, '1');
       const done = () => {
         localStorage.setItem(BUILD_KEY, current);
-        window.location.reload();
+        reloadWhenIdle(() => window.location.reload());
       };
       Promise.all([
         'serviceWorker' in navigator
@@ -67,6 +100,7 @@ if (typeof window !== 'undefined') {
     }
   } catch { /* ignore */ }
 }
+
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
