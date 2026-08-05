@@ -21,6 +21,8 @@ export default function BulkShowImport({ onImported }: Props) {
   const [text, setText] = useState('');
   const [parsed, setParsed] = useState<ParsedShow[]>([]);
   const [saving, setSaving] = useState(false);
+  const [warnings, setWarnings] = useState<string[]>([]);
+
 
   // Defaults applied to ALL parsed shows
   const [defPriceShow, setDefPriceShow] = useState<number>(0);
