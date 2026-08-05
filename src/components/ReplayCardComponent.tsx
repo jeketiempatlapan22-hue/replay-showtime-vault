@@ -1,4 +1,4 @@
-import { memo, useEffect, useState } from 'react';
+import { memo, useEffect, useState, useMemo } from 'react';
 import { Lock, Unlock, Play, Calendar, Users, Tag, Star, Tv, Bookmark, BookmarkCheck, ShoppingCart, Copy, Crown } from 'lucide-react';
 import { type ReplayRow, verifyPasswordDetailed } from '@/lib/store';
 import { Button } from '@/components/ui/button';
@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import BuyShowDialog from '@/components/BuyShowDialog';
 import { getReplayPurchase } from '@/lib/purchases';
 import { toast } from '@/hooks/use-toast';
-import { useActiveMembership } from '@/hooks/useActiveMembership';
+import type { ActiveMembership } from '@/hooks/useActiveMembership';
 import { isReplayCoveredByMembership } from '@/lib/membershipReplayAccess';
 
 
@@ -27,6 +27,7 @@ interface Props {
   isBookmarked?: boolean;
   onToggleBookmark?: (id: string) => void;
   searchQuery?: string;
+  membership?: ActiveMembership | null;
 }
 
 function highlightText(text: string, query: string) {
@@ -40,7 +41,7 @@ function highlightText(text: string, query: string) {
 
 const REPLAY_DEFAULT_PRICE = 2000;
 
-function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWatch, onUnlockAndWatch, index = 0, isBookmarked, onToggleBookmark, searchQuery = '' }: Props) {
+function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWatch, onUnlockAndWatch, index = 0, isBookmarked, onToggleBookmark, searchQuery = '', membership = null }: Props) {
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -66,25 +67,15 @@ function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWatch, onUnlockAn
     };
   }, [replay.id]);
 
-  const { membership } = useActiveMembership();
-  const membershipCovered = isReplayCoveredByMembership(replay.date, membership);
+  const membershipCovered = useMemo(() => isReplayCoveredByMembership(replay.date, membership), [replay.date, membership]);
   const membershipActiveButOutside = !!membership?.token && !membershipCovered && !!membership?.includes_replays;
 
   const isPurchased = !!purchasedToken;
-
-  // After purchase, treat as unlocked & store token in sessionStorage so player can fetch source.
   useEffect(() => {
-    if (isPurchased) {
-      try { sessionStorage.setItem(`replaytime-tok-${replay.id}`, purchasedToken); } catch { /* ignore */ }
-      if (!isUnlocked) onUnlock(replay.id);
-    }
-  }, [isPurchased, purchasedToken, replay.id, isUnlocked, onUnlock]);
+    if (isPurchased && !isUnlocked) onUnlock(replay.id);
+  }, [isPurchased, isUnlocked, replay.id, onUnlock]);
 
-  // Membership aktif: simpan token membership agar player bisa mengambil sumber replay.
-  useEffect(() => {
-    if (!membershipCovered || !membership?.token) return;
-    try { sessionStorage.setItem(`replaytime-tok-${replay.id}`, membership.token); } catch { /* ignore */ }
-  }, [membershipCovered, membership?.token, replay.id]);
+
 
   const watchWithMembership = () => {
     if (membership?.token) {
@@ -155,8 +146,8 @@ function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWatch, onUnlockAn
   return (
     <div>
       <div
-        className="group relative rounded-xl overflow-hidden border border-border bg-card/80 backdrop-blur-sm hover:border-primary/50 transition-all duration-300 hover:shadow-lg hover:shadow-primary/10 hover:-translate-y-1 animate-fade-up opacity-0"
-        style={{ animationDelay: `${index * 80}ms`, animationFillMode: 'forwards' }}
+        className="group relative rounded-xl overflow-hidden border border-border bg-card/95 hover:border-primary/50 transition-colors duration-200 animate-fade-up opacity-0"
+        style={{ animationDelay: `${Math.min(index, 3) * 35}ms`, animationFillMode: 'forwards', contentVisibility: 'auto', containIntrinsicSize: '520px' }}
       >
         <div className="relative aspect-video overflow-hidden bg-muted">
           {!imgLoaded && (
@@ -172,11 +163,11 @@ function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWatch, onUnlockAn
             fetchPriority={index < 3 ? 'auto' : 'low'}
             onLoad={() => setImgLoaded(true)}
             onError={() => setImgLoaded(true)}
-            className={`w-full h-full object-cover group-hover:scale-105 transition-all duration-500 ${imgLoaded ? 'opacity-100' : 'opacity-0'}`}
+            className={`w-full h-full object-cover transition-opacity duration-200 ${imgLoaded ? 'opacity-100' : 'opacity-0'}`}
           />
 
           {!isUnlocked && (
-            <div className="absolute inset-0 bg-background/70 backdrop-blur-sm flex items-center justify-center">
+            <div className="absolute inset-0 bg-background/80 flex items-center justify-center">
               <Lock className="w-10 h-10 text-primary animate-pulse" />
             </div>
           )}
@@ -244,11 +235,16 @@ function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWatch, onUnlockAn
               style={{ WebkitOverflowScrolling: 'touch' }}
             >
               <ul className="flex gap-2 w-max py-1 list-none m-0 p-0">
-                {replay.lineup.map((member, i) => (
+                {replay.lineup.slice(0, 6).map((member, i) => (
                   <li key={i} className="snap-start">
                     <MemberAvatar name={member} size={40} />
                   </li>
                 ))}
+                {replay.lineup.length > 6 && (
+                  <li className="snap-start flex items-center justify-center min-w-10 h-10 rounded-full border border-primary/30 bg-secondary text-xs font-semibold text-muted-foreground">
+                    +{replay.lineup.length - 6}
+                  </li>
+                )}
               </ul>
             </div>
           </div>
@@ -268,7 +264,16 @@ function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWatch, onUnlockAn
             </div>
           ) : isPurchased ? (
             <div className="space-y-2 mt-2">
-              <Button type="button" className="w-full" onClick={() => onWatch(replay)}>
+              <Button
+                type="button"
+                className="w-full"
+                onClick={() => {
+                  if (purchasedToken) {
+                    try { sessionStorage.setItem(`replaytime-tok-${replay.id}`, purchasedToken); } catch { /* ignore */ }
+                  }
+                  onWatch(replay);
+                }}
+              >
                 <Play className="w-4 h-4 mr-2" /> Tonton Replay
               </Button>
               <div className="rounded-md border-2 border-primary/40 bg-primary/10 p-2 space-y-1.5">

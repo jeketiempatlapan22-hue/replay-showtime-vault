@@ -112,11 +112,16 @@ function loadYouTubeApi(): Promise<void> {
       tag.async = true;
       document.head.appendChild(tag);
     }
-    // Safety poll dalam kasus event tidak terpanggil
+    // Safety poll dalam kasus event tidak terpanggil. Jangan resolve sebelum API
+    // tersedia karena itu membuat init retry tanpa batas saat script diblokir.
     const start = Date.now();
     const poll = setInterval(() => {
       if (w.YT?.Player) { clearInterval(poll); done(); }
-      else if (Date.now() - start > 10000) { clearInterval(poll); done(); }
+      else if (Date.now() - start > 6000) {
+        clearInterval(poll);
+        ytApiLoadingPromise = null;
+        resolve();
+      }
     }, 150);
   });
   return ytApiLoadingPromise;
@@ -341,7 +346,17 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
       }
 
       const YT = (window as YoutubeWindow).YT;
-      if (!YT?.Player) { setTimeout(init, 200); return; }
+      if (!YT?.Player) {
+        // API diblokir/lambat: iframe standar sudah terpasang dan tetap dapat
+        // diputar. Beralih ke mode polos agar tidak terjadi retry selamanya.
+        if (initTries++ < 20) setTimeout(init, 150);
+        else {
+          plainModeRef.current = true;
+          setPlainMode(true);
+          markReady(true);
+        }
+        return;
+      }
 
       initialized = true;
       ytPlayerRef.current = new YT.Player(iframeRef.current, {
@@ -631,7 +646,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
     } catch { return ''; }
   })();
   const ytBaseParams = 'rel=0&modestbranding=1&playsinline=1&autoplay=1&mute=1&controls=0&fs=0&iv_load_policy=3&cc_load_policy=0&hl=id&disablekb=1';
-  const ytPlainParams = 'rel=0&modestbranding=1&playsinline=1&autoplay=1&mute=1&iv_load_policy=3&cc_load_policy=0&hl=id';
+  const ytPlainParams = 'rel=0&modestbranding=1&playsinline=1&autoplay=1&mute=1&controls=1&fs=1&iv_load_policy=3&cc_load_policy=0&hl=id';
   const ytEmbedUrl = ytId
     ? plainMode
       ? `https://www.youtube-nocookie.com/embed/${ytId}?${ytPlainParams}`
@@ -675,10 +690,10 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
             allow="autoplay; encrypted-media; picture-in-picture; fullscreen; accelerometer; gyroscope"
             allowFullScreen
             loading="eager"
-            referrerPolicy="strict-origin-when-cross-origin"
+            referrerPolicy="origin-when-cross-origin"
             // @ts-expect-error - fetchpriority valid HTML attr
             fetchpriority="high"
-            style={{ border: 0, willChange: 'transform' }}
+            style={{ border: 0 }}
           />
 
         ) : (
@@ -697,10 +712,10 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
             allow="autoplay; encrypted-media; picture-in-picture; fullscreen; accelerometer; gyroscope"
             allowFullScreen
             loading="eager"
-            referrerPolicy="strict-origin-when-cross-origin"
+            referrerPolicy="origin-when-cross-origin"
             // @ts-expect-error - fetchpriority valid HTML attr
             fetchpriority="high"
-            style={{ border: 0, willChange: 'transform' }}
+            style={{ border: 0 }}
           />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center bg-black text-white/80 text-sm px-4 text-center">

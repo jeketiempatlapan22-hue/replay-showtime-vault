@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import {
@@ -117,7 +117,7 @@ export function useActiveMembership(): { membership: ActiveMembership | null; lo
 
     void loadMembership(userId).then(() => { if (!cancelled) setLoading(false); });
 
-    const onUpd = () => { void loadMembership(sharedUserId, true); };
+    const onUpd = () => { if (!inFlight) void loadMembership(sharedUserId); };
     window.addEventListener(MEMBERSHIP_UPDATED_EVENT, onUpd);
 
     // Satu interval global saja untuk semua komponen yang memakai hook ini.
@@ -141,6 +141,6 @@ export function useActiveMembership(): { membership: ActiveMembership | null; lo
     void loadMembership(sharedUserId, true);
   };
 
-  return { membership, loading, refresh };
+  return useMemo(() => ({ membership, loading, refresh }), [membership, loading]);
 
 }

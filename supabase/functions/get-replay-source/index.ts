@@ -1,5 +1,4 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { isYouTubeVideoPlayable } from "../_shared/yt-check.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -166,14 +165,9 @@ Deno.serve(async (req) => {
       return json({ valid: false, reason: "source_unavailable" }, 404);
     }
 
-    // Deteksi video YouTube yang dihapus / kena ban / embed diblokir.
-    if (!hasSources && !hasUrl && hasYt) {
-      const check = await isYouTubeVideoPlayable(String(replay.youtube_id));
-      if (!check.ok) {
-        await markOffline(check.reason);
-        return json({ valid: false, reason: "source_unavailable", detail: check.reason }, 404);
-      }
-    }
+    // Jangan melakukan pemeriksaan oEmbed YouTube di jalur buka player.
+    // Pemeriksaan jaringan ini dapat menunggu hingga beberapa detik dan membuat
+    // UI tampak loading terus. Ketersediaan video ditangani scan-replay-sources.
 
     return json({
       valid: true,
