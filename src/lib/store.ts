@@ -134,17 +134,28 @@ export async function deleteMasterPassword(id: string) {
   if (error) throw error;
 }
 
-export async function verifyPassword(replayId: string, password: string): Promise<boolean> {
+export async function verifyPasswordDetailed(
+  replayId: string,
+  password: string,
+): Promise<{ valid: boolean; reason?: string; seconds_remaining?: number }> {
   try {
     const { data, error } = await supabase.functions.invoke('verify-password', {
       body: { replay_id: replayId, password },
     });
-    if (error) return false;
-    return data?.valid === true;
+    if (error) {
+      const body = await readFunctionErrorBody(error);
+      return { valid: false, reason: body?.reason, seconds_remaining: body?.seconds_remaining };
+    }
+    return { valid: data?.valid === true, reason: data?.reason };
   } catch {
-    return false;
+    return { valid: false };
   }
 }
+
+export async function verifyPassword(replayId: string, password: string): Promise<boolean> {
+  return (await verifyPasswordDetailed(replayId, password)).valid;
+}
+
 
 export async function getSetting(key: string): Promise<string> {
   const { data } = await supabase.from('site_settings').select('value').eq('key', key).maybeSingle();
