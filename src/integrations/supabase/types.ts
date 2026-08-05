@@ -1666,6 +1666,24 @@ export type Database = {
         }
         Relationships: []
       }
+      wa_send_claims: {
+        Row: {
+          claimed_at: string
+          dedup_key: string
+          sent: boolean
+        }
+        Insert: {
+          claimed_at?: string
+          dedup_key: string
+          sent?: boolean
+        }
+        Update: {
+          claimed_at?: string
+          dedup_key?: string
+          sent?: boolean
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -2132,6 +2150,10 @@ export type Database = {
           seconds_remaining: number
         }[]
       }
+      claim_wa_send: {
+        Args: { _key: string; _retry_seconds?: number }
+        Returns: boolean
+      }
       cleanup_expired_membership_proofs: {
         Args: never
         Returns: {
@@ -2255,6 +2277,7 @@ export type Database = {
         Args: { _bill_id: string }
         Returns: undefined
       }
+      mark_wa_sent: { Args: { _key: string }; Returns: undefined }
       phone_exists: { Args: { _phone: string }; Returns: boolean }
       rate_replay: {
         Args: { _browser_id: string; _rating: number; _replay_id: string }
