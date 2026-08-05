@@ -117,7 +117,7 @@ export function useActiveMembership(): { membership: ActiveMembership | null; lo
 
     void loadMembership(userId).then(() => { if (!cancelled) setLoading(false); });
 
-    const onUpd = () => { void loadMembership(sharedUserId, true); };
+    const onUpd = () => { if (!inFlight) void loadMembership(sharedUserId); };
     window.addEventListener(MEMBERSHIP_UPDATED_EVENT, onUpd);
 
     // Satu interval global saja untuk semua komponen yang memakai hook ini.
