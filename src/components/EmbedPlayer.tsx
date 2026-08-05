@@ -331,12 +331,18 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
       setIsPlaying(true);
     }, 700);
 
+    let initTries = 0;
     const init = () => {
-      if (cancelled || !iframeRef.current || plainModeRef.current) return;
-      if (initialized) return;
+      if (cancelled || plainModeRef.current || initialized) return;
+      // Iframe mungkin belum ter-mount pada tick pertama — coba lagi sebentar.
+      if (!iframeRef.current) {
+        if (initTries++ < 40) setTimeout(init, 100);
+        return;
+      }
 
       const YT = (window as YoutubeWindow).YT;
       if (!YT?.Player) { setTimeout(init, 200); return; }
+
       initialized = true;
       ytPlayerRef.current = new YT.Player(iframeRef.current, {
         events: {
