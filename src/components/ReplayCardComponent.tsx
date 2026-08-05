@@ -155,8 +155,8 @@ function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWatch, onUnlockAn
   return (
     <div>
       <div
-        className="group relative rounded-xl overflow-hidden border border-border bg-card/80 backdrop-blur-sm hover:border-primary/50 transition-all duration-300 hover:shadow-lg hover:shadow-primary/10 hover:-translate-y-1 animate-fade-up opacity-0"
-        style={{ animationDelay: `${index * 80}ms`, animationFillMode: 'forwards' }}
+        className="group relative rounded-xl overflow-hidden border border-border bg-card/95 hover:border-primary/50 transition-colors duration-200 animate-fade-up opacity-0"
+        style={{ animationDelay: `${Math.min(index, 3) * 35}ms`, animationFillMode: 'forwards', contentVisibility: 'auto', containIntrinsicSize: '520px' }}
       >
         <div className="relative aspect-video overflow-hidden bg-muted">
           {!imgLoaded && (
@@ -172,11 +172,11 @@ function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWatch, onUnlockAn
             fetchPriority={index < 3 ? 'auto' : 'low'}
             onLoad={() => setImgLoaded(true)}
             onError={() => setImgLoaded(true)}
-            className={`w-full h-full object-cover group-hover:scale-105 transition-all duration-500 ${imgLoaded ? 'opacity-100' : 'opacity-0'}`}
+            className={`w-full h-full object-cover transition-opacity duration-200 ${imgLoaded ? 'opacity-100' : 'opacity-0'}`}
           />
 
           {!isUnlocked && (
-            <div className="absolute inset-0 bg-background/70 backdrop-blur-sm flex items-center justify-center">
+            <div className="absolute inset-0 bg-background/80 flex items-center justify-center">
               <Lock className="w-10 h-10 text-primary animate-pulse" />
             </div>
           )}

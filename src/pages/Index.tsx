@@ -325,7 +325,7 @@ export default function Index() {
   );
 
   // Render bertahap (infinite scroll) — cegah ratusan kartu dipasang sekaligus.
-  const PAGE_SIZE = 18;
+  const PAGE_SIZE = 12;
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const sentinelRef = useRef<HTMLDivElement>(null);
   const loadLockRef = useRef(false);
@@ -367,14 +367,14 @@ export default function Index() {
             if (gen !== loadGenRef.current) return;
             loadLockRef.current = false;
             setLoadingMore(false);
-          }, 250);
+          }, 120);
         });
-      }, 180);
+      }, 100);
     };
 
     const io = new IntersectionObserver((entries) => {
       if (entries.some(e => e.isIntersecting)) requestMore();
-    }, { rootMargin: '600px 0px' });
+    }, { rootMargin: '350px 0px' });
     io.observe(el);
     return () => {
       io.disconnect();
@@ -400,7 +400,7 @@ export default function Index() {
     if (closingTimerRef.current) clearTimeout(closingTimerRef.current);
     setDisplayedReplay(replay);
     setWatchingReplay(replay);
-    requestAnimationFrame(() => requestAnimationFrame(() => setPlayerVisible(true)));
+    setPlayerVisible(true);
   }, []);
 
   const handleOpenPlayer = useCallback((replay: ReplayRow) => {
@@ -412,7 +412,7 @@ export default function Index() {
     if (closingTimerRef.current) clearTimeout(closingTimerRef.current);
     setDisplayedReplay(replay);
     setWatchingReplay(replay);
-    requestAnimationFrame(() => requestAnimationFrame(() => setPlayerVisible(true)));
+    setPlayerVisible(true);
   }, []);
 
   const handleClosePlayer = useCallback(() => {
@@ -436,8 +436,8 @@ export default function Index() {
     <div className="relative">
       {/* Player overlay - always stable in DOM, visibility via CSS only */}
       <div
-        className={`fixed inset-0 z-[100] bg-background overflow-y-auto transition-all duration-300 ease-out ${
-          playerVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'
+        className={`fixed inset-0 z-[100] bg-background overflow-y-auto transition-opacity duration-150 ease-out ${
+          playerVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'
         }`}
       >
         <div className={displayedReplay ? 'block' : 'hidden'}>
@@ -459,7 +459,7 @@ export default function Index() {
       </div>
 
       {/* Main content - always in DOM */}
-      <div className={`relative min-h-screen transition-colors duration-500 ${watchingReplay ? 'invisible' : 'visible'}`}>
+      <div className={`relative min-h-screen transition-colors duration-300 ${watchingReplay ? 'invisible' : 'visible'}`}>
       <div className={`fixed inset-0 z-0 transition-opacity duration-700 ${lightMode ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
         <ThemedBackground theme={theme} />
       </div>
@@ -590,11 +590,11 @@ export default function Index() {
               sections.push(
                 <section key={monthKey} className="mb-12">
                   <div className="flex items-center gap-3 mb-6">
-                    <div className="h-px flex-1 bg-gradient-to-r from-transparent via-primary/40 to-transparent" />
+                    <div className="h-px flex-1 bg-primary/30" />
                     <h2 className="text-2xl md:text-3xl font-bold text-primary whitespace-nowrap">
                       ☪ {monthName} {year}
                     </h2>
-                    <div className="h-px flex-1 bg-gradient-to-r from-transparent via-primary/40 to-transparent" />
+                    <div className="h-px flex-1 bg-primary/30" />
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
