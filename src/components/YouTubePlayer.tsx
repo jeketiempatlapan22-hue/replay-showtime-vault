@@ -189,9 +189,14 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
       setSource(res.data);
       setNeedsPassword(false);
       setPwInput('');
+    } else if (res.reason === 'rate_limited') {
+      setPwError('Terlalu banyak percobaan. Tunggu beberapa saat lalu coba lagi.');
+    } else if (res.reason === 'source_unavailable') {
+      setPwError('Sandi benar, tetapi sumber video sedang tidak tersedia. Hubungi admin.');
     } else {
       setPwError('Sandi salah. Coba lagi.');
     }
+
   };
 
   useEffect(() => {
