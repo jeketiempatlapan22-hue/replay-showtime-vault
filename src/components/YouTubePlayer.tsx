@@ -209,16 +209,25 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
     incrementView();
   }, [replay.id]);
 
-  const toggleFullscreen = useCallback(() => {
-    if (!containerRef.current) return;
-    if (!document.fullscreenElement) {
-      void containerRef.current.requestFullscreen?.();
-      setIsFullscreen(true);
-    } else {
-      void document.exitFullscreen?.();
+  useEffect(() => onFullscreenChange(() => setIsFullscreen(isFullscreenActive())), []);
+
+  const toggleFullscreen = useCallback(async () => {
+    const el = containerRef.current;
+    if (!el) return;
+    if (isFullscreenActive()) {
+      await exitFs();
       setIsFullscreen(false);
+      return;
     }
+    const target = (el.querySelector('[data-player-root]') as HTMLElement) || el;
+    await requestFs(target, target.querySelector('video'));
+    setIsFullscreen(isFullscreenActive());
+    try {
+      const so = (screen as unknown as { orientation?: { lock?: (o: string) => Promise<void> } }).orientation;
+      await so?.lock?.('landscape');
+    } catch { /* ignore */ }
   }, []);
+
 
   const handleHlsFatalError = useCallback(() => {
     // Try to switch to next source automatically
