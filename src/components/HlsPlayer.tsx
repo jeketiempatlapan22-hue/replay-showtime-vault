@@ -965,6 +965,8 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
     <>
     <div
       ref={containerRef}
+      data-player-root
+
       className={`relative w-full overflow-hidden rounded-xl bg-black group/player ${isFullscreen ? 'h-dvh' : ''} ${showControls || !isPlaying ? '' : 'cursor-none'}`}
       style={{ paddingBottom: isFullscreen ? '0' : '56.25%', height: isFullscreen ? '100dvh' : undefined }}
       onMouseMove={resetHideTimer}
