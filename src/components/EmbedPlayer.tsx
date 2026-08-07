@@ -553,6 +553,15 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
     return onFullscreenChange(onChange);
   }, []);
 
+  // Esc keluar dari mode fullscreen CSS (fallback iOS/WebView).
+  useEffect(() => {
+    if (!pseudoFs) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setPseudoFs(false); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [pseudoFs]);
+
+
   // Poll YT time/duration — auto-pause saat tab hidden untuk hemat CPU & cegah throttling browser
   // membuat polling tertimbun antrian ketika tab kembali aktif.
   useEffect(() => {
