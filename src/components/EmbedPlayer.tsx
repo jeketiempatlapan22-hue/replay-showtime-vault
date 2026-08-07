@@ -696,6 +696,31 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
     }, 350);
   };
 
+  // iOS/iPadOS tidak mendukung screen.orientation.lock. Saat mode fullscreen CSS
+  // aktif sementara perangkat masih portrait, putar container 90° agar video
+  // benar-benar tampil landscape memenuhi layar.
+  const [portrait, setPortrait] = useState(false);
+  useEffect(() => {
+    if (!pseudoFs) { setPortrait(false); return; }
+    const check = () => setPortrait(window.innerHeight > window.innerWidth);
+    check();
+    window.addEventListener('resize', check);
+    window.addEventListener('orientationchange', check);
+    return () => {
+      window.removeEventListener('resize', check);
+      window.removeEventListener('orientationchange', check);
+    };
+  }, [pseudoFs]);
+  const rotateFs = pseudoFs && portrait;
+
+  // Cegah scroll body saat fullscreen CSS aktif.
+  useEffect(() => {
+    if (!pseudoFs) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = prev; };
+  }, [pseudoFs]);
+
 
   // Origin hanya dikirim jika benar-benar valid. Di iframe sandbox/webview,
   // window.location.origin bisa bernilai "null" → YouTube menolak (Error 153) & layar hitam.
