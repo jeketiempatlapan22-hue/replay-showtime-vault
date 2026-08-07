@@ -186,7 +186,13 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
     const ordered = YT_QUALITY_LADDER.filter(q => avail.includes(q));
     if (!ordered.length) return;
     const idx = Math.min(qualityCapIdxRef.current, ordered.length - 1);
-    try { p.setPlaybackQuality(ordered[idx]); } catch { /* ignore */ }
+    const target = ordered[idx];
+    try { p.setPlaybackQuality(target); } catch { /* ignore */ }
+    // Sebagian build YT hanya menghormati setPlaybackQualityRange.
+    try {
+      (p as unknown as { setPlaybackQualityRange?: (a: string, b: string) => void })
+        .setPlaybackQualityRange?.(target, target);
+    } catch { /* ignore */ }
   }, []);
 
   const refreshAvailableQualities = useCallback(() => {
@@ -200,6 +206,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
       }
     } catch { /* ignore */ }
   }, [applyQualityCap]);
+
 
 
   // Matikan subtitle YouTube (captions) — dipanggil di beberapa titik karena YT
