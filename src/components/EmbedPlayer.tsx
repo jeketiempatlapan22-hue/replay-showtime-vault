@@ -631,11 +631,33 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
     return h ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
   };
 
-  const toggleFullscreen = () => {
-    if (!containerRef.current) return;
-    if (!isFullscreenActive()) requestFs(containerRef.current);
-    else exitFs();
+  const lockLandscape = async (on: boolean) => {
+    try {
+      const so = (screen as unknown as { orientation?: { lock?: (o: string) => Promise<void>; unlock?: () => void } }).orientation;
+      if (!so) return;
+      if (on) await so.lock?.('landscape');
+      else so.unlock?.();
+    } catch { /* ignore */ }
   };
+
+  const toggleFullscreen = async () => {
+    const el = containerRef.current;
+    if (!el) return;
+    if (isFullscreenActive() || pseudoFs) {
+      await exitFs();
+      setPseudoFs(false);
+      void lockLandscape(false);
+      return;
+    }
+    await requestFs(el, el.querySelector('video'));
+    void lockLandscape(true);
+    // Fallback: beberapa browser (iOS Safari, sebagian WebView TV) menolak
+    // fullscreen untuk elemen non-video → pakai mode fullscreen CSS.
+    setTimeout(() => {
+      if (!isFullscreenActive()) setPseudoFs(true);
+    }, 350);
+  };
+
 
   // Origin hanya dikirim jika benar-benar valid. Di iframe sandbox/webview,
   // window.location.origin bisa bernilai "null" → YouTube menolak (Error 153) & layar hitam.
