@@ -134,6 +134,8 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
   const ytFallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const readyRef = useRef(false);
   const [ready, setReady] = useState(false);
+  const [pseudoFs, setPseudoFs] = useState(false);
+
   const [isPlaying, setIsPlaying] = useState(false);
   // Default unmuted: clear stale persisted mute one time per session.
   const initialMuted = (() => {
@@ -551,6 +553,15 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
     return onFullscreenChange(onChange);
   }, []);
 
+  // Esc keluar dari mode fullscreen CSS (fallback iOS/WebView).
+  useEffect(() => {
+    if (!pseudoFs) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setPseudoFs(false); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [pseudoFs]);
+
+
   // Poll YT time/duration — auto-pause saat tab hidden untuk hemat CPU & cegah throttling browser
   // membuat polling tertimbun antrian ketika tab kembali aktif.
   useEffect(() => {
@@ -631,11 +642,33 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
     return h ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
   };
 
-  const toggleFullscreen = () => {
-    if (!containerRef.current) return;
-    if (!isFullscreenActive()) requestFs(containerRef.current);
-    else exitFs();
+  const lockLandscape = async (on: boolean) => {
+    try {
+      const so = (screen as unknown as { orientation?: { lock?: (o: string) => Promise<void>; unlock?: () => void } }).orientation;
+      if (!so) return;
+      if (on) await so.lock?.('landscape');
+      else so.unlock?.();
+    } catch { /* ignore */ }
   };
+
+  const toggleFullscreen = async () => {
+    const el = containerRef.current;
+    if (!el) return;
+    if (isFullscreenActive() || pseudoFs) {
+      await exitFs();
+      setPseudoFs(false);
+      void lockLandscape(false);
+      return;
+    }
+    await requestFs(el, el.querySelector('video'));
+    void lockLandscape(true);
+    // Fallback: beberapa browser (iOS Safari, sebagian WebView TV) menolak
+    // fullscreen untuk elemen non-video → pakai mode fullscreen CSS.
+    setTimeout(() => {
+      if (!isFullscreenActive()) setPseudoFs(true);
+    }, 350);
+  };
+
 
   // Origin hanya dikirim jika benar-benar valid. Di iframe sandbox/webview,
   // window.location.origin bisa bernilai "null" → YouTube menolak (Error 153) & layar hitam.
@@ -669,8 +702,14 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
   return (
     <div
       ref={containerRef}
-      className={`relative w-full overflow-hidden rounded-xl bg-black select-none ${isFullscreen ? 'h-dvh' : ''} ${showControls || !isPlaying ? '' : 'cursor-none'}`}
-      style={{ paddingBottom: isFullscreen ? '0' : '56.25%', height: isFullscreen ? '100dvh' : undefined }}
+      data-player-root
+
+      className={`relative w-full overflow-hidden bg-black select-none ${isFullscreen || pseudoFs ? 'rounded-none' : 'rounded-xl'} ${pseudoFs ? 'fixed inset-0 z-[9999] w-screen' : ''} ${showControls || !isPlaying ? '' : 'cursor-none'}`}
+      style={{
+        paddingBottom: isFullscreen || pseudoFs ? '0' : '56.25%',
+        height: isFullscreen || pseudoFs ? '100dvh' : undefined,
+      }}
+
       onContextMenu={(e) => e.preventDefault()}
       onMouseMove={resetHideTimer}
       onTouchStart={resetHideTimer}
@@ -811,7 +850,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
           />
           <div className="flex-1" />
           <button onClick={(e) => { e.stopPropagation(); toggleFullscreen(); }} aria-label="Fullscreen" className="p-2.5 landscape:p-3 text-white hover:text-primary active:scale-95 transition-all">
-            {isFullscreen ? <Minimize className="w-5 h-5 landscape:w-6 landscape:h-6" /> : <Maximize className="w-5 h-5 landscape:w-6 landscape:h-6" />}
+            {isFullscreen || pseudoFs ? <Minimize className="w-5 h-5 landscape:w-6 landscape:h-6" /> : <Maximize className="w-5 h-5 landscape:w-6 landscape:h-6" />}
           </button>
         </div>
       </div>
