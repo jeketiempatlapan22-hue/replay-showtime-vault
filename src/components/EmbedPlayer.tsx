@@ -568,6 +568,26 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
     return () => window.removeEventListener('keydown', onKey);
   }, [pseudoFs]);
 
+  // Kunci resolusi (replay saja): YouTube sering menurunkan kualitas sendiri.
+  // Setiap 5 detik kita cek kualitas aktif; bila lebih rendah dari cap saat ini,
+  // paksa kembali ke cap. Cap hanya turun lewat logika buffering di onStateChange.
+  useEffect(() => {
+    if (type !== 'youtube' || isLive || !ready) return;
+    const id = setInterval(() => {
+      const p = ytPlayerRef.current;
+      if (!p) return;
+      if (!availableQualitiesRef.current.length) { refreshAvailableQualities(); return; }
+      const ordered = YT_QUALITY_LADDER.filter(q => availableQualitiesRef.current.includes(q));
+      if (!ordered.length) return;
+      const targetIdx = Math.min(qualityCapIdxRef.current, ordered.length - 1);
+      let current = '';
+      try { current = p.getPlaybackQuality?.() || ''; } catch { /* ignore */ }
+      const currentIdx = ordered.indexOf(current);
+      if (current && currentIdx > targetIdx) applyQualityCap();
+    }, 5000);
+    return () => clearInterval(id);
+  }, [type, isLive, ready, applyQualityCap, refreshAvailableQualities]);
+
 
   // Poll YT time/duration — auto-pause saat tab hidden untuk hemat CPU & cegah throttling browser
   // membuat polling tertimbun antrian ketika tab kembali aktif.
