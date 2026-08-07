@@ -702,6 +702,8 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
   return (
     <div
       ref={containerRef}
+      data-player-root
+
       className={`relative w-full overflow-hidden bg-black select-none ${isFullscreen || pseudoFs ? 'rounded-none' : 'rounded-xl'} ${pseudoFs ? 'fixed inset-0 z-[9999] w-screen' : ''} ${showControls || !isPlaying ? '' : 'cursor-none'}`}
       style={{
         paddingBottom: isFullscreen || pseudoFs ? '0' : '56.25%',
