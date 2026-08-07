@@ -756,11 +756,21 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
       ref={containerRef}
       data-player-root
 
-      className={`relative w-full overflow-hidden bg-black select-none ${isFullscreen || pseudoFs ? 'rounded-none' : 'rounded-xl'} ${pseudoFs ? 'fixed inset-0 z-[9999] w-screen' : ''} ${showControls || !isPlaying ? '' : 'cursor-none'}`}
+      className={`relative overflow-hidden bg-black select-none ${isFullscreen || pseudoFs ? 'rounded-none' : 'rounded-xl'} ${pseudoFs ? 'fixed z-[9999]' : 'w-full'} ${pseudoFs && !rotateFs ? 'inset-0 w-screen' : ''} ${showControls || !isPlaying ? '' : 'cursor-none'}`}
       style={{
         paddingBottom: isFullscreen || pseudoFs ? '0' : '56.25%',
-        height: isFullscreen || pseudoFs ? '100dvh' : undefined,
+        height: rotateFs ? '100vw' : (isFullscreen || pseudoFs ? '100dvh' : undefined),
+        ...(rotateFs
+          ? {
+              width: '100dvh',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%) rotate(90deg)',
+              transformOrigin: 'center center',
+            }
+          : {}),
       }}
+
 
       onContextMenu={(e) => e.preventDefault()}
       onMouseMove={resetHideTimer}
