@@ -186,7 +186,13 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
     const ordered = YT_QUALITY_LADDER.filter(q => avail.includes(q));
     if (!ordered.length) return;
     const idx = Math.min(qualityCapIdxRef.current, ordered.length - 1);
-    try { p.setPlaybackQuality(ordered[idx]); } catch { /* ignore */ }
+    const target = ordered[idx];
+    try { p.setPlaybackQuality(target); } catch { /* ignore */ }
+    // Sebagian build YT hanya menghormati setPlaybackQualityRange.
+    try {
+      (p as unknown as { setPlaybackQualityRange?: (a: string, b: string) => void })
+        .setPlaybackQualityRange?.(target, target);
+    } catch { /* ignore */ }
   }, []);
 
   const refreshAvailableQualities = useCallback(() => {
@@ -200,6 +206,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
       }
     } catch { /* ignore */ }
   }, [applyQualityCap]);
+
 
 
   // Matikan subtitle YouTube (captions) — dipanggil di beberapa titik karena YT
@@ -561,6 +568,26 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
     return () => window.removeEventListener('keydown', onKey);
   }, [pseudoFs]);
 
+  // Kunci resolusi (replay saja): YouTube sering menurunkan kualitas sendiri.
+  // Setiap 5 detik kita cek kualitas aktif; bila lebih rendah dari cap saat ini,
+  // paksa kembali ke cap. Cap hanya turun lewat logika buffering di onStateChange.
+  useEffect(() => {
+    if (type !== 'youtube' || isLive || !ready) return;
+    const id = setInterval(() => {
+      const p = ytPlayerRef.current;
+      if (!p) return;
+      if (!availableQualitiesRef.current.length) { refreshAvailableQualities(); return; }
+      const ordered = YT_QUALITY_LADDER.filter(q => availableQualitiesRef.current.includes(q));
+      if (!ordered.length) return;
+      const targetIdx = Math.min(qualityCapIdxRef.current, ordered.length - 1);
+      let current = '';
+      try { current = p.getPlaybackQuality?.() || ''; } catch { /* ignore */ }
+      const currentIdx = ordered.indexOf(current);
+      if (current && currentIdx > targetIdx) applyQualityCap();
+    }, 5000);
+    return () => clearInterval(id);
+  }, [type, isLive, ready, applyQualityCap, refreshAvailableQualities]);
+
 
   // Poll YT time/duration — auto-pause saat tab hidden untuk hemat CPU & cegah throttling browser
   // membuat polling tertimbun antrian ketika tab kembali aktif.
@@ -669,6 +696,31 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
     }, 350);
   };
 
+  // iOS/iPadOS tidak mendukung screen.orientation.lock. Saat mode fullscreen CSS
+  // aktif sementara perangkat masih portrait, putar container 90° agar video
+  // benar-benar tampil landscape memenuhi layar.
+  const [portrait, setPortrait] = useState(false);
+  useEffect(() => {
+    if (!pseudoFs) { setPortrait(false); return; }
+    const check = () => setPortrait(window.innerHeight > window.innerWidth);
+    check();
+    window.addEventListener('resize', check);
+    window.addEventListener('orientationchange', check);
+    return () => {
+      window.removeEventListener('resize', check);
+      window.removeEventListener('orientationchange', check);
+    };
+  }, [pseudoFs]);
+  const rotateFs = pseudoFs && portrait;
+
+  // Cegah scroll body saat fullscreen CSS aktif.
+  useEffect(() => {
+    if (!pseudoFs) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = prev; };
+  }, [pseudoFs]);
+
 
   // Origin hanya dikirim jika benar-benar valid. Di iframe sandbox/webview,
   // window.location.origin bisa bernilai "null" → YouTube menolak (Error 153) & layar hitam.
@@ -704,11 +756,21 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
       ref={containerRef}
       data-player-root
 
-      className={`relative w-full overflow-hidden bg-black select-none ${isFullscreen || pseudoFs ? 'rounded-none' : 'rounded-xl'} ${pseudoFs ? 'fixed inset-0 z-[9999] w-screen' : ''} ${showControls || !isPlaying ? '' : 'cursor-none'}`}
+      className={`relative overflow-hidden bg-black select-none ${isFullscreen || pseudoFs ? 'rounded-none' : 'rounded-xl'} ${pseudoFs ? 'fixed z-[9999]' : 'w-full'} ${pseudoFs && !rotateFs ? 'inset-0 w-screen' : ''} ${showControls || !isPlaying ? '' : 'cursor-none'}`}
       style={{
         paddingBottom: isFullscreen || pseudoFs ? '0' : '56.25%',
-        height: isFullscreen || pseudoFs ? '100dvh' : undefined,
+        height: rotateFs ? '100vw' : (isFullscreen || pseudoFs ? '100dvh' : undefined),
+        ...(rotateFs
+          ? {
+              width: '100dvh',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%) rotate(90deg)',
+              transformOrigin: 'center center',
+            }
+          : {}),
       }}
+
 
       onContextMenu={(e) => e.preventDefault()}
       onMouseMove={resetHideTimer}
