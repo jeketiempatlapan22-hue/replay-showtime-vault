@@ -152,6 +152,12 @@ Deno.serve(async (req) => {
         .limit(1)
         .maybeSingle();
       if (liveShow?.id) resolvedShowId = liveShow.id;
+      if (!resolvedShowId) {
+        // Fallback: show dengan auto schedule yang sudah masuk window (15 menit sebelum jadwal).
+        const { data: autoShow } = await supabase.rpc("get_active_live");
+        const row = Array.isArray(autoShow) ? autoShow[0] : autoShow;
+        if (row?.id) resolvedShowId = row.id as string;
+      }
     }
 
     if (resolvedShowId) {
@@ -164,7 +170,15 @@ Deno.serve(async (req) => {
         // fall through to legacy branch
       } else {
 
-      const enabled = !!show.is_live;
+      // Auto schedule: live dianggap aktif mulai 15 menit sebelum jam jadwal, sampai +8 jam.
+      const autoLiveNow = (() => {
+        if (!show.live_auto_schedule || !show.show_date || !show.show_time) return false;
+        const startMs = new Date(`${show.show_date}T${String(show.show_time).slice(0, 8)}+07:00`).getTime();
+        if (!Number.isFinite(startMs)) return false;
+        const now = Date.now();
+        return now >= startMs - 15 * 60 * 1000 && now <= startMs + 8 * 3600 * 1000;
+      })();
+      const enabled = !!show.is_live || autoLiveNow;
       const okPayload = {
         valid: true, enabled, title: show.title, type: show.live_type || "m3u8",
         url: show.live_url || "",
