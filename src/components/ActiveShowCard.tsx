@@ -60,10 +60,11 @@ export default function ActiveShowCard({ show, index = 0 }: { show: ActiveShow; 
   const showBuyable = showPriced || showCoinPrice > 0;
   const replayBuyable = replayPriced || replayCoinPrice > 0;
 
-  // LIVE detection
+  // LIVE detection — auto schedule membuka live 15 menit sebelum jam jadwal
+  const PRE_LIVE_MS = 15 * 60 * 1000;
   const startMs = target.getTime();
   const nowMs = Date.now();
-  const autoLive = !!show.live_auto_schedule && nowMs >= startMs && nowMs <= startMs + 8 * 3600 * 1000;
+  const autoLive = !!show.live_auto_schedule && nowMs >= startMs - PRE_LIVE_MS && nowMs <= startMs + 8 * 3600 * 1000;
   const isLiveNow = !!show.is_live || autoLive;
 
   // Per-show unlock check (sessionStorage live unlock OR localStorage purchase)
