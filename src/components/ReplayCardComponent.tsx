@@ -146,7 +146,7 @@ function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWatch, onUnlockAn
   return (
     <div>
       <div
-        className="group relative rounded-xl overflow-hidden border border-border bg-card/95 hover:border-primary/50 transition-colors duration-200 animate-fade-up opacity-0"
+        className="group relative rounded-xl overflow-hidden border border-border bg-card/95 hover:border-primary/50 transition-colors duration-200 animate-fade-up"
         style={{ animationDelay: `${Math.min(index, 3) * 35}ms`, animationFillMode: 'forwards', contentVisibility: 'auto', containIntrinsicSize: '520px' }}
       >
         <div className="relative aspect-video overflow-hidden bg-muted">
