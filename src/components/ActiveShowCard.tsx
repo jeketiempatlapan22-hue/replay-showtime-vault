@@ -136,7 +136,7 @@ export default function ActiveShowCard({ show, index = 0 }: { show: ActiveShow; 
 
   return (
     <div
-      className="group relative rounded-xl overflow-hidden border border-border bg-card/80 backdrop-blur-sm hover:border-primary/60 transition-all duration-300 hover:shadow-lg hover:shadow-primary/20 hover:-translate-y-1 animate-fade-up opacity-0"
+      className="group relative rounded-xl overflow-hidden border border-border bg-card/80 backdrop-blur-sm hover:border-primary/60 transition-all duration-300 hover:shadow-lg hover:shadow-primary/20 hover:-translate-y-1 animate-fade-up"
       style={{ animationDelay: `${index * 80}ms`, animationFillMode: 'forwards' }}
     >
       {show.image_url && (
