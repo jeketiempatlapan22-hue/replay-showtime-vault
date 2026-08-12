@@ -152,6 +152,12 @@ Deno.serve(async (req) => {
         .limit(1)
         .maybeSingle();
       if (liveShow?.id) resolvedShowId = liveShow.id;
+      if (!resolvedShowId) {
+        // Fallback: show dengan auto schedule yang sudah masuk window (15 menit sebelum jadwal).
+        const { data: autoShow } = await supabase.rpc("get_active_live");
+        const row = Array.isArray(autoShow) ? autoShow[0] : autoShow;
+        if (row?.id) resolvedShowId = row.id as string;
+      }
     }
 
     if (resolvedShowId) {
