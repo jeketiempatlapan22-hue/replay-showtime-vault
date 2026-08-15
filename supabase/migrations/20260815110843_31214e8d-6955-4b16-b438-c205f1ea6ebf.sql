@@ -1,0 +1,1 @@
+ALTER TABLE public.replays ADD COLUMN IF NOT EXISTS price_idr integer NOT NULL DEFAULT 2000;

@@ -40,6 +40,10 @@ function highlightText(text: string, query: string) {
 }
 
 const REPLAY_DEFAULT_PRICE = 2000;
+const getReplayPrice = (r: any) => {
+  const v = Number(r?.price_idr);
+  return Number.isFinite(v) && v > 0 ? v : REPLAY_DEFAULT_PRICE;
+};
 
 function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWatch, onUnlockAndWatch, index = 0, isBookmarked, onToggleBookmark, searchQuery = '', membership = null }: Props) {
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
@@ -302,7 +306,7 @@ function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWatch, onUnlockAn
               <div className="rounded-md border border-primary/20 bg-primary/5 p-2.5 space-y-1">
                 <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Harga Replay</div>
                 <div className="flex items-center justify-between gap-2 flex-wrap">
-                  <span className="text-base font-bold text-primary">Rp {REPLAY_DEFAULT_PRICE.toLocaleString('id-ID')}</span>
+                  <span className="text-base font-bold text-primary">Rp {getReplayPrice(replay).toLocaleString('id-ID')}</span>
                   {((replay as any).price_coins ?? 0) > 0 && (
                     <Badge variant="secondary" className="text-xs">atau {(replay as any).price_coins} koin</Badge>
                   )}
@@ -326,7 +330,7 @@ function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWatch, onUnlockAn
         onOpenChange={setBuyOpen}
         showId=""
         showTitle={replay.title}
-        amount={REPLAY_DEFAULT_PRICE}
+        amount={getReplayPrice(replay)}
         itemTitle={`Replay: ${replay.title}`}
         replayId={replay.id}
         kind="replay_only"

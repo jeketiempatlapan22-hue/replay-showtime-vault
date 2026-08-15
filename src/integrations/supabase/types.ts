@@ -1359,6 +1359,7 @@ export type Database = {
           offline_reason: string
           password: string
           price_coins: number
+          price_idr: number
           show_name: string
           show_time: string | null
           source_type: string
@@ -1384,6 +1385,7 @@ export type Database = {
           offline_reason?: string
           password: string
           price_coins?: number
+          price_idr?: number
           show_name?: string
           show_time?: string | null
           source_type?: string
@@ -1409,6 +1411,7 @@ export type Database = {
           offline_reason?: string
           password?: string
           price_coins?: number
+          price_idr?: number
           show_name?: string
           show_time?: string | null
           source_type?: string
@@ -1899,6 +1902,7 @@ export type Database = {
           offline_reason: string
           password: string
           price_coins: number
+          price_idr: number
           show_name: string
           show_time: string | null
           source_type: string

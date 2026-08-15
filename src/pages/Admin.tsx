@@ -76,7 +76,7 @@ export default function Admin() {
   const [editingReplay, setEditingReplay] = useState<ReplayRow | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ReplayRow | null>(null);
 
-  const [form, setForm] = useState({ title: '', showName: '', date: '', showTime: '19:00', criteria: 'reguler', featuredMember: '', lineup: '', password: '', adminAlias: '', youtubeId: '', imageUrl: '', sourceType: 'youtube', m3u8Url: '', sources: [] as PlaylistSource[], priceCoins: 1 });
+  const [form, setForm] = useState({ title: '', showName: '', date: '', showTime: '19:00', criteria: 'reguler', featuredMember: '', lineup: '', password: '', adminAlias: '', youtubeId: '', imageUrl: '', sourceType: 'youtube', m3u8Url: '', sources: [] as PlaylistSource[], priceCoins: 1, priceIdr: 2000 });
   const [liveChatEnabled, setLiveChatEnabled] = useState(true);
 
   const [mpYear, setMpYear] = useState(String(new Date().getFullYear()));
@@ -371,7 +371,7 @@ export default function Admin() {
   const handleLogout = async () => { await supabase.auth.signOut(); setIsLoggedIn(false); };
 
   const resetForm = () => {
-    setForm({ title: '', showName: '', date: '', showTime: '19:00', criteria: 'reguler', featuredMember: '', lineup: '', password: '', adminAlias: '', youtubeId: '', imageUrl: '', sourceType: 'youtube', m3u8Url: '', sources: [], priceCoins: 1 });
+    setForm({ title: '', showName: '', date: '', showTime: '19:00', criteria: 'reguler', featuredMember: '', lineup: '', password: '', adminAlias: '', youtubeId: '', imageUrl: '', sourceType: 'youtube', m3u8Url: '', sources: [], priceCoins: 1, priceIdr: 2000 });
     setEditingReplay(null);
   };
 
@@ -413,6 +413,7 @@ export default function Admin() {
         m3u8_url: isYoutube ? '' : form.m3u8Url,
         sources: normalizedSources as any,
         price_coins: Number.isFinite(Number(form.priceCoins)) ? Math.max(0, Number(form.priceCoins)) : 1,
+        price_idr: Number.isFinite(Number(form.priceIdr)) ? Math.max(0, Number(form.priceIdr)) : 2000,
       };
       if (editingReplay) {
         await updateReplay(editingReplay.id, payload);
@@ -439,6 +440,7 @@ export default function Admin() {
       sourceType: (r as any).source_type || 'youtube', m3u8Url: (r as any).m3u8_url || '',
       sources: Array.isArray((r as any).sources) ? (r as any).sources : [],
       priceCoins: ((r as any).price_coins ?? 1),
+      priceIdr: ((r as any).price_idr ?? 2000),
     });
     setShowAddDialog(true);
   };
@@ -1506,6 +1508,11 @@ export default function Admin() {
             </div>
             <div><Label>Foto Kartu</Label><ImagePicker value={form.imageUrl} onChange={url => setForm(f => ({ ...f, imageUrl: url }))} /></div>
             <div><Label>Sandi *</Label><Input placeholder="Sandi untuk replay ini" value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} /></div>
+            <div>
+              <Label>Harga Replay (Rp)</Label>
+              <Input type="number" min={0} value={form.priceIdr} onChange={e => setForm(f => ({ ...f, priceIdr: Number(e.target.value) }))} placeholder="cth: 2000" />
+              <p className="text-[11px] text-muted-foreground mt-1">Harga QRIS yang tampil di kartu replay. Default Rp 2.000.</p>
+            </div>
             <div>
               <Label>Harga Koin (untuk tukar)</Label>
               <Input type="number" min={0} value={form.priceCoins} onChange={e => setForm(f => ({ ...f, priceCoins: Number(e.target.value) }))} placeholder="default 1 koin" />
