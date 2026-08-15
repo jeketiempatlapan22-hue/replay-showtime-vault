@@ -1,0 +1,1 @@
+GRANT SELECT (price_idr) ON public.replays TO anon, authenticated;
