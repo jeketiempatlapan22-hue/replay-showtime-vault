@@ -688,10 +688,14 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
   }, [type, liveActive]);
 
   const seekTo = (t: number) => {
-    const p = ytPlayerRef.current;
-    if (!p || !duration) return;
+    if (!duration) return;
     const target = Math.max(0, Math.min(duration, t));
-    try { p.seekTo(target, true); setCurrentTime(target); } catch { /* ignore */ }
+    const p = ytPlayerRef.current;
+    if (p?.seekTo) {
+      try { p.seekTo(target, true); setCurrentTime(target); return; } catch { /* ignore */ }
+    }
+    ytPost('seekTo', [target, true]);
+    setCurrentTime(target);
   };
   const skip = (delta: number) => seekTo((currentTime || 0) + delta);
   const fmtTime = (s: number) => {
