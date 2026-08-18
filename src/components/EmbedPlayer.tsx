@@ -496,6 +496,16 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
     try { w.postMessage(msg, '*'); } catch { /* ignore */ }
   };
 
+  // Handshake wajib agar iframe YouTube menerima perintah postMessage.
+  const ytHandshake = () => {
+    const w = iframeRef.current?.contentWindow;
+    if (!w) return;
+    const msg = JSON.stringify({ event: 'listening', id: ytId || 'yt-embed', channel: 'widget' });
+    try { w.postMessage(msg, 'https://www.youtube-nocookie.com'); } catch { /* ignore */ }
+    try { w.postMessage(msg, 'https://www.youtube.com'); } catch { /* ignore */ }
+    try { w.postMessage(msg, '*'); } catch { /* ignore */ }
+  };
+
   // Jalankan aksi via JS API bila tersedia; kalau tidak, langsung pakai postMessage
   // agar tombol tetap responsif seketika (tanpa menunggu retry).
   const withYtPlayer = (action: (p: YoutubePlayerApi) => void, fallback?: () => void) => {
