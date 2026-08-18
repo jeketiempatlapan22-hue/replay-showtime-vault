@@ -538,10 +538,22 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
     if (!m) userUnmutedRef.current = true;
     try { localStorage.setItem(MUTED_KEY, m ? '1' : '0'); } catch { /* ignore */ }
     if (type === 'youtube') {
-      withYtPlayer((p) => {
-        if (m) p.mute?.();
-        else { p.unMute?.(); p.setVolume?.(Math.round(volumeRef.current * 100)); p.playVideo?.(); }
-      });
+      withYtPlayer(
+        (p) => {
+          if (m) p.mute?.();
+          else { p.unMute?.(); p.setVolume?.(Math.round(volumeRef.current * 100)); p.playVideo?.(); }
+        },
+        () => {
+          if (m) ytPost('mute');
+          else {
+            ytPost('unMute');
+            ytPost('setVolume', [Math.round(volumeRef.current * 100)]);
+            ytPost('playVideo');
+            setIsPlaying(true);
+            isPlayingRef.current = true;
+          }
+        },
+      );
     } else {
       cfPost(m ? 'mute' : 'unmute');
     }
@@ -561,10 +573,16 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
       try { localStorage.setItem(MUTED_KEY, '0'); } catch { /* ignore */ }
     }
     if (type === 'youtube') {
-      withYtPlayer((p) => {
-        p.setVolume?.(Math.round(v * 100));
-        if (v > 0) p.unMute?.();
-      });
+      withYtPlayer(
+        (p) => {
+          p.setVolume?.(Math.round(v * 100));
+          if (v > 0) p.unMute?.();
+        },
+        () => {
+          ytPost('setVolume', [Math.round(v * 100)]);
+          if (v > 0) ytPost('unMute');
+        },
+      );
     } else {
       cfPost('setVolume', v);
     }
