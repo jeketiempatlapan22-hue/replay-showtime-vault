@@ -832,7 +832,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
             key={plainMode ? 'plain' : 'api'}
             id={ytIframeId}
             src={ytEmbedUrl}
-            onLoad={handleFrameLoaded}
+            onLoad={() => { handleFrameLoaded(); ytHandshake(); setTimeout(ytHandshake, 800); }}
             className={`absolute inset-0 w-full h-full ${plainMode ? '' : 'pointer-events-none'}`}
             title={title}
             allow="autoplay; encrypted-media; picture-in-picture; fullscreen; accelerometer; gyroscope"
