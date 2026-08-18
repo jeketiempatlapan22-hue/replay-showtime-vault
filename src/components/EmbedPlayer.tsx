@@ -485,30 +485,45 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
     iframeRef.current.contentWindow.postMessage({ event: 'command', func: event, args: value !== undefined ? [value] : [] }, '*');
   };
 
-  const withYtPlayer = (action: (p: YoutubePlayerApi) => void) => {
-    const apply = (attempt = 0) => {
-      const p = ytPlayerRef.current;
-      if (p && typeof p.playVideo === 'function') {
-        try { action(p); } catch { /* ignore */ }
-        return;
-      }
-      if (attempt < 20) setTimeout(() => apply(attempt + 1), 100);
-    };
-    apply();
+  // Fallback kontrol YouTube lewat postMessage (iframe API) — dipakai ketika
+  // objek YT.Player belum/tidak pernah ter-attach (API diblokir, init lambat).
+  const ytPost = (func: string, args: unknown[] = []) => {
+    const w = iframeRef.current?.contentWindow;
+    if (!w) return;
+    const msg = JSON.stringify({ event: 'command', func, args });
+    try { w.postMessage(msg, 'https://www.youtube-nocookie.com'); } catch { /* ignore */ }
+    try { w.postMessage(msg, 'https://www.youtube.com'); } catch { /* ignore */ }
+    try { w.postMessage(msg, '*'); } catch { /* ignore */ }
+  };
+
+  // Jalankan aksi via JS API bila tersedia; kalau tidak, langsung pakai postMessage
+  // agar tombol tetap responsif seketika (tanpa menunggu retry).
+  const withYtPlayer = (action: (p: YoutubePlayerApi) => void, fallback?: () => void) => {
+    const p = ytPlayerRef.current;
+    if (p && typeof p.playVideo === 'function') {
+      try { action(p); return; } catch { /* ignore */ }
+    }
+    fallback?.();
   };
 
   const togglePlay = () => {
     if (type === 'youtube') {
-      withYtPlayer((p) => {
-        const state = p.getPlayerState?.();
-        if (state === 1 || isPlayingRef.current) {
-          p.pauseVideo?.();
-          setIsPlaying(false);
-        } else {
-          p.playVideo?.();
-          setIsPlaying(true);
-        }
-      });
+      const next = !isPlayingRef.current;
+      withYtPlayer(
+        (p) => {
+          const state = p.getPlayerState?.();
+          const playing = state === 1 || (state === undefined && isPlayingRef.current);
+          if (playing) p.pauseVideo?.();
+          else p.playVideo?.();
+          setIsPlaying(!playing);
+          isPlayingRef.current = !playing;
+        },
+        () => {
+          ytPost(next ? 'playVideo' : 'pauseVideo');
+          setIsPlaying(next);
+          isPlayingRef.current = next;
+        },
+      );
     } else {
       if (iframeRef.current && iframeRef.current.src === 'about:blank') iframeRef.current.src = cfEmbedUrl;
       cfPost(isPlaying ? 'pause' : 'play');
