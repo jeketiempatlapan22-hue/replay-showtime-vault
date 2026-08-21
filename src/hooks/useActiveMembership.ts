@@ -123,7 +123,11 @@ export function useActiveMembership(): { membership: ActiveMembership | null; lo
     // Satu interval global saja untuk semua komponen yang memakai hook ini.
     subscriberCount += 1;
     if (sharedInterval === null) {
-      sharedInterval = window.setInterval(() => { void loadMembership(sharedUserId, true); }, 120_000);
+      // 5 menit + hanya saat tab terlihat: menekan jumlah request backend (hemat kredit).
+      sharedInterval = window.setInterval(() => {
+        if (document.visibilityState !== 'visible') return;
+        void loadMembership(sharedUserId, true);
+      }, 300_000);
     }
 
     return () => {
