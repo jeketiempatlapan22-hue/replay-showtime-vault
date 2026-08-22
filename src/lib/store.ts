@@ -198,7 +198,7 @@ export async function setSetting(key: string, value: string) {
 }
 
 export async function uploadImage(file: File): Promise<string> {
-  const compressed = await compressImage(file, 1280, 0.7);
+  const compressed = await compressImage(file, 0, 0.75);
   const ext = compressed.type === 'image/jpeg' ? 'jpg' : (file.name.split('.').pop() || 'jpg');
   const fileName = `${crypto.randomUUID()}.${ext}`;
   const { error } = await supabase.storage.from('card-images').upload(fileName, compressed, { contentType: compressed.type });
