@@ -14,8 +14,8 @@ export function thumbUrl(url?: string | null, width = 640, quality = 60): string
   if (!url.includes(PUBLIC_MARK)) return url;
   const base = url.replace(PUBLIC_MARK, RENDER_MARK);
   const sep = base.includes('?') ? '&' : '?';
-  // resize=contain menjaga rasio asli (tidak crop/zoom), hanya dikompres.
-  return `${base}${sep}width=${width}&quality=${quality}&resize=contain`;
+  // resize=cover menjaga rasio asli (tidak crop/zoom), hanya dikompres.
+  return `${base}${sep}width=${width}&quality=${quality}&resize=cover`;
 }
 
 /**

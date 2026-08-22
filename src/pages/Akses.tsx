@@ -94,7 +94,7 @@ export default function Akses() {
               <>
                 {replay.image_url && (
                   <div className="aspect-video bg-muted overflow-hidden">
-                    <img src={replay.image_url} alt={replay.title} className="w-full h-full object-contain" loading="lazy" />
+                    <img src={replay.image_url} alt={replay.title} className="w-full h-full object-cover" loading="lazy" />
                   </div>
                 )}
                 <div className="p-5 space-y-4">
