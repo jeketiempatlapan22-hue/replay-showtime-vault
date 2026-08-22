@@ -12,7 +12,7 @@ export async function getReplays(): Promise<ReplayRow[]> {
   // after the user enters the correct password.
   const { data, error } = await supabase
     .from('replays')
-    .select('id, title, show_name, date, criteria, featured_member, lineup, image_url, view_count, show_time, created_at, updated_at, source_type, price_coins, price_idr')
+    .select('id, title, show_name, date, criteria, featured_member, lineup, image_url, view_count, show_time, created_at, updated_at, source_type, price_coins, price_idr, image_fit')
     .eq('is_offline', false)
     .order('date', { ascending: false })
     .order('show_time', { ascending: false });
@@ -115,7 +115,7 @@ export async function addReplay(replay: {
   featured_member: string; lineup: string[];
   password: string; youtube_id: string; image_url: string;
   source_type?: string; m3u8_url?: string; show_time?: string;
-  admin_alias?: string; sources?: any; price_coins?: number; price_idr?: number;
+  admin_alias?: string; sources?: any; price_coins?: number; price_idr?: number; image_fit?: string;
 }) {
   const { error } = await supabase.from('replays').insert(replay);
   if (error) throw error;
