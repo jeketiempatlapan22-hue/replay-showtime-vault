@@ -1351,6 +1351,7 @@ export type Database = {
           date: string
           featured_member: string
           id: string
+          image_fit: string
           image_url: string
           is_offline: boolean
           lineup: string[]
@@ -1377,6 +1378,7 @@ export type Database = {
           date: string
           featured_member?: string
           id?: string
+          image_fit?: string
           image_url?: string
           is_offline?: boolean
           lineup?: string[]
@@ -1403,6 +1405,7 @@ export type Database = {
           date?: string
           featured_member?: string
           id?: string
+          image_fit?: string
           image_url?: string
           is_offline?: boolean
           lineup?: string[]
@@ -1894,6 +1897,7 @@ export type Database = {
           date: string
           featured_member: string
           id: string
+          image_fit: string
           image_url: string
           is_offline: boolean
           lineup: string[]
