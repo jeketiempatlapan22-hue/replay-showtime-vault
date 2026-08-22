@@ -40,6 +40,12 @@ function highlightText(text: string, query: string) {
   );
 }
 
+const FIT_CLASS: Record<string, string> = {
+  contain: 'object-contain',
+  'scale-down': 'object-scale-down',
+  cover: 'object-cover',
+};
+
 const REPLAY_DEFAULT_PRICE = 2000;
 const getReplayPrice = (r: any) => {
   const v = Number(r?.price_idr);
@@ -169,7 +175,7 @@ function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWatch, onUnlockAn
             fetchPriority={index < 3 ? 'auto' : 'low'}
             onLoad={() => setImgLoaded(true)}
             onError={() => setImgLoaded(true)}
-            className={`w-full h-full object-contain transition-opacity duration-200 ${imgLoaded ? 'opacity-100' : 'opacity-0'}`}
+            className={`w-full h-full ${fitClass} transition-opacity duration-200 ${imgLoaded ? 'opacity-100' : 'opacity-0'}`}
           />
 
           {!isUnlocked && (
