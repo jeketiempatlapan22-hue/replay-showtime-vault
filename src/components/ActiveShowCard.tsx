@@ -141,8 +141,8 @@ export default function ActiveShowCard({ show, index = 0 }: { show: ActiveShow; 
       style={{ animationDelay: `${index * 80}ms`, animationFillMode: 'forwards' }}
     >
       {show.image_url && (
-        <div className="relative aspect-video overflow-hidden">
-          <img src={thumbUrl(show.image_url, 640, 60)} alt={show.title} className="w-full h-full object-contain" />
+        <div className="relative aspect-video overflow-hidden bg-muted">
+          <img src={thumbUrl(show.image_url, 640, 60)} alt={show.title} width={640} height={360} loading="lazy" decoding="async" className="w-full h-full object-scale-down" />
           <div className="absolute top-2 left-2">
             <Badge variant="secondary" className="text-xs">{CATEGORY_LABELS[show.category] || show.category}</Badge>
           </div>

@@ -46,10 +46,10 @@ export default function MemberAvatar({ name, size = 56, showName = true, classNa
     <div className={`flex flex-col items-center gap-1 ${className}`}>
       <div
         className="rounded-full overflow-hidden border-2 border-primary/40 bg-secondary flex items-center justify-center shrink-0"
-        style={{ width: size, height: size }}
+        style={{ width: size, height: size, aspectRatio: "1 / 1" }}
       >
         {photo ? (
-          <img src={thumbUrl(photo, 128, 60)} alt={name} className="w-full h-full object-contain" loading="lazy" />
+          <img src={thumbUrl(photo, 128, 60)} alt={name} width={size} height={size} className="w-full h-full object-contain" loading="lazy" decoding="async" />
         ) : (
           <span className="text-xs font-bold text-muted-foreground">{initials}</span>
         )}
