@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { compressImage } from '@/lib/imageUrl';
 
 export interface Member {
   id: string;
@@ -28,9 +29,10 @@ export async function deleteMember(id: string) {
 }
 
 export async function uploadMemberPhoto(file: File): Promise<string> {
-  const ext = file.name.split('.').pop() || 'jpg';
+  const compressed = await compressImage(file, 512, 0.7);
+  const ext = compressed.type === 'image/jpeg' ? 'jpg' : (file.name.split('.').pop() || 'jpg');
   const fileName = `${crypto.randomUUID()}.${ext}`;
-  const { error } = await supabase.storage.from('member-photos').upload(fileName, file);
+  const { error } = await supabase.storage.from('member-photos').upload(fileName, compressed, { contentType: compressed.type });
   if (error) throw error;
   const { data } = supabase.storage.from('member-photos').getPublicUrl(fileName);
   return data.publicUrl;

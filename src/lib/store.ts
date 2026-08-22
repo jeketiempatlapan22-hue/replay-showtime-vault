@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import type { Tables } from '@/integrations/supabase/types';
+import { compressImage } from '@/lib/imageUrl';
 
 export type ReplayRow = Tables<'replays'>;
 export type MasterPasswordRow = Tables<'master_passwords'>;
@@ -197,9 +198,10 @@ export async function setSetting(key: string, value: string) {
 }
 
 export async function uploadImage(file: File): Promise<string> {
-  const ext = file.name.split('.').pop();
+  const compressed = await compressImage(file, 1280, 0.7);
+  const ext = compressed.type === 'image/jpeg' ? 'jpg' : (file.name.split('.').pop() || 'jpg');
   const fileName = `${crypto.randomUUID()}.${ext}`;
-  const { error } = await supabase.storage.from('card-images').upload(fileName, file);
+  const { error } = await supabase.storage.from('card-images').upload(fileName, compressed, { contentType: compressed.type });
   if (error) throw error;
   const { data } = supabase.storage.from('card-images').getPublicUrl(fileName);
   return data.publicUrl;
