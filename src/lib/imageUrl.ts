@@ -14,19 +14,19 @@ export function thumbUrl(url?: string | null, width = 640, quality = 60): string
   if (!url.includes(PUBLIC_MARK)) return url;
   const base = url.replace(PUBLIC_MARK, RENDER_MARK);
   const sep = base.includes('?') ? '&' : '?';
-  // resize=contain: gambar pas mengikuti bingkai, dikompres tanpa zoom berlebih.
-  return `${base}${sep}width=${width}&quality=${quality}&resize=contain`;
+  // Hanya kompresi kualitas: dimensi gambar tetap seperti aslinya.
+  return `${base}${sep}quality=${quality}`;
 }
 
 /**
  * Kompres file gambar di browser sebelum diunggah (maks sisi terpanjang & kualitas JPEG).
  * Jika gagal, file asli dikembalikan.
  */
-export async function compressImage(file: File, maxSize = 1280, quality = 0.7): Promise<File> {
+export async function compressImage(file: File, maxSize = 0, quality = 0.7): Promise<File> {
   try {
     if (!file.type.startsWith('image/') || file.type === 'image/gif') return file;
     const bitmap = await createImageBitmap(file);
-    const scale = Math.min(1, maxSize / Math.max(bitmap.width, bitmap.height));
+    const scale = maxSize > 0 ? Math.min(1, maxSize / Math.max(bitmap.width, bitmap.height)) : 1;
     const w = Math.round(bitmap.width * scale);
     const h = Math.round(bitmap.height * scale);
     const canvas = document.createElement('canvas');

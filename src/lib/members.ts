@@ -29,7 +29,7 @@ export async function deleteMember(id: string) {
 }
 
 export async function uploadMemberPhoto(file: File): Promise<string> {
-  const compressed = await compressImage(file, 512, 0.7);
+  const compressed = await compressImage(file, 0, 0.75);
   const ext = compressed.type === 'image/jpeg' ? 'jpg' : (file.name.split('.').pop() || 'jpg');
   const fileName = `${crypto.randomUUID()}.${ext}`;
   const { error } = await supabase.storage.from('member-photos').upload(fileName, compressed, { contentType: compressed.type });

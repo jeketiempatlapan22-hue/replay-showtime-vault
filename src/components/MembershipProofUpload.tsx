@@ -64,7 +64,7 @@ export default function MembershipProofUpload({ open, onOpenChange, orderId, sho
     try {
       const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
       const name = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-      const compressed = await compressImage(file, 1280, 0.65);
+      const compressed = await compressImage(file, 0, 0.7);
       const { error: upErr } = await supabase.storage.from('membership-proofs').upload(name, compressed, { contentType: compressed.type, upsert: false });
       if (upErr) throw upErr;
 
