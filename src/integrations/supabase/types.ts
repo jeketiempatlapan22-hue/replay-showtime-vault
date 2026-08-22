@@ -2284,6 +2284,7 @@ export type Database = {
       mark_wa_sent: { Args: { _key: string }; Returns: undefined }
       phone_exists: { Args: { _phone: string }; Returns: boolean }
       prune_old_logs: { Args: never; Returns: undefined }
+      prune_proofs_and_storage: { Args: never; Returns: number }
       rate_replay: {
         Args: { _browser_id: string; _rating: number; _replay_id: string }
         Returns: undefined

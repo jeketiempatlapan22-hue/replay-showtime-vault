@@ -11,6 +11,7 @@ import { getReplayPurchase } from '@/lib/purchases';
 import { toast } from '@/hooks/use-toast';
 import type { ActiveMembership } from '@/hooks/useActiveMembership';
 import { isReplayCoveredByMembership } from '@/lib/membershipReplayAccess';
+import { thumbUrl } from '@/lib/imageUrl';
 
 
 const CRITERIA_LABELS: Record<string, string> = {
@@ -145,7 +146,7 @@ function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWatch, onUnlockAn
   const criteriaLabel = CRITERIA_LABELS[replay.criteria] || replay.criteria;
   // SECURITY: thumbnail uses uploaded image only — youtube_id is hidden
   // from the client until the user enters the correct password.
-  const thumbnailUrl = replay.image_url || '/placeholder.svg';
+  const thumbnailUrl = replay.image_url ? thumbUrl(replay.image_url, 640, 60) : '/placeholder.svg';
 
   return (
     <div>
