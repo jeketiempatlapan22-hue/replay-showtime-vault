@@ -197,53 +197,38 @@ export default function ActiveShowCard({ show, index = 0 }: { show: ActiveShow; 
         )}
 
 
-        {/* Countdown */}
-        <div className="pt-3 border-t border-border/50">
+        {/* Countdown ringkas */}
+        <div className="pt-2 border-t border-border/50 text-xs">
           {cd.live ? (
-            <div className="text-center py-2">
-              <p className="text-xs text-muted-foreground mb-1">Sedang Berlangsung</p>
-              <p className="text-lg font-bold text-red-500 animate-pulse">🔴 ON AIR</p>
-            </div>
+            <p className="font-bold text-red-500 animate-pulse">🔴 ON AIR — Sedang Berlangsung</p>
           ) : (
-            <>
-              <p className="text-xs text-muted-foreground text-center mb-2">Hitung Mundur</p>
-              <div className="grid grid-cols-4 gap-1.5 text-center">
-                {[
-                  { v: cd.days, l: 'Hari' },
-                  { v: cd.hours, l: 'Jam' },
-                  { v: cd.minutes, l: 'Menit' },
-                  { v: cd.seconds, l: 'Detik' },
-                ].map((u, i) => (
-                  <div key={i} className="rounded-md bg-primary/10 border border-primary/20 py-1.5">
-                    <div className="text-lg sm:text-xl font-bold text-primary tabular-nums">{pad(u.v)}</div>
-                    <div className="text-[10px] text-muted-foreground uppercase tracking-wider">{u.l}</div>
-                  </div>
-                ))}
-              </div>
-            </>
+            <p className="text-muted-foreground">
+              Mulai dalam{' '}
+              <span className="font-semibold text-primary tabular-nums">
+                {cd.days > 0 ? `${cd.days}h ` : ''}{pad(cd.hours)}:{pad(cd.minutes)}:{pad(cd.seconds)}
+              </span>
+            </p>
           )}
         </div>
 
-        {/* Price block */}
+        {/* Harga ringkas */}
         {(replayMode ? replayBuyable : showBuyable) && (
-          <div className="rounded-md border border-primary/20 bg-primary/5 p-2.5 space-y-1">
-            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Harga {replayMode ? 'Replay' : 'Show'}</div>
-            <div className="flex items-center justify-between gap-2 flex-wrap">
-              {(replayMode ? replayPriced : showPriced) ? (
-                <span className="text-base font-bold text-primary">
-                  Rp {(replayMode ? replayAmount : showAmount).toLocaleString('id-ID')}
-                </span>
-              ) : (
-                <span className="text-xs text-muted-foreground">Hanya tukar koin</span>
-              )}
-              {((replayMode ? replayCoinPrice : showCoinPrice) > 0) && (
-                <Badge variant="secondary" className="text-xs">
-                  {(replayMode ? replayPriced : showPriced) ? 'atau ' : ''}{replayMode ? replayCoinPrice : showCoinPrice} koin
-                </Badge>
-              )}
-            </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            {(replayMode ? replayPriced : showPriced) ? (
+              <span className="text-sm font-bold text-primary">
+                Rp {(replayMode ? replayAmount : showAmount).toLocaleString('id-ID')}
+              </span>
+            ) : (
+              <span className="text-xs text-muted-foreground">Hanya tukar koin</span>
+            )}
+            {((replayMode ? replayCoinPrice : showCoinPrice) > 0) && (
+              <Badge variant="secondary" className="text-xs">
+                {replayMode ? replayCoinPrice : showCoinPrice} koin
+              </Badge>
+            )}
           </div>
         )}
+
 
         {/* Salin link token banner */}
         {purchasedToken && (() => {
