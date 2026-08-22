@@ -142,7 +142,7 @@ export default function ActiveShowCard({ show, index = 0 }: { show: ActiveShow; 
     >
       {show.image_url && (
         <div className="relative aspect-video overflow-hidden">
-          <img src={thumbUrl(show.image_url, 640, 60)} alt={show.title} className="w-full h-full object-cover" />
+          <img src={thumbUrl(show.image_url, 640, 60)} alt={show.title} className="w-full h-full object-contain" />
           <div className="absolute top-2 left-2">
             <Badge variant="secondary" className="text-xs">{CATEGORY_LABELS[show.category] || show.category}</Badge>
           </div>
