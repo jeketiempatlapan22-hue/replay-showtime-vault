@@ -143,6 +143,7 @@ export default function ActiveShowCard({ show, index = 0 }: { show: ActiveShow; 
       {show.image_url && (
         <div className="relative aspect-video overflow-hidden bg-muted">
           <img src={thumbUrl(show.image_url, 640, 60)} alt={show.title} width={640} height={360} loading="lazy" decoding="async" className="w-full h-full object-cover object-center" />
+          <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/85 via-black/35 to-transparent" />
           <div className="absolute top-2 left-2">
             <Badge variant="secondary" className="text-xs">{CATEGORY_LABELS[show.category] || show.category}</Badge>
           </div>
@@ -153,30 +154,20 @@ export default function ActiveShowCard({ show, index = 0 }: { show: ActiveShow; 
               </Badge>
             </div>
           )}
+          <h3 className="absolute left-3 right-3 bottom-2 text-base sm:text-lg font-bold text-white line-clamp-2 font-sans drop-shadow">{show.title}</h3>
         </div>
       )}
 
-      <div className="p-4 space-y-3">
-        <h3 className="text-lg font-semibold text-foreground line-clamp-2 font-sans">{show.title}</h3>
-
-        {show.description && (
-          <p className="text-sm text-muted-foreground line-clamp-2">{show.description}</p>
+      <div className="p-3 space-y-2">
+        {!show.image_url && (
+          <h3 className="text-lg font-semibold text-foreground line-clamp-2 font-sans">{show.title}</h3>
         )}
 
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Calendar className="w-4 h-4 text-primary" />
-          <span>{formattedDate}</span>
+        <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
+          <span className="inline-flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5 text-primary" />{formattedDate}</span>
+          <span className="inline-flex items-center gap-1.5"><Clock className="w-3.5 h-3.5 text-primary" />{formattedTime}</span>
         </div>
 
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Clock className="w-4 h-4 text-primary" />
-          <span>{formattedTime}</span>
-        </div>
-
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Tag className="w-4 h-4 text-primary" />
-          <span>{CATEGORY_LABELS[show.category] || show.category}</span>
-        </div>
 
         {show.lineup.length > 0 && (
           <div className="flex items-start gap-2 text-sm text-muted-foreground">
@@ -206,53 +197,38 @@ export default function ActiveShowCard({ show, index = 0 }: { show: ActiveShow; 
         )}
 
 
-        {/* Countdown */}
-        <div className="pt-3 border-t border-border/50">
+        {/* Countdown ringkas */}
+        <div className="pt-2 border-t border-border/50 text-xs">
           {cd.live ? (
-            <div className="text-center py-2">
-              <p className="text-xs text-muted-foreground mb-1">Sedang Berlangsung</p>
-              <p className="text-lg font-bold text-red-500 animate-pulse">🔴 ON AIR</p>
-            </div>
+            <p className="font-bold text-red-500 animate-pulse">🔴 ON AIR — Sedang Berlangsung</p>
           ) : (
-            <>
-              <p className="text-xs text-muted-foreground text-center mb-2">Hitung Mundur</p>
-              <div className="grid grid-cols-4 gap-1.5 text-center">
-                {[
-                  { v: cd.days, l: 'Hari' },
-                  { v: cd.hours, l: 'Jam' },
-                  { v: cd.minutes, l: 'Menit' },
-                  { v: cd.seconds, l: 'Detik' },
-                ].map((u, i) => (
-                  <div key={i} className="rounded-md bg-primary/10 border border-primary/20 py-1.5">
-                    <div className="text-lg sm:text-xl font-bold text-primary tabular-nums">{pad(u.v)}</div>
-                    <div className="text-[10px] text-muted-foreground uppercase tracking-wider">{u.l}</div>
-                  </div>
-                ))}
-              </div>
-            </>
+            <p className="text-muted-foreground">
+              Mulai dalam{' '}
+              <span className="font-semibold text-primary tabular-nums">
+                {cd.days > 0 ? `${cd.days}h ` : ''}{pad(cd.hours)}:{pad(cd.minutes)}:{pad(cd.seconds)}
+              </span>
+            </p>
           )}
         </div>
 
-        {/* Price block */}
+        {/* Harga ringkas */}
         {(replayMode ? replayBuyable : showBuyable) && (
-          <div className="rounded-md border border-primary/20 bg-primary/5 p-2.5 space-y-1">
-            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Harga {replayMode ? 'Replay' : 'Show'}</div>
-            <div className="flex items-center justify-between gap-2 flex-wrap">
-              {(replayMode ? replayPriced : showPriced) ? (
-                <span className="text-base font-bold text-primary">
-                  Rp {(replayMode ? replayAmount : showAmount).toLocaleString('id-ID')}
-                </span>
-              ) : (
-                <span className="text-xs text-muted-foreground">Hanya tukar koin</span>
-              )}
-              {((replayMode ? replayCoinPrice : showCoinPrice) > 0) && (
-                <Badge variant="secondary" className="text-xs">
-                  {(replayMode ? replayPriced : showPriced) ? 'atau ' : ''}{replayMode ? replayCoinPrice : showCoinPrice} koin
-                </Badge>
-              )}
-            </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            {(replayMode ? replayPriced : showPriced) ? (
+              <span className="text-sm font-bold text-primary">
+                Rp {(replayMode ? replayAmount : showAmount).toLocaleString('id-ID')}
+              </span>
+            ) : (
+              <span className="text-xs text-muted-foreground">Hanya tukar koin</span>
+            )}
+            {((replayMode ? replayCoinPrice : showCoinPrice) > 0) && (
+              <Badge variant="secondary" className="text-xs">
+                {replayMode ? replayCoinPrice : showCoinPrice} koin
+              </Badge>
+            )}
           </div>
         )}
+
 
         {/* Salin link token banner */}
         {purchasedToken && (() => {
