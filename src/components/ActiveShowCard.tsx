@@ -143,6 +143,7 @@ export default function ActiveShowCard({ show, index = 0 }: { show: ActiveShow; 
       {show.image_url && (
         <div className="relative aspect-video overflow-hidden bg-muted">
           <img src={thumbUrl(show.image_url, 640, 60)} alt={show.title} width={640} height={360} loading="lazy" decoding="async" className="w-full h-full object-cover object-center" />
+          <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/85 via-black/35 to-transparent" />
           <div className="absolute top-2 left-2">
             <Badge variant="secondary" className="text-xs">{CATEGORY_LABELS[show.category] || show.category}</Badge>
           </div>
@@ -153,30 +154,20 @@ export default function ActiveShowCard({ show, index = 0 }: { show: ActiveShow; 
               </Badge>
             </div>
           )}
+          <h3 className="absolute left-3 right-3 bottom-2 text-base sm:text-lg font-bold text-white line-clamp-2 font-sans drop-shadow">{show.title}</h3>
         </div>
       )}
 
-      <div className="p-4 space-y-3">
-        <h3 className="text-lg font-semibold text-foreground line-clamp-2 font-sans">{show.title}</h3>
-
-        {show.description && (
-          <p className="text-sm text-muted-foreground line-clamp-2">{show.description}</p>
+      <div className="p-3 space-y-2">
+        {!show.image_url && (
+          <h3 className="text-lg font-semibold text-foreground line-clamp-2 font-sans">{show.title}</h3>
         )}
 
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Calendar className="w-4 h-4 text-primary" />
-          <span>{formattedDate}</span>
+        <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
+          <span className="inline-flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5 text-primary" />{formattedDate}</span>
+          <span className="inline-flex items-center gap-1.5"><Clock className="w-3.5 h-3.5 text-primary" />{formattedTime}</span>
         </div>
 
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Clock className="w-4 h-4 text-primary" />
-          <span>{formattedTime}</span>
-        </div>
-
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Tag className="w-4 h-4 text-primary" />
-          <span>{CATEGORY_LABELS[show.category] || show.category}</span>
-        </div>
 
         {show.lineup.length > 0 && (
           <div className="flex items-start gap-2 text-sm text-muted-foreground">
