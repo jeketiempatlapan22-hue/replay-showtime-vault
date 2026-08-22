@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Upload, Loader2, MessageCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { compressImage } from '@/lib/imageUrl';
 
 interface Props {
   open: boolean;
@@ -63,7 +64,8 @@ export default function MembershipProofUpload({ open, onOpenChange, orderId, sho
     try {
       const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
       const name = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-      const { error: upErr } = await supabase.storage.from('membership-proofs').upload(name, file, { contentType: file.type, upsert: false });
+      const compressed = await compressImage(file, 1280, 0.65);
+      const { error: upErr } = await supabase.storage.from('membership-proofs').upload(name, compressed, { contentType: compressed.type, upsert: false });
       if (upErr) throw upErr;
 
       const { data: auth } = await supabase.auth.getUser();

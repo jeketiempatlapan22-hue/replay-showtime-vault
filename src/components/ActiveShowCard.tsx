@@ -14,6 +14,7 @@ import { getShowPurchase, setShowPurchase } from '@/lib/purchases';
 import { MEMBERSHIP_UPDATED_EVENT, readMembershipCredentials } from '@/lib/membershipAccess';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
+import { thumbUrl } from '@/lib/imageUrl';
 
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -141,7 +142,7 @@ export default function ActiveShowCard({ show, index = 0 }: { show: ActiveShow; 
     >
       {show.image_url && (
         <div className="relative aspect-video overflow-hidden">
-          <img src={show.image_url} alt={show.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+          <img src={thumbUrl(show.image_url, 640, 60)} alt={show.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
           <div className="absolute top-2 left-2">
             <Badge variant="secondary" className="text-xs">{CATEGORY_LABELS[show.category] || show.category}</Badge>
           </div>

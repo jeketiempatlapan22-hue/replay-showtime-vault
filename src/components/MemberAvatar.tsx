@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { thumbUrl } from '@/lib/imageUrl';
 
 interface Cache { [name: string]: string | null }
 let cache: Cache | null = null;
@@ -48,7 +49,7 @@ export default function MemberAvatar({ name, size = 56, showName = true, classNa
         style={{ width: size, height: size }}
       >
         {photo ? (
-          <img src={photo} alt={name} className="w-full h-full object-cover" loading="lazy" />
+          <img src={thumbUrl(photo, 128, 60)} alt={name} className="w-full h-full object-cover" loading="lazy" />
         ) : (
           <span className="text-xs font-bold text-muted-foreground">{initials}</span>
         )}

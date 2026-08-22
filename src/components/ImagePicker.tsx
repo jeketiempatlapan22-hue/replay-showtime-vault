@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { uploadImage, getGalleryImages } from '@/lib/store';
 import { toast } from '@/hooks/use-toast';
+import { thumbUrl } from '@/lib/imageUrl';
 
 interface ImagePickerProps {
   value: string;
@@ -52,7 +53,7 @@ export default function ImagePicker({ value, onChange }: ImagePickerProps) {
   return (
     <div className="space-y-2">
       {value && (
-        <img src={value} alt="Preview" className="w-full h-32 object-cover rounded-lg border border-border" />
+        <img src={thumbUrl(value, 480, 60)} alt="Preview" className="w-full h-32 object-cover rounded-lg border border-border" />
       )}
 
       <div className="flex gap-2">
@@ -82,7 +83,7 @@ export default function ImagePicker({ value, onChange }: ImagePickerProps) {
                   className={`relative aspect-video rounded-lg overflow-hidden border-2 transition-all ${value === url ? 'border-primary' : 'border-border hover:border-primary/50'}`}
                   onClick={() => { onChange(url); setShowGallery(false); }}
                 >
-                  <img src={url} alt="" className="w-full h-full object-cover" />
+                  <img src={thumbUrl(url, 320, 55)} alt="" className="w-full h-full object-cover" />
                   {value === url && (
                     <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
                       <Check className="w-6 h-6 text-primary" />
