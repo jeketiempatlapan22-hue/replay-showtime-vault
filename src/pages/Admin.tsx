@@ -76,7 +76,7 @@ export default function Admin() {
   const [editingReplay, setEditingReplay] = useState<ReplayRow | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ReplayRow | null>(null);
 
-  const [form, setForm] = useState({ title: '', showName: '', date: '', showTime: '19:00', criteria: 'reguler', featuredMember: '', lineup: '', password: '', adminAlias: '', youtubeId: '', imageUrl: '', sourceType: 'youtube', m3u8Url: '', sources: [] as PlaylistSource[], priceCoins: 1, priceIdr: 2000 });
+  const [form, setForm] = useState({ title: '', showName: '', date: '', showTime: '19:00', criteria: 'reguler', featuredMember: '', lineup: '', password: '', adminAlias: '', youtubeId: '', imageUrl: '', sourceType: 'youtube', m3u8Url: '', sources: [] as PlaylistSource[], priceCoins: 1, priceIdr: 2000, imageFit: 'contain' });
   const [liveChatEnabled, setLiveChatEnabled] = useState(true);
 
   const [mpYear, setMpYear] = useState(String(new Date().getFullYear()));
@@ -371,7 +371,7 @@ export default function Admin() {
   const handleLogout = async () => { await supabase.auth.signOut(); setIsLoggedIn(false); };
 
   const resetForm = () => {
-    setForm({ title: '', showName: '', date: '', showTime: '19:00', criteria: 'reguler', featuredMember: '', lineup: '', password: '', adminAlias: '', youtubeId: '', imageUrl: '', sourceType: 'youtube', m3u8Url: '', sources: [], priceCoins: 1, priceIdr: 2000 });
+    setForm({ title: '', showName: '', date: '', showTime: '19:00', criteria: 'reguler', featuredMember: '', lineup: '', password: '', adminAlias: '', youtubeId: '', imageUrl: '', sourceType: 'youtube', m3u8Url: '', sources: [], priceCoins: 1, priceIdr: 2000, imageFit: 'contain' });
     setEditingReplay(null);
   };
 
@@ -414,6 +414,7 @@ export default function Admin() {
         sources: normalizedSources as any,
         price_coins: Number.isFinite(Number(form.priceCoins)) ? Math.max(0, Number(form.priceCoins)) : 1,
         price_idr: Number.isFinite(Number(form.priceIdr)) ? Math.max(0, Number(form.priceIdr)) : 2000,
+        image_fit: form.imageFit || 'contain',
       };
       if (editingReplay) {
         await updateReplay(editingReplay.id, payload);
@@ -441,6 +442,7 @@ export default function Admin() {
       sources: Array.isArray((r as any).sources) ? (r as any).sources : [],
       priceCoins: ((r as any).price_coins ?? 1),
       priceIdr: ((r as any).price_idr ?? 2000),
+      imageFit: ((r as any).image_fit as string) || 'contain',
     });
     setShowAddDialog(true);
   };
@@ -1507,6 +1509,18 @@ export default function Admin() {
               )}
             </div>
             <div><Label>Foto Kartu</Label><ImagePicker value={form.imageUrl} onChange={url => setForm(f => ({ ...f, imageUrl: url }))} /></div>
+            <div>
+              <Label>Mode Tampilan Gambar</Label>
+              <Select value={form.imageFit} onValueChange={v => setForm(f => ({ ...f, imageFit: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="contain">Contain — seluruh poster terlihat (tanpa zoom)</SelectItem>
+                  <SelectItem value="scale-down">Scale down — pas bingkai, tidak pernah diperbesar</SelectItem>
+                  <SelectItem value="cover">Cover — penuhi bingkai (bisa terpotong)</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-[11px] text-muted-foreground mt-1">Gunakan Contain/Scale down agar wajah member dan poster tidak ter-zoom.</p>
+            </div>
             <div><Label>Sandi *</Label><Input placeholder="Sandi untuk replay ini" value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} /></div>
             <div>
               <Label>Harga Replay (Rp)</Label>
