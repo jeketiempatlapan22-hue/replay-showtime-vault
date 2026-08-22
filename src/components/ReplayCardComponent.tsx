@@ -41,9 +41,9 @@ function highlightText(text: string, query: string) {
 }
 
 const FIT_CLASS: Record<string, string> = {
-  contain: 'object-contain',
+  contain: 'object-cover object-top',
   'scale-down': 'object-scale-down',
-  cover: 'object-cover',
+  cover: 'object-cover object-center',
 };
 
 const REPLAY_DEFAULT_PRICE = 2000;
@@ -153,7 +153,7 @@ function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWatch, onUnlockAn
   // SECURITY: thumbnail uses uploaded image only — youtube_id is hidden
   // from the client until the user enters the correct password.
   const thumbnailUrl = replay.image_url ? thumbUrl(replay.image_url, 640, 60) : '/placeholder.svg';
-  const fitClass = FIT_CLASS[(replay as any).image_fit as string] || 'object-contain';
+  const fitClass = FIT_CLASS[(replay as any).image_fit as string] || 'object-cover object-top';
 
   return (
     <div>

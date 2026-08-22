@@ -49,7 +49,7 @@ export default function MemberAvatar({ name, size = 56, showName = true, classNa
         style={{ width: size, height: size, aspectRatio: "1 / 1" }}
       >
         {photo ? (
-          <img src={thumbUrl(photo, 128, 60)} alt={name} width={size} height={size} className="w-full h-full object-contain" loading="lazy" decoding="async" />
+          <img src={thumbUrl(photo, 128, 60)} alt={name} width={size} height={size} className="w-full h-full object-cover object-top" loading="lazy" decoding="async" />
         ) : (
           <span className="text-xs font-bold text-muted-foreground">{initials}</span>
         )}
