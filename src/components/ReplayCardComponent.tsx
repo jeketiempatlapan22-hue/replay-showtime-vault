@@ -158,8 +158,8 @@ function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWatch, onUnlockAn
   return (
     <div>
       <div
-        className="group relative rounded-xl overflow-hidden border border-border bg-card/95 hover:border-primary/50 transition-colors duration-200 animate-fade-up"
-        style={{ animationDelay: `${Math.min(index, 3) * 35}ms`, animationFillMode: 'forwards', contentVisibility: 'auto', containIntrinsicSize: '520px' }}
+        className="group relative rounded-xl overflow-hidden border border-border bg-card/80 backdrop-blur-sm hover:border-primary/60 transition-all duration-300 hover:shadow-lg hover:shadow-primary/20 animate-fade-up"
+        style={{ animationDelay: `${Math.min(index, 3) * 35}ms`, animationFillMode: 'forwards', contentVisibility: 'auto', containIntrinsicSize: '420px' }}
       >
         <div className="relative aspect-video overflow-hidden bg-muted">
           {!imgLoaded && (
@@ -177,59 +177,45 @@ function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWatch, onUnlockAn
             onError={() => setImgLoaded(true)}
             className={`w-full h-full ${fitClass} transition-opacity duration-200 ${imgLoaded ? 'opacity-100' : 'opacity-0'}`}
           />
-
-          {!isUnlocked && (
-            <div className="absolute inset-0 bg-background/80 flex items-center justify-center">
-              <Lock className="w-10 h-10 text-primary animate-pulse" />
-            </div>
-          )}
-          {isUnlocked && (
+          <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/85 via-black/35 to-transparent" />
+          <div className="absolute top-2 left-2">
+            <Badge variant="secondary" className="text-xs">{criteriaLabel}</Badge>
+          </div>
+          {isUnlocked ? (
             <div className="absolute top-2 right-2">
               <Badge className="bg-green-600/90 text-foreground border-0">
                 <Unlock className="w-3 h-3 mr-1" /> Terbuka
               </Badge>
             </div>
+          ) : !isPurchased && !membershipCovered && (
+            <div className="absolute top-2 right-2">
+              <Badge className="bg-background/70 backdrop-blur text-foreground border-0">
+                <Lock className="w-3 h-3 mr-1" /> Terkunci
+              </Badge>
+            </div>
           )}
-          <div className="absolute top-2 left-2">
-            <Badge variant="secondary" className="text-xs">{criteriaLabel}</Badge>
-          </div>
           {onToggleBookmark && (
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); onToggleBookmark(replay.id); }}
-              className={`absolute bottom-2 right-2 p-1.5 rounded-full transition-all duration-200 ${isBookmarked ? 'bg-primary text-primary-foreground' : 'bg-background/60 backdrop-blur text-muted-foreground hover:text-primary'}`}
+              className={`absolute bottom-2 right-2 z-10 p-1.5 rounded-full transition-all duration-200 ${isBookmarked ? 'bg-primary text-primary-foreground' : 'bg-background/60 backdrop-blur text-muted-foreground hover:text-primary'}`}
             >
               {isBookmarked ? <BookmarkCheck className="w-4 h-4" /> : <Bookmark className="w-4 h-4" />}
             </button>
           )}
+          <h3 className="absolute left-3 right-12 bottom-2 text-base sm:text-lg font-bold text-white line-clamp-2 font-sans drop-shadow">{highlightText(replay.title, searchQuery)}</h3>
         </div>
 
-        <div className="p-4 space-y-3">
-          <h3 className="text-lg font-semibold text-foreground line-clamp-2 font-sans">{highlightText(replay.title, searchQuery)}</h3>
-
-          {replay.show_name && (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Tv className="w-4 h-4 text-primary" />
-              <span>{highlightText(replay.show_name, searchQuery)}</span>
-            </div>
-          )}
-          
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Calendar className="w-4 h-4 text-primary" />
-            <span>{formattedDate}</span>
+        <div className="p-3 space-y-2">
+          <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
+            <span className="inline-flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5 text-primary" />{formattedDate}</span>
+            {replay.show_name && (
+              <span className="inline-flex items-center gap-1.5"><Tv className="w-3.5 h-3.5 text-primary" />{highlightText(replay.show_name, searchQuery)}</span>
+            )}
+            {replay.featured_member && (
+              <span className="inline-flex items-center gap-1.5"><Star className="w-3.5 h-3.5 text-primary" />{highlightText(replay.featured_member, searchQuery)}</span>
+            )}
           </div>
-
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Tag className="w-4 h-4 text-primary" />
-            <span>{criteriaLabel}</span>
-          </div>
-
-          {replay.featured_member && (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Star className="w-4 h-4 text-primary" />
-              <span className="font-medium">{highlightText(replay.featured_member, searchQuery)}</span>
-            </div>
-          )}
 
           <div className="flex items-start gap-2 text-sm text-muted-foreground">
             <Users className="w-4 h-4 text-primary mt-1.5 shrink-0" aria-hidden="true" />
@@ -253,17 +239,15 @@ function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWatch, onUnlockAn
                   </li>
                 ))}
               </ul>
-
             </div>
           </div>
 
-
           {membershipCovered ? (
-            <div className="space-y-2 mt-2">
+            <div className="space-y-2 pt-1">
               <Button type="button" className="w-full" onClick={watchWithMembership}>
                 <Play className="w-4 h-4 mr-2" /> Tonton Replay
               </Button>
-              <div className="rounded-md border border-primary/30 bg-primary/10 p-2 flex items-center gap-1.5">
+              <div className="rounded-md border border-primary/30 bg-primary/10 p-1.5 flex items-center gap-1.5">
                 <Crown className="w-3.5 h-3.5 text-primary shrink-0" />
                 <span className="text-[10px] text-primary font-semibold">
                   Termasuk Membership {membership?.package_name ? `· ${membership.package_name}` : ''}
@@ -271,7 +255,7 @@ function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWatch, onUnlockAn
               </div>
             </div>
           ) : isPurchased ? (
-            <div className="space-y-2 mt-2">
+            <div className="space-y-2 pt-1">
               <Button
                 type="button"
                 className="w-full"
@@ -301,24 +285,21 @@ function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWatch, onUnlockAn
               </div>
             </div>
           ) : isUnlocked ? (
-            <Button type="button" className="w-full mt-2" onClick={() => onWatch(replay)}>
+            <Button type="button" className="w-full" onClick={() => onWatch(replay)}>
               <Play className="w-4 h-4 mr-2" /> Tonton Sekarang
             </Button>
           ) : (
-            <div className="space-y-2 mt-2">
+            <div className="space-y-2 pt-1">
               {membershipActiveButOutside && (
-                <div className="rounded-md border border-border bg-muted/30 p-2 text-[10px] text-muted-foreground">
+                <div className="rounded-md border border-border bg-muted/30 p-1.5 text-[10px] text-muted-foreground">
                   Replay ini di luar periode membership kamu, jadi masih perlu dibeli terpisah.
                 </div>
               )}
-              <div className="rounded-md border border-primary/20 bg-primary/5 p-2.5 space-y-1">
-                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Harga Replay</div>
-                <div className="flex items-center justify-between gap-2 flex-wrap">
-                  <span className="text-base font-bold text-primary">Rp {getReplayPrice(replay).toLocaleString('id-ID')}</span>
-                  {((replay as any).price_coins ?? 0) > 0 && (
-                    <Badge variant="secondary" className="text-xs">atau {(replay as any).price_coins} koin</Badge>
-                  )}
-                </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-sm font-bold text-primary">Rp {getReplayPrice(replay).toLocaleString('id-ID')}</span>
+                {((replay as any).price_coins ?? 0) > 0 && (
+                  <Badge variant="secondary" className="text-xs">atau {(replay as any).price_coins} koin</Badge>
+                )}
               </div>
               <Button type="button" className="w-full gap-2" onClick={() => setBuyOpen(true)}>
                 <ShoppingCart className="w-4 h-4" />
