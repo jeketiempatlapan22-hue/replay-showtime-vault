@@ -26,8 +26,8 @@ function cleanLineup(lineup: unknown) {
 
 function cleanActiveShowPayload(input: Record<string, unknown>) {
   const payload: Record<string, unknown> = {};
-  const textFields = ['title', 'show_date', 'show_time', 'category', 'description', 'image_url', 'admin_alias', 'live_url', 'live_type', 'live_password', 'replay_m3u8_url', 'replay_youtube_url', 'idn_show_id', 'group_link', 'replay_info'];
-  const boolFields = ['is_active', 'is_special', 'replay_enabled', 'is_live', 'live_auto_schedule', 'live_require_password', 'replay_mode'];
+  const textFields = ['title', 'show_date', 'show_time', 'category', 'description', 'image_url', 'admin_alias', 'live_url', 'live_type', 'live_password', 'replay_m3u8_url', 'replay_youtube_url', 'idn_show_id', 'group_link', 'group_link_label', 'group_link_note', 'replay_info'];
+  const boolFields = ['is_active', 'is_special', 'replay_enabled', 'is_live', 'live_auto_schedule', 'live_require_password', 'replay_mode', 'group_link_enabled'];
   const numberFields = ['sort_order', 'price_show', 'price_replay', 'price_show_coins', 'price_replay_coins', 'pakasir_amount'];
 
   for (const field of textFields) {

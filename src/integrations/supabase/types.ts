@@ -109,6 +109,9 @@ export type Database = {
           created_at: string
           description: string
           group_link: string
+          group_link_enabled: boolean
+          group_link_label: string
+          group_link_note: string
           id: string
           idn_show_id: string
           image_url: string
@@ -145,6 +148,9 @@ export type Database = {
           created_at?: string
           description?: string
           group_link?: string
+          group_link_enabled?: boolean
+          group_link_label?: string
+          group_link_note?: string
           id?: string
           idn_show_id?: string
           image_url?: string
@@ -181,6 +187,9 @@ export type Database = {
           created_at?: string
           description?: string
           group_link?: string
+          group_link_enabled?: boolean
+          group_link_label?: string
+          group_link_note?: string
           id?: string
           idn_show_id?: string
           image_url?: string
@@ -1774,6 +1783,9 @@ export type Database = {
           created_at: string
           description: string
           group_link: string
+          group_link_enabled: boolean
+          group_link_label: string
+          group_link_note: string
           id: string
           idn_show_id: string
           image_url: string
@@ -1819,6 +1831,9 @@ export type Database = {
           created_at: string
           description: string
           group_link: string
+          group_link_enabled: boolean
+          group_link_label: string
+          group_link_note: string
           id: string
           idn_show_id: string
           image_url: string

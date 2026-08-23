@@ -34,6 +34,9 @@ export interface ActiveShow {
   replay_youtube_url?: string;
   idn_show_id?: string;
   group_link?: string;
+  group_link_enabled?: boolean;
+  group_link_label?: string;
+  group_link_note?: string;
   replay_info?: string;
   created_at?: string;
   updated_at?: string;
