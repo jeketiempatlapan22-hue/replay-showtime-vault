@@ -35,7 +35,7 @@ type SrcType = 'm3u8' | 'youtube' | 'cloudflare';
 interface PublicSource { label: string; type: SrcType }
 interface PrivateSource extends PublicSource { url: string }
 interface MembershipInfo { expires_at?: string; resets_used: number; resets_max: number; remaining: number; includes_replays?: boolean; max_devices?: number }
-interface LiveStatus { enabled: boolean; title: string; type: string; require_password: boolean; sources: PublicSource[]; lineup: string[]; show_date?: string; show_time?: string; image_url?: string; idn_show_id?: string }
+interface LiveStatus { enabled: boolean; title: string; type: string; require_password: boolean; sources: PublicSource[]; lineup: string[]; show_date?: string; show_time?: string; image_url?: string; idn_show_id?: string; group_link?: string; group_link_enabled?: boolean; group_link_label?: string; group_link_note?: string }
 interface UnlockedConfig { title: string; type: SrcType; url: string; sources: PrivateSource[]; watermark: string; enabled: boolean; idn_show_id?: string }
 type SourceLike = Partial<Record<keyof PrivateSource, unknown>>;
 interface IdnTokenResponse { error?: string; xApiToken?: string; xSecKey?: string; xTokenId?: string; xShowId?: string; playbackUrl?: string }
@@ -174,7 +174,7 @@ export default function Live() {
   const fetchStatus = () => {
     if (showId) {
       return supabase.from('active_shows')
-        .select('id,title,is_live,live_type,live_require_password,lineup,show_date,show_time,is_active,image_url,idn_show_id')
+        .select('id,title,is_live,live_type,live_require_password,lineup,show_date,show_time,is_active,image_url,idn_show_id,group_link,group_link_enabled,group_link_label,group_link_note')
         .eq('id', showId).maybeSingle()
         .then(({ data }) => {
           if (!data || !data.is_active) {
@@ -195,6 +195,10 @@ export default function Live() {
               show_date: row.show_date, show_time: row.show_time,
               image_url: row.image_url || '',
               idn_show_id: row.idn_show_id || '',
+              group_link: (row as any).group_link || '',
+              group_link_enabled: !!(row as any).group_link_enabled,
+              group_link_label: (row as any).group_link_label || 'Join Saluran',
+              group_link_note: (row as any).group_link_note || '',
             };
           });
           // Stream URLs are no longer readable from the public table — only the
@@ -993,6 +997,24 @@ export default function Live() {
                 </div>
               )}
             </div>
+
+            {/* SALURAN / GROUP LINK */}
+            {status?.group_link_enabled && !!status?.group_link && (
+              <div className="rounded-xl border border-primary/30 bg-primary/5 p-3 space-y-2">
+                <a
+                  href={status.group_link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-center gap-2 w-full rounded-lg bg-primary text-primary-foreground font-semibold text-sm py-2.5 hover:opacity-90 transition-opacity"
+                >
+                  <Users className="w-4 h-4" />
+                  {status.group_link_label || 'Join Saluran'}
+                </a>
+                <p className="text-[11px] text-muted-foreground text-center">
+                  {status.group_link_note || 'Gabung ke saluran resmi untuk info & update show terbaru.'}
+                </p>
+              </div>
+            )}
 
             {/* LIVE CHAT */}
             <div ref={chatHostRef}>
