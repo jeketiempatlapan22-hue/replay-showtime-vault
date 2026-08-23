@@ -197,17 +197,32 @@ export default function ActiveShowCard({ show, index = 0 }: { show: ActiveShow; 
         )}
 
 
-        {/* Countdown ringkas */}
-        <div className="pt-2 border-t border-border/50 text-xs">
+        {/* Countdown blok seperti sebelumnya */}
+        <div className="pt-2 border-t border-border/50">
           {cd.live ? (
-            <p className="font-bold text-red-500 animate-pulse">🔴 ON AIR — Sedang Berlangsung</p>
+            <p className="font-bold text-red-500 animate-pulse text-sm">🔴 ON AIR — Sedang Berlangsung</p>
           ) : (
-            <p className="text-muted-foreground">
-              Mulai dalam{' '}
-              <span className="font-semibold text-primary tabular-nums">
-                {cd.days > 0 ? `${cd.days}h ` : ''}{pad(cd.hours)}:{pad(cd.minutes)}:{pad(cd.seconds)}
-              </span>
-            </p>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] uppercase tracking-wider text-muted-foreground mr-1">Mulai dalam</span>
+              {cd.days > 0 && (
+                <div className="flex flex-col items-center bg-primary/10 rounded px-1.5 py-0.5 min-w-[2rem]">
+                  <span className="text-sm font-bold text-primary tabular-nums leading-none">{pad(cd.days)}</span>
+                  <span className="text-[8px] text-muted-foreground leading-none mt-0.5">hari</span>
+                </div>
+              )}
+              <div className="flex flex-col items-center bg-primary/10 rounded px-1.5 py-0.5 min-w-[2rem]">
+                <span className="text-sm font-bold text-primary tabular-nums leading-none">{pad(cd.hours)}</span>
+                <span className="text-[8px] text-muted-foreground leading-none mt-0.5">jam</span>
+              </div>
+              <div className="flex flex-col items-center bg-primary/10 rounded px-1.5 py-0.5 min-w-[2rem]">
+                <span className="text-sm font-bold text-primary tabular-nums leading-none">{pad(cd.minutes)}</span>
+                <span className="text-[8px] text-muted-foreground leading-none mt-0.5">mnt</span>
+              </div>
+              <div className="flex flex-col items-center bg-primary/10 rounded px-1.5 py-0.5 min-w-[2rem]">
+                <span className="text-sm font-bold text-primary tabular-nums leading-none">{pad(cd.seconds)}</span>
+                <span className="text-[8px] text-muted-foreground leading-none mt-0.5">dtk</span>
+              </div>
+            </div>
           )}
         </div>
 
