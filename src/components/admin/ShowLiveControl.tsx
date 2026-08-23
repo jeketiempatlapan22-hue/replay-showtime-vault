@@ -39,6 +39,9 @@ export default function ShowLiveControl({ showId, showTitle }: Props) {
   const [replayYt, setReplayYt] = useState('');
   const [idnShowId, setIdnShowId] = useState('');
   const [groupLink, setGroupLink] = useState('');
+  const [groupLinkEnabled, setGroupLinkEnabled] = useState(false);
+  const [groupLinkLabel, setGroupLinkLabel] = useState('Join Saluran');
+  const [groupLinkNote, setGroupLinkNote] = useState('');
   const [replayInfo, setReplayInfo] = useState('');
 
   const [newLabel, setNewLabel] = useState('');
@@ -63,6 +66,9 @@ export default function ShowLiveControl({ showId, showTitle }: Props) {
         setReplayYt(row.replay_youtube_url || '');
         setIdnShowId((row as any).idn_show_id || '');
         setGroupLink((row as any).group_link || '');
+        setGroupLinkEnabled(!!(row as any).group_link_enabled);
+        setGroupLinkLabel((row as any).group_link_label || 'Join Saluran');
+        setGroupLinkNote((row as any).group_link_note || '');
         setReplayInfo((row as any).replay_info || '');
       }
       setLoading(false);
@@ -130,6 +136,9 @@ export default function ShowLiveControl({ showId, showTitle }: Props) {
             replay_youtube_url: normalizedReplayYt,
             idn_show_id: idnShowId.trim(),
             group_link: groupLink.trim(),
+            group_link_enabled: groupLinkEnabled,
+            group_link_label: groupLinkLabel.trim() || 'Join Saluran',
+            group_link_note: groupLinkNote.trim(),
             replay_info: replayInfo.trim(),
           },
         },
@@ -238,6 +247,23 @@ export default function ShowLiveControl({ showId, showTitle }: Props) {
           value={groupLink}
           onChange={e => setGroupLink(e.target.value)}
           placeholder="https://chat.whatsapp.com/... (opsional). Otomatis dikirim ke WA pembeli show."
+        />
+        <div className="flex items-center justify-between gap-3 rounded border border-border bg-background px-3 py-2">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold">Tampilkan tombol saluran di halaman Live</p>
+            <p className="text-[11px] text-muted-foreground">Aktif/nonaktif realtime, tampil di atas Live Chat.</p>
+          </div>
+          <Switch checked={groupLinkEnabled} onCheckedChange={setGroupLinkEnabled} />
+        </div>
+        <Input
+          value={groupLinkLabel}
+          onChange={e => setGroupLinkLabel(e.target.value)}
+          placeholder="Teks tombol (mis. Join Saluran WhatsApp)"
+        />
+        <Input
+          value={groupLinkNote}
+          onChange={e => setGroupLinkNote(e.target.value)}
+          placeholder="Keterangan singkat di bawah tombol (opsional)"
         />
         <Label className="text-xs flex items-center gap-1 pt-1">🎞️ Info Replay (Show Spesial)</Label>
         <textarea
