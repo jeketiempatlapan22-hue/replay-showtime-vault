@@ -133,15 +133,37 @@ export default function MembershipPackagesAdmin() {
       fixed_starts_at: dateInputToIso(form.fixed_starts_at, false),
       fixed_expires_at: dateInputToIso(form.fixed_expires_at, true),
     };
-    const { error } = form.id
-      ? await supabase.from('membership_packages').update(payload).eq('id', form.id)
+    const editingId = form.id;
+    const { error } = editingId
+      ? await supabase.from('membership_packages').update(payload).eq('id', editingId)
       : await supabase.from('membership_packages').insert(payload);
     setSaving(false);
     if (error) { toast.error(error.message); return; }
-    toast.success(form.id ? 'Paket diperbarui' : 'Paket dibuat');
+    toast.success(editingId ? 'Paket diperbarui' : 'Paket dibuat');
+
+    if (editingId) {
+      const prev = rows.find((r) => r.id === editingId);
+      const changed = !prev
+        || prev.duration_days !== payload.duration_days
+        || prev.max_devices !== payload.max_devices
+        || prev.includes_replays !== payload.includes_replays
+        || (prev.fixed_starts_at || null) !== payload.fixed_starts_at
+        || (prev.fixed_expires_at || null) !== payload.fixed_expires_at;
+      if (changed && window.confirm('Terapkan durasi/pengaturan baru ini ke member AKTIF yang sudah membeli paket ini? (tanggal berakhir dihitung ulang dari tanggal mulai masing-masing member)')) {
+        const includeExpired = window.confirm('Termasuk member yang sudah kedaluwarsa? OK = ya, Batal = hanya yang masih aktif.');
+        const { data: n, error: syncErr } = await (supabase as any).rpc('admin_sync_package_duration', {
+          _package_id: editingId,
+          _include_expired: includeExpired,
+        });
+        if (syncErr) toast.error(`Gagal sinkron member: ${syncErr.message}`);
+        else toast.success(`${Number(n) || 0} membership diperbarui`);
+      }
+    }
+
     setForm({ ...emptyForm });
     void load();
   };
+
 
   const edit = (p: Pkg) => {
     setForm({
