@@ -2148,6 +2148,10 @@ export type Database = {
         Args: { _offline: boolean; _reason?: string; _replay_id: string }
         Returns: undefined
       }
+      admin_sync_package_duration: {
+        Args: { _include_expired?: boolean; _package_id: string }
+        Returns: number
+      }
       admin_unblock_ip: { Args: { _id: string }; Returns: boolean }
       admin_unblock_token: {
         Args: { _kind: string; _token_id: string }
