@@ -2,6 +2,7 @@
 // Triggered by pg_cron every minute. Idempotent — safe to re-run.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { waDedupKey, claimWaSend, markWaSent } from '../_shared/wa-guard.ts';
+import { sendTelegramByPhone } from '../_shared/telegram.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -310,10 +311,16 @@ async function processOrder(admin: ReturnType<typeof createClient>, order: any, 
   }
 
 
-  if (await isFonntePaused(admin)) return { id: order.id, status: 'paid', skipped: 'fonnte_timeout_pause' };
-  if (await shouldDelayWaRetry(admin, order.id)) return { id: order.id, status: 'paid', skipped: 'wa_retry_backoff' };
+  // Telegram: jalur alternatif pengiriman token (kebal terhadap gangguan Fonnte).
+  const tgSent = await sendTelegramByPhone(admin, order.user_phone, message);
+
+  if (await isFonntePaused(admin)) {
+    if (tgSent) await admin.from('orders').update({ token_sent_at: new Date().toISOString() }).eq('id', order.id);
+    return { id: order.id, status: 'paid', skipped: 'fonnte_timeout_pause', telegram: tgSent };
+  }
+  if (await shouldDelayWaRetry(admin, order.id)) return { id: order.id, status: 'paid', skipped: 'wa_retry_backoff', telegram: tgSent };
   const sent = await sendFonnte(order.user_phone, message);
-  if (sent.ok) await admin.from('orders').update({ token_sent_at: new Date().toISOString() }).eq('id', order.id);
+  if (sent.ok || tgSent) await admin.from('orders').update({ token_sent_at: new Date().toISOString() }).eq('id', order.id);
   await admin.from('token_deliveries').insert({
     phone: order.user_phone, replay_id: order.replay_id, replay_title: order.item_title,
     order_id: order.id, access_token: accessToken, link,

@@ -39,3 +39,9 @@ verify_jwt = false
 [functions.purchase-membership-with-coins]
 verify_jwt = false
 
+[functions.telegram-webhook]
+verify_jwt = false
+
+[functions.telegram-link-code]
+verify_jwt = false
+

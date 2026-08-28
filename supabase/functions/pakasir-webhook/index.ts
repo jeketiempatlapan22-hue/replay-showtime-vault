@@ -1,6 +1,7 @@
 // Pakasir webhook: konfirmasi pembayaran QRIS dinamis, lalu kirim token via Fonnte.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { waDedupKey, claimWaSend, markWaSent } from '../_shared/wa-guard.ts';
+import { sendTelegramByPhone } from '../_shared/telegram.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -399,9 +400,12 @@ Deno.serve(async (req) => {
   }
 
 
+  // Telegram: jalur alternatif — token tetap sampai walau Fonnte gangguan.
+  const tgSent = await sendTelegramByPhone(admin, order.user_phone, message);
+
   const paused = await isFonntePaused(admin);
   const sent = paused ? { ok: false, data: { error: 'fonnte_timeout_pause' } } : await sendFonnte(order.user_phone, message);
-  if (sent.ok) await admin.from('orders').update({ token_sent_at: new Date().toISOString() }).eq('id', order.id);
+  if (sent.ok || tgSent) await admin.from('orders').update({ token_sent_at: new Date().toISOString() }).eq('id', order.id);
   await admin.from('token_deliveries').insert({
     phone: order.user_phone, replay_id: order.replay_id, replay_title: order.item_title,
     order_id: order.id, access_token: accessToken, link,

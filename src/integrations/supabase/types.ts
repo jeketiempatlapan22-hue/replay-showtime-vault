@@ -1591,6 +1591,36 @@ export type Database = {
         }
         Relationships: []
       }
+      telegram_links: {
+        Row: {
+          chat_id: number | null
+          created_at: string
+          id: string
+          link_code: string
+          linked_at: string | null
+          phone: string
+          user_id: string | null
+        }
+        Insert: {
+          chat_id?: number | null
+          created_at?: string
+          id?: string
+          link_code: string
+          linked_at?: string | null
+          phone: string
+          user_id?: string | null
+        }
+        Update: {
+          chat_id?: number | null
+          created_at?: string
+          id?: string
+          link_code?: string
+          linked_at?: string | null
+          phone?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       token_deliveries: {
         Row: {
           access_token: string
