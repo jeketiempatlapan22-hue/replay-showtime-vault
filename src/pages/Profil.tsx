@@ -53,6 +53,8 @@ export default function Profil() {
   const [adminPhone, setAdminPhone] = useState<string>('');
   const [memberships, setMemberships] = useState<MyMembership[]>([]);
   const [memLoading, setMemLoading] = useState(true);
+  const [myOrders, setMyOrders] = useState<MyOrder[]>([]);
+
   const [tgCode, setTgCode] = useState('');
   const [tgLinked, setTgLinked] = useState(false);
   const [tgBusy, setTgBusy] = useState(false);
