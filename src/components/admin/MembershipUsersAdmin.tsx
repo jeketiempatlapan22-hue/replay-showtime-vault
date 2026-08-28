@@ -107,6 +107,12 @@ export default function MembershipUsersAdmin() {
     catch { toast({ title: 'Gagal menyalin', variant: 'destructive' }); }
   };
 
+  const copyBulk = (field: 'email' | 'phone') => {
+    const list = [...new Set(filtered.map(r => field === 'email' ? r.email : r.phone).filter(Boolean))];
+    if (!list.length) return toast({ title: 'Tidak ada data', variant: 'destructive' });
+    void copy(list.join('\n'), `${list.length} ${field === 'email' ? 'email' : 'nomor'}`);
+  };
+
   const linkFor = (r: Row) => r.token ? `${SITE}/live?mtoken=${encodeURIComponent(r.token)}` : '';
 
   const openEdit = (r: Row) => {
@@ -267,6 +273,15 @@ export default function MembershipUsersAdmin() {
           </Select>
         </div>
 
+        <div className="flex gap-1.5 flex-wrap">
+          <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => copyBulk('email')}>
+            <Copy className="w-3.5 h-3.5 mr-1" />Salin Email ({filtered.length})
+          </Button>
+          <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => copyBulk('phone')}>
+            <Copy className="w-3.5 h-3.5 mr-1" />Salin Nomor
+          </Button>
+        </div>
+
         <div className="space-y-2">
           {filtered.map(r => (
             <div key={r.order_id} className="border border-border rounded-lg p-3 bg-card/50">
@@ -274,11 +289,24 @@ export default function MembershipUsersAdmin() {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-medium truncate">{r.email || '(no email)'}</span>
+                    {r.email && (
+                      <button title="Salin email" onClick={() => copy(r.email, 'Email')} className="text-muted-foreground hover:text-primary">
+                        <Copy className="w-3 h-3" />
+                      </button>
+                    )}
                     <Badge variant={r.status==='active'?'default':r.status==='expired'?'secondary':'destructive'}>{r.status}</Badge>
                     <Badge variant="outline">{r.kind}</Badge>
                   </div>
                   <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
-                    <div>📱 {r.phone || '-'} · 📦 {r.package_name || '-'}</div>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      📱 {r.phone || '-'}
+                      {r.phone && (
+                        <button title="Salin nomor" onClick={() => copy(r.phone, 'Nomor')} className="text-muted-foreground hover:text-primary">
+                          <Copy className="w-3 h-3" />
+                        </button>
+                      )}
+                      · 📦 {r.package_name || '-'}
+                    </div>
                     <div>🕒 Dibeli: {r.paid_at ? new Date(r.paid_at).toLocaleString('id-ID') : '-'}</div>
                     <div>⏳ Berakhir: {r.expires_at ? new Date(r.expires_at).toLocaleString('id-ID') : '-'} {r.days_remaining!=null && r.days_remaining >= 0 && ` (${r.days_remaining}h lagi)`}</div>
                     <div>📲 Device: {r.devices_used}/{r.max_devices}</div>
