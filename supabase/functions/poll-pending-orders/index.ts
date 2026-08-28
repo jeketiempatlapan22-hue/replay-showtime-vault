@@ -3,6 +3,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { waDedupKey, claimWaSend, markWaSent } from '../_shared/wa-guard.ts';
 import { sendTelegramByPhone } from '../_shared/telegram.ts';
+import { verifyPakasirPaidStrict, PAID_STATUSES as STRICT_PAID_STATUSES } from '../_shared/pakasir.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -22,32 +23,10 @@ function genToken() {
   return crypto.randomUUID().replace(/-/g, '').slice(0, 24);
 }
 
-const PAID_STATUSES = new Set(['completed', 'paid', 'success']);
+const PAID_STATUSES = STRICT_PAID_STATUSES;
 
 async function verifyPakasirPaid(apiKey: string, slug: string, pakasirOrderId: string, amount: number) {
-  if (!pakasirOrderId || !amount || amount < 100) return { paid: false, status: 'invalid_order' };
-  const url = `https://app.pakasir.com/api/transactiondetail?project=${encodeURIComponent(slug)}&amount=${amount}&order_id=${encodeURIComponent(pakasirOrderId)}&api_key=${encodeURIComponent(apiKey)}`;
-  let pjson: any = {};
-  let ok = false;
-  try {
-    const pres = await fetch(url, { signal: AbortSignal.timeout(4000) });
-    ok = pres.ok;
-    pjson = await pres.json().catch(() => ({}));
-  } catch (e) {
-    return { paid: false, status: 'pakasir_fetch:' + String(e) };
-  }
-  const tx = pjson?.transaction || pjson?.payment || {};
-  const status = String(tx.status || pjson?.status || '').toLowerCase();
-  const returnedOrderId = String(tx.order_id || tx.orderId || tx.merchant_order_id || pjson?.order_id || '').trim();
-  const returnedProject = String(tx.project || pjson?.project || '').trim();
-  const returnedAmount = Number(tx.amount ?? tx.nominal ?? pjson?.amount ?? 0);
-  const orderMatches = !returnedOrderId || returnedOrderId === pakasirOrderId;
-  const projectMatches = !returnedProject || returnedProject === slug;
-  const amountMatches = !Number.isFinite(returnedAmount) || returnedAmount <= 0 || returnedAmount === amount;
-  return {
-    paid: ok && PAID_STATUSES.has(status) && orderMatches && projectMatches && amountMatches,
-    status: status || (ok ? 'pending' : 'unreachable'),
-  };
+  return await verifyPakasirPaidStrict(apiKey, slug, pakasirOrderId, amount, 6000);
 }
 
 // Provision a fresh single-device token row for this paid order.
