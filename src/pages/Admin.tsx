@@ -557,6 +557,43 @@ export default function Admin() {
     }
   };
 
+  const handleSaveAdminAccount = async () => {
+    const email = (acctEmail || '').trim().toLowerCase();
+    if (!acctCurrentPw) {
+      toast({ title: 'Error', description: 'Masukkan sandi saat ini untuk konfirmasi.', variant: 'destructive' });
+      return;
+    }
+    if (acctNewPw && acctNewPw.length < 8) {
+      toast({ title: 'Error', description: 'Sandi baru minimal 8 karakter.', variant: 'destructive' });
+      return;
+    }
+    if (acctNewPw && acctNewPw !== acctNewPw2) {
+      toast({ title: 'Error', description: 'Konfirmasi sandi baru tidak cocok.', variant: 'destructive' });
+      return;
+    }
+    setAcctSaving(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('admin-update-self-credentials', {
+        body: { current_password: acctCurrentPw, email, password: acctNewPw || undefined },
+      });
+      const d = data as any;
+      if (error || d?.error) {
+        toast({ title: 'Gagal', description: d?.message || d?.error || error?.message || 'Gagal memperbarui akun.', variant: 'destructive' });
+        return;
+      }
+      setAcctCurrentPw(''); setAcctNewPw(''); setAcctNewPw2('');
+      toast({ title: 'Berhasil', description: 'Akun admin diperbarui. Silakan login ulang dengan data baru.' });
+      await supabase.auth.signOut();
+      setIsLoggedIn(false);
+      setLoginEmail(email);
+      setLoginPassword('');
+    } finally {
+      setAcctSaving(false);
+    }
+  };
+
+
+
   const handleGenerateToken = async (r: ReplayRow) => {
     const token = (crypto as any).randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2) + Date.now().toString(36);
     try {
