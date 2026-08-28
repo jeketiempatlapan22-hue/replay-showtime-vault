@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, RefreshCw, Trash2, CheckCircle2, ExternalLink, Save, Phone, Send } from 'lucide-react';
+import { Loader2, RefreshCw, Trash2, CheckCircle2, ExternalLink, Save, Phone, Send, Copy } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
@@ -79,6 +79,17 @@ export default function MembershipProofsAdmin() {
   };
 
 
+  const copyText = async (text: string, label: string) => {
+    try { await navigator.clipboard.writeText(text); toast({ title: `${label} disalin` }); }
+    catch { toast({ title: 'Gagal menyalin', variant: 'destructive' }); }
+  };
+
+  const copyBulk = (field: 'email' | 'phone') => {
+    const list = [...new Set(rows.map(r => field === 'email' ? r.email : r.phone).filter(Boolean))];
+    if (!list.length) return toast({ title: 'Tidak ada data', variant: 'destructive' });
+    void copyText(list.join('\n'), `${list.length} ${field === 'email' ? 'email' : 'nomor'}`);
+  };
+
   const setHandled = async (r: Proof, h: boolean) => {
     const { error } = await supabase.rpc('admin_set_proof_handled', { _id: r.id, _handled: h });
     if (error) return toast({ title: 'Gagal', description: error.message, variant: 'destructive' });
@@ -142,7 +153,11 @@ export default function MembershipProofsAdmin() {
         <CardHeader>
           <CardTitle className="font-sans text-base sm:text-lg flex items-center justify-between gap-2">
             <span>Bukti Transaksi ({rows.length})</span>
-            <Button size="sm" variant="outline" onClick={load} disabled={loading}><RefreshCw className={`w-4 h-4 mr-1 ${loading ? 'animate-spin' : ''}`} />Muat</Button>
+            <div className="flex gap-1.5 flex-wrap">
+              <Button size="sm" variant="outline" onClick={() => copyBulk('email')} title="Salin semua email"><Copy className="w-3.5 h-3.5 mr-1" />Email</Button>
+              <Button size="sm" variant="outline" onClick={() => copyBulk('phone')} title="Salin semua nomor"><Copy className="w-3.5 h-3.5 mr-1" />Nomor</Button>
+              <Button size="sm" variant="outline" onClick={load} disabled={loading}><RefreshCw className={`w-4 h-4 mr-1 ${loading ? 'animate-spin' : ''}`} />Muat</Button>
+            </div>
           </CardTitle>
           <p className="text-[11px] text-muted-foreground">Bukti otomatis dihapus 7 hari setelah dibuat.</p>
         </CardHeader>
@@ -167,8 +182,12 @@ export default function MembershipProofsAdmin() {
                       <Badge variant="outline">{r.package_name || 'Paket -'}</Badge>
                       {r.amount > 0 && <Badge variant="outline">Rp {r.amount.toLocaleString('id-ID')}</Badge>}
                     </div>
-                    <div>📧 {r.email}</div>
-                    <div>📱 <a href={`https://wa.me/${r.phone}`} target="_blank" rel="noreferrer" className="text-primary underline">{r.phone}</a></div>
+                    <div className="flex items-center gap-1.5">📧 <span className="truncate">{r.email}</span>
+                      {r.email && <button title="Salin email" onClick={() => copyText(r.email, 'Email')} className="text-muted-foreground hover:text-primary shrink-0"><Copy className="w-3 h-3" /></button>}
+                    </div>
+                    <div className="flex items-center gap-1.5">📱 <a href={`https://wa.me/${r.phone}`} target="_blank" rel="noreferrer" className="text-primary underline">{r.phone}</a>
+                      {r.phone && <button title="Salin nomor" onClick={() => copyText(r.phone, 'Nomor')} className="text-muted-foreground hover:text-primary shrink-0"><Copy className="w-3 h-3" /></button>}
+                    </div>
                     {r.order_id && <div className="font-mono text-[10px] truncate">Order Membership: {r.order_id}</div>}
                     {r.show_order_id && <div className="font-mono text-[10px] truncate">Order Show: {r.show_order_id}</div>}
                     {r.note && <div className="text-muted-foreground italic">"{r.note}"</div>}

@@ -192,6 +192,13 @@ export default function ShowOrdersResendDialog({ open, onOpenChange, showId, sho
     try { await navigator.clipboard.writeText(p); toast({ title: 'Nomor disalin' }); } catch { /* ignore */ }
   };
 
+  const copyAllPhones = async () => {
+    const list = [...new Set(filtered.map(r => r.user_phone).filter(Boolean))];
+    if (!list.length) { toast({ title: 'Tidak ada nomor pada filter ini', variant: 'destructive' }); return; }
+    try { await navigator.clipboard.writeText(list.join('\n')); toast({ title: `${list.length} nomor disalin` }); }
+    catch { toast({ title: 'Gagal menyalin', variant: 'destructive' }); }
+  };
+
   const counts = rows.reduce((acc, r) => {
     if (r.status !== 'paid') { if (r.kind !== 'coin_topup') acc.pending++; return acc; }
     const w = waStatus[r.id] || 'none';
@@ -285,6 +292,9 @@ export default function ShowOrdersResendDialog({ open, onOpenChange, showId, sho
             </Button>
             <Button size="sm" variant="ghost" className="h-7 text-xs text-destructive" onClick={() => deleteLogBulk('all')} title="Hapus SEMUA log WA untuk show ini">
               <Trash2 className="w-3 h-3 mr-1" /> Semua
+            </Button>
+            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={copyAllPhones} title="Salin semua nomor pada filter ini">
+              <Copy className="w-3 h-3 mr-1" /> Salin Nomor
             </Button>
             <Button size="sm" variant="ghost" className="h-7" onClick={load}><RefreshCw className="w-3 h-3" /></Button>
           </div>
