@@ -261,14 +261,22 @@ async function checkOrder(admin: Admin, chatId: number, orderUuid: string) {
 }
 
 
-async function showStatus(admin: Admin, chatId: number, phone: string) {
+/** Semua identitas pembeli untuk chat ini: identitas Telegram + nomor WA (bila terhubung). */
+async function identities(admin: Admin, chatId: number): Promise<string[]> {
+  const list = [tgPhone(chatId)];
+  const link = await getLink(admin, chatId);
+  if (link?.phone && !/^tg\d+$/.test(link.phone)) list.push(normalizePhone(link.phone));
+  return list;
+}
+
+async function showStatus(admin: Admin, chatId: number, phones: string[]) {
   const { data } = await admin.from('orders')
     .select('id,item_title,amount,status,created_at')
-    .eq('user_phone', phone)
+    .in('user_phone', phones)
     .order('created_at', { ascending: false })
     .limit(1).maybeSingle();
   if (!data) {
-    await sendTelegram(chatId, '📭 Belum ada pembelian atas nomor Anda.\n\nKetik `/show` untuk melihat show yang tersedia.');
+    await sendTelegram(chatId, '📭 Belum ada pembelian dari akun Telegram ini.\n\nKetik `/show` untuk melihat show yang tersedia.');
     return;
   }
   if (data.status === 'paid') {
@@ -278,12 +286,12 @@ async function showStatus(admin: Admin, chatId: number, phone: string) {
   await checkOrder(admin, chatId, data.id as string);
 }
 
-async function sendTokens(admin: Admin, chatId: number, phone: string) {
+async function sendTokens(admin: Admin, chatId: number, phones: string[]) {
   const { data } = await admin.from('token_deliveries')
     .select('replay_title,link,created_at')
-    .eq('phone', phone).order('created_at', { ascending: false }).limit(5);
+    .in('phone', phones).order('created_at', { ascending: false }).limit(5);
   if (!data?.length) {
-    await sendTelegram(chatId, '📭 Belum ada token untuk nomor Anda.\n\nSetelah pembayaran terkonfirmasi, token muncul di sini otomatis.');
+    await sendTelegram(chatId, '📭 Belum ada token untuk akun ini.\n\nSetelah pembayaran terkonfirmasi, token muncul di sini otomatis.');
     return;
   }
   const lines = data.map((d: any, i: number) => `${i + 1}. *${d.replay_title || 'Akses'}*\n🔗 ${d.link}`);
@@ -417,11 +425,15 @@ Deno.serve(async (req) => {
 
     if (cmd === '/akun') {
       const link = await getLink(admin, chatId);
-      if (link?.phone) {
-        await sendTelegram(chatId, `👤 *Akun Terhubung*\n\n📱 Nomor: \`${link.phone}\`\n\nSemua link token pembelian akan dikirim ke chat ini.`);
-      } else {
-        await requireLink(admin, chatId);
-      }
+      const wa = link?.phone && !/^tg\d+$/.test(link.phone) ? link.phone : '';
+      await sendTelegramRich(chatId, [
+        '👤 *AKUN TELEGRAM*',
+        '━━━━━━━━━━━━━━━━━━',
+        '✅ Siap membeli — *tanpa perlu nomor WhatsApp*.',
+        wa ? `📱 WhatsApp terhubung: \`${wa}\`` : '📱 WhatsApp: belum terhubung (opsional)',
+        '',
+        'Semua link token & sandi replay dikirim langsung ke chat ini. 💖',
+      ].join('\n'), [[{ text: '🎤 Lihat Show', callback_data: 'menu:show' }]]);
       return respond();
     }
 
