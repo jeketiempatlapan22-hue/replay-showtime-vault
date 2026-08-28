@@ -51,6 +51,30 @@ export default function Profil() {
   const [adminPhone, setAdminPhone] = useState<string>('');
   const [memberships, setMemberships] = useState<MyMembership[]>([]);
   const [memLoading, setMemLoading] = useState(true);
+  const [tgCode, setTgCode] = useState('');
+  const [tgLinked, setTgLinked] = useState(false);
+  const [tgBusy, setTgBusy] = useState(false);
+
+  const handleTelegramLink = async () => {
+    if (!phone) { toast.error('Isi nomor HP dulu lalu simpan, baru hubungkan Telegram'); return; }
+    setTgBusy(true);
+    try {
+      const { data: session } = await supabase.auth.getSession();
+      const res = await supabase.functions.invoke('telegram-link-code', {
+        body: { phone },
+        headers: session.session?.access_token ? { Authorization: `Bearer ${session.session.access_token}` } : undefined,
+      });
+      const d = res.data as any;
+      if (res.error || !d?.ok) throw new Error(d?.error === 'phone_not_found' ? 'Nomor belum pernah tercatat di transaksi' : (d?.error || res.error?.message || 'Gagal membuat kode'));
+      if (d.already_linked) { setTgLinked(true); toast.success('Telegram sudah terhubung'); return; }
+      setTgCode(d.code);
+      window.open(`https://t.me/${d.bot || 'Real48time_bot'}?start=${d.code}`, '_blank');
+    } catch (e: any) {
+      toast.error(e?.message || 'Gagal menghubungkan Telegram');
+    } finally {
+      setTgBusy(false);
+    }
+  };
 
   useEffect(() => {
     supabase.from('site_settings').select('key,value').in('key', ['owner_wa_number', 'admin_wa_phone'])
