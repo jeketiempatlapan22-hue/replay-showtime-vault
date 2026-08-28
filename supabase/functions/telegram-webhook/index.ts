@@ -13,12 +13,19 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import {
   sendTelegram, sendTelegramRich, sendTelegramPhoto, answerCallbackQuery, setBotCommands,
+  deleteTelegramMessage,
   deriveTelegramWebhookSecret, safeEqual, type InlineKeyboard,
 } from '../_shared/telegram.ts';
 
 type Admin = ReturnType<typeof createClient>;
 
 const SITE = 'https://realtime48stream.my.id';
+
+/** Masa berlaku QRIS yang ditampilkan di Telegram. */
+const QR_TTL_MS = 5 * 60 * 1000;
+
+/** Identitas pembeli Telegram (tanpa nomor WhatsApp). */
+const tgPhone = (chatId: number) => `tg${chatId}`;
 
 function normalizePhone(raw: string) {
   const d = String(raw || '').replace(/\D/g, '');
@@ -323,11 +330,9 @@ Deno.serve(async (req) => {
       }
       if (data.startsWith('b:')) {
         const [, type, id] = data.split(':');
-        const link = await requireLink(admin, chatId);
-        if (!link) return respond();
         const kind = type === 's' ? 'show' : type === 'r' ? 'replay' : 'replay_only';
         await sendTelegram(chatId, '⏳ Membuat QRIS pembayaran…');
-        await createOrderAndSendQr(admin, chatId, link.phone, kind as any, id);
+        await createOrderAndSendQr(admin, chatId, kind as any, id);
       }
       return respond();
     }
@@ -420,17 +425,8 @@ Deno.serve(async (req) => {
       return respond();
     }
 
-    if (cmd === '/status') {
-      const link = await requireLink(admin, chatId);
-      if (link) await showStatus(admin, chatId, normalizePhone(link.phone));
-      return respond();
-    }
-
-    if (cmd === '/token') {
-      const link = await requireLink(admin, chatId);
-      if (link) await sendTokens(admin, chatId, normalizePhone(link.phone));
-      return respond();
-    }
+    if (cmd === '/status') { await showStatus(admin, chatId, await identities(admin, chatId)); return respond(); }
+    if (cmd === '/token') { await sendTokens(admin, chatId, await identities(admin, chatId)); return respond(); }
 
     await sendTelegramRich(chatId, HELP_TEXT, [
       [{ text: '🎤 Show Aktif', callback_data: 'menu:show' }],
