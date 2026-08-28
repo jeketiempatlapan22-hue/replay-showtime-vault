@@ -12,7 +12,7 @@
 //   /bantuan      — daftar perintah
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import {
-  sendTelegram, sendTelegramRich, sendTelegramPhoto, answerCallbackQuery, setBotCommands,
+  sendTelegram, sendTelegramRich, sendTelegramPhoto, sendTelegramPhotoBytes, answerCallbackQuery, setBotCommands,
   deleteTelegramMessage,
   deriveTelegramWebhookSecret, safeEqual, type InlineKeyboard,
 } from '../_shared/telegram.ts';
