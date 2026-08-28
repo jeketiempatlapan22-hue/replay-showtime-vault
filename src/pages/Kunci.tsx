@@ -5,9 +5,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { supabase } from '@/integrations/supabase/client';
 import { getBrowserId } from '@/lib/browserId';
+import { DEFAULT_ADMIN_WA } from '@/lib/adminWa';
 
 const SS_KEY_BASE = 'replaytime-live-unlocked';
-const WA_NUMBER = '62859106545522';
+const WA_NUMBER = DEFAULT_ADMIN_WA;
 const WA_LINK = `https://wa.me/${WA_NUMBER}?text=${encodeURIComponent('Halo admin, saya ingin beli akses show live.')}`;
 
 const reasonMessage = (reason?: string): string => {
@@ -160,7 +161,7 @@ export default function Kunci() {
                 Beli Show via WhatsApp
               </Button>
             </a>
-            <p className="text-center text-[11px] text-muted-foreground">+62 888-0904-8431</p>
+            <p className="text-center text-[11px] text-muted-foreground">+62 838-9908-7711</p>
 
             <div className="pt-3 border-t border-border">
               <Button type="button" variant="ghost" size="sm" className="w-full text-xs" onClick={handleSelfReset}>

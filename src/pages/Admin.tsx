@@ -40,6 +40,7 @@ import YouTubeIdInput from '@/components/admin/YouTubeIdInput';
 import { parseYouTubeId } from '@/lib/youtube';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { adminWaNumber } from '@/lib/adminWa';
 
 const CRITERIA_OPTIONS = [
   { value: 'reguler', label: 'Reguler' },
@@ -247,7 +248,7 @@ export default function Admin() {
       setWaLink(settings.whatsapp_link || '');
       setLiveChatEnabled((settings.live_chat_enabled ?? 'true') !== 'false');
       setAdminUsername(settings.admin_username || 'Admin');
-      setOwnerWaNumber(settings.owner_wa_number || '62859106545522');
+      setOwnerWaNumber(settings.owner_wa_number || '6283899087711');
       setStaticQrisUrl(settings.static_qris_url || '');
       setUseStaticQris((settings.use_static_qris || 'false') === 'true');
       const { data: comments } = await supabase.from('comments').select('*').order('created_at', { ascending: false });
@@ -518,7 +519,7 @@ export default function Admin() {
 
   const handleSavePakasirFallback = async () => {
     try {
-      const num = ownerWaNumber.replace(/\D/g, '') || '62859106545522';
+      const num = adminWaNumber(ownerWaNumber);
       await Promise.all([
         setSetting('owner_wa_number', num),
         // Keep the legacy key in sync so every "Hubungi Admin" surface uses the new number.
@@ -1348,7 +1349,7 @@ export default function Admin() {
               <CardContent className="space-y-3">
                 <div>
                   <Label>Nomor WhatsApp Admin (untuk konfirmasi pembayaran)</Label>
-                  <Input placeholder="62859106545522" value={ownerWaNumber} onChange={e => setOwnerWaNumber(e.target.value)} />
+                  <Input placeholder="6283899087711" value={ownerWaNumber} onChange={e => setOwnerWaNumber(e.target.value)} />
                   <p className="text-[11px] text-muted-foreground mt-1">Tombol "Hubungi Admin" pada dialog pembayaran akan membuka chat ke nomor ini.</p>
                 </div>
                 <div>
