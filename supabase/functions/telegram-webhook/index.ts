@@ -198,28 +198,57 @@ async function createOrderAndSendQr(
     const alt = await sendTelegramRich(chatId, `${caption}\n\n🔗 QRIS: ${data.qr_url}`, keyboard);
     messageId = Number((alt.data as any)?.result?.message_id || 0);
   }
-  scheduleQrExpiry(admin, chatId, messageId, String(data.order_id));
+  watchOrder(admin, chatId, messageId, String(data.order_id));
 }
 
-/** Setelah 5 menit QRIS dihapus dari chat bila belum dibayar. */
-function scheduleQrExpiry(admin: Admin, chatId: number, messageId: number, orderUuid: string) {
+/**
+ * Pantau order otomatis: cek status Pakasir tiap 10 detik selama 5 menit.
+ * Begitu terkonfirmasi, token langsung dikirim (oleh check-pakasir-status),
+ * QRIS dihapus, dan user diberi tahu — tanpa menunggu cron polling.
+ */
+function watchOrder(admin: Admin, chatId: number, messageId: number, orderUuid: string) {
   const task = (async () => {
+    const started = Date.now();
+    let notified = false;
     try {
-      await new Promise((r) => setTimeout(r, QR_TTL_MS));
-      const { data } = await admin.from('orders').select('status').eq('id', orderUuid).maybeSingle();
-      if (String((data as any)?.status || '') === 'paid') return;
-      if (messageId) await deleteTelegramMessage(chatId, messageId);
-      await sendTelegramRich(
-        chatId,
-        '⌛ *QRIS sudah kadaluarsa*\n━━━━━━━━━━━━━━━━━━\n\nBatas waktu 5 menit terlewati, jadi kode QR tadi dihapus.\n\nSilakan lakukan pembelian ulang untuk mendapatkan QRIS baru. 💖',
-        [[{ text: '🎤 Beli Lagi', callback_data: 'menu:show' }]],
-      );
+      while (Date.now() - started < QR_TTL_MS) {
+        await new Promise((r) => setTimeout(r, 10000));
+        const { data: row } = await admin.from('orders')
+          .select('status,token_sent_at').eq('id', orderUuid).maybeSingle();
+        const paidInDb = String((row as any)?.status || '') === 'paid';
+        let paid = paidInDb;
+        if (!paid) {
+          const { data } = await callFn('check-pakasir-status', { order_id: orderUuid });
+          paid = String(data?.status || '') === 'paid';
+        } else if (!(row as any)?.token_sent_at) {
+          // Sudah paid tapi token belum terkirim → paksa pengiriman sekarang.
+          await callFn('check-pakasir-status', { order_id: orderUuid });
+        }
+        if (paid) {
+          notified = true;
+          if (messageId) await deleteTelegramMessage(chatId, messageId).catch(() => {});
+          await sendTelegram(
+            chatId,
+            '✅ *Pembayaran terkonfirmasi!*\n━━━━━━━━━━━━━━━━━━\n\nLink token & info replay dikirim ke chat ini sekarang.\n\nKalau belum muncul dalam 1 menit, ketik `/token`. 💖',
+          );
+          return;
+        }
+      }
+      if (!notified) {
+        if (messageId) await deleteTelegramMessage(chatId, messageId).catch(() => {});
+        await sendTelegramRich(
+          chatId,
+          '⌛ *QRIS sudah kadaluarsa*\n━━━━━━━━━━━━━━━━━━\n\nBatas waktu 5 menit terlewati, jadi kode QR tadi dihapus.\n\nSilakan lakukan pembelian ulang untuk mendapatkan QRIS baru. 💖',
+          [[{ text: '🎤 Beli Lagi', callback_data: 'menu:show' }]],
+        );
+      }
     } catch (e) {
-      console.error('qr expiry error:', String(e));
+      console.error('watchOrder error:', String(e));
     }
   })();
   try { (globalThis as any).EdgeRuntime?.waitUntil?.(task); } catch { /* ignore */ }
 }
+
 
 async function checkOrder(admin: Admin, chatId: number, orderUuid: string) {
   const { data } = await callFn('check-pakasir-status', { order_id: orderUuid });
