@@ -13,6 +13,7 @@ import { Loader2, CheckCircle2, Copy, Smartphone, ExternalLink, MessageCircle, A
 import { setShowPurchase, setReplayPurchase } from '@/lib/purchases';
 import MembershipProofUpload from '@/components/MembershipProofUpload';
 import { adminWaNumber } from '@/lib/adminWa';
+import AccessInfoCard from '@/components/AccessInfoCard';
 
 interface Props {
   open: boolean;
@@ -466,6 +467,13 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
             </div>
             {accessToken && (
               <>
+                <AccessInfoCard
+                  token={accessToken}
+                  showId={kind === 'replay_only' ? undefined : showId}
+                  replayId={replayId || undefined}
+                  fallbackLink={accessLink}
+                  compact
+                />
                 <div className="rounded-lg border-2 border-primary/40 bg-primary/10 p-3 space-y-2 animate-pulse-slow">
                   <div className="flex items-center gap-1.5 text-[11px] font-semibold text-primary">
                     <Copy className="w-3.5 h-3.5" /> SALIN LINK TOKEN & TEMPEL DI BROWSER
