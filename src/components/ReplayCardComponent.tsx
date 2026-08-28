@@ -13,6 +13,9 @@ import type { ActiveMembership } from '@/hooks/useActiveMembership';
 import { isReplayCoveredByMembership } from '@/lib/membershipReplayAccess';
 import { thumbUrl } from '@/lib/imageUrl';
 import AccessInfoCard from '@/components/AccessInfoCard';
+import { setReplayPurchase } from '@/lib/purchases';
+import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
 
 
 
@@ -62,6 +65,7 @@ function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWatch, onUnlockAn
   const [buyOpen, setBuyOpen] = useState(false);
   const [purchasedToken, setPurchasedToken] = useState<string>('');
   const [imgLoaded, setImgLoaded] = useState(false);
+  const { user } = useAuth();
 
   // Sync purchase state from localStorage
   useEffect(() => {
@@ -79,6 +83,31 @@ function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWatch, onUnlockAn
       window.removeEventListener('replaytime-purchases-updated', refresh);
     };
   }, [replay.id]);
+
+  // Sinkron lintas perangkat: user login yang sudah membeli (QRIS maupun koin)
+  // tetap melihat tombol tonton + panel salin link di perangkat manapun.
+  useEffect(() => {
+    if (!user || !replay.id) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from('orders')
+        .select('access_token,created_at')
+        .eq('user_id', user.id)
+        .eq('replay_id', replay.id)
+        .eq('status', 'paid')
+        .not('access_token', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(1);
+      if (cancelled) return;
+      const tok = (data || [])[0]?.access_token as string | undefined;
+      if (tok) {
+        try { setReplayPurchase(replay.id, { token: tok, paidAt: Date.now() }); } catch { /* ignore */ }
+        setPurchasedToken(tok);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user, replay.id]);
 
   const membershipCovered = useMemo(() => isReplayCoveredByMembership(replay.date, membership), [replay.date, membership]);
   const membershipActiveButOutside = !!membership?.token && !membershipCovered && !!membership?.includes_replays;
