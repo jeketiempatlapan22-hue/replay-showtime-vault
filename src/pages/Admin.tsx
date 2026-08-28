@@ -1302,6 +1302,36 @@ export default function Admin() {
               </CardContent>
             </Card>
 
+            {/* Akun Login Admin */}
+            <Card>
+              <CardHeader><CardTitle className="font-sans text-base sm:text-lg flex items-center gap-2"><Key className="w-5 h-5 text-primary" />Akun Login Admin</CardTitle></CardHeader>
+              <CardContent className="space-y-3">
+                <div>
+                  <Label>Email login</Label>
+                  <Input type="email" placeholder="admin@email.com" value={acctEmail} onChange={e => setAcctEmail(e.target.value)} />
+                </div>
+                <div>
+                  <Label>Sandi saat ini *</Label>
+                  <Input type="password" placeholder="Sandi saat ini" value={acctCurrentPw} onChange={e => setAcctCurrentPw(e.target.value)} autoComplete="current-password" />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <Label>Sandi baru (opsional)</Label>
+                    <Input type="password" placeholder="Min. 8 karakter" value={acctNewPw} onChange={e => setAcctNewPw(e.target.value)} autoComplete="new-password" />
+                  </div>
+                  <div>
+                    <Label>Ulangi sandi baru</Label>
+                    <Input type="password" placeholder="Ulangi sandi baru" value={acctNewPw2} onChange={e => setAcctNewPw2(e.target.value)} autoComplete="new-password" />
+                  </div>
+                </div>
+                <p className="text-[11px] text-muted-foreground">Setelah disimpan, Anda otomatis keluar dan harus login ulang dengan email/sandi baru.</p>
+                <Button onClick={handleSaveAdminAccount} size="sm" disabled={acctSaving}>
+                  <Save className="w-4 h-4 mr-2" />{acctSaving ? 'Menyimpan…' : 'Simpan Akun'}
+                </Button>
+              </CardContent>
+            </Card>
+
+
             {/* WhatsApp */}
             <Card>
               <CardHeader><CardTitle className="font-sans text-base sm:text-lg flex items-center gap-2"><MessageCircle className="w-5 h-5 text-primary" />WhatsApp</CardTitle></CardHeader>
