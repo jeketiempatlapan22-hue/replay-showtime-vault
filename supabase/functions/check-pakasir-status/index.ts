@@ -295,7 +295,11 @@ Deno.serve(async (req) => {
       .from('orders').select('*').eq('id', orderUuid).maybeSingle();
     if (!order) return new Response(JSON.stringify({ error: 'order not found' }), { status: 404, headers: corsHeaders });
 
-    const alreadySent = order.token_sent_at && await hasSentWa(admin, order.id);
+    // Pembeli Telegram murni tidak melewati Fonnte, jadi `token_sent_at` saja
+    // sudah menandakan token terkirim (jangan cek wa_outbox).
+    const isTgOnlyOrder = /^tg\d+$/i.test(String(order.user_phone || ''));
+    const alreadySent = order.token_sent_at && (isTgOnlyOrder || await hasSentWa(admin, order.id));
+
 
     // Kalau order sudah ditandai paid oleh admin (approve manual bukti transaksi),
     // lewati verifikasi Pakasir agar finalize + kirim WA tetap jalan.
