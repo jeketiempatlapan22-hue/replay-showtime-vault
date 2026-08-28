@@ -12,6 +12,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { saveMembershipCredentials } from '@/lib/membershipAccess';
 import DeviceResetButton from '@/components/DeviceResetButton';
+import AccessInfoCard from '@/components/AccessInfoCard';
+
 
 interface MyMembership {
   order_id: string;
