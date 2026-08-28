@@ -15,6 +15,8 @@ import { MEMBERSHIP_UPDATED_EVENT, readMembershipCredentials } from '@/lib/membe
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { thumbUrl } from '@/lib/imageUrl';
+import AccessInfoCard from '@/components/AccessInfoCard';
+
 
 
 const CATEGORY_LABELS: Record<string, string> = {
