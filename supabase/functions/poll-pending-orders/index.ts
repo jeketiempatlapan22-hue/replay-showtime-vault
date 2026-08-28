@@ -314,6 +314,19 @@ async function processOrder(admin: ReturnType<typeof createClient>, order: any, 
   // Telegram: jalur alternatif pengiriman token (kebal terhadap gangguan Fonnte).
   const tgSent = await sendTelegramByPhone(admin, order.user_phone, message);
 
+  // Pembeli murni Telegram: tidak ada nomor WA, jadi lewati Fonnte.
+  if (/^tg\d+$/.test(String(order.user_phone || ''))) {
+    if (tgSent) await admin.from('orders').update({ token_sent_at: new Date().toISOString() }).eq('id', order.id);
+    await admin.from('token_deliveries').insert({
+      phone: order.user_phone, replay_id: order.replay_id, replay_title: order.item_title,
+      order_id: order.id, access_token: accessToken, link,
+      source: 'pakasir-poll', requested_by: 'poll-pending-orders-telegram',
+    });
+    return { id: order.id, status: 'paid', telegram: tgSent };
+  }
+
+
+
   if (await isFonntePaused(admin)) {
     if (tgSent) await admin.from('orders').update({ token_sent_at: new Date().toISOString() }).eq('id', order.id);
     return { id: order.id, status: 'paid', skipped: 'fonnte_timeout_pause', telegram: tgSent };
