@@ -195,40 +195,62 @@ async function createOrderAndSendQr(
   }
   const amount = Number(data.total_payment || data.amount || 0);
   const qrImg = `https://api.qrserver.com/v1/create-qr-code/?size=600x600&margin=16&data=${encodeURIComponent(data.qr_string)}`;
-  const expired = data.expired_at ? new Date(data.expired_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta' }) + ' WIB' : '';
+  const deadline = new Date(Date.now() + QR_TTL_MS).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta' }) + ' WIB';
   const caption = [
     '💳 *PEMBAYARAN QRIS*',
     '━━━━━━━━━━━━━━━━━━',
-    `💰 Total: *${rupiah(amount)}*`,
-    `🆔 Order: \`${data.pakasir_order_id}\``,
-    expired ? `⏰ Berlaku sampai: ${expired}` : '',
+    `💰 Total  : *${rupiah(amount)}*`,
+    `⏳ Berlaku : *5 menit* (s/d ${deadline})`,
     '',
-    '📲 Scan QR di atas dengan aplikasi apa pun (GoPay, DANA, OVO, ShopeePay, m-banking).',
+    '📲 Scan QR di atas dengan GoPay / DANA / OVO / ShopeePay / m-banking.',
+    '⚠️ Bayar *tepat* sesuai nominal.',
     '',
-    '⚠️ Bayar *tepat* sesuai nominal di atas.',
-    'Setelah bayar, tekan *Saya Sudah Bayar* — link token akan langsung dikirim ke sini. 💖',
-  ].filter(Boolean).join('\n');
+    '✅ Setelah bayar, tekan tombol di bawah — link token & sandi replay langsung dikirim ke chat ini.',
+  ].join('\n');
   const keyboard: InlineKeyboard = [
     [{ text: '✅ Saya Sudah Bayar', callback_data: `c:${data.order_id}` }],
-    [{ text: '🌐 Bayar di Website', url: String(data.qr_url || SITE) }],
   ];
   const sent = await sendTelegramPhoto(chatId, qrImg, caption, keyboard);
+  let messageId = Number((sent.data as any)?.result?.message_id || 0);
   if (!sent.ok) {
-    await sendTelegramRich(chatId, `${caption}\n\n🔗 QRIS: ${data.qr_url}`, keyboard);
+    const alt = await sendTelegramRich(chatId, `${caption}\n\n🔗 QRIS: ${data.qr_url}`, keyboard);
+    messageId = Number((alt.data as any)?.result?.message_id || 0);
   }
+  scheduleQrExpiry(admin, chatId, messageId, String(data.order_id));
+}
+
+/** Setelah 5 menit QRIS dihapus dari chat bila belum dibayar. */
+function scheduleQrExpiry(admin: Admin, chatId: number, messageId: number, orderUuid: string) {
+  const task = (async () => {
+    try {
+      await new Promise((r) => setTimeout(r, QR_TTL_MS));
+      const { data } = await admin.from('orders').select('status').eq('id', orderUuid).maybeSingle();
+      if (String((data as any)?.status || '') === 'paid') return;
+      if (messageId) await deleteTelegramMessage(chatId, messageId);
+      await sendTelegramRich(
+        chatId,
+        '⌛ *QRIS sudah kadaluarsa*\n━━━━━━━━━━━━━━━━━━\n\nBatas waktu 5 menit terlewati, jadi kode QR tadi dihapus.\n\nSilakan lakukan pembelian ulang untuk mendapatkan QRIS baru. 💖',
+        [[{ text: '🎤 Beli Lagi', callback_data: 'menu:show' }]],
+      );
+    } catch (e) {
+      console.error('qr expiry error:', String(e));
+    }
+  })();
+  try { (globalThis as any).EdgeRuntime?.waitUntil?.(task); } catch { /* ignore */ }
 }
 
 async function checkOrder(admin: Admin, chatId: number, orderUuid: string) {
   const { data } = await callFn('check-pakasir-status', { order_id: orderUuid });
   const status = String(data?.status || '');
   if (status === 'paid') {
-    await sendTelegram(chatId, '✅ *Pembayaran terkonfirmasi!*\n\nLink token sedang dikirim ke chat ini dan WhatsApp Anda. Kalau belum muncul dalam 1 menit, ketik `/token`. 💖');
+    await sendTelegram(chatId, '✅ *Pembayaran terkonfirmasi!*\n\nLink token sedang dikirim ke chat ini. Kalau belum muncul dalam 1 menit, ketik `/token`. 💖');
   } else {
     await sendTelegramRich(chatId, '⏳ *Pembayaran belum terdeteksi.*\n\nKalau sudah bayar, tunggu ±1 menit lalu tekan tombol di bawah lagi.', [
       [{ text: '🔄 Cek Lagi', callback_data: `c:${orderUuid}` }],
     ]);
   }
 }
+
 
 async function showStatus(admin: Admin, chatId: number, phone: string) {
   const { data } = await admin.from('orders')
