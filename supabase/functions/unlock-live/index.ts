@@ -170,13 +170,13 @@ Deno.serve(async (req) => {
         // fall through to legacy branch
       } else {
 
-      // Auto schedule: live dianggap aktif mulai 15 menit sebelum jam jadwal, sampai +8 jam.
+      // Auto schedule: semua show otomatis live mulai 20 menit sebelum jam jadwal, sampai +8 jam.
       const autoLiveNow = (() => {
-        if (!show.live_auto_schedule || !show.show_date || !show.show_time) return false;
+        if (!show.show_date || !show.show_time) return false;
         const startMs = new Date(`${show.show_date}T${String(show.show_time).slice(0, 8)}+07:00`).getTime();
         if (!Number.isFinite(startMs)) return false;
         const now = Date.now();
-        return now >= startMs - 15 * 60 * 1000 && now <= startMs + 8 * 3600 * 1000;
+        return now >= startMs - 20 * 60 * 1000 && now <= startMs + 8 * 3600 * 1000;
       })();
       const enabled = !!show.is_live || autoLiveNow;
       const okPayload = {
