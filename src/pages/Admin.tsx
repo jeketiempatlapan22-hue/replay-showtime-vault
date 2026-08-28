@@ -92,6 +92,12 @@ export default function Admin() {
   const [useStaticQris, setUseStaticQris] = useState(false);
   const [adminUsername, setAdminUsername] = useState('');
   const [canEditAdminUsername, setCanEditAdminUsername] = useState(false);
+  const [acctEmail, setAcctEmail] = useState('');
+  const [acctCurrentPw, setAcctCurrentPw] = useState('');
+  const [acctNewPw, setAcctNewPw] = useState('');
+  const [acctNewPw2, setAcctNewPw2] = useState('');
+  const [acctSaving, setAcctSaving] = useState(false);
+
 
   // Comments state
   const [allComments, setAllComments] = useState<Comment[]>([]);
