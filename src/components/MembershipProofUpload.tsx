@@ -41,10 +41,11 @@ export default function MembershipProofUpload({ open, onOpenChange, orderId, sho
 
   useEffect(() => {
     if (!open) return;
-    void supabase.from('site_settings').select('key,value').in('key', ['admin_wa_phone','owner_wa_number']).then(({ data }) => {
+    void supabase.from('site_settings').select('key,value').in('key', ['owner_wa_number','admin_wa_phone']).then(({ data }) => {
       const m = new Map((data || []).map((r: any) => [r.key, String(r.value || '')]));
-      setAdminWa(m.get('admin_wa_phone') || m.get('owner_wa_number') || '');
+      setAdminWa(m.get('owner_wa_number') || m.get('admin_wa_phone') || '');
     });
+
   }, [open]);
 
   const onPickFile = (f: File | null) => {
