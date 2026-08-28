@@ -245,7 +245,13 @@ export default function MembershipAdmin() {
                     </div>
                     <div className="text-xs text-muted-foreground font-mono break-all">Token: {r.token} · Sandi: {r.password}</div>
                     <div className="text-xs text-muted-foreground">
-                      WA: {r.phone || '-'} · Kuota reset: <span className="font-mono">{r.manual_resets_used}/{r.manual_resets_max}</span> · Durasi: <span className="font-medium text-foreground">{r.duration_days} hari</span> · Aktif s/d <span className="font-medium text-foreground">{new Date(r.expires_at).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })}</span>
+                      WA: {r.phone || '-'}
+                      {r.phone && (
+                        <button title="Salin nomor" onClick={() => { navigator.clipboard.writeText(r.phone); toast.success('Nomor disalin'); }} className="hover:text-primary align-middle mx-1">
+                          <Copy className="w-3 h-3 inline" />
+                        </button>
+                      )}
+                      · Kuota reset: <span className="font-mono">{r.manual_resets_used}/{r.manual_resets_max}</span> · Durasi: <span className="font-medium text-foreground">{r.duration_days} hari</span> · Aktif s/d <span className="font-medium text-foreground">{new Date(r.expires_at).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })}</span>
                       {(() => {
                         const ms = new Date(r.expires_at).getTime() - Date.now();
                         if (ms <= 0) return <span className="text-destructive"> · sudah expired</span>;
