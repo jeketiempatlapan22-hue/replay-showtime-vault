@@ -12,6 +12,8 @@ import { toast } from '@/hooks/use-toast';
 import type { ActiveMembership } from '@/hooks/useActiveMembership';
 import { isReplayCoveredByMembership } from '@/lib/membershipReplayAccess';
 import { thumbUrl } from '@/lib/imageUrl';
+import AccessInfoCard from '@/components/AccessInfoCard';
+
 
 
 const CRITERIA_LABELS: Record<string, string> = {
