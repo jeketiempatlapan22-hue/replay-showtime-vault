@@ -45,9 +45,11 @@ export default function MembershipProofsAdmin() {
   };
 
   const loadWa = async () => {
-    const { data } = await supabase.from('site_settings').select('value').eq('key', 'admin_wa_phone').maybeSingle();
-    setAdminWa(String((data as any)?.value || ''));
+    const { data } = await supabase.from('site_settings').select('key,value').in('key', ['owner_wa_number', 'admin_wa_phone']);
+    const m = new Map(((data || []) as any[]).map((r) => [r.key, String(r.value || '')]));
+    setAdminWa(m.get('owner_wa_number') || m.get('admin_wa_phone') || '');
   };
+
 
   const loadTargets = async () => {
     const [sh, rp, pk] = await Promise.all([
