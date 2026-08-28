@@ -268,21 +268,8 @@ function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWatch, onUnlockAn
               >
                 <Play className="w-4 h-4 mr-2" /> Tonton Replay
               </Button>
-              <div className="rounded-md border-2 border-primary/40 bg-primary/10 p-2 space-y-1.5">
-                <div className="text-[10px] font-semibold text-primary flex items-center gap-1">
-                  <Copy className="w-3 h-3" /> SALIN LINK & TEMPEL DI BROWSER
-                </div>
-                <Button type="button" size="sm" className="w-full h-7 text-xs gap-1" onClick={copyLink}>
-                  <Copy className="w-3 h-3" /> Salin Link Token
-                </Button>
-              </div>
-              <div className="rounded-md border border-border bg-muted/30 p-2 space-y-1">
-                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Sandi akses</div>
-                <div className="flex items-center gap-2">
-                  <code className="flex-1 text-[11px] font-mono break-all text-foreground">{purchasedToken}</code>
-                  <Button type="button" size="sm" variant="outline" onClick={copyToken} className="h-7 px-2"><Copy className="w-3 h-3" /></Button>
-                </div>
-              </div>
+              <AccessInfoCard token={purchasedToken} replayId={replay.id} fallbackLink={accessLink} compact />
+
             </div>
           ) : isUnlocked ? (
             <Button type="button" className="w-full" onClick={() => onWatch(replay)}>
