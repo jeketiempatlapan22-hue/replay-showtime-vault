@@ -1,8 +1,77 @@
 // Helper Telegram bersama: kirim pesan lewat connector gateway Lovable.
 // Dipakai oleh telegram-webhook, poll-pending-orders, dan pakasir-webhook.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { claimWaSend, markWaSent } from './wa-guard.ts';
 
 const GATEWAY_URL = 'https://connector-gateway.lovable.dev/telegram';
+
+export type InlineButton = { text: string; callback_data?: string; url?: string };
+export type InlineKeyboard = InlineButton[][];
+
+async function gatewayCall(method: string, payload: Record<string, unknown>) {
+  const headers = gatewayHeaders();
+  if (!headers) return { ok: false, data: { error: 'telegram_not_configured' } };
+  try {
+    const res = await fetch(`${GATEWAY_URL}/${method}`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(15000),
+    });
+    const data = await res.json().catch(() => ({}));
+    return { ok: res.ok && (data as any)?.ok !== false, data };
+  } catch (e) {
+    return { ok: false, data: { error: String(e) } };
+  }
+}
+
+/** Kirim pesan dengan tombol inline (opsional). */
+export async function sendTelegramRich(
+  chatId: number | string,
+  text: string,
+  keyboard?: InlineKeyboard,
+  extra: Record<string, unknown> = {},
+) {
+  const payload: Record<string, unknown> = {
+    chat_id: chatId,
+    text,
+    parse_mode: 'Markdown',
+    disable_web_page_preview: true,
+    ...extra,
+  };
+  if (keyboard?.length) payload.reply_markup = { inline_keyboard: keyboard };
+  const first = await gatewayCall('sendMessage', payload);
+  if (first.ok) return first;
+  const { parse_mode: _pm, ...plain } = payload as any;
+  return await gatewayCall('sendMessage', plain);
+}
+
+/** Kirim gambar (mis. QRIS) dengan caption. */
+export async function sendTelegramPhoto(
+  chatId: number | string,
+  photoUrl: string,
+  caption: string,
+  keyboard?: InlineKeyboard,
+) {
+  const payload: Record<string, unknown> = {
+    chat_id: chatId, photo: photoUrl, caption, parse_mode: 'Markdown',
+  };
+  if (keyboard?.length) payload.reply_markup = { inline_keyboard: keyboard };
+  const first = await gatewayCall('sendPhoto', payload);
+  if (first.ok) return first;
+  const { parse_mode: _pm, ...plain } = payload as any;
+  return await gatewayCall('sendPhoto', plain);
+}
+
+export async function answerCallbackQuery(id: string, text = '') {
+  return await gatewayCall('answerCallbackQuery', { callback_query_id: id, text });
+}
+
+/** Daftarkan menu perintah bot agar rapi di UI Telegram. */
+export async function setBotCommands(commands: { command: string; description: string }[]) {
+  return await gatewayCall('setMyCommands', { commands });
+}
+
 
 function gatewayHeaders() {
   const lovableKey = Deno.env.get('LOVABLE_API_KEY');
