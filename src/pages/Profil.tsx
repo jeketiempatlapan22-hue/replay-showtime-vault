@@ -393,6 +393,31 @@ export default function Profil() {
           </CardContent>
         </Card>
 
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base"><KeyRound className="w-4 h-4 text-primary" /> Link & Sandi Replay Saya</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {myOrders.length === 0 ? (
+              <p className="text-xs text-muted-foreground text-center py-2">Belum ada pembelian show atau replay.</p>
+            ) : (
+              myOrders.map((o) => (
+                <div key={o.id} className="rounded-lg border border-border p-3 space-y-2 bg-card/50">
+                  <div className="font-semibold text-sm leading-tight">{o.item_title || 'Pembelian'}</div>
+                  <div className="text-[10px] text-muted-foreground">
+                    {o.paid_at ? new Date(o.paid_at).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' }) : ''}
+                  </div>
+                  <AccessInfoCard
+                    token={o.access_token!}
+                    showId={o.show_id || undefined}
+                    replayId={o.replay_id || undefined}
+                    compact
+                  />
+                </div>
+              ))
+            )}
+          </CardContent>
+        </Card>
 
 
         <Card>
