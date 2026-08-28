@@ -119,6 +119,17 @@ export default function HamburgerMenu({ whatsappNumber, whatsappLink, lightMode,
           </Link>
 
           <Link
+            to="/profil"
+            onClick={() => setOpen(false)}
+            className="flex items-center gap-3 px-4 py-3 rounded-lg text-foreground hover:bg-secondary transition-colors"
+          >
+            <UserIcon className="w-5 h-5 text-primary" />
+            <span className="font-medium">Profil</span>
+          </Link>
+
+
+
+          <Link
             to="/panduan"
             onClick={() => setOpen(false)}
             className="flex items-center gap-3 px-4 py-3 rounded-lg text-foreground hover:bg-secondary transition-colors"
