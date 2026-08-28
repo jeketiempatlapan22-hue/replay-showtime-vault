@@ -244,11 +244,12 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
       setStatus('qr');
     } catch (e: any) {
       const msg = e?.message || 'Gagal membuat order';
-      if (staticQrisUrl) {
+      // QRIS statis hanya dipakai kalau admin memang mengaktifkannya.
+      if (useStaticQris && staticQrisUrl) {
         toast.error(`${msg}. Gunakan QRIS statis di bawah.`);
         setStatus('static_qris');
       } else {
-        toast.error(`${msg}. Silakan coba QRIS dinamis lagi.`);
+        toast.error(`${msg}. Silakan coba lagi.`);
         setStatus('form');
       }
     }
