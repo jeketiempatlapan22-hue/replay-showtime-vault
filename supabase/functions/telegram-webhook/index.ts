@@ -177,10 +177,12 @@ async function listReplays(admin: Admin, chatId: number) {
 }
 
 async function createOrderAndSendQr(
-  admin: Admin, chatId: number, phone: string,
+  admin: Admin, chatId: number,
   kind: 'show' | 'replay' | 'replay_only', id: string,
 ) {
-  const body: Record<string, unknown> = { kind, phone };
+  // Tanpa nomor WhatsApp: order diikat langsung ke chat Telegram.
+  const body: Record<string, unknown> = { kind, telegram_chat_id: chatId };
+
   if (kind === 'replay_only') {
     body.replay_id = id;
     const { data: rp } = await admin.from('replays').select('price_idr').eq('id', id).maybeSingle();
