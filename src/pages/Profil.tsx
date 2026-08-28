@@ -369,8 +369,10 @@ export default function Profil() {
                             <ExternalLink className="w-3 h-3 mr-1" /> Buka
                           </Button>
                         </div>
+                        <AccessInfoCard mtoken={m.token!} mpassword={m.password!} fallbackLink={link} compact />
                       </div>
                     )}
+
 
                     {isPaid && !tokenExpired && !m.revoked && m.token && m.password && (m.max_devices ?? 1) <= 1 && (
                       <DeviceResetButton kind="membership" token={m.token} password={m.password} />
