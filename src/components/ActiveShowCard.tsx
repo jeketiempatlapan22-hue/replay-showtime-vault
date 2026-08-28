@@ -245,25 +245,19 @@ export default function ActiveShowCard({ show, index = 0 }: { show: ActiveShow; 
         )}
 
 
-        {/* Salin link token banner */}
-        {purchasedToken && (() => {
-          const link = replayMode
-            ? (show.replay_id ? `${window.location.origin}/akses?token=${purchasedToken}&replay=${show.replay_id}` : `${window.location.origin}/akses?token=${purchasedToken}`)
-            : `${window.location.origin}/live?show=${show.id}&t=${purchasedToken}`;
-          const copyLink = async () => {
-            try { await navigator.clipboard.writeText(link); toast.success('Link akses disalin', { description: 'Tempel di browser untuk menonton.' }); } catch { /* ignore */ }
-          };
-          return (
-            <div className="rounded-md border-2 border-primary/40 bg-primary/10 p-2 space-y-1.5">
-              <div className="text-[10px] font-semibold text-primary flex items-center gap-1">
-                <Copy className="w-3 h-3" /> SALIN LINK & TEMPEL DI BROWSER
-              </div>
-              <Button size="sm" className="w-full h-7 text-xs gap-1" onClick={copyLink}>
-                <Copy className="w-3 h-3" /> Salin Link Token
-              </Button>
-            </div>
-          );
-        })()}
+        {/* Salin link token + info replay */}
+        {purchasedToken && (
+          <AccessInfoCard
+            token={purchasedToken}
+            showId={show.id}
+            replayId={replayMode ? (show.replay_id || undefined) : undefined}
+            fallbackLink={replayMode
+              ? (show.replay_id ? `${window.location.origin}/akses?token=${purchasedToken}&replay=${show.replay_id}` : `${window.location.origin}/akses?token=${purchasedToken}`)
+              : `${window.location.origin}/live?show=${show.id}&t=${purchasedToken}`}
+            compact
+          />
+        )}
+
 
 
 
