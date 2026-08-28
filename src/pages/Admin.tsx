@@ -209,6 +209,8 @@ export default function Admin() {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
+        setAcctEmail(session.user.email || '');
+
         supabase.from('user_roles').select('role').eq('user_id', session.user.id).eq('role', 'admin').maybeSingle().then(({ data }) => {
           if (data) setIsLoggedIn(true);
         });
