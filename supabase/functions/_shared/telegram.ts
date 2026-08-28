@@ -152,8 +152,14 @@ export async function sendTelegramByPhone(
       .not('chat_id', 'is', null)
       .maybeSingle();
     if (!data?.chat_id) return false;
+    // Anti-dobel: webhook Pakasir, poller, dan cek status bisa jalan bersamaan.
+    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(message));
+    const hash = Array.from(new Uint8Array(digest)).slice(0, 12).map((b) => b.toString(16).padStart(2, '0')).join('');
+    const key = `tg:${data.chat_id}:${hash}`;
+    if (!(await claimWaSend(key))) return true;
     const sent = await sendTelegram(data.chat_id, message);
-    if (!sent.ok) console.error('telegram send failed:', JSON.stringify(sent.data));
+    if (sent.ok) await markWaSent(key);
+    else console.error('telegram send failed:', JSON.stringify(sent.data));
     return sent.ok;
   } catch (e) {
     console.error('sendTelegramByPhone error:', String(e));
