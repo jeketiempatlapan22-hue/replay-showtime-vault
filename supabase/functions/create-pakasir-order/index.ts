@@ -51,7 +51,7 @@ Deno.serve(async (req) => {
     // (webhook Pakasir / poller / cek status) menemukan tujuannya.
     if (tgChatId) {
       await admin.from('telegram_links').upsert(
-        { phone, chat_id: tgChatId, linked_at: new Date().toISOString() },
+        { phone, chat_id: tgChatId, link_code: `TG${tgChatId}`, linked_at: new Date().toISOString() },
         { onConflict: 'phone' },
       );
     }
