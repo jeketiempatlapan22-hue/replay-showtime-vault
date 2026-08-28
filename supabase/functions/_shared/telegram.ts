@@ -150,15 +150,25 @@ export async function sendTelegramByPhone(
 ): Promise<boolean> {
   try {
     if (!telegramConfigured()) return false;
-    const p = normalizePhone(phone);
-    if (!p) return false;
-    const { data } = await admin
-      .from('telegram_links')
-      .select('chat_id')
-      .eq('phone', p)
-      .not('chat_id', 'is', null)
-      .maybeSingle();
-    if (!data?.chat_id) return false;
+    const raw = String(phone || '').trim();
+    // Pembeli Telegram murni memakai identitas semu `tg<chat_id>`:
+    // chat_id-nya sudah ada di string, jangan dinormalisasi jadi nomor telepon.
+    const pseudo = /^tg(\d+)$/i.exec(raw);
+    let chatId: number | string | null = pseudo ? Number(pseudo[1]) : null;
+    if (!chatId) {
+      const p = normalizePhone(raw);
+      if (!p) return false;
+      const { data } = await admin
+        .from('telegram_links')
+        .select('chat_id')
+        .eq('phone', p)
+        .not('chat_id', 'is', null)
+        .maybeSingle();
+      if (!data?.chat_id) return false;
+      chatId = data.chat_id as number;
+    }
+    const data = { chat_id: chatId } as { chat_id: number | string };
+
     // Anti-dobel: webhook Pakasir, poller, dan cek status bisa jalan bersamaan.
     const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(message));
     const hash = Array.from(new Uint8Array(digest)).slice(0, 12).map((b) => b.toString(16).padStart(2, '0')).join('');
