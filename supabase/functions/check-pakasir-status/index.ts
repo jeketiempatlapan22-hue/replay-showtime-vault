@@ -334,15 +334,20 @@ Deno.serve(async (req) => {
         newBal = Number(row?.new_balance ?? 0);
       }
       if (!alreadySent) {
+        const msg = `✅ *Top-up berhasil*\n+${order.coin_amount} koin sudah masuk.${newBal != null ? `\nSaldo sekarang: *${newBal}* koin` : ''}\n\nTerima kasih 💖 — *ReplayTime*`;
+        const tgOk = await sendTelegramByPhone(admin, order.user_phone, msg);
+        if (isTgOnlyOrder) {
+          if (tgOk) await admin.from('orders').update({ token_sent_at: new Date().toISOString() }).eq('id', order.id);
+          return new Response(JSON.stringify({ ok: true, status: 'paid', topup: true, new_balance: newBal, telegram: tgOk }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
         if (await isFonntePaused(admin)) {
           return new Response(JSON.stringify({ ok: true, status: 'paid', topup: true, new_balance: newBal, sent: false, retry_delayed: true, reason: 'fonnte_timeout_pause' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
         }
         if (await shouldDelayWaRetry(admin, order.id)) {
           return new Response(JSON.stringify({ ok: true, status: 'paid', topup: true, new_balance: newBal, sent: false, retry_delayed: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
         }
-        const msg = `✅ *Top-up berhasil*\n+${order.coin_amount} koin sudah masuk.${newBal != null ? `\nSaldo sekarang: *${newBal}* koin` : ''}\n\nTerima kasih 💖 — *ReplayTime*`;
         const sent = await sendFonnte(order.user_phone, msg);
-        if (sent.ok) {
+        if (sent.ok || tgOk) {
           await admin.from('orders').update({ token_sent_at: new Date().toISOString() }).eq('id', order.id);
         }
         await admin.from('wa_outbox').insert({
@@ -362,7 +367,8 @@ Deno.serve(async (req) => {
       }).eq('id', order.id);
     }
 
-    if (order.token_sent_at && await hasSentWa(admin, order.id)) {
+    if (order.token_sent_at && (isTgOnlyOrder || await hasSentWa(admin, order.id))) {
+
       return new Response(JSON.stringify({ ok: true, status: 'paid', access_token: accessToken }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
