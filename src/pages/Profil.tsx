@@ -37,7 +37,17 @@ interface MyMembership {
   pause_message: string | null;
 }
 
+interface MyOrder {
+  id: string;
+  item_title: string | null;
+  show_id: string | null;
+  replay_id: string | null;
+  access_token: string | null;
+  paid_at: string | null;
+}
+
 export default function Profil() {
+
   const navigate = useNavigate();
   const { user, loading } = useAuth();
   const [username, setUsername] = useState('');
