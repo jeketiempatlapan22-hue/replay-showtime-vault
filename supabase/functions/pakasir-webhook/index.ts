@@ -399,9 +399,12 @@ Deno.serve(async (req) => {
   }
 
 
+  // Telegram: jalur alternatif — token tetap sampai walau Fonnte gangguan.
+  const tgSent = await sendTelegramByPhone(admin, order.user_phone, message);
+
   const paused = await isFonntePaused(admin);
   const sent = paused ? { ok: false, data: { error: 'fonnte_timeout_pause' } } : await sendFonnte(order.user_phone, message);
-  if (sent.ok) await admin.from('orders').update({ token_sent_at: new Date().toISOString() }).eq('id', order.id);
+  if (sent.ok || tgSent) await admin.from('orders').update({ token_sent_at: new Date().toISOString() }).eq('id', order.id);
   await admin.from('token_deliveries').insert({
     phone: order.user_phone, replay_id: order.replay_id, replay_title: order.item_title,
     order_id: order.id, access_token: accessToken, link,
