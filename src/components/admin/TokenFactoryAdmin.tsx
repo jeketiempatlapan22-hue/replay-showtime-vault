@@ -129,6 +129,18 @@ function TokenTable({ kind, status }: { kind: Kind; status: Status }) {
         <Button size="sm" variant="outline" onClick={load} disabled={loading}><RefreshCw className={`w-4 h-4 mr-1 ${loading?'animate-spin':''}`} />Muat</Button>
       </div>
 
+      {kind === 'membership' && (
+        <div className="flex gap-1.5 flex-wrap">
+          <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => {
+            const list = [...new Set(filtered.map((r: any) => r.phone).filter(Boolean))];
+            if (!list.length) return toast({ title: 'Tidak ada nomor', variant: 'destructive' });
+            copy(list.join('\n'), `${list.length} nomor`);
+          }}>
+            <Copy className="w-3.5 h-3.5 mr-1" />Salin Semua Nomor
+          </Button>
+        </div>
+      )}
+
       {status === 'expired' && (
         <div className="flex flex-wrap items-center gap-2 p-2 rounded-lg bg-amber-500/10 border border-amber-500/30">
           <Checkbox checked={selected.size>0 && selected.size===filtered.length} onCheckedChange={(c) => toggleAll(!!c)} />
@@ -172,7 +184,11 @@ function TokenTable({ kind, status }: { kind: Kind; status: Status }) {
                 <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
                   <div className="font-mono text-foreground/80 break-all">🔑 {r.token}</div>
                   {kind==='membership' && (r as MbRow).password && <div className="font-mono">🔒 {(r as MbRow).password}</div>}
-                  {kind==='membership' && (r as MbRow).phone && <div>📱 {(r as MbRow).phone}</div>}
+                  {kind==='membership' && (r as MbRow).phone && (
+                    <div className="flex items-center gap-1.5">📱 {(r as MbRow).phone}
+                      <button title="Salin nomor" onClick={() => copy((r as MbRow).phone, 'Nomor')} className="hover:text-primary"><Copy className="w-3 h-3" /></button>
+                    </div>
+                  )}
                   <div>📲 Device: {r.devices_used}/{r.max_devices}</div>
                   <div>🕒 Dibuat: {new Date(r.created_at).toLocaleString('id-ID')}</div>
                   <div>⏳ Berakhir: {r.expires_at ? new Date(r.expires_at).toLocaleString('id-ID') : '—'}</div>
