@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Menu, X, Home, MessageCircle, Phone, Sun, Moon, Radio, LogIn, LogOut, User as UserIcon, Crown, BookOpen } from 'lucide-react';
+import { Menu, X, Home, MessageCircle, Phone, Sun, Moon, Radio, LogIn, LogOut, User as UserIcon, Crown, BookOpen, Clapperboard } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -73,13 +73,23 @@ export default function HamburgerMenu({ whatsappNumber, whatsappLink, lightMode,
 
         <nav className="p-4 space-y-2">
           <Link
-            to="/shows"
+            to="/"
             onClick={() => setOpen(false)}
             className="flex items-center gap-3 px-4 py-3 rounded-lg text-foreground hover:bg-secondary transition-colors"
           >
             <Home className="w-5 h-5 text-primary" />
             <span className="font-medium">Beranda</span>
           </Link>
+
+          <Link
+            to="/shows"
+            onClick={() => setOpen(false)}
+            className="flex items-center gap-3 px-4 py-3 rounded-lg text-foreground hover:bg-secondary transition-colors"
+          >
+            <Clapperboard className="w-5 h-5 text-primary" />
+            <span className="font-medium">Show</span>
+          </Link>
+
 
           <Link
             to="/live"
@@ -107,6 +117,17 @@ export default function HamburgerMenu({ whatsappNumber, whatsappLink, lightMode,
             <Crown className="w-5 h-5 text-primary" />
             <span className="font-medium">Membership</span>
           </Link>
+
+          <Link
+            to="/profil"
+            onClick={() => setOpen(false)}
+            className="flex items-center gap-3 px-4 py-3 rounded-lg text-foreground hover:bg-secondary transition-colors"
+          >
+            <UserIcon className="w-5 h-5 text-primary" />
+            <span className="font-medium">Profil</span>
+          </Link>
+
+
 
           <Link
             to="/panduan"

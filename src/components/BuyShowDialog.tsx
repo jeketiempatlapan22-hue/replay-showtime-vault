@@ -50,7 +50,7 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
   const [lastChecked, setLastChecked] = useState<number>(0);
   const [staticQrisUrl, setStaticQrisUrl] = useState<string>('');
   const [proofOpen, setProofOpen] = useState(false);
-  const [ownerWa, setOwnerWa] = useState<string>('6288809048431');
+  const [ownerWa, setOwnerWa] = useState<string>('62859106545522');
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   // Load admin contact + static QRIS settings + coin price/balance when dialog opens
@@ -64,7 +64,7 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
           .in('key', ['static_qris_url', 'owner_wa_number', 'use_static_qris']);
         for (const row of data || []) {
           if (row.key === 'static_qris_url') setStaticQrisUrl(String(row.value || ''));
-          if (row.key === 'owner_wa_number') setOwnerWa(String(row.value || '6288809048431'));
+          if (row.key === 'owner_wa_number') setOwnerWa(String(row.value || '62859106545522'));
         }
       } catch { /* ignore */ }
       // Coin price for the item
@@ -286,7 +286,7 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
   };
 
   const adminWaUrl = (() => {
-    const num = (ownerWa || '6288809048431').replace(/\D/g, '');
+    const num = (ownerWa || '62859106545522').replace(/\D/g, '');
     const desc = `Halo Admin, saya ingin konfirmasi pembayaran:%0A%0A• Item: ${encodeURIComponent(itemTitle)}%0A• Show: ${encodeURIComponent(showTitle)}%0A• Nominal: Rp ${amount.toLocaleString('id-ID')}%0A• Nomor saya: ${normalizePhone(phone) || '-'}${pakasirOrderId ? `%0A• Order ID: ${pakasirOrderId}` : ''}%0A%0AMohon dikirimkan token akses setelah pembayaran terkonfirmasi. Terima kasih 🙏`;
     return `https://wa.me/${num}?text=${desc}`;
   })();
