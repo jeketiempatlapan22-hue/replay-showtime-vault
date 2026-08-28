@@ -145,6 +145,26 @@ export default function Profil() {
     return () => { supabase.removeChannel(ch); };
   }, [user]);
 
+  // Riwayat pembelian show/replay yang sudah lunas (untuk link + sandi replay)
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from('orders')
+        .select('id,item_title,show_id,replay_id,access_token,paid_at')
+        .eq('user_id', user.id)
+        .eq('status', 'paid')
+        .not('access_token', 'is', null)
+        .order('paid_at', { ascending: false })
+        .limit(20);
+      if (!cancelled) setMyOrders((data || []) as MyOrder[]);
+    })();
+    return () => { cancelled = true; };
+  }, [user]);
+
+
+
   const copyText = async (text: string, label = 'Disalin') => {
     try { await navigator.clipboard.writeText(text); toast.success(label); }
     catch { toast.error('Gagal menyalin'); }
