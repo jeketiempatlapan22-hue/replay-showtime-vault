@@ -438,7 +438,25 @@ Deno.serve(async (req) => {
     }
 
     // Telegram: kirim token juga ke Telegram user bila sudah terhubung.
-    await sendTelegramByPhone(admin, order.user_phone, message);
+    const tgSent = await sendTelegramByPhone(admin, order.user_phone, message);
+
+    // Pembeli murni Telegram (identitas semu `tg<chat_id>`) tidak punya nomor WA:
+    // jangan panggil Fonnte (selalu gagal & memicu mode pause).
+    const tgOnly = /^tg\d+$/i.test(String(order.user_phone || ''));
+    if (tgOnly) {
+      if (tgSent) {
+        await admin.from('orders').update({ token_sent_at: new Date().toISOString() }).eq('id', order.id);
+      }
+      await admin.from('token_deliveries').insert({
+        phone: order.user_phone, replay_id: order.replay_id, replay_title: order.item_title,
+        order_id: order.id, access_token: accessToken, link,
+        source: 'pakasir', requested_by: 'check-pakasir-status-telegram',
+      });
+      return new Response(JSON.stringify({ ok: true, status: 'paid', access_token: accessToken, telegram: tgSent, sent: tgSent }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     if (await isFonntePaused(admin)) {
       return new Response(JSON.stringify({ ok: true, status: 'paid', access_token: accessToken, sent: false, retry_delayed: true, reason: 'fonnte_timeout_pause' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -450,7 +468,8 @@ Deno.serve(async (req) => {
       });
     }
     const sent = await sendFonnte(order.user_phone, message);
-    if (sent.ok) await admin.from('orders').update({ token_sent_at: new Date().toISOString() }).eq('id', order.id);
+    if (sent.ok || tgSent) await admin.from('orders').update({ token_sent_at: new Date().toISOString() }).eq('id', order.id);
+
     await admin.from('token_deliveries').insert({
       phone: order.user_phone, replay_id: order.replay_id, replay_title: order.item_title,
       order_id: order.id, access_token: accessToken, link,
