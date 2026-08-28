@@ -91,9 +91,11 @@ async function callFn(name: string, body: Record<string, unknown>) {
 }
 
 async function getLink(admin: Admin, chatId: number) {
+  // Satu chat bisa punya 2 baris: identitas semu `tg<chat_id>` dan nomor WA asli.
   const { data } = await admin.from('telegram_links')
-    .select('id,phone,chat_id').eq('chat_id', chatId).maybeSingle();
-  return data as { id: string; phone: string; chat_id: number } | null;
+    .select('id,phone,chat_id').eq('chat_id', chatId).limit(5);
+  const rows = (data ?? []) as { id: string; phone: string; chat_id: number }[];
+  return rows.find((r) => !/^tg\d+$/.test(r.phone)) ?? rows[0] ?? null;
 }
 
 
@@ -352,7 +354,6 @@ Deno.serve(async (req) => {
     if (cmd === '/start') {
       const code = text.split(/\s+/)[1]?.trim().toUpperCase() || '';
       if (!code) {
-        const link = await getLink(admin, chatId);
         await sendTelegramRich(
           chatId,
           [
