@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 import { Loader2, CheckCircle2, Copy, Smartphone, ExternalLink, MessageCircle, AlertTriangle, Coins, Lock, Upload } from 'lucide-react';
 import { setShowPurchase, setReplayPurchase } from '@/lib/purchases';
 import MembershipProofUpload from '@/components/MembershipProofUpload';
+import { adminWaNumber } from '@/lib/adminWa';
 
 interface Props {
   open: boolean;
@@ -50,7 +51,8 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
   const [lastChecked, setLastChecked] = useState<number>(0);
   const [staticQrisUrl, setStaticQrisUrl] = useState<string>('');
   const [proofOpen, setProofOpen] = useState(false);
-  const [ownerWa, setOwnerWa] = useState<string>('62859106545522');
+  const [ownerWa, setOwnerWa] = useState<string>('');
+  const [useStaticQris, setUseStaticQris] = useState(false);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   // Load admin contact + static QRIS settings + coin price/balance when dialog opens
@@ -61,11 +63,11 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
         const { data } = await supabase
           .from('site_settings')
           .select('key,value')
-          .in('key', ['static_qris_url', 'owner_wa_number', 'use_static_qris']);
-        for (const row of data || []) {
-          if (row.key === 'static_qris_url') setStaticQrisUrl(String(row.value || ''));
-          if (row.key === 'owner_wa_number') setOwnerWa(String(row.value || '62859106545522'));
-        }
+          .in('key', ['static_qris_url', 'owner_wa_number', 'admin_wa_phone', 'use_static_qris']);
+        const m = new Map((data || []).map((r: any) => [r.key, String(r.value || '')]));
+        setStaticQrisUrl(m.get('static_qris_url') || '');
+        setOwnerWa(m.get('owner_wa_number') || m.get('admin_wa_phone') || '');
+        setUseStaticQris((m.get('use_static_qris') || 'false') === 'true');
       } catch { /* ignore */ }
       // Coin price for the item
       try {
@@ -208,6 +210,8 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
       return;
     }
     try { localStorage.setItem('replaytime-phone', phone); } catch { /* ignore */ }
+    // Admin mengaktifkan QRIS statis: berlaku untuk semua pembelian (show maupun replay).
+    if (useStaticQris) { setStatus('static_qris'); return; }
     setStatus('creating');
     try {
       const { data, error } = await supabase.functions.invoke('create-pakasir-order', {
@@ -239,8 +243,13 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
       setStatus('qr');
     } catch (e: any) {
       const msg = e?.message || 'Gagal membuat order';
-      toast.error(`${msg}. Silakan coba buat QRIS dinamis lagi.`);
-      setStatus('form');
+      if (staticQrisUrl) {
+        toast.error(`${msg}. Gunakan QRIS statis di bawah.`);
+        setStatus('static_qris');
+      } else {
+        toast.error(`${msg}. Silakan coba QRIS dinamis lagi.`);
+        setStatus('form');
+      }
     }
   };
 
@@ -286,7 +295,7 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
   };
 
   const adminWaUrl = (() => {
-    const num = (ownerWa || '62859106545522').replace(/\D/g, '');
+    const num = adminWaNumber(ownerWa);
     const desc = `Halo Admin, saya ingin konfirmasi pembayaran:%0A%0A• Item: ${encodeURIComponent(itemTitle)}%0A• Show: ${encodeURIComponent(showTitle)}%0A• Nominal: Rp ${amount.toLocaleString('id-ID')}%0A• Nomor saya: ${normalizePhone(phone) || '-'}${pakasirOrderId ? `%0A• Order ID: ${pakasirOrderId}` : ''}%0A%0AMohon dikirimkan token akses setelah pembayaran terkonfirmasi. Terima kasih 🙏`;
     return `https://wa.me/${num}?text=${desc}`;
   })();
@@ -507,8 +516,8 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
             <div className="flex items-start gap-2 rounded-md border border-yellow-500/30 bg-yellow-500/10 p-3 text-xs text-foreground">
               <AlertTriangle className="w-4 h-4 text-yellow-500 shrink-0 mt-0.5" />
               <div>
-                <div className="font-semibold mb-0.5">QRIS dinamis sedang gangguan.</div>
-                <div className="text-muted-foreground">Silakan bayar lewat QRIS statis di bawah, lalu hubungi admin untuk konfirmasi & menerima token akses.</div>
+                <div className="font-semibold mb-0.5">{useStaticQris ? 'Pembayaran memakai QRIS statis.' : 'QRIS dinamis sedang gangguan.'}</div>
+                <div className="text-muted-foreground">Bayar sesuai nominal lewat QRIS di bawah, lalu kirim bukti transfer / hubungi admin untuk menerima token akses.</div>
               </div>
             </div>
 
@@ -537,9 +546,11 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
               <Upload className="w-4 h-4" /> Kirim Bukti Transfer
             </Button>
 
-            <Button variant="ghost" className="w-full" onClick={() => setStatus('form')}>
-              Coba QRIS dinamis lagi
-            </Button>
+            {!useStaticQris && (
+              <Button variant="ghost" className="w-full" onClick={() => setStatus('form')}>
+                Coba QRIS dinamis lagi
+              </Button>
+            )}
           </div>
         )}
         <MembershipProofUpload
