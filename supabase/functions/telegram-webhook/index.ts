@@ -181,7 +181,12 @@ async function createOrderAndSendQr(
   kind: 'show' | 'replay' | 'replay_only', id: string,
 ) {
   const body: Record<string, unknown> = { kind, phone };
-  if (kind === 'replay_only') body.replay_id = id; else body.show_id = id;
+  if (kind === 'replay_only') {
+    body.replay_id = id;
+    const { data: rp } = await admin.from('replays').select('price_idr').eq('id', id).maybeSingle();
+    const p = Number((rp as any)?.price_idr || 0);
+    if (p >= 100) body.amount = p;
+  } else body.show_id = id;
   const { ok, data } = await callFn('create-pakasir-order', body);
   if (!ok || !data?.qr_string) {
     const detail = String(data?.message || data?.error || 'gagal membuat order');
