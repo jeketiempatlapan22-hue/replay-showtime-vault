@@ -6,6 +6,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import DeviceResetButton from '@/components/DeviceResetButton';
+import AccessInfoCard from '@/components/AccessInfoCard';
+
 import { siteLink } from '@/lib/siteOrigin';
 import { supabase } from '@/integrations/supabase/client';
 import type { ActiveMembership } from '@/hooks/useActiveMembership';
@@ -135,7 +137,10 @@ export default function MembershipDashboard({ membership, onShopMore }: { member
             <p className="text-[10px] text-muted-foreground">Tempel link ini di browser perangkat lain untuk login otomatis.</p>
           </div>
 
+          <AccessInfoCard mtoken={membership.token} mpassword={membership.password} fallbackLink={link} compact />
+
           <DeviceResetButton kind="membership" token={membership.token} password={membership.password} />
+
         </CardContent>
       </Card>
 

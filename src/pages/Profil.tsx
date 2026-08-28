@@ -12,6 +12,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { saveMembershipCredentials } from '@/lib/membershipAccess';
 import DeviceResetButton from '@/components/DeviceResetButton';
+import AccessInfoCard from '@/components/AccessInfoCard';
+
 
 interface MyMembership {
   order_id: string;
@@ -35,7 +37,17 @@ interface MyMembership {
   pause_message: string | null;
 }
 
+interface MyOrder {
+  id: string;
+  item_title: string | null;
+  show_id: string | null;
+  replay_id: string | null;
+  access_token: string | null;
+  paid_at: string | null;
+}
+
 export default function Profil() {
+
   const navigate = useNavigate();
   const { user, loading } = useAuth();
   const [username, setUsername] = useState('');
@@ -51,6 +63,8 @@ export default function Profil() {
   const [adminPhone, setAdminPhone] = useState<string>('');
   const [memberships, setMemberships] = useState<MyMembership[]>([]);
   const [memLoading, setMemLoading] = useState(true);
+  const [myOrders, setMyOrders] = useState<MyOrder[]>([]);
+
   const [tgCode, setTgCode] = useState('');
   const [tgLinked, setTgLinked] = useState(false);
   const [tgBusy, setTgBusy] = useState(false);
@@ -142,6 +156,26 @@ export default function Profil() {
       .subscribe();
     return () => { supabase.removeChannel(ch); };
   }, [user]);
+
+  // Riwayat pembelian show/replay yang sudah lunas (untuk link + sandi replay)
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from('orders')
+        .select('id,item_title,show_id,replay_id,access_token,paid_at')
+        .eq('user_id', user.id)
+        .eq('status', 'paid')
+        .not('access_token', 'is', null)
+        .order('paid_at', { ascending: false })
+        .limit(20);
+      if (!cancelled) setMyOrders((data || []) as MyOrder[]);
+    })();
+    return () => { cancelled = true; };
+  }, [user]);
+
+
 
   const copyText = async (text: string, label = 'Disalin') => {
     try { await navigator.clipboard.writeText(text); toast.success(label); }
@@ -369,8 +403,10 @@ export default function Profil() {
                             <ExternalLink className="w-3 h-3 mr-1" /> Buka
                           </Button>
                         </div>
+                        <AccessInfoCard mtoken={m.token!} mpassword={m.password!} fallbackLink={link} compact />
                       </div>
                     )}
+
 
                     {isPaid && !tokenExpired && !m.revoked && m.token && m.password && (m.max_devices ?? 1) <= 1 && (
                       <DeviceResetButton kind="membership" token={m.token} password={m.password} />
@@ -389,6 +425,31 @@ export default function Profil() {
           </CardContent>
         </Card>
 
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base"><KeyRound className="w-4 h-4 text-primary" /> Link & Sandi Replay Saya</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {myOrders.length === 0 ? (
+              <p className="text-xs text-muted-foreground text-center py-2">Belum ada pembelian show atau replay.</p>
+            ) : (
+              myOrders.map((o) => (
+                <div key={o.id} className="rounded-lg border border-border p-3 space-y-2 bg-card/50">
+                  <div className="font-semibold text-sm leading-tight">{o.item_title || 'Pembelian'}</div>
+                  <div className="text-[10px] text-muted-foreground">
+                    {o.paid_at ? new Date(o.paid_at).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' }) : ''}
+                  </div>
+                  <AccessInfoCard
+                    token={o.access_token!}
+                    showId={o.show_id || undefined}
+                    replayId={o.replay_id || undefined}
+                    compact
+                  />
+                </div>
+              ))
+            )}
+          </CardContent>
+        </Card>
 
 
         <Card>
