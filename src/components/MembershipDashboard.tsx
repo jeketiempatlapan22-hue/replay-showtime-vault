@@ -6,6 +6,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import DeviceResetButton from '@/components/DeviceResetButton';
+import AccessInfoCard from '@/components/AccessInfoCard';
+
 import { siteLink } from '@/lib/siteOrigin';
 import { supabase } from '@/integrations/supabase/client';
 import type { ActiveMembership } from '@/hooks/useActiveMembership';
