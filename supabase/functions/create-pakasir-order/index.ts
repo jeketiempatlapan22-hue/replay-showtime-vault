@@ -46,8 +46,19 @@ Deno.serve(async (req) => {
     }
 
     const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+
+    // Petakan identitas semu Telegram -> chat_id agar pengiriman token otomatis
+    // (webhook Pakasir / poller / cek status) menemukan tujuannya.
+    if (tgChatId) {
+      await admin.from('telegram_links').upsert(
+        { phone, chat_id: tgChatId, linked_at: new Date().toISOString() },
+        { onConflict: 'phone' },
+      );
+    }
+
     const slug = Deno.env.get('PAKASIR_PROJECT_SLUG');
     if (!slug) return new Response(JSON.stringify({ error: 'pakasir not configured' }), { status: 500, headers: corsHeaders });
+
 
     // Rate limit: max 5 pending orders per phone in last 10 minutes
     try {
