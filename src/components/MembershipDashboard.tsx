@@ -135,7 +135,10 @@ export default function MembershipDashboard({ membership, onShopMore }: { member
             <p className="text-[10px] text-muted-foreground">Tempel link ini di browser perangkat lain untuk login otomatis.</p>
           </div>
 
+          <AccessInfoCard mtoken={membership.token} mpassword={membership.password} fallbackLink={link} compact />
+
           <DeviceResetButton kind="membership" token={membership.token} password={membership.password} />
+
         </CardContent>
       </Card>
 
