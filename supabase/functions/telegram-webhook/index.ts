@@ -176,7 +176,7 @@ async function createOrderAndSendQr(
     return;
   }
   const amount = Number(data.total_payment || data.amount || 0);
-  const qrImg = `https://api.qrserver.com/v1/create-qr-code/?size=600x600&margin=16&data=${encodeURIComponent(data.qr_string)}`;
+  const payload = String(data.qr_string);
   const deadline = new Date(Date.now() + QR_TTL_MS).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta' }) + ' WIB';
   const caption = [
     '💳 *PEMBAYARAN QRIS*',
@@ -191,15 +191,54 @@ async function createOrderAndSendQr(
   ].join('\n');
   const keyboard: InlineKeyboard = [
     [{ text: '✅ Saya Sudah Bayar', callback_data: `c:${data.order_id}` }],
+    [{ text: '🌐 Bayar di Website', url: String(data.qr_url || SITE) }],
   ];
-  const sent = await sendTelegramPhoto(chatId, qrImg, caption, keyboard);
-  let messageId = Number((sent.data as any)?.result?.message_id || 0);
-  if (!sent.ok) {
-    const alt = await sendTelegramRich(chatId, `${caption}\n\n🔗 QRIS: ${data.qr_url}`, keyboard);
+
+  // QR dibuat di server (PNG tajam, quiet zone cukup) lalu diunggah sebagai file
+  // agar tidak bergantung pada layanan gambar pihak ketiga yang sering gagal /
+  // terkompres sehingga QRIS tidak terbaca aplikasi pembayaran.
+  let messageId = 0;
+  let sentOk = false;
+  try {
+    const png = await qrisPng(payload);
+    const sent = await sendTelegramPhotoBytes(chatId, png, caption, keyboard);
+    sentOk = sent.ok;
+    messageId = Number((sent.data as any)?.result?.message_id || 0);
+  } catch (e) {
+    console.error('qris png failed:', String(e));
+  }
+  if (!sentOk) {
+    const qrImg = `https://api.qrserver.com/v1/create-qr-code/?size=800x800&margin=24&ecc=M&format=png&data=${encodeURIComponent(payload)}`;
+    const sent = await sendTelegramPhoto(chatId, qrImg, caption, keyboard);
+    sentOk = sent.ok;
+    messageId = Number((sent.data as any)?.result?.message_id || 0);
+  }
+  if (!sentOk) {
+    const alt = await sendTelegramRich(chatId, `${caption}\n\n🔗 Bayar di sini: ${data.qr_url}`, keyboard);
     messageId = Number((alt.data as any)?.result?.message_id || 0);
   }
+  // Kode QRIS mentah agar user bisa "scan dari galeri" gagal pun tetap bisa
+  // memakai fitur "bayar dengan kode QRIS" di beberapa e-wallet.
+  await sendTelegramRich(chatId, `🧾 *Kode QRIS (cadangan)*\n\`\`\`\n${payload}\n\`\`\``);
   watchOrder(admin, chatId, messageId, String(data.order_id));
 }
+
+/** Render QRIS jadi PNG hitam-putih dengan quiet zone lebar (mudah dipindai). */
+async function qrisPng(payload: string): Promise<Uint8Array> {
+  const { default: QRCode } = await import('npm:qrcode@1.5.4');
+  const dataUrl: string = await QRCode.toDataURL(payload, {
+    errorCorrectionLevel: 'M',
+    margin: 4,
+    width: 900,
+    color: { dark: '#000000', light: '#FFFFFF' },
+  });
+  const b64 = dataUrl.split(',')[1];
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
+}
+
 
 /**
  * Pantau order otomatis: cek status Pakasir tiap 10 detik selama 5 menit.
