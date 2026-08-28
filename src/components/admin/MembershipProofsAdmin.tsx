@@ -69,11 +69,15 @@ export default function MembershipProofsAdmin() {
   const saveWa = async () => {
     setSavingWa(true);
     const v = adminWa.replace(/\D/g, '');
-    const { error } = await supabase.from('site_settings').upsert({ key: 'admin_wa_phone', value: v }, { onConflict: 'key' });
+    const { error } = await supabase.from('site_settings').upsert(
+      [{ key: 'owner_wa_number', value: v }, { key: 'admin_wa_phone', value: v }],
+      { onConflict: 'key' },
+    );
     setSavingWa(false);
     if (error) toast({ title: 'Gagal simpan', description: error.message, variant: 'destructive' });
     else toast({ title: 'Nomor admin tersimpan', description: v || '(kosong)' });
   };
+
 
   const setHandled = async (r: Proof, h: boolean) => {
     const { error } = await supabase.rpc('admin_set_proof_handled', { _id: r.id, _handled: h });
