@@ -191,11 +191,14 @@ export async function getSettings(): Promise<Record<string, string>> {
 export async function setSetting(key: string, value: string) {
   const { data: existing } = await supabase.from('site_settings').select('id').eq('key', key).maybeSingle();
   if (existing) {
-    await supabase.from('site_settings').update({ value }).eq('id', existing.id);
+    const { error } = await supabase.from('site_settings').update({ value }).eq('id', existing.id);
+    if (error) throw error;
   } else {
-    await supabase.from('site_settings').insert({ key, value });
+    const { error } = await supabase.from('site_settings').insert({ key, value });
+    if (error) throw error;
   }
 }
+
 
 export async function uploadImage(file: File): Promise<string> {
   const compressed = await compressImage(file, 0, 0.75);
