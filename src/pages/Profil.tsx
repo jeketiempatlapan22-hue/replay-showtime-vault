@@ -52,9 +52,14 @@ export default function Profil() {
   const [memLoading, setMemLoading] = useState(true);
 
   useEffect(() => {
-    supabase.from('bot_admins').select('phone').eq('enabled', true).limit(1).maybeSingle()
-      .then(({ data }) => { if ((data as any)?.phone) setAdminPhone(String((data as any).phone).replace(/\D/g, '')); });
+    supabase.from('site_settings').select('key,value').in('key', ['owner_wa_number', 'admin_wa_phone'])
+      .then(({ data }) => {
+        const m = new Map(((data || []) as any[]).map((r) => [r.key, String(r.value || '')]));
+        const v = (m.get('owner_wa_number') || m.get('admin_wa_phone') || '').replace(/\D/g, '');
+        if (v) setAdminPhone(v);
+      });
   }, []);
+
 
   const handleChangePassword = async () => {
     if (newPwd.length < 8) { toast.error('Kata sandi minimal 8 karakter'); return; }

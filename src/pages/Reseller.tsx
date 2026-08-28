@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -839,13 +839,38 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
 
 export default function ResellerPage() {
   const [session, setSessionState] = useState<Session | null>(() => getSession());
-  const ready = useMemo(() => true, []);
-  if (!ready) return null;
+
+  const logout = useCallback((reason?: string) => {
+    setSession(null);
+    setSessionState(null);
+    if (reason) toast({ title: 'Sesi berakhir', description: reason, variant: 'destructive' });
+  }, []);
+
+  // Sandi (PIN) reseller bisa diganti admin kapan saja — validasi ulang sesi tersimpan
+  // saat mount, saat tab kembali aktif, dan tiap 60 detik. Jika PIN sudah tidak cocok,
+  // reseller otomatis ter-logout dan wajib login dengan sandi baru.
+  useEffect(() => {
+    if (!session) return;
+    let cancelled = false;
+    const verify = async () => {
+      const { data, error } = await supabase.rpc('reseller_verify', { _phone: session.phone, _pin: session.pin });
+      if (cancelled || error) return; // error jaringan -> jangan paksa logout
+      if (data === false) logout('Sandi reseller telah diubah admin. Silakan masuk kembali dengan sandi baru.');
+    };
+    void verify();
+    const id = window.setInterval(verify, 60_000);
+    const onFocus = () => void verify();
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onFocus);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onFocus);
+    };
+  }, [session, logout]);
+
   if (!session) return <LoginCard onLogin={(s) => setSessionState(s)} />;
-  return (
-    <Dashboard
-      session={session}
-      onLogout={() => { setSession(null); setSessionState(null); }}
-    />
-  );
+  return <Dashboard session={session} onLogout={() => logout()} />;
 }
+

@@ -92,6 +92,12 @@ export default function Admin() {
   const [useStaticQris, setUseStaticQris] = useState(false);
   const [adminUsername, setAdminUsername] = useState('');
   const [canEditAdminUsername, setCanEditAdminUsername] = useState(false);
+  const [acctEmail, setAcctEmail] = useState('');
+  const [acctCurrentPw, setAcctCurrentPw] = useState('');
+  const [acctNewPw, setAcctNewPw] = useState('');
+  const [acctNewPw2, setAcctNewPw2] = useState('');
+  const [acctSaving, setAcctSaving] = useState(false);
+
 
   // Comments state
   const [allComments, setAllComments] = useState<Comment[]>([]);
@@ -203,6 +209,8 @@ export default function Admin() {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
+        setAcctEmail(session.user.email || '');
+
         supabase.from('user_roles').select('role').eq('user_id', session.user.id).eq('role', 'admin').maybeSingle().then(({ data }) => {
           if (data) setIsLoggedIn(true);
         });
@@ -510,16 +518,20 @@ export default function Admin() {
 
   const handleSavePakasirFallback = async () => {
     try {
+      const num = ownerWaNumber.replace(/\D/g, '') || '6288809048431';
       await Promise.all([
-        setSetting('owner_wa_number', ownerWaNumber.replace(/\D/g, '') || '6288809048431'),
+        setSetting('owner_wa_number', num),
+        // Keep the legacy key in sync so every "Hubungi Admin" surface uses the new number.
+        setSetting('admin_wa_phone', num),
         setSetting('static_qris_url', staticQrisUrl),
         setSetting('use_static_qris', useStaticQris ? 'true' : 'false'),
       ]);
       toast({ title: 'Berhasil', description: 'Pengaturan QRIS statis & nomor admin tersimpan.' });
-    } catch {
-      toast({ title: 'Error', description: 'Gagal menyimpan pengaturan.', variant: 'destructive' });
+    } catch (e: any) {
+      toast({ title: 'Error', description: e?.message || 'Gagal menyimpan pengaturan.', variant: 'destructive' });
     }
   };
+
 
   const handleToggleLiveChat = async (enabled: boolean) => {
     setLiveChatEnabled(enabled);
@@ -544,6 +556,43 @@ export default function Admin() {
       toast({ title: 'Error', description: 'Gagal menyimpan username admin.', variant: 'destructive' });
     }
   };
+
+  const handleSaveAdminAccount = async () => {
+    const email = (acctEmail || '').trim().toLowerCase();
+    if (!acctCurrentPw) {
+      toast({ title: 'Error', description: 'Masukkan sandi saat ini untuk konfirmasi.', variant: 'destructive' });
+      return;
+    }
+    if (acctNewPw && acctNewPw.length < 8) {
+      toast({ title: 'Error', description: 'Sandi baru minimal 8 karakter.', variant: 'destructive' });
+      return;
+    }
+    if (acctNewPw && acctNewPw !== acctNewPw2) {
+      toast({ title: 'Error', description: 'Konfirmasi sandi baru tidak cocok.', variant: 'destructive' });
+      return;
+    }
+    setAcctSaving(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('admin-update-self-credentials', {
+        body: { current_password: acctCurrentPw, email, password: acctNewPw || undefined },
+      });
+      const d = data as any;
+      if (error || d?.error) {
+        toast({ title: 'Gagal', description: d?.message || d?.error || error?.message || 'Gagal memperbarui akun.', variant: 'destructive' });
+        return;
+      }
+      setAcctCurrentPw(''); setAcctNewPw(''); setAcctNewPw2('');
+      toast({ title: 'Berhasil', description: 'Akun admin diperbarui. Silakan login ulang dengan data baru.' });
+      await supabase.auth.signOut();
+      setIsLoggedIn(false);
+      setLoginEmail(email);
+      setLoginPassword('');
+    } finally {
+      setAcctSaving(false);
+    }
+  };
+
+
 
   const handleGenerateToken = async (r: ReplayRow) => {
     const token = (crypto as any).randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2) + Date.now().toString(36);
@@ -1252,6 +1301,36 @@ export default function Admin() {
                 )}
               </CardContent>
             </Card>
+
+            {/* Akun Login Admin */}
+            <Card>
+              <CardHeader><CardTitle className="font-sans text-base sm:text-lg flex items-center gap-2"><Key className="w-5 h-5 text-primary" />Akun Login Admin</CardTitle></CardHeader>
+              <CardContent className="space-y-3">
+                <div>
+                  <Label>Email login</Label>
+                  <Input type="email" placeholder="admin@email.com" value={acctEmail} onChange={e => setAcctEmail(e.target.value)} />
+                </div>
+                <div>
+                  <Label>Sandi saat ini *</Label>
+                  <Input type="password" placeholder="Sandi saat ini" value={acctCurrentPw} onChange={e => setAcctCurrentPw(e.target.value)} autoComplete="current-password" />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <Label>Sandi baru (opsional)</Label>
+                    <Input type="password" placeholder="Min. 8 karakter" value={acctNewPw} onChange={e => setAcctNewPw(e.target.value)} autoComplete="new-password" />
+                  </div>
+                  <div>
+                    <Label>Ulangi sandi baru</Label>
+                    <Input type="password" placeholder="Ulangi sandi baru" value={acctNewPw2} onChange={e => setAcctNewPw2(e.target.value)} autoComplete="new-password" />
+                  </div>
+                </div>
+                <p className="text-[11px] text-muted-foreground">Setelah disimpan, Anda otomatis keluar dan harus login ulang dengan email/sandi baru.</p>
+                <Button onClick={handleSaveAdminAccount} size="sm" disabled={acctSaving}>
+                  <Save className="w-4 h-4 mr-2" />{acctSaving ? 'Menyimpan…' : 'Simpan Akun'}
+                </Button>
+              </CardContent>
+            </Card>
+
 
             {/* WhatsApp */}
             <Card>

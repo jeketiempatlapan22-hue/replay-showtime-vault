@@ -45,9 +45,11 @@ export default function MembershipProofsAdmin() {
   };
 
   const loadWa = async () => {
-    const { data } = await supabase.from('site_settings').select('value').eq('key', 'admin_wa_phone').maybeSingle();
-    setAdminWa(String((data as any)?.value || ''));
+    const { data } = await supabase.from('site_settings').select('key,value').in('key', ['owner_wa_number', 'admin_wa_phone']);
+    const m = new Map(((data || []) as any[]).map((r) => [r.key, String(r.value || '')]));
+    setAdminWa(m.get('owner_wa_number') || m.get('admin_wa_phone') || '');
   };
+
 
   const loadTargets = async () => {
     const [sh, rp, pk] = await Promise.all([
@@ -67,11 +69,15 @@ export default function MembershipProofsAdmin() {
   const saveWa = async () => {
     setSavingWa(true);
     const v = adminWa.replace(/\D/g, '');
-    const { error } = await supabase.from('site_settings').upsert({ key: 'admin_wa_phone', value: v }, { onConflict: 'key' });
+    const { error } = await supabase.from('site_settings').upsert(
+      [{ key: 'owner_wa_number', value: v }, { key: 'admin_wa_phone', value: v }],
+      { onConflict: 'key' },
+    );
     setSavingWa(false);
     if (error) toast({ title: 'Gagal simpan', description: error.message, variant: 'destructive' });
     else toast({ title: 'Nomor admin tersimpan', description: v || '(kosong)' });
   };
+
 
   const setHandled = async (r: Proof, h: boolean) => {
     const { error } = await supabase.rpc('admin_set_proof_handled', { _id: r.id, _handled: h });
