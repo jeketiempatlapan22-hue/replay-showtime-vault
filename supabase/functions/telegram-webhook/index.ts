@@ -98,33 +98,6 @@ async function getLink(admin: Admin, chatId: number) {
   return data as { id: string; phone: string; chat_id: number } | null;
 }
 
-const askLinkKeyboard: InlineKeyboard = [
-  [{ text: '🔗 Buka halaman Profil', url: `${SITE}/profil` }],
-];
-
-async function requireLink(admin: Admin, chatId: number) {
-  const link = await getLink(admin, chatId);
-  if (link?.phone) return link;
-  await sendTelegramRich(
-    chatId,
-    [
-      '⚠️ *Akun belum terhubung*',
-      '',
-      'Agar bot bisa mengirim link token ke Anda, hubungkan nomor WhatsApp Anda dulu:',
-      '',
-      '1️⃣ Tekan tombol *Bagikan Nomor* di bawah, atau',
-      '2️⃣ Buka *Profil* di website → salin kode → kirim `/start <KODE>` ke sini.',
-    ].join('\n'),
-    askLinkKeyboard,
-    {
-      reply_markup: {
-        keyboard: [[{ text: '📱 Bagikan Nomor WhatsApp', request_contact: true }]],
-        resize_keyboard: true, one_time_keyboard: true,
-      },
-    },
-  );
-  return null;
-}
 
 async function listShows(admin: Admin, chatId: number) {
   const { data } = await admin.from('active_shows')
