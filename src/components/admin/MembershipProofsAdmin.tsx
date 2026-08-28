@@ -198,12 +198,13 @@ export default function MembershipProofsAdmin() {
                       <Badge variant="outline">{r.package_name || 'Paket -'}</Badge>
                       {r.amount > 0 && <Badge variant="outline">Rp {r.amount.toLocaleString('id-ID')}</Badge>}
                     </div>
-                    <div className="flex items-center gap-1.5">📧 <span className="truncate">{r.email}</span>
-                      {r.email && <button title="Salin email" onClick={() => copyText(r.email, 'Email')} className="text-muted-foreground hover:text-primary shrink-0"><Copy className="w-3 h-3" /></button>}
+                    <div className="flex items-center gap-1.5">📧 <span className="truncate select-all">{r.email}</span>
+                      {r.email && <button type="button" title="Salin email" onClick={() => copyText(r.email, 'Email')} className="shrink-0 inline-flex items-center gap-1 rounded border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground hover:text-primary hover:border-primary"><Copy className="w-3 h-3" />Salin</button>}
                     </div>
-                    <div className="flex items-center gap-1.5">📱 <a href={`https://wa.me/${r.phone}`} target="_blank" rel="noreferrer" className="text-primary underline">{r.phone}</a>
-                      {r.phone && <button title="Salin nomor" onClick={() => copyText(r.phone, 'Nomor')} className="text-muted-foreground hover:text-primary shrink-0"><Copy className="w-3 h-3" /></button>}
+                    <div className="flex items-center gap-1.5">📱 <a href={`https://wa.me/${r.phone}`} target="_blank" rel="noreferrer" className="text-primary underline select-all">{r.phone}</a>
+                      {r.phone && <button type="button" title="Salin nomor" onClick={() => copyText(r.phone, 'Nomor')} className="shrink-0 inline-flex items-center gap-1 rounded border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground hover:text-primary hover:border-primary"><Copy className="w-3 h-3" />Salin</button>}
                     </div>
+
                     {r.order_id && <div className="font-mono text-[10px] truncate">Order Membership: {r.order_id}</div>}
                     {r.show_order_id && <div className="font-mono text-[10px] truncate">Order Show: {r.show_order_id}</div>}
                     {r.note && <div className="text-muted-foreground italic">"{r.note}"</div>}
