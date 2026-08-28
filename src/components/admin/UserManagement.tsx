@@ -53,6 +53,17 @@ export default function UserManagement() {
   };
   useEffect(() => { load(); }, []);
 
+  const copyText = async (text: string, label: string) => {
+    try { await navigator.clipboard.writeText(text); toast.success(`${label} disalin`); }
+    catch { toast.error('Gagal menyalin'); }
+  };
+
+  const copyBulk = (field: 'email' | 'phone') => {
+    const list = [...new Set(users.map(u => field === 'email' ? u.email : u.phone).filter(Boolean))] as string[];
+    if (!list.length) return toast.error('Tidak ada data');
+    void copyText(list.join('\n'), `${list.length} ${field === 'email' ? 'email' : 'nomor'}`);
+  };
+
   const grantCoins = async (u: UserRow, delta: number, reason?: string) => {
     if (!delta || isNaN(delta)) return toast.error('Masukkan jumlah koin');
     const { error } = await supabase.rpc('grant_coins', {
