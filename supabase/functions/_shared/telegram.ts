@@ -201,3 +201,37 @@ export function safeEqual(a: string | null, b: string): boolean {
   for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
   return diff === 0;
 }
+
+/**
+ * Kirim gambar QRIS sebagai file (multipart) — lebih tajam & pasti terbaca
+ * dibanding mengandalkan Telegram mengunduh URL gambar pihak ketiga.
+ */
+export async function sendTelegramPhotoBytes(
+  chatId: number | string,
+  bytes: Uint8Array,
+  caption: string,
+  keyboard?: InlineKeyboard,
+  filename = 'qris.png',
+) {
+  const lovableKey = Deno.env.get('LOVABLE_API_KEY');
+  const tgKey = Deno.env.get('TELEGRAM_API_KEY');
+  if (!lovableKey || !tgKey) return { ok: false, data: { error: 'telegram_not_configured' } };
+  try {
+    const form = new FormData();
+    form.append('chat_id', String(chatId));
+    form.append('caption', caption);
+    form.append('parse_mode', 'Markdown');
+    if (keyboard?.length) form.append('reply_markup', JSON.stringify({ inline_keyboard: keyboard }));
+    form.append('photo', new Blob([bytes], { type: 'image/png' }), filename);
+    const res = await fetch(`${GATEWAY_URL}/sendPhoto`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${lovableKey}`, 'X-Connection-Api-Key': tgKey },
+      body: form,
+      signal: AbortSignal.timeout(20000),
+    });
+    const data = await res.json().catch(() => ({}));
+    return { ok: res.ok && (data as any)?.ok !== false, data };
+  } catch (e) {
+    return { ok: false, data: { error: String(e) } };
+  }
+}
