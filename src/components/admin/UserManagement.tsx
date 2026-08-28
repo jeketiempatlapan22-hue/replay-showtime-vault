@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { Search, Coins, Plus, Minus, KeyRound, RefreshCw, User as UserIcon, Mail, Phone, Save } from 'lucide-react';
+import { Search, Coins, Plus, Minus, KeyRound, RefreshCw, User as UserIcon, Mail, Phone, Save, Copy } from 'lucide-react';
 
 interface UserRow {
   user_id: string;
@@ -52,6 +52,17 @@ export default function UserManagement() {
     } finally { setLoading(false); }
   };
   useEffect(() => { load(); }, []);
+
+  const copyText = async (text: string, label: string) => {
+    try { await navigator.clipboard.writeText(text); toast.success(`${label} disalin`); }
+    catch { toast.error('Gagal menyalin'); }
+  };
+
+  const copyBulk = (field: 'email' | 'phone') => {
+    const list = [...new Set(users.map(u => field === 'email' ? u.email : u.phone).filter(Boolean))] as string[];
+    if (!list.length) return toast.error('Tidak ada data');
+    void copyText(list.join('\n'), `${list.length} ${field === 'email' ? 'email' : 'nomor'}`);
+  };
 
   const grantCoins = async (u: UserRow, delta: number, reason?: string) => {
     if (!delta || isNaN(delta)) return toast.error('Masukkan jumlah koin');
@@ -128,6 +139,15 @@ export default function UserManagement() {
             </Button>
           </div>
 
+          <div className="flex gap-2 flex-wrap">
+            <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => copyBulk('email')}>
+              <Copy className="w-3.5 h-3.5 mr-1" />Salin Semua Email ({users.length})
+            </Button>
+            <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => copyBulk('phone')}>
+              <Copy className="w-3.5 h-3.5 mr-1" />Salin Semua Nomor
+            </Button>
+          </div>
+
           <div className="space-y-2">
             {users.map(u => {
               const g = grant[u.user_id] || { amount: '', reason: '' };
@@ -140,7 +160,20 @@ export default function UserManagement() {
                     <div className="flex-1 min-w-[200px] space-y-0.5">
                       <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                         <Mail className="w-3 h-3" />{u.email || <span className="italic">tanpa email</span>}
+                        {u.email && (
+                          <button title="Salin email" onClick={() => copyText(u.email, 'Email')} className="hover:text-primary">
+                            <Copy className="w-3 h-3" />
+                          </button>
+                        )}
                       </div>
+                      {u.phone && (
+                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                          <Phone className="w-3 h-3" />{u.phone}
+                          <button title="Salin nomor" onClick={() => copyText(u.phone!, 'Nomor')} className="hover:text-primary">
+                            <Copy className="w-3 h-3" />
+                          </button>
+                        </div>
+                      )}
                       {!u.has_profile && (
                         <Badge variant="outline" className="text-[10px]">Belum punya profil</Badge>
                       )}

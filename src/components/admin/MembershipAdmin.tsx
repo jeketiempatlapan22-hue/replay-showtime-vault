@@ -191,14 +191,23 @@ export default function MembershipAdmin() {
         <CardHeader>
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <CardTitle className="text-base">Daftar Membership</CardTitle>
-            <div className="relative w-full sm:w-72">
-              <Search className="w-4 h-4 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                placeholder="Cari nomor / nama / token…"
-                className="pl-8"
-              />
+            <div className="flex items-center gap-1.5 flex-wrap w-full sm:w-auto">
+              <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => {
+                const list = [...new Set(filtered.map(r => r.phone).filter(Boolean))];
+                if (!list.length) return toast.error('Tidak ada nomor');
+                navigator.clipboard.writeText(list.join('\n')); toast.success(`${list.length} nomor disalin`);
+              }} title="Salin semua nomor pada daftar ini">
+                <Copy className="w-3.5 h-3.5 mr-1" />Salin Nomor
+              </Button>
+              <div className="relative w-full sm:w-72">
+                <Search className="w-4 h-4 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  placeholder="Cari nomor / nama / token…"
+                  className="pl-8"
+                />
+              </div>
             </div>
           </div>
         </CardHeader>
@@ -236,7 +245,13 @@ export default function MembershipAdmin() {
                     </div>
                     <div className="text-xs text-muted-foreground font-mono break-all">Token: {r.token} · Sandi: {r.password}</div>
                     <div className="text-xs text-muted-foreground">
-                      WA: {r.phone || '-'} · Kuota reset: <span className="font-mono">{r.manual_resets_used}/{r.manual_resets_max}</span> · Durasi: <span className="font-medium text-foreground">{r.duration_days} hari</span> · Aktif s/d <span className="font-medium text-foreground">{new Date(r.expires_at).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })}</span>
+                      WA: {r.phone || '-'}
+                      {r.phone && (
+                        <button title="Salin nomor" onClick={() => { navigator.clipboard.writeText(r.phone); toast.success('Nomor disalin'); }} className="hover:text-primary align-middle mx-1">
+                          <Copy className="w-3 h-3 inline" />
+                        </button>
+                      )}
+                      · Kuota reset: <span className="font-mono">{r.manual_resets_used}/{r.manual_resets_max}</span> · Durasi: <span className="font-medium text-foreground">{r.duration_days} hari</span> · Aktif s/d <span className="font-medium text-foreground">{new Date(r.expires_at).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })}</span>
                       {(() => {
                         const ms = new Date(r.expires_at).getTime() - Date.now();
                         if (ms <= 0) return <span className="text-destructive"> · sudah expired</span>;

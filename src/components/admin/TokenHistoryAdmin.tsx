@@ -53,13 +53,25 @@ export default function TokenHistoryAdmin() {
     toast({ title: 'Disalin' });
   };
 
+  const copyAllPhones = () => {
+    const list = [...new Set(filtered.map(i => i.phone).filter(Boolean))].join('\n');
+    if (!list) return toast({ title: 'Tidak ada nomor', variant: 'destructive' });
+    navigator.clipboard.writeText(list);
+    toast({ title: `${list.split('\n').length} nomor disalin` });
+  };
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between gap-2">
         <CardTitle className="text-base sm:text-lg flex items-center gap-2">
           <History className="w-4 h-4" /> Riwayat Pengiriman Token ({filtered.length})
         </CardTitle>
-        <Button size="sm" variant="outline" onClick={load} disabled={loading}>Refresh</Button>
+        <div className="flex gap-1.5">
+          <Button size="sm" variant="outline" onClick={copyAllPhones} title="Salin semua nomor pada hasil filter">
+            <Copy className="w-3.5 h-3.5 mr-1" />Salin Nomor
+          </Button>
+          <Button size="sm" variant="outline" onClick={load} disabled={loading}>Refresh</Button>
+        </div>
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="relative">
@@ -84,6 +96,9 @@ export default function TokenHistoryAdmin() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-mono text-sm font-semibold">+{item.phone}</span>
+                      <button title="Salin nomor" onClick={() => copy(item.phone)} className="text-muted-foreground hover:text-primary">
+                        <Copy className="w-3 h-3" />
+                      </button>
                       <Badge variant={item.source === 'pakasir' ? 'default' : 'secondary'} className="text-[10px]">
                         {item.source === 'pakasir' ? '💳 Pakasir' : '🤖 Bot'}
                       </Badge>

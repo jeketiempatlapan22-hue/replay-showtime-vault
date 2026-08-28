@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Plus, Trash2, Search, Coins, ArrowUp, ArrowDown, History, Minus, RefreshCw } from 'lucide-react';
+import { Plus, Trash2, Search, Coins, ArrowUp, ArrowDown, History, Minus, RefreshCw, Copy } from 'lucide-react';
 import { upsertActiveShow } from '@/lib/activeShows';
 
 interface Pkg { id: string; label: string; coins: number; price_idr: number; sort_order: number; enabled: boolean; }
@@ -216,6 +216,24 @@ export default function CoinAdmin() {
                   {searching ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
                 </Button>
               </div>
+              {users.length > 0 && (
+                <div className="flex gap-2 flex-wrap">
+                  <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => {
+                    const list = [...new Set(users.map(u => u.email).filter(Boolean))];
+                    if (!list.length) return toast.error('Tidak ada email');
+                    navigator.clipboard.writeText(list.join('\n')); toast.success(`${list.length} email disalin`);
+                  }}>
+                    <Copy className="w-3.5 h-3.5 mr-1" />Salin Email ({users.length})
+                  </Button>
+                  <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => {
+                    const list = [...new Set(users.map(u => u.phone).filter(Boolean))] as string[];
+                    if (!list.length) return toast.error('Tidak ada nomor');
+                    navigator.clipboard.writeText(list.join('\n')); toast.success(`${list.length} nomor disalin`);
+                  }}>
+                    <Copy className="w-3.5 h-3.5 mr-1" />Salin Nomor
+                  </Button>
+                </div>
+              )}
               <div className="space-y-2">
                 {users.map(u => {
                   const g = grant[u.user_id] || { amount: '', reason: '' };
@@ -224,8 +242,20 @@ export default function CoinAdmin() {
                     <div key={u.user_id} className="border border-border rounded-md p-3 bg-card/50 space-y-2">
                       <div className="flex flex-wrap items-center gap-2">
                         <div className="flex-1 min-w-[180px]">
-                          <div className="font-medium text-sm">{u.email}</div>
-                          <div className="text-xs text-muted-foreground">{u.phone || 'No HP belum diisi'}</div>
+                          <div className="font-medium text-sm flex items-center gap-1.5">{u.email}
+                            {u.email && (
+                              <button title="Salin email" onClick={() => { navigator.clipboard.writeText(u.email); toast.success('Email disalin'); }} className="text-muted-foreground hover:text-primary">
+                                <Copy className="w-3 h-3" />
+                              </button>
+                            )}
+                          </div>
+                          <div className="text-xs text-muted-foreground flex items-center gap-1.5">{u.phone || 'No HP belum diisi'}
+                            {u.phone && (
+                              <button title="Salin nomor" onClick={() => { navigator.clipboard.writeText(u.phone!); toast.success('Nomor disalin'); }} className="hover:text-primary">
+                                <Copy className="w-3 h-3" />
+                              </button>
+                            )}
+                          </div>
                         </div>
                         <Badge variant="secondary" className="font-mono"><Coins className="w-3 h-3 mr-1 text-primary" />{u.balance}</Badge>
                         <Button size="sm" variant="outline" onClick={() => openUserDetail(u)}><History className="w-3.5 h-3.5 mr-1" />Detail</Button>
