@@ -286,6 +286,8 @@ Deno.serve(async (req) => {
       const data = String(cq.data || '');
       await answerCallbackQuery(cq.id, 'Diproses…');
       if (!chatId) return respond();
+      if (data === 'menu:show') { await listShows(admin, chatId); return respond(); }
+      if (data === 'menu:replay') { await listReplays(admin, chatId); return respond(); }
       if (data.startsWith('c:')) {
         await checkOrder(admin, chatId, data.slice(2));
         return respond();
