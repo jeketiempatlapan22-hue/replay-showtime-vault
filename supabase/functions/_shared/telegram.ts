@@ -1,0 +1,111 @@
+// Helper Telegram bersama: kirim pesan lewat connector gateway Lovable.
+// Dipakai oleh telegram-webhook, poll-pending-orders, dan pakasir-webhook.
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+const GATEWAY_URL = 'https://connector-gateway.lovable.dev/telegram';
+
+function gatewayHeaders() {
+  const lovableKey = Deno.env.get('LOVABLE_API_KEY');
+  const tgKey = Deno.env.get('TELEGRAM_API_KEY');
+  if (!lovableKey || !tgKey) return null;
+  return {
+    'Authorization': `Bearer ${lovableKey}`,
+    'X-Connection-Api-Key': tgKey,
+    'Content-Type': 'application/json',
+  };
+}
+
+export function telegramConfigured(): boolean {
+  return !!(Deno.env.get('LOVABLE_API_KEY') && Deno.env.get('TELEGRAM_API_KEY'));
+}
+
+/** Kirim pesan Telegram ke chat_id. Markdown WA (*bold*) kompatibel dengan parse_mode Markdown. */
+export async function sendTelegram(chatId: number | string, text: string): Promise<{ ok: boolean; data: unknown }> {
+  const headers = gatewayHeaders();
+  if (!headers) return { ok: false, data: { error: 'telegram_not_configured' } };
+  try {
+    const res = await fetch(`${GATEWAY_URL}/sendMessage`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        chat_id: chatId,
+        text,
+        parse_mode: 'Markdown',
+        disable_web_page_preview: true,
+      }),
+      signal: AbortSignal.timeout(12000),
+    });
+    const data = await res.json().catch(() => ({}));
+    // Telegram menaruh error di dalam body 200/4xx dengan ok:false
+    const ok = res.ok && (data as any)?.ok !== false;
+    // Fallback tanpa parse_mode kalau Markdown gagal (karakter aneh)
+    if (!ok && (data as any)?.description && /parse|markdown/i.test(String((data as any).description))) {
+      const res2 = await fetch(`${GATEWAY_URL}/sendMessage`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ chat_id: chatId, text, disable_web_page_preview: true }),
+        signal: AbortSignal.timeout(12000),
+      });
+      const data2 = await res2.json().catch(() => ({}));
+      return { ok: res2.ok && (data2 as any)?.ok !== false, data: data2 };
+    }
+    return { ok, data };
+  } catch (e) {
+    return { ok: false, data: { error: String(e) } };
+  }
+}
+
+function normalizePhone(raw: string) {
+  const d = String(raw || '').replace(/\D/g, '');
+  if (!d) return '';
+  if (d.startsWith('0')) return '62' + d.slice(1);
+  if (d.startsWith('8')) return '62' + d;
+  return d;
+}
+
+/**
+ * Kirim pesan Telegram ke user berdasarkan nomor WA (mencari telegram_links).
+ * Mengembalikan true jika terkirim. Tidak pernah melempar error.
+ */
+export async function sendTelegramByPhone(
+  admin: ReturnType<typeof createClient>,
+  phone: string,
+  message: string,
+): Promise<boolean> {
+  try {
+    if (!telegramConfigured()) return false;
+    const p = normalizePhone(phone);
+    if (!p) return false;
+    const { data } = await admin
+      .from('telegram_links')
+      .select('chat_id')
+      .eq('phone', p)
+      .not('chat_id', 'is', null)
+      .maybeSingle();
+    if (!data?.chat_id) return false;
+    const sent = await sendTelegram(data.chat_id, message);
+    if (!sent.ok) console.error('telegram send failed:', JSON.stringify(sent.data));
+    return sent.ok;
+  } catch (e) {
+    console.error('sendTelegramByPhone error:', String(e));
+    return false;
+  }
+}
+
+/** Turunan secret webhook yang sama dengan pola di pengetahuan Telegram. */
+export async function deriveTelegramWebhookSecret(telegramApiKey: string): Promise<string> {
+  const data = new TextEncoder().encode(`telegram-webhook:${telegramApiKey}`);
+  const digest = await crypto.subtle.digest('SHA-256', data);
+  return btoa(String.fromCharCode(...new Uint8Array(digest)))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/g, '');
+}
+
+export function safeEqual(a: string | null, b: string): boolean {
+  if (!a) return false;
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
