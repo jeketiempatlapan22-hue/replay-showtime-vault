@@ -45,3 +45,6 @@ verify_jwt = false
 [functions.telegram-link-code]
 verify_jwt = false
 
+
+[functions.get-access-info]
+verify_jwt = false
