@@ -13,12 +13,19 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import {
   sendTelegram, sendTelegramRich, sendTelegramPhoto, answerCallbackQuery, setBotCommands,
+  deleteTelegramMessage,
   deriveTelegramWebhookSecret, safeEqual, type InlineKeyboard,
 } from '../_shared/telegram.ts';
 
 type Admin = ReturnType<typeof createClient>;
 
 const SITE = 'https://realtime48stream.my.id';
+
+/** Masa berlaku QRIS yang ditampilkan di Telegram. */
+const QR_TTL_MS = 5 * 60 * 1000;
+
+/** Identitas pembeli Telegram (tanpa nomor WhatsApp). */
+const tgPhone = (chatId: number) => `tg${chatId}`;
 
 function normalizePhone(raw: string) {
   const d = String(raw || '').replace(/\D/g, '');
@@ -45,19 +52,17 @@ const HELP_TEXT = [
   '🎬 *REALTIME48 · ReplayTime Bot*',
   '━━━━━━━━━━━━━━━━━━',
   '',
-  '🎫 *Pembelian*',
-  '`/show` — daftar show aktif + harga',
-  '`/replay` — daftar replay + harga',
-  '`/status` — cek pembayaran terakhir',
+  '🎫 `/show` — show aktif + harga',
+  '🎬 `/replay` — replay + harga',
+  '💳 `/status` — cek pembayaran terakhir',
+  '🎟️ `/token` — link token terakhir',
+  '👤 `/akun` — status akun',
+  '❓ `/bantuan` — tampilkan menu ini',
   '',
-  '🔗 *Akun*',
-  '`/start <KODE>` — hubungkan akun (kode dari halaman Profil)',
-  '`/akun` — status akun & nomor terhubung',
-  '`/token` — link token pembelian terakhir',
+  '✨ Beli langsung di sini — *tanpa nomor WhatsApp*.',
+  'Bayar QRIS (berlaku 5 menit), link token otomatis masuk ke chat ini.',
   '',
-  '❓ `/bantuan` — tampilkan pesan ini',
-  '',
-  `🌐 Website: ${SITE}`,
+  `🌐 ${SITE}`,
 ].join('\n');
 
 const BOT_COMMANDS = [
@@ -86,38 +91,13 @@ async function callFn(name: string, body: Record<string, unknown>) {
 }
 
 async function getLink(admin: Admin, chatId: number) {
+  // Satu chat bisa punya 2 baris: identitas semu `tg<chat_id>` dan nomor WA asli.
   const { data } = await admin.from('telegram_links')
-    .select('id,phone,chat_id').eq('chat_id', chatId).maybeSingle();
-  return data as { id: string; phone: string; chat_id: number } | null;
+    .select('id,phone,chat_id').eq('chat_id', chatId).limit(5);
+  const rows = (data ?? []) as { id: string; phone: string; chat_id: number }[];
+  return rows.find((r) => !/^tg\d+$/.test(r.phone)) ?? rows[0] ?? null;
 }
 
-const askLinkKeyboard: InlineKeyboard = [
-  [{ text: '🔗 Buka halaman Profil', url: `${SITE}/profil` }],
-];
-
-async function requireLink(admin: Admin, chatId: number) {
-  const link = await getLink(admin, chatId);
-  if (link?.phone) return link;
-  await sendTelegramRich(
-    chatId,
-    [
-      '⚠️ *Akun belum terhubung*',
-      '',
-      'Agar bot bisa mengirim link token ke Anda, hubungkan nomor WhatsApp Anda dulu:',
-      '',
-      '1️⃣ Tekan tombol *Bagikan Nomor* di bawah, atau',
-      '2️⃣ Buka *Profil* di website → salin kode → kirim `/start <KODE>` ke sini.',
-    ].join('\n'),
-    askLinkKeyboard,
-    {
-      reply_markup: {
-        keyboard: [[{ text: '📱 Bagikan Nomor WhatsApp', request_contact: true }]],
-        resize_keyboard: true, one_time_keyboard: true,
-      },
-    },
-  );
-  return null;
-}
 
 async function listShows(admin: Admin, chatId: number) {
   const { data } = await admin.from('active_shows')
@@ -177,10 +157,12 @@ async function listReplays(admin: Admin, chatId: number) {
 }
 
 async function createOrderAndSendQr(
-  admin: Admin, chatId: number, phone: string,
+  admin: Admin, chatId: number,
   kind: 'show' | 'replay' | 'replay_only', id: string,
 ) {
-  const body: Record<string, unknown> = { kind, phone };
+  // Tanpa nomor WhatsApp: order diikat langsung ke chat Telegram.
+  const body: Record<string, unknown> = { kind, telegram_chat_id: chatId };
+
   if (kind === 'replay_only') {
     body.replay_id = id;
     const { data: rp } = await admin.from('replays').select('price_idr').eq('id', id).maybeSingle();
@@ -195,34 +177,55 @@ async function createOrderAndSendQr(
   }
   const amount = Number(data.total_payment || data.amount || 0);
   const qrImg = `https://api.qrserver.com/v1/create-qr-code/?size=600x600&margin=16&data=${encodeURIComponent(data.qr_string)}`;
-  const expired = data.expired_at ? new Date(data.expired_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta' }) + ' WIB' : '';
+  const deadline = new Date(Date.now() + QR_TTL_MS).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta' }) + ' WIB';
   const caption = [
     '💳 *PEMBAYARAN QRIS*',
     '━━━━━━━━━━━━━━━━━━',
-    `💰 Total: *${rupiah(amount)}*`,
-    `🆔 Order: \`${data.pakasir_order_id}\``,
-    expired ? `⏰ Berlaku sampai: ${expired}` : '',
+    `💰 Total  : *${rupiah(amount)}*`,
+    `⏳ Berlaku : *5 menit* (s/d ${deadline})`,
     '',
-    '📲 Scan QR di atas dengan aplikasi apa pun (GoPay, DANA, OVO, ShopeePay, m-banking).',
+    '📲 Scan QR di atas dengan GoPay / DANA / OVO / ShopeePay / m-banking.',
+    '⚠️ Bayar *tepat* sesuai nominal.',
     '',
-    '⚠️ Bayar *tepat* sesuai nominal di atas.',
-    'Setelah bayar, tekan *Saya Sudah Bayar* — link token akan langsung dikirim ke sini. 💖',
-  ].filter(Boolean).join('\n');
+    '✅ Setelah bayar, tekan tombol di bawah — link token & sandi replay langsung dikirim ke chat ini.',
+  ].join('\n');
   const keyboard: InlineKeyboard = [
     [{ text: '✅ Saya Sudah Bayar', callback_data: `c:${data.order_id}` }],
-    [{ text: '🌐 Bayar di Website', url: String(data.qr_url || SITE) }],
   ];
   const sent = await sendTelegramPhoto(chatId, qrImg, caption, keyboard);
+  let messageId = Number((sent.data as any)?.result?.message_id || 0);
   if (!sent.ok) {
-    await sendTelegramRich(chatId, `${caption}\n\n🔗 QRIS: ${data.qr_url}`, keyboard);
+    const alt = await sendTelegramRich(chatId, `${caption}\n\n🔗 QRIS: ${data.qr_url}`, keyboard);
+    messageId = Number((alt.data as any)?.result?.message_id || 0);
   }
+  scheduleQrExpiry(admin, chatId, messageId, String(data.order_id));
+}
+
+/** Setelah 5 menit QRIS dihapus dari chat bila belum dibayar. */
+function scheduleQrExpiry(admin: Admin, chatId: number, messageId: number, orderUuid: string) {
+  const task = (async () => {
+    try {
+      await new Promise((r) => setTimeout(r, QR_TTL_MS));
+      const { data } = await admin.from('orders').select('status').eq('id', orderUuid).maybeSingle();
+      if (String((data as any)?.status || '') === 'paid') return;
+      if (messageId) await deleteTelegramMessage(chatId, messageId);
+      await sendTelegramRich(
+        chatId,
+        '⌛ *QRIS sudah kadaluarsa*\n━━━━━━━━━━━━━━━━━━\n\nBatas waktu 5 menit terlewati, jadi kode QR tadi dihapus.\n\nSilakan lakukan pembelian ulang untuk mendapatkan QRIS baru. 💖',
+        [[{ text: '🎤 Beli Lagi', callback_data: 'menu:show' }]],
+      );
+    } catch (e) {
+      console.error('qr expiry error:', String(e));
+    }
+  })();
+  try { (globalThis as any).EdgeRuntime?.waitUntil?.(task); } catch { /* ignore */ }
 }
 
 async function checkOrder(admin: Admin, chatId: number, orderUuid: string) {
   const { data } = await callFn('check-pakasir-status', { order_id: orderUuid });
   const status = String(data?.status || '');
   if (status === 'paid') {
-    await sendTelegram(chatId, '✅ *Pembayaran terkonfirmasi!*\n\nLink token sedang dikirim ke chat ini dan WhatsApp Anda. Kalau belum muncul dalam 1 menit, ketik `/token`. 💖');
+    await sendTelegram(chatId, '✅ *Pembayaran terkonfirmasi!*\n\nLink token sedang dikirim ke chat ini. Kalau belum muncul dalam 1 menit, ketik `/token`. 💖');
   } else {
     await sendTelegramRich(chatId, '⏳ *Pembayaran belum terdeteksi.*\n\nKalau sudah bayar, tunggu ±1 menit lalu tekan tombol di bawah lagi.', [
       [{ text: '🔄 Cek Lagi', callback_data: `c:${orderUuid}` }],
@@ -230,14 +233,23 @@ async function checkOrder(admin: Admin, chatId: number, orderUuid: string) {
   }
 }
 
-async function showStatus(admin: Admin, chatId: number, phone: string) {
+
+/** Semua identitas pembeli untuk chat ini: identitas Telegram + nomor WA (bila terhubung). */
+async function identities(admin: Admin, chatId: number): Promise<string[]> {
+  const list = [tgPhone(chatId)];
+  const link = await getLink(admin, chatId);
+  if (link?.phone && !/^tg\d+$/.test(link.phone)) list.push(normalizePhone(link.phone));
+  return list;
+}
+
+async function showStatus(admin: Admin, chatId: number, phones: string[]) {
   const { data } = await admin.from('orders')
     .select('id,item_title,amount,status,created_at')
-    .eq('user_phone', phone)
+    .in('user_phone', phones)
     .order('created_at', { ascending: false })
     .limit(1).maybeSingle();
   if (!data) {
-    await sendTelegram(chatId, '📭 Belum ada pembelian atas nomor Anda.\n\nKetik `/show` untuk melihat show yang tersedia.');
+    await sendTelegram(chatId, '📭 Belum ada pembelian dari akun Telegram ini.\n\nKetik `/show` untuk melihat show yang tersedia.');
     return;
   }
   if (data.status === 'paid') {
@@ -247,12 +259,12 @@ async function showStatus(admin: Admin, chatId: number, phone: string) {
   await checkOrder(admin, chatId, data.id as string);
 }
 
-async function sendTokens(admin: Admin, chatId: number, phone: string) {
+async function sendTokens(admin: Admin, chatId: number, phones: string[]) {
   const { data } = await admin.from('token_deliveries')
     .select('replay_title,link,created_at')
-    .eq('phone', phone).order('created_at', { ascending: false }).limit(5);
+    .in('phone', phones).order('created_at', { ascending: false }).limit(5);
   if (!data?.length) {
-    await sendTelegram(chatId, '📭 Belum ada token untuk nomor Anda.\n\nSetelah pembayaran terkonfirmasi, token muncul di sini otomatis.');
+    await sendTelegram(chatId, '📭 Belum ada token untuk akun ini.\n\nSetelah pembayaran terkonfirmasi, token muncul di sini otomatis.');
     return;
   }
   const lines = data.map((d: any, i: number) => `${i + 1}. *${d.replay_title || 'Akses'}*\n🔗 ${d.link}`);
@@ -299,11 +311,9 @@ Deno.serve(async (req) => {
       }
       if (data.startsWith('b:')) {
         const [, type, id] = data.split(':');
-        const link = await requireLink(admin, chatId);
-        if (!link) return respond();
         const kind = type === 's' ? 'show' : type === 'r' ? 'replay' : 'replay_only';
         await sendTelegram(chatId, '⏳ Membuat QRIS pembayaran…');
-        await createOrderAndSendQr(admin, chatId, link.phone, kind as any, id);
+        await createOrderAndSendQr(admin, chatId, kind as any, id);
       }
       return respond();
     }
@@ -344,17 +354,22 @@ Deno.serve(async (req) => {
     if (cmd === '/start') {
       const code = text.split(/\s+/)[1]?.trim().toUpperCase() || '';
       if (!code) {
-        const link = await getLink(admin, chatId);
         await sendTelegramRich(
           chatId,
-          `👋 *Selamat datang di ReplayTime!*\n━━━━━━━━━━━━━━━━━━\n\nBeli tiket show & replay langsung dari Telegram — bayar QRIS, link token dikirim otomatis ke sini.\n\n${link?.phone ? `✅ Terhubung: \`${link.phone}\`` : '⚠️ Akun belum terhubung. Bagikan nomor WhatsApp Anda lewat tombol di bawah.'}\n\n${HELP_TEXT}`,
-          [[{ text: '🎤 Lihat Show', callback_data: 'menu:show' }], [{ text: '🌐 Website', url: SITE }]],
-          link?.phone ? {} : {
-            reply_markup: {
-              keyboard: [[{ text: '📱 Bagikan Nomor WhatsApp', request_contact: true }]],
-              resize_keyboard: true, one_time_keyboard: true,
-            },
-          },
+          [
+            '👋 *Selamat datang di ReplayTime!*',
+            '━━━━━━━━━━━━━━━━━━',
+            '',
+            'Beli tiket show & replay langsung dari Telegram:',
+            '1️⃣ Ketik `/show` atau `/replay`',
+            '2️⃣ Tekan tombol harga → QRIS muncul (berlaku *5 menit*)',
+            '3️⃣ Bayar → link token & sandi replay dikirim ke chat ini 💖',
+            '',
+            '✅ Tidak perlu daftar atau memberi nomor WhatsApp.',
+            '',
+            HELP_TEXT,
+          ].join('\n'),
+          [[{ text: '🎤 Lihat Show', callback_data: 'menu:show' }], [{ text: '🎬 Replay', callback_data: 'menu:replay' }]],
         );
         return respond();
       }
@@ -377,36 +392,33 @@ Deno.serve(async (req) => {
       await sendTelegramRich(chatId, [
         '🛒 *CARA BELI DI TELEGRAM*',
         '━━━━━━━━━━━━━━━━━━',
-        '1️⃣ Hubungkan nomor WhatsApp (`/akun`)',
-        '2️⃣ Ketik `/show` atau `/replay`',
-        '3️⃣ Tekan tombol harga → bot kirim QRIS',
-        '4️⃣ Bayar, lalu tekan *Saya Sudah Bayar*',
-        '5️⃣ Link token & sandi dikirim otomatis ke sini 💖',
+        '1️⃣ Ketik `/show` atau `/replay`',
+        '2️⃣ Tekan tombol harga → bot kirim QRIS',
+        '3️⃣ Bayar dalam *5 menit* (lewat batas, QRIS dihapus)',
+        '4️⃣ Tekan *Saya Sudah Bayar*',
+        '5️⃣ Link token & sandi replay masuk ke chat ini 💖',
+        '',
+        '✅ Tanpa nomor WhatsApp, tanpa pindah aplikasi.',
       ].join('\n'), [[{ text: '🎤 Lihat Show', callback_data: 'menu:show' }]]);
       return respond();
     }
 
     if (cmd === '/akun') {
       const link = await getLink(admin, chatId);
-      if (link?.phone) {
-        await sendTelegram(chatId, `👤 *Akun Terhubung*\n\n📱 Nomor: \`${link.phone}\`\n\nSemua link token pembelian akan dikirim ke chat ini.`);
-      } else {
-        await requireLink(admin, chatId);
-      }
+      const wa = link?.phone && !/^tg\d+$/.test(link.phone) ? link.phone : '';
+      await sendTelegramRich(chatId, [
+        '👤 *AKUN TELEGRAM*',
+        '━━━━━━━━━━━━━━━━━━',
+        '✅ Siap membeli — *tanpa perlu nomor WhatsApp*.',
+        wa ? `📱 WhatsApp terhubung: \`${wa}\`` : '📱 WhatsApp: belum terhubung (opsional)',
+        '',
+        'Semua link token & sandi replay dikirim langsung ke chat ini. 💖',
+      ].join('\n'), [[{ text: '🎤 Lihat Show', callback_data: 'menu:show' }]]);
       return respond();
     }
 
-    if (cmd === '/status') {
-      const link = await requireLink(admin, chatId);
-      if (link) await showStatus(admin, chatId, normalizePhone(link.phone));
-      return respond();
-    }
-
-    if (cmd === '/token') {
-      const link = await requireLink(admin, chatId);
-      if (link) await sendTokens(admin, chatId, normalizePhone(link.phone));
-      return respond();
-    }
+    if (cmd === '/status') { await showStatus(admin, chatId, await identities(admin, chatId)); return respond(); }
+    if (cmd === '/token') { await sendTokens(admin, chatId, await identities(admin, chatId)); return respond(); }
 
     await sendTelegramRich(chatId, HELP_TEXT, [
       [{ text: '🎤 Show Aktif', callback_data: 'menu:show' }],

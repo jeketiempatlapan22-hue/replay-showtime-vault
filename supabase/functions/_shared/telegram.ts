@@ -67,6 +67,13 @@ export async function answerCallbackQuery(id: string, text = '') {
   return await gatewayCall('answerCallbackQuery', { callback_query_id: id, text });
 }
 
+/** Hapus pesan (dipakai untuk menghapus QRIS yang kedaluwarsa). */
+export async function deleteTelegramMessage(chatId: number | string, messageId: number) {
+  return await gatewayCall('deleteMessage', { chat_id: chatId, message_id: messageId });
+}
+
+
+
 /** Daftarkan menu perintah bot agar rapi di UI Telegram. */
 export async function setBotCommands(commands: { command: string; description: string }[]) {
   return await gatewayCall('setMyCommands', { commands });

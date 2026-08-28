@@ -34,16 +34,31 @@ Deno.serve(async (req) => {
     const showId = String(body.show_id ?? '');
     const replayId = String(body.replay_id ?? '');
     const kind = String(body.kind ?? 'show'); // 'show' | 'replay' | 'replay_only'
-    const phone = normalizePhone(String(body.phone ?? ''));
+    const tgChatId = Number(body.telegram_chat_id ?? 0);
+    // Pembeli lewat Telegram tidak perlu nomor WhatsApp: kami pakai identitas
+    // semu `tg<chat_id>` yang dipetakan ke chat Telegram untuk pengiriman token.
+    const phone = tgChatId ? `tg${tgChatId}` : normalizePhone(String(body.phone ?? ''));
 
-    if (!validPhone(phone)) return new Response(JSON.stringify({ error: 'invalid phone' }), { status: 400, headers: corsHeaders });
+    if (!tgChatId && !validPhone(phone)) return new Response(JSON.stringify({ error: 'invalid phone' }), { status: 400, headers: corsHeaders });
+
     if (!['show', 'replay', 'replay_only'].includes(kind)) {
       return new Response(JSON.stringify({ error: 'invalid kind' }), { status: 400, headers: corsHeaders });
     }
 
     const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+
+    // Petakan identitas semu Telegram -> chat_id agar pengiriman token otomatis
+    // (webhook Pakasir / poller / cek status) menemukan tujuannya.
+    if (tgChatId) {
+      await admin.from('telegram_links').upsert(
+        { phone, chat_id: tgChatId, link_code: `TG${tgChatId}`, linked_at: new Date().toISOString() },
+        { onConflict: 'phone' },
+      );
+    }
+
     const slug = Deno.env.get('PAKASIR_PROJECT_SLUG');
     if (!slug) return new Response(JSON.stringify({ error: 'pakasir not configured' }), { status: 500, headers: corsHeaders });
+
 
     // Rate limit: max 5 pending orders per phone in last 10 minutes
     try {

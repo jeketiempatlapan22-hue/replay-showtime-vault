@@ -403,6 +403,20 @@ Deno.serve(async (req) => {
   // Telegram: jalur alternatif — token tetap sampai walau Fonnte gangguan.
   const tgSent = await sendTelegramByPhone(admin, order.user_phone, message);
 
+  // Pembeli murni Telegram (identitas semu `tg<chat_id>`) tidak punya nomor WA.
+  const tgOnly = /^tg\d+$/.test(String(order.user_phone || ''));
+  if (tgOnly) {
+    if (tgSent) await admin.from('orders').update({ token_sent_at: new Date().toISOString() }).eq('id', order.id);
+    await admin.from('token_deliveries').insert({
+      phone: order.user_phone, replay_id: order.replay_id, replay_title: order.item_title,
+      order_id: order.id, access_token: accessToken, link,
+      source: 'pakasir', requested_by: 'pakasir-webhook-telegram',
+    });
+    return new Response(JSON.stringify({ ok: true, telegram: tgSent }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+
   const paused = await isFonntePaused(admin);
   const sent = paused ? { ok: false, data: { error: 'fonnte_timeout_pause' } } : await sendFonnte(order.user_phone, message);
   if (sent.ok || tgSent) await admin.from('orders').update({ token_sent_at: new Date().toISOString() }).eq('id', order.id);
@@ -416,6 +430,7 @@ Deno.serve(async (req) => {
     error: sent.ok ? null : JSON.stringify(sent.data),
     related_order_id: order.id, fonnte_response: sent.data as Record<string, unknown>,
   });
+
 
   return new Response(JSON.stringify({ ok: true, sent: sent.ok }), {
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
