@@ -3,6 +3,7 @@
 // (same format as the pakasir-webhook). Idempotent via `token_sent_at`.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { waDedupKey, claimWaSend, markWaSent } from '../_shared/wa-guard.ts';
+import { sendTelegramByPhone } from '../_shared/telegram.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -253,6 +254,8 @@ Deno.serve(async (req) => {
         .replace(/\{replay_info_block\}/g, tok.replay_info ? `🎬 *Info Replay:*\n${tok.replay_info}\n\n` : '')
         .replace(/\{site\}/g, morigin.replace(/^https?:\/\//, ''));
 
+      // Telegram: jalur alternatif (kebal gangguan Fonnte).
+      await sendTelegramByPhone(admin, mOrder.phone, mmsg);
       if (await isFonntePaused(admin)) {
         return new Response(JSON.stringify({ ok: true, status: 'paid', membership: true, sent: false, retry_delayed: true, reason: 'fonnte_timeout_pause' }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -434,6 +437,8 @@ Deno.serve(async (req) => {
       message = fillTpl(tpl, dateStr, link, '');
     }
 
+    // Telegram: kirim token juga ke Telegram user bila sudah terhubung.
+    await sendTelegramByPhone(admin, order.user_phone, message);
     if (await isFonntePaused(admin)) {
       return new Response(JSON.stringify({ ok: true, status: 'paid', access_token: accessToken, sent: false, retry_delayed: true, reason: 'fonnte_timeout_pause' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
