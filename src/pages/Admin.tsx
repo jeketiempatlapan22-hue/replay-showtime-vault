@@ -510,16 +510,20 @@ export default function Admin() {
 
   const handleSavePakasirFallback = async () => {
     try {
+      const num = ownerWaNumber.replace(/\D/g, '') || '6288809048431';
       await Promise.all([
-        setSetting('owner_wa_number', ownerWaNumber.replace(/\D/g, '') || '6288809048431'),
+        setSetting('owner_wa_number', num),
+        // Keep the legacy key in sync so every "Hubungi Admin" surface uses the new number.
+        setSetting('admin_wa_phone', num),
         setSetting('static_qris_url', staticQrisUrl),
         setSetting('use_static_qris', useStaticQris ? 'true' : 'false'),
       ]);
       toast({ title: 'Berhasil', description: 'Pengaturan QRIS statis & nomor admin tersimpan.' });
-    } catch {
-      toast({ title: 'Error', description: 'Gagal menyimpan pengaturan.', variant: 'destructive' });
+    } catch (e: any) {
+      toast({ title: 'Error', description: e?.message || 'Gagal menyimpan pengaturan.', variant: 'destructive' });
     }
   };
+
 
   const handleToggleLiveChat = async (enabled: boolean) => {
     setLiveChatEnabled(enabled);
