@@ -52,19 +52,17 @@ const HELP_TEXT = [
   '🎬 *REALTIME48 · ReplayTime Bot*',
   '━━━━━━━━━━━━━━━━━━',
   '',
-  '🎫 *Pembelian*',
-  '`/show` — daftar show aktif + harga',
-  '`/replay` — daftar replay + harga',
-  '`/status` — cek pembayaran terakhir',
+  '🎫 `/show` — show aktif + harga',
+  '🎬 `/replay` — replay + harga',
+  '💳 `/status` — cek pembayaran terakhir',
+  '🎟️ `/token` — link token terakhir',
+  '👤 `/akun` — status akun',
+  '❓ `/bantuan` — tampilkan menu ini',
   '',
-  '🔗 *Akun*',
-  '`/start <KODE>` — hubungkan akun (kode dari halaman Profil)',
-  '`/akun` — status akun & nomor terhubung',
-  '`/token` — link token pembelian terakhir',
+  '✨ Beli langsung di sini — *tanpa nomor WhatsApp*.',
+  'Bayar QRIS (berlaku 5 menit), link token otomatis masuk ke chat ini.',
   '',
-  '❓ `/bantuan` — tampilkan pesan ini',
-  '',
-  `🌐 Website: ${SITE}`,
+  `🌐 ${SITE}`,
 ].join('\n');
 
 const BOT_COMMANDS = [
@@ -357,14 +355,20 @@ Deno.serve(async (req) => {
         const link = await getLink(admin, chatId);
         await sendTelegramRich(
           chatId,
-          `👋 *Selamat datang di ReplayTime!*\n━━━━━━━━━━━━━━━━━━\n\nBeli tiket show & replay langsung dari Telegram — bayar QRIS, link token dikirim otomatis ke sini.\n\n${link?.phone ? `✅ Terhubung: \`${link.phone}\`` : '⚠️ Akun belum terhubung. Bagikan nomor WhatsApp Anda lewat tombol di bawah.'}\n\n${HELP_TEXT}`,
-          [[{ text: '🎤 Lihat Show', callback_data: 'menu:show' }], [{ text: '🌐 Website', url: SITE }]],
-          link?.phone ? {} : {
-            reply_markup: {
-              keyboard: [[{ text: '📱 Bagikan Nomor WhatsApp', request_contact: true }]],
-              resize_keyboard: true, one_time_keyboard: true,
-            },
-          },
+          [
+            '👋 *Selamat datang di ReplayTime!*',
+            '━━━━━━━━━━━━━━━━━━',
+            '',
+            'Beli tiket show & replay langsung dari Telegram:',
+            '1️⃣ Ketik `/show` atau `/replay`',
+            '2️⃣ Tekan tombol harga → QRIS muncul (berlaku *5 menit*)',
+            '3️⃣ Bayar → link token & sandi replay dikirim ke chat ini 💖',
+            '',
+            '✅ Tidak perlu daftar atau memberi nomor WhatsApp.',
+            '',
+            HELP_TEXT,
+          ].join('\n'),
+          [[{ text: '🎤 Lihat Show', callback_data: 'menu:show' }], [{ text: '🎬 Replay', callback_data: 'menu:replay' }]],
         );
         return respond();
       }
@@ -387,11 +391,13 @@ Deno.serve(async (req) => {
       await sendTelegramRich(chatId, [
         '🛒 *CARA BELI DI TELEGRAM*',
         '━━━━━━━━━━━━━━━━━━',
-        '1️⃣ Hubungkan nomor WhatsApp (`/akun`)',
-        '2️⃣ Ketik `/show` atau `/replay`',
-        '3️⃣ Tekan tombol harga → bot kirim QRIS',
-        '4️⃣ Bayar, lalu tekan *Saya Sudah Bayar*',
-        '5️⃣ Link token & sandi dikirim otomatis ke sini 💖',
+        '1️⃣ Ketik `/show` atau `/replay`',
+        '2️⃣ Tekan tombol harga → bot kirim QRIS',
+        '3️⃣ Bayar dalam *5 menit* (lewat batas, QRIS dihapus)',
+        '4️⃣ Tekan *Saya Sudah Bayar*',
+        '5️⃣ Link token & sandi replay masuk ke chat ini 💖',
+        '',
+        '✅ Tanpa nomor WhatsApp, tanpa pindah aplikasi.',
       ].join('\n'), [[{ text: '🎤 Lihat Show', callback_data: 'menu:show' }]]);
       return respond();
     }
