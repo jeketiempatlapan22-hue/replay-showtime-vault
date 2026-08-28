@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Loader2, RefreshCw, Trash2, CheckCircle2, ExternalLink, Save, Phone, Send, Copy } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { adminWaNumber } from '@/lib/adminWa';
 import { toast } from '@/hooks/use-toast';
 
 type Proof = {
@@ -68,7 +69,7 @@ export default function MembershipProofsAdmin() {
 
   const saveWa = async () => {
     setSavingWa(true);
-    const v = adminWa.replace(/\D/g, '');
+    const v = adminWaNumber(adminWa);
     const { error } = await supabase.from('site_settings').upsert(
       [{ key: 'owner_wa_number', value: v }, { key: 'admin_wa_phone', value: v }],
       { onConflict: 'key' },
@@ -159,7 +160,7 @@ export default function MembershipProofsAdmin() {
         <CardContent className="space-y-2">
           <Label className="text-xs">Nomor WA yang akan dihubungi user setelah upload bukti (format 628xxx)</Label>
           <div className="flex gap-2">
-            <Input value={adminWa} onChange={(e) => setAdminWa(e.target.value)} placeholder="6281234567890" />
+            <Input value={adminWa} onChange={(e) => setAdminWa(e.target.value)} placeholder="6283899087711" />
             <Button onClick={saveWa} disabled={savingWa}>{savingWa ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}<span className="ml-1 hidden sm:inline">Simpan</span></Button>
           </div>
         </CardContent>

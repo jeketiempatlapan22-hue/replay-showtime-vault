@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
+import { adminWaNumber, normalizeWa } from '@/lib/adminWa';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { saveMembershipCredentials } from '@/lib/membershipAccess';
@@ -55,7 +56,7 @@ export default function Profil() {
     supabase.from('site_settings').select('key,value').in('key', ['owner_wa_number', 'admin_wa_phone'])
       .then(({ data }) => {
         const m = new Map(((data || []) as any[]).map((r) => [r.key, String(r.value || '')]));
-        const v = (m.get('owner_wa_number') || m.get('admin_wa_phone') || '').replace(/\D/g, '');
+        const v = normalizeWa(m.get('owner_wa_number') || m.get('admin_wa_phone') || '');
         if (v) setAdminPhone(v);
       });
   }, []);
@@ -78,7 +79,7 @@ export default function Profil() {
   };
 
   const handleContactAdmin = () => {
-    const phone = adminPhone || '6281234567890';
+    const phone = adminWaNumber(adminPhone);
     const msg = encodeURIComponent(`Halo Admin, saya butuh bantuan terkait akun saya.\nEmail: ${user?.email || '-'}\nNomor HP terdaftar: ${phone || '-'}`);
     window.open(`https://wa.me/${phone}?text=${msg}`, '_blank');
   };

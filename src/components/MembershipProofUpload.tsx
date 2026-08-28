@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Upload, Loader2, MessageCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { adminWaNumber } from '@/lib/adminWa';
 import { compressImage } from '@/lib/imageUrl';
 
 interface Props {
@@ -86,7 +87,7 @@ export default function MembershipProofUpload({ open, onOpenChange, orderId, sho
       if (insErr) throw insErr;
 
       toast.success('Bukti terkirim. Diarahkan ke WhatsApp admin…');
-      const target = (adminWa || '').replace(/\D/g, '');
+      const target = adminWaNumber(adminWa);
       if (target) {
         const msg = encodeURIComponent(
           `Halo admin, saya sudah melakukan pembayaran membership.\n\n` +
