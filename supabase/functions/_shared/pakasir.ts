@@ -70,7 +70,9 @@ export async function verifyPakasirPaidStrict(
   const rawAmount = pick(hasTx ? tx : body, ['amount', 'nominal', 'total', 'gross_amount']);
   const returnedAmount = Number(rawAmount);
   if (rawAmount === undefined || !Number.isFinite(returnedAmount) || returnedAmount <= 0) {
-    // Nominal tidak dilaporkan → tidak bisa dipastikan lunas.
+    // Nominal tidak dilaporkan Pakasir. Terima HANYA jika order_id balik dan cocok
+    // (endpoint sudah difilter project+amount+order_id), selain itu anggap belum lunas.
+    if (returnedOrderId && returnedOrderId === pakasirOrderId) return { paid: true, status };
     return { paid: false, status: 'unverified', detail: 'amount_missing' };
   }
   if (returnedAmount !== amt) {
