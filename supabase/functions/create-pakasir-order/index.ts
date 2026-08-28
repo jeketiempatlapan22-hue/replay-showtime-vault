@@ -34,9 +34,13 @@ Deno.serve(async (req) => {
     const showId = String(body.show_id ?? '');
     const replayId = String(body.replay_id ?? '');
     const kind = String(body.kind ?? 'show'); // 'show' | 'replay' | 'replay_only'
-    const phone = normalizePhone(String(body.phone ?? ''));
+    const tgChatId = Number(body.telegram_chat_id ?? 0);
+    // Pembeli lewat Telegram tidak perlu nomor WhatsApp: kami pakai identitas
+    // semu `tg<chat_id>` yang dipetakan ke chat Telegram untuk pengiriman token.
+    const phone = tgChatId ? `tg${tgChatId}` : normalizePhone(String(body.phone ?? ''));
 
-    if (!validPhone(phone)) return new Response(JSON.stringify({ error: 'invalid phone' }), { status: 400, headers: corsHeaders });
+    if (!tgChatId && !validPhone(phone)) return new Response(JSON.stringify({ error: 'invalid phone' }), { status: 400, headers: corsHeaders });
+
     if (!['show', 'replay', 'replay_only'].includes(kind)) {
       return new Response(JSON.stringify({ error: 'invalid kind' }), { status: 400, headers: corsHeaders });
     }
