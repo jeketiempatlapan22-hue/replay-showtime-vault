@@ -7,7 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { getBrowserId } from '@/lib/browserId';
 
 const SS_KEY_BASE = 'replaytime-live-unlocked';
-const WA_NUMBER = '6288809048431';
+const WA_NUMBER = '62859106545522';
 const WA_LINK = `https://wa.me/${WA_NUMBER}?text=${encodeURIComponent('Halo admin, saya ingin beli akses show live.')}`;
 
 const reasonMessage = (reason?: string): string => {
