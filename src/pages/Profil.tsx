@@ -436,6 +436,33 @@ export default function Profil() {
           </CardContent>
         </Card>
 
+        <Card className="border-sky-500/30 bg-sky-500/5">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base"><ExternalLink className="w-4 h-4 text-sky-600" /> Hubungkan Telegram</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-xs text-muted-foreground">
+              Dapatkan link token pembelian otomatis di Telegram juga — jadi kalau WhatsApp sedang gangguan, token tetap sampai.
+            </p>
+            {tgLinked ? (
+              <Badge variant="outline" className="border-sky-500/40 text-sky-700">✅ Telegram sudah terhubung</Badge>
+            ) : (
+              <>
+                <Button onClick={handleTelegramLink} disabled={tgBusy} variant="outline" className="w-full border-sky-500/40 hover:bg-sky-500/10">
+                  {tgBusy ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <ExternalLink className="w-4 h-4 mr-2" />}
+                  Hubungkan ke @Real48time_bot
+                </Button>
+                {tgCode && (
+                  <div className="rounded-lg border border-sky-500/30 bg-background p-3 text-center space-y-1">
+                    <p className="text-xs text-muted-foreground">Kode Anda (kirim ke bot jika diminta):</p>
+                    <p className="font-mono font-bold tracking-widest">{tgCode}</p>
+                  </div>
+                )}
+              </>
+            )}
+          </CardContent>
+        </Card>
+
         <Card className="border-amber-500/30 bg-amber-500/5">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base"><MessageCircle className="w-4 h-4 text-amber-600" /> Butuh Bantuan?</CardTitle>
