@@ -1,6 +1,7 @@
 // Pakasir webhook: konfirmasi pembayaran QRIS dinamis, lalu kirim token via Fonnte.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { waDedupKey, claimWaSend, markWaSent } from '../_shared/wa-guard.ts';
+import { sendTelegramByPhone } from '../_shared/telegram.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
