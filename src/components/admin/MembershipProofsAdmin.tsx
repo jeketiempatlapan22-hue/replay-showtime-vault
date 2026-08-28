@@ -80,9 +80,25 @@ export default function MembershipProofsAdmin() {
 
 
   const copyText = async (text: string, label: string) => {
-    try { await navigator.clipboard.writeText(text); toast({ title: `${label} disalin` }); }
-    catch { toast({ title: 'Gagal menyalin', variant: 'destructive' }); }
+    const value = String(text || '').trim();
+    if (!value) { toast({ title: 'Data kosong', variant: 'destructive' }); return; }
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(value);
+      } else {
+        const ta = document.createElement('textarea');
+        ta.value = value;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.focus(); ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+      toast({ title: `${label} disalin`, description: value });
+    } catch { toast({ title: 'Gagal menyalin', variant: 'destructive' }); }
   };
+
 
   const copyBulk = (field: 'email' | 'phone') => {
     const list = [...new Set(rows.map(r => field === 'email' ? r.email : r.phone).filter(Boolean))];
