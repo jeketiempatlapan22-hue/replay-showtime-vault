@@ -159,6 +159,34 @@ export default function ShowLiveControl({ showId, showTitle }: Props) {
     setSaving(false);
   };
 
+  const holdActive = !!holdUntil && new Date(holdUntil).getTime() > Date.now();
+
+  const applyHold = async (hours: number) => {
+    const until = hours > 0 ? new Date(Date.now() + hours * 3600 * 1000).toISOString() : null;
+    setSaving(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('manage-live', {
+        body: {
+          action: 'upsert_active_show',
+          show: { id: showId, live_hold_until: until, ...(until ? { is_live: false, live_auto_schedule: false } : {}) },
+        },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      setHoldUntil(until);
+      if (until) { setIsLive(false); setAutoSchedule(false); }
+      toast({
+        title: until ? 'Live ditahan' : 'Tahan live dilepas',
+        description: until ? `Auto-live tidak akan menyala sampai ${new Date(until).toLocaleString('id-ID')}.` : 'Auto-live kembali normal.',
+      });
+    } catch (e: any) {
+      toast({ title: 'Gagal mengubah override', description: e.message, variant: 'destructive' });
+    }
+    setSaving(false);
+  };
+
+
+
   if (loading) return <div className="py-4 text-center text-sm text-muted-foreground"><Loader2 className="w-4 h-4 inline animate-spin mr-2" />Memuat…</div>;
 
   return (
