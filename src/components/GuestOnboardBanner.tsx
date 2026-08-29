@@ -15,17 +15,21 @@ const DISMISS_KEY = 'replaytime-guest-banner-dismissed';
 export default function GuestOnboardBanner() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [visible, setVisible] = useState(false);
+
+  const hidden = ['/live', '/adpan', '/auth', '/reset-password', '/reseller', '/kunci'].some(p => location.pathname.startsWith(p));
 
   useEffect(() => {
     try {
-      if (user) { setVisible(false); return; }
+      if (user || hidden) { setVisible(false); return; }
       if (localStorage.getItem(DISMISS_KEY) === '1') return;
       if (getGuestAccount()) return;
       const t = setTimeout(() => setVisible(true), 1200);
       return () => clearTimeout(t);
     } catch { /* ignore */ }
-  }, [user]);
+  }, [user, hidden]);
+
 
   if (!visible) return null;
 
