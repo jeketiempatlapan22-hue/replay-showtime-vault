@@ -27,7 +27,9 @@ export default function ShowLiveControl({ showId, showTitle }: Props) {
   const [resendOpen, setResendOpen] = useState(false);
 
   const [isLive, setIsLive] = useState(false);
+  const [holdUntil, setHoldUntil] = useState<string | null>(null);
   const [autoSchedule, setAutoSchedule] = useState(false);
+
   const [liveUrl, setLiveUrl] = useState('');
   const [liveType, setLiveType] = useState<SrcType>('m3u8');
   const [liveSources, setLiveSources] = useState<LiveSource[]>([]);
@@ -55,7 +57,9 @@ export default function ShowLiveControl({ showId, showTitle }: Props) {
       const row = Array.isArray(data) ? data[0] : data;
       if (row) {
         setIsLive(!!row.is_live);
+        setHoldUntil((row as any).live_hold_until || null);
         setAutoSchedule(!!row.live_auto_schedule);
+
         setLiveUrl(row.live_url || '');
         setLiveType(((row.live_type as SrcType) || 'm3u8'));
         setLiveSources(Array.isArray(row.live_sources) ? row.live_sources as any : []);
@@ -155,6 +159,34 @@ export default function ShowLiveControl({ showId, showTitle }: Props) {
     setSaving(false);
   };
 
+  const holdActive = !!holdUntil && new Date(holdUntil).getTime() > Date.now();
+
+  const applyHold = async (hours: number) => {
+    const until = hours > 0 ? new Date(Date.now() + hours * 3600 * 1000).toISOString() : null;
+    setSaving(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('manage-live', {
+        body: {
+          action: 'upsert_active_show',
+          show: { id: showId, live_hold_until: until, ...(until ? { is_live: false, live_auto_schedule: false } : {}) },
+        },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      setHoldUntil(until);
+      if (until) { setIsLive(false); setAutoSchedule(false); }
+      toast({
+        title: until ? 'Live ditahan' : 'Tahan live dilepas',
+        description: until ? `Auto-live tidak akan menyala sampai ${new Date(until).toLocaleString('id-ID')}.` : 'Auto-live kembali normal.',
+      });
+    } catch (e: any) {
+      toast({ title: 'Gagal mengubah override', description: e.message, variant: 'destructive' });
+    }
+    setSaving(false);
+  };
+
+
+
   if (loading) return <div className="py-4 text-center text-sm text-muted-foreground"><Loader2 className="w-4 h-4 inline animate-spin mr-2" />Memuat…</div>;
 
   return (
@@ -207,6 +239,42 @@ export default function ShowLiveControl({ showId, showTitle }: Props) {
           <Switch checked={autoSchedule} onCheckedChange={setAutoSchedule} />
         </div>
       </div>
+
+      {/* Override: tahan live */}
+      <div className="p-3 rounded bg-card border border-border space-y-2">
+        <div>
+          <Label className="text-sm">Override — Tahan Live (anti nyala otomatis)</Label>
+          <p className="text-[11px] text-muted-foreground">
+            Mematikan live dan mencegah sistem otomatis menyalakannya lagi sampai waktu yang dipilih.
+          </p>
+        </div>
+        {holdActive ? (
+          <p className="text-[11px] font-semibold text-amber-600">
+            Ditahan sampai {new Date(holdUntil as string).toLocaleString('id-ID')}
+          </p>
+        ) : (
+          <p className="text-[11px] text-muted-foreground">Saat ini tidak ditahan.</p>
+        )}
+        <div className="flex flex-wrap gap-2">
+          {[
+            { label: '1 jam', h: 1 },
+            { label: '3 jam', h: 3 },
+            { label: '12 jam', h: 12 },
+            { label: '24 jam', h: 24 },
+          ].map(o => (
+            <Button key={o.h} size="sm" variant="outline" disabled={saving} onClick={() => applyHold(o.h)}>
+              {o.label}
+            </Button>
+          ))}
+          {holdActive && (
+            <Button size="sm" variant="secondary" disabled={saving} onClick={() => applyHold(0)}>
+              Lepas tahan
+            </Button>
+          )}
+        </div>
+      </div>
+
+
 
       {/* Live URL */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">

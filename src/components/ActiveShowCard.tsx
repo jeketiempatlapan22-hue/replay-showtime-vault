@@ -16,6 +16,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { thumbUrl } from '@/lib/imageUrl';
 import AccessInfoCard from '@/components/AccessInfoCard';
+import AnonReplayPassword from '@/components/AnonReplayPassword';
+
 
 
 
@@ -63,12 +65,15 @@ export default function ActiveShowCard({ show, index = 0 }: { show: ActiveShow; 
   const showBuyable = showPriced || showCoinPrice > 0;
   const replayBuyable = replayPriced || replayCoinPrice > 0;
 
-  // LIVE detection — semua show otomatis live 20 menit sebelum jam jadwal
+  // LIVE detection — semua show otomatis live 20 menit sebelum jam jadwal,
+  // kecuali admin sedang menahan live (override).
   const PRE_LIVE_MS = 20 * 60 * 1000;
   const startMs = target.getTime();
   const nowMs = Date.now();
+  const holdActive = !!show.live_hold_until && new Date(show.live_hold_until).getTime() > nowMs;
   const autoLive = nowMs >= startMs - PRE_LIVE_MS && nowMs <= startMs + 8 * 3600 * 1000;
-  const isLiveNow = !!show.is_live || autoLive;
+  const isLiveNow = !holdActive && (!!show.is_live || autoLive);
+
 
   // Per-show unlock check (sessionStorage live unlock OR localStorage purchase)
   const [hasAccess, setHasAccess] = useState(false);
@@ -276,6 +281,11 @@ export default function ActiveShowCard({ show, index = 0 }: { show: ActiveShow; 
               </Button>
             )
           )}
+          {/* User anon: sandi replay show ini selalu terlihat & bisa disalin */}
+          {!user && !!purchasedToken && (
+            <AnonReplayPassword token={purchasedToken} showId={show.id} replayId={show.replay_id || undefined} />
+          )}
+
           {replayMode ? (
             purchasedToken || membershipToken ? (
               <Button className="w-full gap-2" variant="secondary" onClick={goReplay}>

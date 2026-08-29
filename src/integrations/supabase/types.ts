@@ -120,6 +120,7 @@ export type Database = {
           is_special: boolean
           lineup: string[]
           live_auto_schedule: boolean
+          live_hold_until: string | null
           live_password: string
           live_require_password: boolean
           live_sources: Json
@@ -159,6 +160,7 @@ export type Database = {
           is_special?: boolean
           lineup?: string[]
           live_auto_schedule?: boolean
+          live_hold_until?: string | null
           live_password?: string
           live_require_password?: boolean
           live_sources?: Json
@@ -198,6 +200,7 @@ export type Database = {
           is_special?: boolean
           lineup?: string[]
           live_auto_schedule?: boolean
+          live_hold_until?: string | null
           live_password?: string
           live_require_password?: boolean
           live_sources?: Json
@@ -1824,6 +1827,7 @@ export type Database = {
           is_special: boolean
           lineup: string[]
           live_auto_schedule: boolean
+          live_hold_until: string | null
           live_password: string
           live_require_password: boolean
           live_sources: Json
@@ -1872,6 +1876,7 @@ export type Database = {
           is_special: boolean
           lineup: string[]
           live_auto_schedule: boolean
+          live_hold_until: string | null
           live_password: string
           live_require_password: boolean
           live_sources: Json

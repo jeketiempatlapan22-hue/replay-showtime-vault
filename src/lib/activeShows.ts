@@ -23,7 +23,9 @@ export interface ActiveShow {
   // LIVE controls
   is_live?: boolean;
   live_auto_schedule?: boolean;
+  live_hold_until?: string | null;
   live_url?: string;
+
   live_type?: 'm3u8' | 'youtube' | 'cloudflare';
   live_sources?: { label: string; type: 'm3u8' | 'youtube' | 'cloudflare'; url: string }[];
   live_password?: string;
@@ -60,7 +62,7 @@ export async function getActiveShows(adminMode = false): Promise<ActiveShow[]> {
     return (data || []) as unknown as ActiveShow[];
   }
   const { data, error } = await supabase.from('active_shows').select(
-    'id,title,show_date,show_time,lineup,category,description,image_url,sort_order,is_active,is_special,created_at,updated_at,price_show,price_replay,pakasir_amount,replay_id,replay_enabled,is_live,live_auto_schedule,live_type,live_require_password,replay_mode,admin_alias,price_show_coins,price_replay_coins,idn_show_id'
+    'id,title,show_date,show_time,lineup,category,description,image_url,sort_order,is_active,is_special,created_at,updated_at,price_show,price_replay,pakasir_amount,replay_id,replay_enabled,is_live,live_auto_schedule,live_hold_until,live_type,live_require_password,replay_mode,admin_alias,price_show_coins,price_replay_coins,idn_show_id'
   )
     .eq('is_active', true)
     .order('is_special', { ascending: false })

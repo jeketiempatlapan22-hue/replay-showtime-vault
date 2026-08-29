@@ -10,6 +10,8 @@ import { useDevToolsDetector } from "@/hooks/useDevToolsDetector";
 import { getBrowserId } from "@/lib/browserId";
 import { supabase } from "@/integrations/supabase/client";
 import BottomNav from "./components/BottomNav";
+import GuestOnboardBanner from "./components/GuestOnboardBanner";
+
 
 const Index = lazy(() => import("./pages/Index"));
 const Admin = lazy(() => import("./pages/Admin"));
@@ -90,6 +92,8 @@ const App = () => (
             </Routes>
             </Suspense>
             <BottomNav />
+            <GuestOnboardBanner />
+
           </ProtectedShell>
         </ErrorBoundary>
       </BrowserRouter>
