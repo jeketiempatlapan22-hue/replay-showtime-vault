@@ -16,6 +16,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { thumbUrl } from '@/lib/imageUrl';
 import AccessInfoCard from '@/components/AccessInfoCard';
+import AnonReplayPassword from '@/components/AnonReplayPassword';
+
 
 
 
