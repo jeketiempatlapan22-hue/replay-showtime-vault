@@ -92,6 +92,8 @@ const App = () => (
             </Routes>
             </Suspense>
             <BottomNav />
+            <GuestOnboardBanner />
+
           </ProtectedShell>
         </ErrorBoundary>
       </BrowserRouter>
