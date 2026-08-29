@@ -23,7 +23,9 @@ export interface ActiveShow {
   // LIVE controls
   is_live?: boolean;
   live_auto_schedule?: boolean;
+  live_hold_until?: string | null;
   live_url?: string;
+
   live_type?: 'm3u8' | 'youtube' | 'cloudflare';
   live_sources?: { label: string; type: 'm3u8' | 'youtube' | 'cloudflare'; url: string }[];
   live_password?: string;
