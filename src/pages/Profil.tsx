@@ -68,6 +68,8 @@ export default function Profil() {
   const [memberships, setMemberships] = useState<MyMembership[]>([]);
   const [memLoading, setMemLoading] = useState(true);
   const [myOrders, setMyOrders] = useState<MyOrder[]>([]);
+  const [guest, setGuest] = useState<GuestAccount | null>(() => getGuestAccount());
+
 
   const [tgCode, setTgCode] = useState('');
   const [tgLinked, setTgLinked] = useState(false);
