@@ -27,7 +27,9 @@ export default function ShowLiveControl({ showId, showTitle }: Props) {
   const [resendOpen, setResendOpen] = useState(false);
 
   const [isLive, setIsLive] = useState(false);
+  const [holdUntil, setHoldUntil] = useState<string | null>(null);
   const [autoSchedule, setAutoSchedule] = useState(false);
+
   const [liveUrl, setLiveUrl] = useState('');
   const [liveType, setLiveType] = useState<SrcType>('m3u8');
   const [liveSources, setLiveSources] = useState<LiveSource[]>([]);
