@@ -212,6 +212,42 @@ export default function ShowLiveControl({ showId, showTitle }: Props) {
         </div>
       </div>
 
+      {/* Override: tahan live */}
+      <div className="p-3 rounded bg-card border border-border space-y-2">
+        <div>
+          <Label className="text-sm">Override — Tahan Live (anti nyala otomatis)</Label>
+          <p className="text-[11px] text-muted-foreground">
+            Mematikan live dan mencegah sistem otomatis menyalakannya lagi sampai waktu yang dipilih.
+          </p>
+        </div>
+        {holdActive ? (
+          <p className="text-[11px] font-semibold text-amber-600">
+            Ditahan sampai {new Date(holdUntil as string).toLocaleString('id-ID')}
+          </p>
+        ) : (
+          <p className="text-[11px] text-muted-foreground">Saat ini tidak ditahan.</p>
+        )}
+        <div className="flex flex-wrap gap-2">
+          {[
+            { label: '1 jam', h: 1 },
+            { label: '3 jam', h: 3 },
+            { label: '12 jam', h: 12 },
+            { label: '24 jam', h: 24 },
+          ].map(o => (
+            <Button key={o.h} size="sm" variant="outline" disabled={saving} onClick={() => applyHold(o.h)}>
+              {o.label}
+            </Button>
+          ))}
+          {holdActive && (
+            <Button size="sm" variant="secondary" disabled={saving} onClick={() => applyHold(0)}>
+              Lepas tahan
+            </Button>
+          )}
+        </div>
+      </div>
+
+
+
       {/* Live URL */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
         <div className="sm:col-span-1">
