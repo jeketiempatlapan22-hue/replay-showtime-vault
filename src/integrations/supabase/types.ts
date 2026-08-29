@@ -2199,6 +2199,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      auto_live_sync: { Args: never; Returns: undefined }
       check_login_lock: {
         Args: { _identifier: string }
         Returns: {
