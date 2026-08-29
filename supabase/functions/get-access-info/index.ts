@@ -123,15 +123,16 @@ Deno.serve(async (req) => {
     const t = String(show?.show_time || "").slice(0, 5);
     const date = d ? (t ? `${d} ${t}` : d) : "";
     const link = `${origin}/live?show=${okShowId}&t=${token}`;
-    let password = String(show?.live_password || "");
+    // Sandi yang ditampilkan = sandi yang diatur admin pada show ini.
+    let password = String(show?.live_password || "").trim();
     const replayInfo = String(show?.replay_info || "");
 
-    // Kalau show punya replay terhubung, tampilkan sandi replay-nya.
     let replayLink = "";
     if (show?.replay_id) {
       const { data: rep } = await admin
         .from("replays").select("id,password").eq("id", show.replay_id).maybeSingle();
-      if (rep?.password) password = String(rep.password);
+      // Hanya dipakai sebagai cadangan bila admin belum mengisi sandi di show.
+      if (!password && rep?.password) password = String(rep.password);
       if (rep?.id) replayLink = `${origin}/akses?token=${token}&replay=${rep.id}`;
     }
 

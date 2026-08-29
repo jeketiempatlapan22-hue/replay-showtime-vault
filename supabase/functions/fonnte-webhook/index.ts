@@ -130,12 +130,12 @@ async function createTokenInline(
     const token = newToken();
     const isPersonal = opts.kind === 'personal';
 
-    // Sandi: prioritas sandi replay, fallback ke sandi show terkait.
+    // Sandi: prioritas sandi yang diatur admin di show terkait, fallback ke sandi replay.
     const { data: aShow } = await admin
       .from('active_shows').select('live_password')
       .eq('replay_id', opts.replayId).eq('is_active', true).maybeSingle();
-    const password = ((replay as any).password ? String((replay as any).password) : '')
-      || (aShow?.live_password ? String(aShow.live_password) : '');
+    const password = (aShow?.live_password ? String(aShow.live_password) : '')
+      || ((replay as any).password ? String((replay as any).password) : '');
 
     if (isPersonal) {
       const { error } = await admin.from('replay_personal_tokens').insert({
