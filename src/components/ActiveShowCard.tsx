@@ -281,6 +281,11 @@ export default function ActiveShowCard({ show, index = 0 }: { show: ActiveShow; 
               </Button>
             )
           )}
+          {/* User anon: sandi replay show ini selalu terlihat & bisa disalin */}
+          {!user && !!purchasedToken && (
+            <AnonReplayPassword token={purchasedToken} showId={show.id} replayId={show.replay_id || undefined} />
+          )}
+
           {replayMode ? (
             purchasedToken || membershipToken ? (
               <Button className="w-full gap-2" variant="secondary" onClick={goReplay}>
