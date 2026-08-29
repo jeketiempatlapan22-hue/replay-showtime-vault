@@ -54,3 +54,8 @@ export function setReplayPurchase(replayId: string, value: ReplayPurchase) {
 export function getAllReplayPurchases(): Record<string, ReplayPurchase> {
   return readMap<ReplayPurchase>(REPLAY_KEY);
 }
+
+export function getAllShowPurchases(): Record<string, ShowPurchase> {
+  return readMap<ShowPurchase>(SHOW_KEY);
+}
+

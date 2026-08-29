@@ -13,6 +13,10 @@ import { toast } from 'sonner';
 import { saveMembershipCredentials } from '@/lib/membershipAccess';
 import DeviceResetButton from '@/components/DeviceResetButton';
 import AccessInfoCard from '@/components/AccessInfoCard';
+import GuestChoice from '@/components/GuestChoice';
+import GuestProfile from '@/components/GuestProfile';
+import { getGuestAccount, type GuestAccount } from '@/lib/guest';
+
 
 
 interface MyMembership {
@@ -64,6 +68,8 @@ export default function Profil() {
   const [memberships, setMemberships] = useState<MyMembership[]>([]);
   const [memLoading, setMemLoading] = useState(true);
   const [myOrders, setMyOrders] = useState<MyOrder[]>([]);
+  const [guest, setGuest] = useState<GuestAccount | null>(() => getGuestAccount());
+
 
   const [tgCode, setTgCode] = useState('');
   const [tgLinked, setTgLinked] = useState(false);
@@ -124,8 +130,9 @@ export default function Profil() {
 
   useEffect(() => {
     if (loading) return;
-    if (!user) { navigate('/auth?redirect=/profil', { replace: true }); return; }
+    if (!user) { setLoaded(true); return; }
     (async () => {
+
       const [{ data: prof }, { data: bal }] = await Promise.all([
         supabase.from('profiles').select('username,phone').eq('user_id', user.id).maybeSingle(),
         supabase.from('coin_balances').select('balance').eq('user_id', user.id).maybeSingle(),
@@ -249,6 +256,25 @@ export default function Profil() {
   if (!loaded) {
     return <div className="min-h-screen bg-background flex items-center justify-center text-sm text-muted-foreground">Memuat...</div>;
   }
+
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-background pb-24">
+        <header className="sticky top-0 z-30 backdrop-blur-md bg-background/80 border-b border-border">
+          <div className="container mx-auto px-3 sm:px-4 py-3 flex items-center gap-2">
+            <Button variant="ghost" size="icon" onClick={() => navigate('/')}><ArrowLeft className="w-5 h-5" /></Button>
+            <h1 className="text-base sm:text-lg font-bold text-primary">
+              {guest ? 'Profil Guest' : 'Profil Saya'}
+            </h1>
+          </div>
+        </header>
+        {guest
+          ? <GuestProfile guest={guest} />
+          : <GuestChoice onGuest={() => setGuest(getGuestAccount())} />}
+      </div>
+    );
+  }
+
 
   return (
     <div className="min-h-screen bg-background pb-24">
