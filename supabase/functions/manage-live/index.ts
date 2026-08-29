@@ -42,9 +42,20 @@ function cleanActiveShowPayload(input: Record<string, unknown>) {
   if ('lineup' in input) payload.lineup = cleanLineup(input.lineup);
   if ('live_sources' in input) payload.live_sources = cleanSources(input.live_sources);
   if ('replay_id' in input) payload.replay_id = input.replay_id ? String(input.replay_id) : null;
+  if ('live_hold_until' in input) {
+    const raw = input.live_hold_until;
+    if (!raw) payload.live_hold_until = null;
+    else {
+      const d = new Date(String(raw));
+      payload.live_hold_until = isNaN(d.getTime()) ? null : d.toISOString();
+    }
+  }
+  // Menyalakan live manual otomatis melepas masa tahan
+  if (payload.is_live === true && !('live_hold_until' in payload)) payload.live_hold_until = null;
   if ('live_type' in payload && !['m3u8', 'youtube', 'cloudflare'].includes(String(payload.live_type))) payload.live_type = 'm3u8';
   payload.updated_at = new Date().toISOString();
   return payload;
+
 }
 
 Deno.serve(async (req) => {
