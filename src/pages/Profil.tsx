@@ -13,6 +13,10 @@ import { toast } from 'sonner';
 import { saveMembershipCredentials } from '@/lib/membershipAccess';
 import DeviceResetButton from '@/components/DeviceResetButton';
 import AccessInfoCard from '@/components/AccessInfoCard';
+import GuestChoice from '@/components/GuestChoice';
+import GuestProfile from '@/components/GuestProfile';
+import { getGuestAccount, type GuestAccount } from '@/lib/guest';
+
 
 
 interface MyMembership {
