@@ -130,8 +130,9 @@ export default function Profil() {
 
   useEffect(() => {
     if (loading) return;
-    if (!user) { navigate('/auth?redirect=/profil', { replace: true }); return; }
+    if (!user) { setLoaded(true); return; }
     (async () => {
+
       const [{ data: prof }, { data: bal }] = await Promise.all([
         supabase.from('profiles').select('username,phone').eq('user_id', user.id).maybeSingle(),
         supabase.from('coin_balances').select('balance').eq('user_id', user.id).maybeSingle(),
