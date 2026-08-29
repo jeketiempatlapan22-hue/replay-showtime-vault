@@ -57,7 +57,9 @@ export default function ShowLiveControl({ showId, showTitle }: Props) {
       const row = Array.isArray(data) ? data[0] : data;
       if (row) {
         setIsLive(!!row.is_live);
+        setHoldUntil((row as any).live_hold_until || null);
         setAutoSchedule(!!row.live_auto_schedule);
+
         setLiveUrl(row.live_url || '');
         setLiveType(((row.live_type as SrcType) || 'm3u8'));
         setLiveSources(Array.isArray(row.live_sources) ? row.live_sources as any : []);
