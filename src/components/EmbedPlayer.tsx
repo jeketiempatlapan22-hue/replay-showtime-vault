@@ -648,6 +648,32 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
     return () => clearInterval(id);
   }, [type, isLive, ready, applyQualityCap, refreshAvailableQualities]);
 
+  // Autoplay guard (YouTube): sebagian browser/TV mengabaikan autoplay pertama
+  // sehingga video diam di frame awal. Setelah player siap, pastikan playback
+  // benar-benar berjalan — kecuali user memang menekan pause.
+  useEffect(() => {
+    if (type !== 'youtube' || !ready || !ytId) return;
+    let tries = 0;
+    const kick = () => {
+      if (userPausedRef.current) return;
+      let state: number | undefined;
+      try { state = ytPlayerRef.current?.getPlayerState?.(); } catch { /* ignore */ }
+      // 1 = playing, 3 = buffering (sudah jalan)
+      if (state === 1 || state === 3) { setIsPlaying(true); isPlayingRef.current = true; return; }
+      ytHandshake();
+      ytPost('playVideo');
+      try { ytPlayerRef.current?.playVideo?.(); } catch { /* ignore */ }
+    };
+    const id = setInterval(() => {
+      tries += 1;
+      kick();
+      if (tries >= 6) clearInterval(id);
+    }, 700);
+    kick();
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [type, ready, ytId, plainMode]);
+
 
   // Poll YT time/duration — auto-pause saat tab hidden untuk hemat CPU & cegah throttling browser
   // membuat polling tertimbun antrian ketika tab kembali aktif.
