@@ -288,6 +288,7 @@ export default function Live() {
             if (!prev) return cfg;
             const next = { ...prev, enabled: cfg.enabled, title: cfg.title, type: cfg.type };
             if (cfg.idn_show_id) next.idn_show_id = cfg.idn_show_id;
+            if (cfg.grant) next.grant = cfg.grant;
             if (!prev.url && cfg.url) next.url = cfg.url;
             // Merge playlist sources by URL: keep existing entries (so the
             // active player tidak remount), append baru, dan refresh label.
