@@ -133,7 +133,12 @@ Deno.serve(async (req) => {
           };
         }
       }
-      return json({ ...payload, watermark: `MB-${String(mtoken).slice(-4).toUpperCase()}`, membership: membershipInfo(r.token), soft: r.soft });
+      const mGrant = await signGrant({
+        sid: String(payload?.show_id || ""),
+        idn: String(payload?.idn_show_id || ""),
+        bid: String(browser_id || ""),
+      });
+      return json({ ...payload, grant: mGrant, watermark: `MB-${String(mtoken).slice(-4).toUpperCase()}`, membership: membershipInfo(r.token), soft: r.soft });
     }
 
 
