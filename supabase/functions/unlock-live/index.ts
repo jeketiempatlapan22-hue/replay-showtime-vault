@@ -109,6 +109,7 @@ Deno.serve(async (req) => {
           sources: Array.isArray(liveShow.live_sources) ? liveShow.live_sources : [],
           show_date: liveShow.show_date, show_time: liveShow.show_time,
           idn_show_id: liveShow.idn_show_id || "",
+          show_id: liveShow.id,
         };
       } else {
         const { data: upcoming } = await supabase
