@@ -191,6 +191,11 @@ Deno.serve(async (req) => {
         sources: Array.isArray(show.live_sources) ? show.live_sources : [],
         show_date: show.show_date, show_time: show.show_time,
         idn_show_id: show.idn_show_id || "",
+        grant: await signGrant({
+          sid: String(show.id),
+          idn: String(show.idn_show_id || ""),
+          bid: String(browser_id || ""),
+        }),
         watermark: `RT-${String(show.id).slice(0, 4).toUpperCase()}`,
       };
 
