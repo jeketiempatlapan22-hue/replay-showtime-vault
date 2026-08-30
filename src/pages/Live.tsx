@@ -269,6 +269,8 @@ export default function Live() {
         body: { ...opts, browser_id: getBrowserId(), show_id: showId || undefined, silent },
       });
       if (data?.valid) {
+        // Membership tanpa ?show: pakai show yang di-resolve server agar chat & status ikut show terbaru.
+        if (!showId && data.show_id) setResolvedShowId(String(data.show_id));
         const cfg: UnlockedConfig = {
           title: data.title,
           type: isSrcType(data.type) ? data.type : 'm3u8',
