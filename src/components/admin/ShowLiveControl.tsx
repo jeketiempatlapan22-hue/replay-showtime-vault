@@ -46,9 +46,47 @@ export default function ShowLiveControl({ showId, showTitle }: Props) {
   const [groupLinkNote, setGroupLinkNote] = useState('');
   const [replayInfo, setReplayInfo] = useState('');
 
+  const [freeEnabled, setFreeEnabled] = useState(false);
+  const [freeShowId, setFreeShowId] = useState('');
+  const [freeSaving, setFreeSaving] = useState(false);
+
   const [newLabel, setNewLabel] = useState('');
   const [newType, setNewType] = useState<SrcType>('m3u8');
   const [newUrl, setNewUrl] = useState('');
+
+  useEffect(() => {
+    supabase.from('site_settings').select('key,value').in('key', ['free_mode_enabled', 'free_show_id'])
+      .then(({ data }) => {
+        const map = Object.fromEntries((data || []).map((r: any) => [r.key, String(r.value || '')]));
+        setFreeEnabled(map.free_mode_enabled === 'true');
+        setFreeShowId(map.free_show_id || '');
+      });
+  }, []);
+
+  const saveSetting = async (key: string, value: string) => {
+    const { data: existing } = await supabase.from('site_settings').select('id').eq('key', key).maybeSingle();
+    if (existing) {
+      const { error } = await supabase.from('site_settings').update({ value }).eq('key', key);
+      if (error) throw error;
+    } else {
+      const { error } = await supabase.from('site_settings').insert({ key, value });
+      if (error) throw error;
+    }
+  };
+
+  const applyFree = async (enabled: boolean, targetShow: string) => {
+    setFreeSaving(true);
+    try {
+      await saveSetting('free_mode_enabled', enabled ? 'true' : 'false');
+      await saveSetting('free_show_id', targetShow);
+      setFreeEnabled(enabled);
+      setFreeShowId(targetShow);
+      toast({ title: enabled ? 'Mode gratis AKTIF' : 'Mode gratis MATI', description: enabled ? 'Halaman /free bisa diakses untuk show ini.' : 'Endpoint /free-token dinonaktifkan.' });
+    } catch (e: any) {
+      toast({ title: 'Gagal menyimpan mode gratis', description: e.message, variant: 'destructive' });
+    }
+    setFreeSaving(false);
+  };
 
   useEffect(() => {
     if (!showId) return;
@@ -275,6 +313,44 @@ export default function ShowLiveControl({ showId, showTitle }: Props) {
       </div>
 
 
+
+      {/* Mode Gratis (/free) */}
+      <div className="p-3 rounded bg-card border border-amber-500/40 space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          <div>
+            <Label className="text-sm">Mode Gratis — halaman /free</Label>
+            <p className="text-[11px] text-muted-foreground">
+              Saat OFF, endpoint /free-token mati total. Saat ON, hanya show yang dipilih di bawah yang bisa ditonton gratis (sesi 30 menit per perangkat).
+            </p>
+          </div>
+          <Switch
+            checked={freeEnabled}
+            disabled={freeSaving}
+            onCheckedChange={(v) => applyFree(v, v ? (freeShowId || showId) : freeShowId)}
+          />
+        </div>
+        <div className="text-[11px]">
+          Show gratis saat ini:{' '}
+          <span className="font-mono">{freeShowId ? (freeShowId === showId ? showTitle : freeShowId) : '— belum dipilih —'}</span>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" variant={freeShowId === showId ? 'secondary' : 'outline'} disabled={freeSaving}
+            onClick={() => applyFree(freeEnabled, showId)}>
+            Jadikan show ini gratis
+          </Button>
+          {freeShowId && (
+            <Button size="sm" variant="outline" disabled={freeSaving} onClick={() => applyFree(false, '')}>
+              Hapus show gratis
+            </Button>
+          )}
+          <Button size="sm" variant="outline" onClick={() => {
+            navigator.clipboard.writeText(`https://realtime48stream.my.id/free?show=${showId}`);
+            toast({ title: 'Link /free disalin' });
+          }}>
+            Salin link /free
+          </Button>
+        </div>
+      </div>
 
       {/* Live URL */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
