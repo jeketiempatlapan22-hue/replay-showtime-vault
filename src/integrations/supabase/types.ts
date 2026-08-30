@@ -614,6 +614,36 @@ export type Database = {
           },
         ]
       }
+      free_sessions: {
+        Row: {
+          created_at: string
+          expires_at: string
+          fingerprint: string
+          id: string
+          ip: string
+          show_id: string | null
+          user_agent: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at: string
+          fingerprint: string
+          id?: string
+          ip?: string
+          show_id?: string | null
+          user_agent?: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          fingerprint?: string
+          id?: string
+          ip?: string
+          show_id?: string | null
+          user_agent?: string
+        }
+        Relationships: []
+      }
       ip_visit_log: {
         Row: {
           endpoint: string
