@@ -717,7 +717,7 @@ export default function Live() {
       cancelled = true;
       if (refreshTimer) window.clearInterval(refreshTimer);
     };
-  }, [activeSourceUrl, idnRetryNonce, idnGrant]);
+  }, [activeSourceUrl, idnRetryNonce, idnGrant, liveOn]);
 
   const selectSource = (i: number) => {
     setSourceIdx(i);
