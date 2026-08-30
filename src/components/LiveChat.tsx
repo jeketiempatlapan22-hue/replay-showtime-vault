@@ -41,7 +41,7 @@ const colorForName = (name: string) => {
   return NAME_COLORS[h % NAME_COLORS.length];
 };
 
-export default function LiveChat({ lite = false }: LiveChatProps) {
+export default function LiveChat({ lite = false, showId = '' }: LiveChatProps) {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [pinned, setPinned] = useState<Msg[]>([]);
   const [name, setName] = useState(() => localStorage.getItem('replaytime-name') || '');
