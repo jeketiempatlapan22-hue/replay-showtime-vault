@@ -112,12 +112,25 @@ Deno.serve(async (req) => {
           show_id: liveShow.id,
         };
       } else {
-        const { data: upcoming } = await supabase
+        // Jangan menempel ke show lama yang sudah selesai: ambil show aktif
+        // TERDEKAT yang belum lewat (hari ini ke depan) secara menaik.
+        const todayWib = new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10);
+        let { data: upcoming } = await supabase
           .from("active_shows")
           .select("id,title,live_type,live_sources,show_date,show_time,idn_show_id")
           .eq("is_active", true)
-          .order("show_date", { ascending: false }).order("show_time", { ascending: false })
+          .gte("show_date", todayWib)
+          .order("show_date", { ascending: true }).order("show_time", { ascending: true })
           .limit(1).maybeSingle();
+        if (!upcoming) {
+          const { data: latest } = await supabase
+            .from("active_shows")
+            .select("id,title,live_type,live_sources,show_date,show_time,idn_show_id")
+            .eq("is_active", true)
+            .order("show_date", { ascending: false }).order("show_time", { ascending: false })
+            .limit(1).maybeSingle();
+          upcoming = latest;
+        }
         if (upcoming) {
           payload = {
             valid: true, enabled: false, title: upcoming.title, type: upcoming.live_type || "m3u8",
