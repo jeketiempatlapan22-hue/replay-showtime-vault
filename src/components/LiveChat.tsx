@@ -15,6 +15,7 @@ interface Msg {
   created_at: string;
   browser_id?: string;
   reply_to_id?: string | null;
+  show_id?: string | null;
 }
 
 interface LiveChatProps {
