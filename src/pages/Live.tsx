@@ -702,7 +702,7 @@ export default function Live() {
       cancelled = true;
       if (refreshTimer) window.clearInterval(refreshTimer);
     };
-  }, [activeSourceUrl, idnRetryNonce]);
+  }, [activeSourceUrl, idnRetryNonce, idnGrant]);
 
   const selectSource = (i: number) => {
     setSourceIdx(i);
