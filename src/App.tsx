@@ -16,6 +16,7 @@ import GuestOnboardBanner from "./components/GuestOnboardBanner";
 const Index = lazy(() => import("./pages/Index"));
 const Admin = lazy(() => import("./pages/Admin"));
 const Live = lazy(() => import("./pages/Live"));
+const Free = lazy(() => import("./pages/Free"));
 const Kunci = lazy(() => import("./pages/Kunci"));
 const Auth = lazy(() => import("./pages/Auth"));
 const NotFound = lazy(() => import("./pages/NotFound"));
