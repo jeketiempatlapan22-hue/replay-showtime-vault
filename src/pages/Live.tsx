@@ -641,8 +641,10 @@ export default function Live() {
   const [idnResolved, setIdnResolved] = useState<{ key: string; url: string; headers: Record<string, string> } | null>(null);
   const [idnError, setIdnError] = useState<string>('');
   const [idnRetryNonce, setIdnRetryNonce] = useState(0);
+  const idnGrant = unlocked?.grant || '';
   useEffect(() => {
     if (!activeSourceUrl.startsWith('idn://')) { setIdnError(''); return; }
+    if (!idnGrant) { setIdnResolved(null); return; }
     const idnId = activeSourceUrl.slice('idn://'.length);
     if (!idnId) {
       setIdnResolved(null);
