@@ -659,7 +659,8 @@ export default function Live() {
     const refreshIdnToken = async (initial = false) => {
       try {
         const { data, error } = await supabase.functions.invoke('idn-stream-token', {
-          body: { showId: idnId, grant: idnGrant },
+          body: { showId: idnId },
+          headers: { Authorization: `Bearer ${idnGrant}` },
         });
         if (error) throw new Error(error.message || 'Gagal memanggil server token');
         const j = (data || {}) as IdnTokenResponse;

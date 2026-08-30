@@ -1,69 +1,56 @@
 // Generates IDN (hanabira48) playback credentials server-side.
-// PROTECTED: requires a short-lived signed grant issued by unlock-live, so only
-// viewers that already passed token/membership/password validation can obtain
-// playback credentials. Returns { xShowId, xTokenId, xSecKey, xApiToken, playbackUrl }.
+// PROTECTED: WAJIB membawa header `Authorization: Bearer <grant>` yang diterbitkan
+// oleh unlock-live. Grant hanya diterbitkan untuk token yang terdaftar di Token
+// Factory (token show / token membership) dan berumur maksimal 6 jam. Setiap
+// request divalidasi ulang ke database: token harus masih ada, tidak dicabut,
+// belum kedaluwarsa, dan perangkat masih terikat.
 
-import { verifyGrant } from '../_shared/stream-grant.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { bearerFrom, verifyGrant } from '../_shared/stream-grant.ts';
+import { cors, generateApiToken, PLAYBACK_URL, X_SEC_KEY, X_TOKEN_ID } from '../_shared/idn-credentials.ts';
 
-const ALLOWED_ORIGINS = [
-  'https://realtime48stream.my.id',
-  'https://www.realtime48stream.my.id',
-  'https://replaytime.lovable.app',
-  'http://localhost:8080',
-];
+async function tokenStillValid(claims: { kind?: string; tid?: string; bid?: string }): Promise<boolean> {
+  const kind = claims.kind;
+  const tid = claims.tid;
+  const bid = claims.bid || '';
+  if (!tid || (kind !== 'show' && kind !== 'membership')) return false;
 
-function cors(origin: string | null) {
-  const allowed = origin && (ALLOWED_ORIGINS.includes(origin) || /^https:\/\/[a-z0-9-]+\.lovable\.app$/.test(origin))
-    ? origin
-    : ALLOWED_ORIGINS[0];
-  return {
-    'Access-Control-Allow-Origin': allowed,
-    'Vary': 'Origin',
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  } as Record<string, string>;
-}
-
-// Static credentials per playback_baru.txt
-const X_TOKEN_ID = '114e0e89-f8b4-44ee-9354-bb06805cc02f';
-const X_SEC_KEY = '49c647f3-c84b-4b93-9b84-9d1ad158428e';
-const PARTNER_SECRET = Deno.env.get('HANABIRA_PARTNER_SECRET') || 'Hanabirastream2026';
-const PLAYBACK_URL = 'https://idn.mediastream48.workers.dev/api/proxy/playback';
-
-function b64url(bytes: Uint8Array): string {
-  let bin = '';
-  for (const b of bytes) bin += String.fromCharCode(b);
-  return btoa(bin).replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_');
-}
-function b64urlStr(s: string): string {
-  return b64url(new TextEncoder().encode(s));
-}
-function toHex(bytes: Uint8Array): string {
-  return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
-}
-
-async function generateApiToken(showId: string): Promise<string> {
-  // Step A: JWT secret = HEX(SHA256(secKey:tokenId:partnerSecret))
-  const seed = `${X_SEC_KEY}:${X_TOKEN_ID}:${PARTNER_SECRET}`;
-  const seedHash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(seed));
-  const jwtSecret = toHex(new Uint8Array(seedHash));
-
-  // Step B: Payload
-  const now = Math.floor(Date.now() / 1000);
-  const header = { alg: 'HS256', typ: 'JWT' };
-  const payload = { sid: showId, tid: X_TOKEN_ID, exp: now + 7200 };
-  const signingInput = `${b64urlStr(JSON.stringify(header))}.${b64urlStr(JSON.stringify(payload))}`;
-
-  // Step C: HMAC-SHA256
-  const key = await crypto.subtle.importKey(
-    'raw',
-    new TextEncoder().encode(jwtSecret),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign'],
+  const supabase = createClient(
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
   );
-  const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(signingInput));
-  return `${signingInput}.${b64url(new Uint8Array(sig))}`;
+
+  if (bid) {
+    const { data: blk } = await supabase
+      .from('blocked_browsers').select('id').eq('browser_id', bid).eq('unblocked', false).maybeSingle();
+    if (blk) return false;
+  }
+
+  const now = Date.now();
+  if (kind === 'show') {
+    const { data: t } = await supabase
+      .from('active_show_tokens').select('id,revoked,expires_at').eq('id', tid).maybeSingle();
+    if (!t || t.revoked) return false;
+    if (t.expires_at && new Date(t.expires_at).getTime() < now) return false;
+    if (bid) {
+      const { data: d } = await supabase
+        .from('active_show_token_devices').select('id').eq('token_id', tid).eq('browser_id', bid).maybeSingle();
+      if (!d) return false;
+    }
+    return true;
+  }
+
+  const { data: m } = await supabase
+    .from('membership_tokens').select('id,revoked,expires_at,starts_at').eq('id', tid).maybeSingle();
+  if (!m || m.revoked) return false;
+  if (m.expires_at && new Date(m.expires_at).getTime() < now) return false;
+  if (m.starts_at && new Date(m.starts_at).getTime() > now) return false;
+  if (bid) {
+    const { data: d } = await supabase
+      .from('membership_token_devices').select('id').eq('token_id', tid).eq('browser_id', bid).maybeSingle();
+    if (!d) return false;
+  }
+  return true;
 }
 
 Deno.serve(async (req) => {
@@ -73,18 +60,16 @@ Deno.serve(async (req) => {
 
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   try {
-    if (!PARTNER_SECRET) return json({ error: 'server_misconfigured' }, 503);
-
     const body = await req.json().catch(() => ({}));
     const showId = String(body?.showId || '').trim();
-    const grant = String(body?.grant || '');
     if (!showId || showId.length > 64) return json({ error: 'showId tidak valid' }, 400);
 
-    // Gate: hanya penonton yang sudah lolos validasi unlock-live (token / membership /
-    // sandi) yang boleh mengambil kredensial IDN.
-    const claims = await verifyGrant(grant);
-    if (!claims) return json({ error: 'akses_ditolak' }, 401);
+    // Bearer WAJIB. Fallback body.grant sengaja dihapus.
+    const bearer = bearerFrom(req);
+    const claims = bearer ? await verifyGrant(bearer) : null;
+    if (!claims) return json({ error: 'unauthorized' }, 401);
     if (claims.idn !== showId) return json({ error: 'grant_mismatch' }, 403);
+    if (!(await tokenStillValid(claims))) return json({ error: 'akses_ditolak' }, 403);
 
     const xApiToken = await generateApiToken(showId);
     return json({

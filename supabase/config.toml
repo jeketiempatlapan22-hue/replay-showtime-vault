@@ -48,3 +48,9 @@ verify_jwt = false
 
 [functions.get-access-info]
 verify_jwt = false
+
+[functions.idn-stream-token]
+verify_jwt = false
+
+[functions.free-token]
+verify_jwt = false
