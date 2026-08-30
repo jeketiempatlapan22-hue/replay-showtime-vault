@@ -155,6 +155,9 @@ export default function Live() {
 
 
   const showId = search.get('show') || '';
+  // Show yang di-resolve server (untuk membership yang membuka /live tanpa ?show).
+  const [resolvedShowId, setResolvedShowId] = useState('');
+  const effectiveShowId = showId || resolvedShowId;
   const isWeakNetwork = useMemo(() => {
     if (typeof navigator === 'undefined') return false;
     const conn = (navigator as Navigator & { connection?: { effectiveType?: string; downlink?: number; saveData?: boolean } }).connection;
