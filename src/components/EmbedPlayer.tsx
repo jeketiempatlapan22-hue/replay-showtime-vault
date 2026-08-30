@@ -234,6 +234,8 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
   }, []);
 
   const isPlayingRef = useRef(false);
+  // Ditandai saat user sengaja menekan pause agar autoplay-guard tidak memaksa play lagi.
+  const userPausedRef = useRef(false);
   useEffect(() => { isPlayingRef.current = isPlaying; }, [isPlaying]);
   // Track whether autoplay-mute coercion has already run for the current source so that
   // subsequent iframe.onLoad / YT onReady events don't re-force mute (and re-show the hint)
