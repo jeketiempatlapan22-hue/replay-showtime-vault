@@ -639,7 +639,7 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
   const [page, setPage] = useState(0);
   const PAGE = 20;
   const [creatingId, setCreatingId] = useState<string | null>(null);
-  const [result, setResult] = useState<{ link: string; message: string; title: string; extra?: string; kind: 'show' | 'replay' | 'membership'; targetId: string; targetTitle: string } | null>(null);
+  const [result, setResult] = useState<{ link: string; message: string; title: string; extra?: string; kind: 'show' | 'replay' | 'membership'; targetId: string; targetTitle: string; regenerate?: () => Promise<{ link: string; message: string; extra?: string } | null> } | null>(null);
   const [statsMap, setStatsMap] = useState<Map<string, number>>(new Map());
 
   const loadStats = async () => {
