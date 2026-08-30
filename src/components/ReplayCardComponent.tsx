@@ -345,6 +345,8 @@ function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWatch, onUnlockAn
                 <Play className="w-4 h-4 mr-2" /> Tonton Replay
               </Button>
               <AccessInfoCard token={purchasedToken} replayId={replay.id} fallbackLink={accessLink} compact />
+              <AnonReplayPassword token={purchasedToken} replayId={replay.id} />
+
 
             </div>
           ) : isUnlocked ? (
