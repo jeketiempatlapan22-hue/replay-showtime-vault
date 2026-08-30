@@ -67,36 +67,35 @@ async function generateApiToken(showId: string): Promise<string> {
 }
 
 Deno.serve(async (req) => {
+  const corsHeaders = cors(req.headers.get('origin'));
+  const json = (b: unknown, status = 200) =>
+    new Response(JSON.stringify(b), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   try {
-    if (!PARTNER_SECRET) {
-      return new Response(JSON.stringify({ error: 'server_misconfigured' }), {
-        status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-    // Public endpoint — no auth required. Credentials are short-lived (2h) and
-    // tied to a specific showId set by admin.
+    if (!PARTNER_SECRET) return json({ error: 'server_misconfigured' }, 503);
 
     const body = await req.json().catch(() => ({}));
     const showId = String(body?.showId || '').trim();
-    if (!showId || showId.length > 64) {
-      return new Response(JSON.stringify({ error: 'showId tidak valid' }), {
-        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
+    const grant = String(body?.grant || '');
+    if (!showId || showId.length > 64) return json({ error: 'showId tidak valid' }, 400);
+
+    // Gate: hanya penonton yang sudah lolos validasi unlock-live (token / membership /
+    // sandi) yang boleh mengambil kredensial IDN.
+    const claims = await verifyGrant(grant);
+    if (!claims) return json({ error: 'akses_ditolak' }, 401);
+    if (claims.idn !== showId) return json({ error: 'grant_mismatch' }, 403);
 
     const xApiToken = await generateApiToken(showId);
-    return new Response(JSON.stringify({
+    return json({
       xShowId: showId,
       xTokenId: X_TOKEN_ID,
       xSecKey: X_SEC_KEY,
       xApiToken,
       playbackUrl: PLAYBACK_URL,
       expiresIn: 7200,
-    }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-  } catch (e) {
-    return new Response(JSON.stringify({ error: (e as Error).message }), {
-      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
+  } catch (e) {
+    return json({ error: (e as Error).message }, 500);
   }
 });
