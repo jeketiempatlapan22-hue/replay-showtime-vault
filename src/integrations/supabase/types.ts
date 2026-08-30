@@ -726,6 +726,7 @@ export type Database = {
           name: string
           pinned: boolean
           reply_to_id: string | null
+          show_id: string | null
         }
         Insert: {
           browser_id?: string
@@ -736,6 +737,7 @@ export type Database = {
           name?: string
           pinned?: boolean
           reply_to_id?: string | null
+          show_id?: string | null
         }
         Update: {
           browser_id?: string
@@ -746,6 +748,7 @@ export type Database = {
           name?: string
           pinned?: boolean
           reply_to_id?: string | null
+          show_id?: string | null
         }
         Relationships: []
       }

@@ -155,6 +155,9 @@ export default function Live() {
 
 
   const showId = search.get('show') || '';
+  // Show yang di-resolve server (untuk membership yang membuka /live tanpa ?show).
+  const [resolvedShowId, setResolvedShowId] = useState('');
+  const effectiveShowId = showId || resolvedShowId;
   const isWeakNetwork = useMemo(() => {
     if (typeof navigator === 'undefined') return false;
     const conn = (navigator as Navigator & { connection?: { effectiveType?: string; downlink?: number; saveData?: boolean } }).connection;
@@ -172,10 +175,11 @@ export default function Live() {
   }, [isWeakNetwork]);
 
   const fetchStatus = () => {
-    if (showId) {
+    const sid = effectiveShowId;
+    if (sid) {
       return supabase.from('active_shows')
         .select('id,title,is_live,live_type,live_require_password,lineup,show_date,show_time,is_active,image_url,idn_show_id,group_link,group_link_enabled,group_link_label,group_link_note')
-        .eq('id', showId).maybeSingle()
+        .eq('id', sid).maybeSingle()
         .then(({ data }) => {
           if (!data || !data.is_active) {
             setStatus({ enabled: false, title: 'Live', type: 'm3u8', require_password: true, sources: [], lineup: [] });
@@ -269,6 +273,8 @@ export default function Live() {
         body: { ...opts, browser_id: getBrowserId(), show_id: showId || undefined, silent },
       });
       if (data?.valid) {
+        // Membership tanpa ?show: pakai show yang di-resolve server agar chat & status ikut show terbaru.
+        if (!showId && data.show_id) setResolvedShowId(String(data.show_id));
         const cfg: UnlockedConfig = {
           title: data.title,
           type: isSrcType(data.type) ? data.type : 'm3u8',
@@ -557,9 +563,20 @@ export default function Live() {
   }, []);
 
   useEffect(() => {
-    if (showId) void fetchStatus();
+    if (effectiveShowId) void fetchStatus();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showId]);
+  }, [effectiveShowId]);
+
+  // Membership tanpa ?show: ikuti perubahan show hasil resolve secara realtime
+  // agar status live/jadwal selalu yang terbaru (bukan show yang sudah selesai).
+  useEffect(() => {
+    if (showId || !resolvedShowId) return;
+    const ch = supabase.channel(`live-cfg-resolved:${resolvedShowId}`)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'active_shows', filter: `id=eq.${resolvedShowId}` }, () => { void fetchStatus(); })
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showId, resolvedShowId]);
 
   useEffect(() => {
     const t = search.get('t');
@@ -1057,7 +1074,7 @@ export default function Live() {
             <div ref={chatHostRef}>
               {chatReady ? (
                 <Suspense fallback={<ChatFallback />}>
-                  <LiveChat lite={playbackPriorityMode} />
+                  <LiveChat lite={playbackPriorityMode} showId={showId || effectiveShowId} />
                 </Suspense>
               ) : <ChatIdle />}
             </div>

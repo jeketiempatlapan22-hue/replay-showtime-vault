@@ -15,11 +15,15 @@ interface Msg {
   created_at: string;
   browser_id?: string;
   reply_to_id?: string | null;
+  show_id?: string | null;
 }
 
 interface LiveChatProps {
   lite?: boolean;
+  /** Chat dipisah per show; tanpa id = chat umum (legacy). */
+  showId?: string;
 }
+
 
 // Palet warna nama (gaya YouTube/TikTok). Pakai token semantik.
 const NAME_COLORS = [
@@ -38,7 +42,7 @@ const colorForName = (name: string) => {
   return NAME_COLORS[h % NAME_COLORS.length];
 };
 
-export default function LiveChat({ lite = false }: LiveChatProps) {
+export default function LiveChat({ lite = false, showId = '' }: LiveChatProps) {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [pinned, setPinned] = useState<Msg[]>([]);
   const [name, setName] = useState(() => localStorage.getItem('replaytime-name') || '');
@@ -82,10 +86,18 @@ export default function LiveChat({ lite = false }: LiveChatProps) {
       .then(({ data }) => { if (data?.value) setAdminUsername(data.value); });
   }, []);
 
+  // Chat dipisah per show: hanya pesan milik show ini yang tampil.
+  const inScope = useCallback((m: Msg) => (showId ? m.show_id === showId : !m.show_id), [showId]);
+
   const refresh = useCallback(async () => {
+    const scoped = (pinnedVal: boolean) => {
+      let q = supabase.from('live_messages').select('*').eq('pinned', pinnedVal).order('created_at', { ascending: false });
+      q = showId ? q.eq('show_id', showId) : q.is('show_id', null);
+      return pinnedVal ? q : q.limit(messageLimit);
+    };
     const [{ data: pins }, { data: list }, { data: blocks }] = await Promise.all([
-      supabase.from('live_messages').select('*').eq('pinned', true).order('created_at', { ascending: false }),
-      supabase.from('live_messages').select('*').eq('pinned', false).order('created_at', { ascending: false }).limit(messageLimit),
+      scoped(true),
+      scoped(false),
       // Admin perlu daftar lengkap block untuk badge moderasi; viewer biasa cukup cek dirinya sendiri.
       isAdmin
         ? supabase.from('chat_blocks').select('browser_id')
@@ -95,13 +107,14 @@ export default function LiveChat({ lite = false }: LiveChatProps) {
     setMessages(((list || []) as Msg[]).slice().reverse());
     setBlockedSet(new Set(((blocks || []) as { browser_id: string }[]).map(b => b.browser_id)));
     stickToBottomRef.current = true;
-  }, [isAdmin, messageLimit, myBrowserId]);
+  }, [isAdmin, messageLimit, myBrowserId, showId]);
 
   useEffect(() => {
     refresh();
-    const ch = supabase.channel('live-chat-realtime')
+    const ch = supabase.channel(`live-chat-realtime${showId ? `:${showId}` : ''}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'live_messages' }, (payload) => {
         const m = payload.new as Msg;
+        if (!inScope(m)) return;
         if (m.pinned) setPinned(prev => [m, ...prev.filter(x => x.id !== m.id)]);
         else setMessages(prev => {
           const next = [...prev.filter(x => x.id !== m.id), m];
@@ -110,6 +123,7 @@ export default function LiveChat({ lite = false }: LiveChatProps) {
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'live_messages' }, (payload) => {
         const m = payload.new as Msg;
+        if (!inScope(m)) return;
         setPinned(prev => m.pinned ? [m, ...prev.filter(x => x.id !== m.id)] : prev.filter(x => x.id !== m.id));
         setMessages(prev => {
           if (m.pinned) return prev.filter(x => x.id !== m.id);
@@ -140,7 +154,7 @@ export default function LiveChat({ lite = false }: LiveChatProps) {
       )
       .subscribe();
     return () => { supabase.removeChannel(ch); };
-  }, [isAdmin, messageLimit, myBrowserId, refresh]);
+  }, [isAdmin, messageLimit, myBrowserId, refresh, showId, inScope]);
 
   const handleScroll = () => {
     const el = listRef.current;
@@ -247,6 +261,7 @@ export default function LiveChat({ lite = false }: LiveChatProps) {
       is_admin: isAdmin,
       pinned: false,
       reply_to_id: replyTo?.id ?? null,
+      show_id: showId || null,
     });
     if (!error) {
       recordSent(msg);
