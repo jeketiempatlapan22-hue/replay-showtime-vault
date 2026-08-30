@@ -123,7 +123,63 @@ Deno.serve(async (req) => {
             }
           }
         }
+
+        // 4) token SHOW yang sudah dikonversi jadi replay ini.
+        // Link nonton live dan link replay saling terhubung: token show tetap
+        // berlaku untuk menonton replay hasil konversinya.
+        if (!valid) {
+          const { data: linkedShows } = await supabase
+            .from("active_shows").select("id").eq("replay_id", replay_id);
+          const showIds = (linkedShows || []).map((s: any) => s.id);
+          if (showIds.length) {
+            // a) pembelian di website (orders)
+            const { data: ord } = await supabase
+              .from("orders")
+              .select("id, show_id, status")
+              .eq("access_token", access_token)
+              .eq("status", "paid")
+              .in("show_id", showIds)
+              .maybeSingle();
+            if (ord) valid = true;
+
+            // b) token dari Token Factory / reseller (active_show_tokens)
+            if (!valid) {
+              const { data: st } = await supabase
+                .from("active_show_tokens")
+                .select("id, revoked, expires_at, max_devices, show_id")
+                .eq("token", access_token)
+                .in("show_id", showIds)
+                .maybeSingle();
+              if (st && !st.revoked) {
+                if (st.expires_at && new Date(st.expires_at).getTime() < Date.now()) {
+                  return json({ valid: false, reason: "expired" }, 403);
+                }
+                if (!browser_id) return json({ valid: false, reason: "no_device" }, 403);
+                const maxDev = Math.max(1, Number(st.max_devices || 1));
+                const { data: dev } = await supabase
+                  .from("active_show_token_devices")
+                  .select("id").eq("token_id", st.id).eq("browser_id", browser_id).maybeSingle();
+                if (dev) {
+                  valid = true;
+                } else {
+                  const { count } = await supabase
+                    .from("active_show_token_devices").select("id", { count: "exact", head: true }).eq("token_id", st.id);
+                  if ((count ?? 0) >= maxDev) return json({ valid: false, reason: "device_limit" }, 403);
+                  const { error: insErr } = await supabase
+                    .from("active_show_token_devices").insert({ token_id: st.id, browser_id });
+                  if (insErr) {
+                    const { data: re } = await supabase.from("active_show_token_devices")
+                      .select("id").eq("token_id", st.id).eq("browser_id", browser_id).maybeSingle();
+                    if (!re) return json({ valid: false, reason: "device_limit" }, 403);
+                  }
+                  valid = true;
+                }
+              }
+            }
+          }
+        }
       }
+
 
     } else if (password) {
       valid = !!replay.password && replay.password === password;
