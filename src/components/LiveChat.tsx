@@ -19,7 +19,10 @@ interface Msg {
 
 interface LiveChatProps {
   lite?: boolean;
+  /** Chat dipisah per show; tanpa id = chat umum (legacy). */
+  showId?: string;
 }
+
 
 // Palet warna nama (gaya YouTube/TikTok). Pakai token semantik.
 const NAME_COLORS = [
