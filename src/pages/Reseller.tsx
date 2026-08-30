@@ -195,12 +195,15 @@ function TokenResultDialog({
             )}
           </div>
 
-          <Button onClick={copyAll} size="lg" className="w-full text-base">
-            {justCopied ? <><Check className="w-5 h-5 mr-2" />Tersalin!</> : <><Copy className="w-5 h-5 mr-2" />Salin Link + Pesan</>}
+          <Button onClick={copyAll} size="lg" className="w-full text-base" disabled={busy}>
+            {busy ? <><Loader2 className="w-5 h-5 mr-2 animate-spin" />Membuat link baru…</>
+              : justCopied ? <><Check className="w-5 h-5 mr-2" />Tersalin!</>
+              : <><Copy className="w-5 h-5 mr-2" />Salin Link Baru + Pesan</>}
           </Button>
 
           <p className="text-[11px] text-muted-foreground italic text-center">
-            🔢 Setiap klik tombol salin akan menambah jumlah salin & masuk tagihan.
+            🔁 Setiap klik tombol salin membuat <b>link token baru</b> · menambah jumlah salin & masuk tagihan.
+            {editing ? ' (Mode edit: link tidak diperbarui)' : ''}
           </p>
         </div>
       </DialogContent>
