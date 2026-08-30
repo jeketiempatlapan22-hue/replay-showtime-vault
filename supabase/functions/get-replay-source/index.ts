@@ -126,14 +126,19 @@ Deno.serve(async (req) => {
       }
 
     } else if (password) {
-      valid = replay.password === password;
+      valid = !!replay.password && replay.password === password;
       if (!valid) {
-        const d = new Date(replay.date);
-        const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+        // Sandi master bulanan: terima master bulan replay DAN master bulan berjalan.
+        const months = new Set<string>();
+        const addMonth = (dt: Date) => {
+          if (!isNaN(dt.getTime())) months.add(`${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}`);
+        };
+        addMonth(new Date(replay.date));
+        addMonth(new Date());
         const { data: masters } = await supabase
           .from("master_passwords")
-          .select("password, paused")
-          .eq("month", monthKey);
+          .select("password, paused, month")
+          .in("month", [...months]);
         valid = (masters || []).some((m: any) => m.paused !== true && m.password === password);
       }
     }
