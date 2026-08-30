@@ -563,9 +563,20 @@ export default function Live() {
   }, []);
 
   useEffect(() => {
-    if (showId) void fetchStatus();
+    if (effectiveShowId) void fetchStatus();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showId]);
+  }, [effectiveShowId]);
+
+  // Membership tanpa ?show: ikuti perubahan show hasil resolve secara realtime
+  // agar status live/jadwal selalu yang terbaru (bukan show yang sudah selesai).
+  useEffect(() => {
+    if (showId || !resolvedShowId) return;
+    const ch = supabase.channel(`live-cfg-resolved:${resolvedShowId}`)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'active_shows', filter: `id=eq.${resolvedShowId}` }, () => { void fetchStatus(); })
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showId, resolvedShowId]);
 
   useEffect(() => {
     const t = search.get('t');
