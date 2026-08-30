@@ -123,6 +123,7 @@ export default function LiveChat({ lite = false, showId = '' }: LiveChatProps) {
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'live_messages' }, (payload) => {
         const m = payload.new as Msg;
+        if (!inScope(m)) return;
         setPinned(prev => m.pinned ? [m, ...prev.filter(x => x.id !== m.id)] : prev.filter(x => x.id !== m.id));
         setMessages(prev => {
           if (m.pinned) return prev.filter(x => x.id !== m.id);
