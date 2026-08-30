@@ -642,7 +642,10 @@ export default function Live() {
   const [idnError, setIdnError] = useState<string>('');
   const [idnRetryNonce, setIdnRetryNonce] = useState(0);
   const idnGrant = unlocked?.grant || '';
+  const liveOn = status ? !!status.enabled : !!unlocked?.enabled;
   useEffect(() => {
+    // Live dimatikan admin → hentikan total pencarian sumber (jangan minta token IDN lagi).
+    if (!liveOn) { setIdnResolved(null); setIdnError(''); return; }
     if (!activeSourceUrl.startsWith('idn://')) { setIdnError(''); return; }
     if (!idnGrant) {
       setIdnResolved(null);
