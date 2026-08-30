@@ -969,6 +969,16 @@ export default function Live() {
                   </div>
                 )}
               </>
+            ) : liveEnded ? (
+              <div className="aspect-video w-full rounded-2xl border border-border bg-card/80 flex flex-col items-center justify-center gap-2 p-6 text-center">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-muted/50 border border-border text-muted-foreground text-[10px] font-bold uppercase tracking-wider">
+                  Off Air
+                </span>
+                <h3 className="text-lg sm:text-xl font-bold text-foreground">Live Telah Selesai</h3>
+                <p className="text-sm text-muted-foreground max-w-sm">
+                  Siaran {status?.title || unlocked.title || 'live'} telah dihentikan oleh admin. Halaman ini akan otomatis menyala kembali begitu admin mengaktifkan live lagi — tidak perlu muat ulang.
+                </p>
+              </div>
             ) : (
               <ScheduleCountdown
                 title={status?.title || unlocked.title || 'Live'}
