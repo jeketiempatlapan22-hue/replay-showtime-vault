@@ -85,10 +85,18 @@ export default function LiveChat({ lite = false, showId = '' }: LiveChatProps) {
       .then(({ data }) => { if (data?.value) setAdminUsername(data.value); });
   }, []);
 
+  // Chat dipisah per show: hanya pesan milik show ini yang tampil.
+  const inScope = useCallback((m: Msg) => (showId ? m.show_id === showId : !m.show_id), [showId]);
+
   const refresh = useCallback(async () => {
+    const scoped = (pinnedVal: boolean) => {
+      let q = supabase.from('live_messages').select('*').eq('pinned', pinnedVal).order('created_at', { ascending: false });
+      q = showId ? q.eq('show_id', showId) : q.is('show_id', null);
+      return pinnedVal ? q : q.limit(messageLimit);
+    };
     const [{ data: pins }, { data: list }, { data: blocks }] = await Promise.all([
-      supabase.from('live_messages').select('*').eq('pinned', true).order('created_at', { ascending: false }),
-      supabase.from('live_messages').select('*').eq('pinned', false).order('created_at', { ascending: false }).limit(messageLimit),
+      scoped(true),
+      scoped(false),
       // Admin perlu daftar lengkap block untuk badge moderasi; viewer biasa cukup cek dirinya sendiri.
       isAdmin
         ? supabase.from('chat_blocks').select('browser_id')
@@ -98,13 +106,14 @@ export default function LiveChat({ lite = false, showId = '' }: LiveChatProps) {
     setMessages(((list || []) as Msg[]).slice().reverse());
     setBlockedSet(new Set(((blocks || []) as { browser_id: string }[]).map(b => b.browser_id)));
     stickToBottomRef.current = true;
-  }, [isAdmin, messageLimit, myBrowserId]);
+  }, [isAdmin, messageLimit, myBrowserId, showId]);
 
   useEffect(() => {
     refresh();
-    const ch = supabase.channel('live-chat-realtime')
+    const ch = supabase.channel(`live-chat-realtime${showId ? `:${showId}` : ''}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'live_messages' }, (payload) => {
         const m = payload.new as Msg;
+        if (!inScope(m)) return;
         if (m.pinned) setPinned(prev => [m, ...prev.filter(x => x.id !== m.id)]);
         else setMessages(prev => {
           const next = [...prev.filter(x => x.id !== m.id), m];
