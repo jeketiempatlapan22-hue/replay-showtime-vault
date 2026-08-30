@@ -730,8 +730,16 @@ export default function Live() {
 
 
   // ON AIR hanya saat admin manual mengaktifkan toggle is_live di admin panel.
-  // status.enabled & unlocked.enabled keduanya bersumber dari kolom is_live.
-  const liveActive = !!(status?.enabled || unlocked?.enabled);
+  // Sumber kebenaran adalah baris `active_shows` terbaru (status). Cache unlock
+  // di sessionStorage bisa basi, jadi jangan dipakai untuk menahan status live.
+  const liveActive = status ? !!status.enabled : !!unlocked?.enabled;
+  // Pernah ON AIR di sesi ini → saat admin mematikan live, tampilkan "Live Telah Selesai".
+  const wasLiveRef = useRef(false);
+  const [liveEnded, setLiveEnded] = useState(false);
+  useEffect(() => {
+    if (liveActive) { wasLiveRef.current = true; setLiveEnded(false); return; }
+    if (wasLiveRef.current) setLiveEnded(true);
+  }, [liveActive]);
 
   useEffect(() => {
     // Chat realtime dimuat hanya saat area chat mendekati layar agar bandwidth/CPU tetap diprioritaskan ke player.
