@@ -7,7 +7,9 @@ import MemberAvatar from '@/components/MemberAvatar';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import BuyShowDialog from '@/components/BuyShowDialog';
-import { getReplayPurchase } from '@/lib/purchases';
+import { getReplayPurchase, getAllShowPurchases } from '@/lib/purchases';
+import AnonReplayPassword from '@/components/AnonReplayPassword';
+
 import { toast } from '@/hooks/use-toast';
 import type { ActiveMembership } from '@/hooks/useActiveMembership';
 import { isReplayCoveredByMembership } from '@/lib/membershipReplayAccess';
