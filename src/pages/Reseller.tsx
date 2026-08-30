@@ -683,29 +683,47 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
     await logCopy(session, kind, targetId, targetTitle);
   };
 
+  const requestToken = async (kind: 'show' | 'replay', id: string) => {
+    const { data, error } = await supabase.functions.invoke('reseller-create-token', {
+      body: { phone: session.phone, pin: session.pin, kind, target_id: id },
+    });
+    let d: any = data;
+    if (error) {
+      try {
+        const ctx: any = (error as any).context;
+        if (ctx && typeof ctx.json === 'function') d = await ctx.json();
+        else if (ctx && typeof ctx.text === 'function') d = JSON.parse(await ctx.text());
+      } catch { /* ignore */ }
+    }
+    if (!d?.ok) throw new Error(d?.detail || d?.error || (error?.message ?? 'gagal'));
+    return d;
+  };
+
+  const extraFor = (kind: 'show' | 'replay', d: any) => {
+    const expStr = d.expires_at ? new Date(d.expires_at).toLocaleString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+    return kind === 'show' ? `Hanya untuk show ini · 1 device · Berlaku s/d ${expStr}` : `1 device · Berlaku s/d ${expStr}`;
+  };
+
   const create = async (kind: 'show' | 'replay', id: string, title: string) => {
     setCreatingId(id);
     try {
-      const { data, error } = await supabase.functions.invoke('reseller-create-token', {
-        body: { phone: session.phone, pin: session.pin, kind, target_id: id },
-      });
-      let d: any = data;
-      if (error) {
-        try {
-          const ctx: any = (error as any).context;
-          if (ctx && typeof ctx.json === 'function') d = await ctx.json();
-          else if (ctx && typeof ctx.text === 'function') d = JSON.parse(await ctx.text());
-        } catch { /* ignore */ }
-      }
-      if (!d?.ok) throw new Error(d?.detail || d?.error || (error?.message ?? 'gagal'));
+      const d = await requestToken(kind, id);
       try { await navigator.clipboard.writeText(d.message); } catch { /* ignore */ }
-      const expStr = d.expires_at ? new Date(d.expires_at).toLocaleString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
       const finalTitle = d.title || title;
       await bumpStats(kind, id, finalTitle);
       setResult({
         link: d.link, message: d.message, title: finalTitle,
-        extra: kind === 'show' ? `Hanya untuk show ini · 1 device · Berlaku s/d ${expStr}` : `1 device · Berlaku s/d ${expStr}`,
+        extra: extraFor(kind, d),
         kind, targetId: id, targetTitle: finalTitle,
+        regenerate: async () => {
+          try {
+            const n = await requestToken(kind, id);
+            return { link: n.link, message: n.message, extra: extraFor(kind, n) };
+          } catch (e) {
+            toast({ title: 'Gagal membuat link baru', description: e instanceof Error ? e.message : 'gagal', variant: 'destructive' });
+            return null;
+          }
+        },
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'gagal';
