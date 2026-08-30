@@ -1,7 +1,10 @@
-// Short-lived signed grant proving that a viewer passed unlock-live validation.
-// Used to gate idn-stream-token so IDN credentials can't be fetched anonymously.
+// Short-lived signed grant proving that a viewer passed unlock-live (or free-token) validation.
+// Used as a Bearer token for idn-stream-token so IDN credentials can't be fetched anonymously.
 
 const SECRET = Deno.env.get("STREAM_GRANT_SECRET") || "";
+
+export const GRANT_TTL_PAID = 6 * 3600;   // 6 jam (maksimum)
+export const GRANT_TTL_FREE = 30 * 60;    // 30 menit
 
 function b64url(bytes: Uint8Array): string {
   let bin = "";
@@ -23,16 +26,26 @@ async function key() {
   );
 }
 
+export type GrantKind = "show" | "membership" | "free";
+
 export type GrantClaims = {
-  sid: string;      // active_shows.id
-  idn: string;      // idn_show_id allowed
-  bid: string;      // browser_id
-  exp: number;      // unix seconds
+  sid: string;        // active_shows.id
+  idn: string;        // idn_show_id allowed
+  bid: string;        // browser_id / fingerprint
+  kind?: GrantKind;   // sumber akses
+  tid?: string;       // id baris token (Token Factory) bila ada
+  iat?: number;       // unix seconds
+  exp: number;        // unix seconds
 };
 
-export async function signGrant(claims: Omit<GrantClaims, "exp">, ttlSec = 21600): Promise<string> {
+export async function signGrant(
+  claims: Omit<GrantClaims, "exp" | "iat">,
+  ttlSec = GRANT_TTL_PAID,
+): Promise<string> {
   if (!SECRET) return "";
-  const payload: GrantClaims = { ...claims, exp: Math.floor(Date.now() / 1000) + ttlSec };
+  const now = Math.floor(Date.now() / 1000);
+  const ttl = Math.min(Math.max(60, ttlSec), GRANT_TTL_PAID);
+  const payload: GrantClaims = { ...claims, iat: now, exp: now + ttl };
   const body = b64url(new TextEncoder().encode(JSON.stringify(payload)));
   const sig = await crypto.subtle.sign("HMAC", await key(), new TextEncoder().encode(body));
   return `${body}.${b64url(new Uint8Array(sig))}`;
@@ -50,9 +63,19 @@ export async function verifyGrant(grant: string): Promise<GrantClaims | null> {
   if (diff !== 0) return null;
   try {
     const claims = JSON.parse(new TextDecoder().decode(b64urlDecode(body))) as GrantClaims;
-    if (!claims?.exp || claims.exp < Math.floor(Date.now() / 1000)) return null;
+    const now = Math.floor(Date.now() / 1000);
+    if (!claims?.exp || claims.exp < now) return null;
+    // Hard cap: apapun isinya, umur token tidak boleh melebihi 6 jam.
+    if (claims.iat && claims.exp - claims.iat > GRANT_TTL_PAID) return null;
     return claims;
   } catch {
     return null;
   }
+}
+
+/** Ambil bearer token dari header Authorization. */
+export function bearerFrom(req: Request): string {
+  const h = req.headers.get("authorization") || req.headers.get("Authorization") || "";
+  if (!h.toLowerCase().startsWith("bearer ")) return "";
+  return h.slice(7).trim();
 }
