@@ -277,7 +277,15 @@ Deno.serve(async (req) => {
         await supabase.rpc('record_login_attempt', { _identifier: lockId, _success: valid });
         if (!valid) return json({ valid: false, reason: "bad_password" });
       }
-      return json(okPayload);
+      // Jalur sandi (sandi show / master): tetap dapat grant, tapi berumur pendek
+      // (30 menit) dan divalidasi ulang tiap request oleh idn-stream-token.
+      const pwGrant = await signGrant({
+        sid: String(show.id),
+        idn: String(show.idn_show_id || ""),
+        bid: String(browser_id || ""),
+        kind: "password",
+      }, GRANT_TTL_FREE);
+      return json({ ...okPayload, grant: pwGrant });
       }
     }
 
