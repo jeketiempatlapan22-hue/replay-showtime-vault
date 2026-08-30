@@ -644,7 +644,11 @@ export default function Live() {
   const idnGrant = unlocked?.grant || '';
   useEffect(() => {
     if (!activeSourceUrl.startsWith('idn://')) { setIdnError(''); return; }
-    if (!idnGrant) { setIdnResolved(null); return; }
+    if (!idnGrant) {
+      setIdnResolved(null);
+      setIdnError('Sesi akses belum siap. Muat ulang halaman atau masukkan ulang sandi/token.');
+      return;
+    }
     const idnId = activeSourceUrl.slice('idn://'.length);
     if (!idnId) {
       setIdnResolved(null);
