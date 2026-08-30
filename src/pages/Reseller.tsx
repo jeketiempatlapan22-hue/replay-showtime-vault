@@ -215,12 +215,11 @@ function MembershipPanel({
   session, onCreated, statsMap,
 }: {
   session: Session;
-  onCreated: (r: { link: string; message: string; title: string; extra: string; kind: 'membership'; targetId: string; targetTitle: string }) => void;
+  onCreated: (r: { link: string; message: string; title: string; extra: string; kind: 'membership'; targetId: string; targetTitle: string; regenerate: () => Promise<{ link: string; message: string; extra?: string } | null> }) => void;
   statsMap: Map<string, number>;
 }) {
   const [pkgs, setPkgs] = useState<PackageRow[]>([]);
   const [loading, setLoading] = useState(false);
-  const [daysMap, setDaysMap] = useState<Record<string, number>>({});
   const [creatingId, setCreatingId] = useState<string | null>(null);
 
   const load = async () => {
@@ -235,29 +234,41 @@ function MembershipPanel({
   };
   useEffect(() => { load(); }, []);
 
-  const setDays = (id: string, v: number) => setDaysMap((m) => ({ ...m, [id]: v }));
+  // Durasi selalu mengikuti pengaturan admin pada paket.
+  const request = async (pkg: PackageRow) => {
+    const { data, error } = await supabase.functions.invoke('reseller-create-membership', {
+      body: { phone: session.phone, pin: session.pin, package_id: pkg.id },
+    });
+    let d: any = data;
+    if (error) {
+      try {
+        const ctx: any = (error as any).context;
+        if (ctx && typeof ctx.json === 'function') d = await ctx.json();
+        else if (ctx && typeof ctx.text === 'function') d = JSON.parse(await ctx.text());
+      } catch { /* ignore */ }
+    }
+    if (!d?.ok) throw new Error(d?.detail || d?.error || (error?.message ?? 'gagal'));
+    return d;
+  };
 
   const create = async (pkg: PackageRow) => {
-    const days = Math.max(2, Math.min(40, Number(daysMap[pkg.id] || 30)));
     setCreatingId(pkg.id);
     try {
-      const { data, error } = await supabase.functions.invoke('reseller-create-membership', {
-        body: { phone: session.phone, pin: session.pin, package_id: pkg.id, days },
-      });
-      let d: any = data;
-      if (error) {
-        try {
-          const ctx: any = (error as any).context;
-          if (ctx && typeof ctx.json === 'function') d = await ctx.json();
-          else if (ctx && typeof ctx.text === 'function') d = JSON.parse(await ctx.text());
-        } catch { /* ignore */ }
-      }
-      if (!d?.ok) throw new Error(d?.detail || d?.error || (error?.message ?? 'gagal'));
+      const d = await request(pkg);
       try { await navigator.clipboard.writeText(d.message); } catch { /* ignore */ }
       onCreated({
         link: d.link, message: d.message, title: d.title || pkg.name,
-        extra: `Membership ${days} hari · ${pkg.max_devices} device · Sandi: ${d.password}`,
+        extra: `Membership ${d.duration_days} hari · ${pkg.max_devices} device · Sandi: ${d.password}`,
         kind: 'membership', targetId: pkg.id, targetTitle: pkg.name,
+        regenerate: async () => {
+          try {
+            const n = await request(pkg);
+            return { link: n.link, message: n.message, extra: `Membership ${n.duration_days} hari · ${pkg.max_devices} device · Sandi: ${n.password}` };
+          } catch (e) {
+            toast({ title: 'Gagal membuat link baru', description: e instanceof Error ? e.message : 'gagal', variant: 'destructive' });
+            return null;
+          }
+        },
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'gagal';
@@ -279,7 +290,6 @@ function MembershipPanel({
       ) : pkgs.length === 0 ? (
         <p className="text-sm text-muted-foreground italic">Belum ada paket membership.</p>
       ) : pkgs.map((p) => {
-        const days = daysMap[p.id] ?? 30;
         const count = statsMap.get(`membership:${p.id}`) ?? 0;
         return (
           <div key={p.id} className="border border-border rounded-xl bg-card p-3 space-y-2">
@@ -291,21 +301,12 @@ function MembershipPanel({
                   {count > 0 && <Badge variant="secondary" className="text-[10px] shrink-0">{count}x salin</Badge>}
                 </div>
                 <p className="text-[11px] text-muted-foreground">
-                  ⏱️ Admin: {p.duration_days || 30} hari · 👤 {p.max_devices} device{p.includes_replays ? ' · 🎬 termasuk replay' : ''}
+                  ⏱️ Durasi admin: {p.duration_days || 30} hari · 👤 {p.max_devices} device{p.includes_replays ? ' · 🎬 termasuk replay' : ''}
                 </p>
                 {p.replay_info && <p className="text-[11px] text-muted-foreground mt-1 line-clamp-2">{p.replay_info}</p>}
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <Label className="text-xs whitespace-nowrap">Durasi:</Label>
-              <Input
-                type="number" min={2} max={40} value={days}
-                onChange={(e) => setDays(p.id, Number(e.target.value) || 0)}
-                className="h-8 w-20 text-sm"
-              />
-              <span className="text-xs text-muted-foreground">hari (2–40)</span>
-            </div>
-            <Button size="sm" className="w-full" disabled={creatingId === p.id || days < 2 || days > 40} onClick={() => create(p)}>
+            <Button size="sm" className="w-full" disabled={creatingId === p.id} onClick={() => create(p)}>
               {creatingId === p.id ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Link2 className="w-4 h-4 mr-1" />}
               Buat & Salin Link Membership
             </Button>
@@ -313,7 +314,7 @@ function MembershipPanel({
         );
       })}
       <p className="text-[11px] text-muted-foreground italic pt-2">
-        ℹ️ Pesan WA otomatis menyertakan info replay membership sesuai pengaturan admin.
+        ℹ️ Durasi membership otomatis mengikuti pengaturan admin · pesan WA menyertakan info replay dari admin.
       </p>
     </div>
   );
