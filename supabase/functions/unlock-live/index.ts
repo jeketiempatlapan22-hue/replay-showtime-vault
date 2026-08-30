@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { signGrant } from "../_shared/stream-grant.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
