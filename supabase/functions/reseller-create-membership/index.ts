@@ -54,17 +54,18 @@ Deno.serve(async (req) => {
   const phone = normalizePhone(body.phone || '');
   const pin = String(body.pin || '').trim();
   const packageId = String(body.package_id || '');
-  const days = Math.floor(Number(body.days));
   if (!phone || !pin || !packageId) return json({ error: 'missing_fields' }, 400);
-  if (!Number.isFinite(days) || days < 2 || days > 40) return json({ error: 'invalid_days', detail: 'Durasi 2–40 hari.' }, 400);
 
   const { data: verified } = await admin.rpc('reseller_verify', { _phone: phone, _pin: pin });
   if (verified !== true) return json({ error: 'unauthorized' }, 401);
 
   const { data: pkg } = await admin.from('membership_packages')
-    .select('id,name,status,paused,max_devices,includes_replays,replay_info').eq('id', packageId).maybeSingle();
+    .select('id,name,status,paused,max_devices,includes_replays,replay_info,duration_days').eq('id', packageId).maybeSingle();
   if (!pkg) return json({ error: 'package_not_found' }, 404);
   if (pkg.paused === true) return json({ error: 'package_paused' }, 400);
+
+  // Durasi SELALU mengikuti pengaturan admin pada paket (reseller tidak bisa mengubah).
+  const days = Math.max(1, Math.floor(Number(pkg.duration_days) || 30));
 
   const { data: settings } = await admin.from('site_settings').select('key,value')
     .in('key', ['site_origin', 'wa_membership_template', 'reseller_membership_replay_info']);
