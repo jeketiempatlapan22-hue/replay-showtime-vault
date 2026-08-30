@@ -118,22 +118,40 @@ function LoginCard({ onLogin }: { onLogin: (s: Session) => void }) {
 }
 
 function TokenResultDialog({
-  open, onOpenChange, link, message: initialMessage, title, extra, copyCount, onCopied,
-}: { open: boolean; onOpenChange: (v: boolean) => void; link: string; message: string; title: string; extra?: string; copyCount: number; onCopied: () => void }) {
+  open, onOpenChange, link: initialLink, message: initialMessage, title, extra: initialExtra, copyCount, onCopied, regenerate,
+}: { open: boolean; onOpenChange: (v: boolean) => void; link: string; message: string; title: string; extra?: string; copyCount: number; onCopied: () => void; regenerate?: () => Promise<{ link: string; message: string; extra?: string } | null> }) {
   const [message, setMessage] = useState(initialMessage);
+  const [link, setLink] = useState(initialLink);
+  const [extra, setExtra] = useState(initialExtra);
   const [editing, setEditing] = useState(false);
   const [justCopied, setJustCopied] = useState(false);
-  useEffect(() => { setMessage(initialMessage); setEditing(false); }, [initialMessage, open]);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { setMessage(initialMessage); setLink(initialLink); setExtra(initialExtra); setEditing(false); }, [initialMessage, initialLink, initialExtra, open]);
 
   const copyAll = async () => {
+    if (busy) return;
+    setBusy(true);
     try {
-      await navigator.clipboard.writeText(message);
+      // Setiap klik salin => buat TOKEN BARU (link unik untuk tiap pembeli).
+      let text = message;
+      if (regenerate && !editing) {
+        const fresh = await regenerate();
+        if (fresh) {
+          text = fresh.message;
+          setMessage(fresh.message);
+          setLink(fresh.link);
+          setExtra(fresh.extra);
+        }
+      }
+      await navigator.clipboard.writeText(text);
       onCopied();
       setJustCopied(true);
       setTimeout(() => setJustCopied(false), 1500);
-      toast({ title: `✅ Link + pesan tersalin`, description: `Total salin untuk ini: ${copyCount + 1}x` });
+      toast({ title: `✅ Link baru tersalin`, description: `Total salin untuk ini: ${copyCount + 1}x` });
     } catch {
       toast({ title: 'Gagal menyalin', variant: 'destructive' });
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -154,6 +172,7 @@ function TokenResultDialog({
             <Label className="text-xs">Link Akses</Label>
             <Input readOnly value={link} className="font-mono text-xs" onFocus={(e) => e.currentTarget.select()} />
           </div>
+
 
           <div className="space-y-1">
             <div className="flex items-center justify-between">
@@ -176,12 +195,15 @@ function TokenResultDialog({
             )}
           </div>
 
-          <Button onClick={copyAll} size="lg" className="w-full text-base">
-            {justCopied ? <><Check className="w-5 h-5 mr-2" />Tersalin!</> : <><Copy className="w-5 h-5 mr-2" />Salin Link + Pesan</>}
+          <Button onClick={copyAll} size="lg" className="w-full text-base" disabled={busy}>
+            {busy ? <><Loader2 className="w-5 h-5 mr-2 animate-spin" />Membuat link baru…</>
+              : justCopied ? <><Check className="w-5 h-5 mr-2" />Tersalin!</>
+              : <><Copy className="w-5 h-5 mr-2" />Salin Link Baru + Pesan</>}
           </Button>
 
           <p className="text-[11px] text-muted-foreground italic text-center">
-            🔢 Setiap klik tombol salin akan menambah jumlah salin & masuk tagihan.
+            🔁 Setiap klik tombol salin membuat <b>link token baru</b> · menambah jumlah salin & masuk tagihan.
+            {editing ? ' (Mode edit: link tidak diperbarui)' : ''}
           </p>
         </div>
       </DialogContent>
@@ -193,12 +215,11 @@ function MembershipPanel({
   session, onCreated, statsMap,
 }: {
   session: Session;
-  onCreated: (r: { link: string; message: string; title: string; extra: string; kind: 'membership'; targetId: string; targetTitle: string }) => void;
+  onCreated: (r: { link: string; message: string; title: string; extra: string; kind: 'membership'; targetId: string; targetTitle: string; regenerate: () => Promise<{ link: string; message: string; extra?: string } | null> }) => void;
   statsMap: Map<string, number>;
 }) {
   const [pkgs, setPkgs] = useState<PackageRow[]>([]);
   const [loading, setLoading] = useState(false);
-  const [daysMap, setDaysMap] = useState<Record<string, number>>({});
   const [creatingId, setCreatingId] = useState<string | null>(null);
 
   const load = async () => {
@@ -213,29 +234,41 @@ function MembershipPanel({
   };
   useEffect(() => { load(); }, []);
 
-  const setDays = (id: string, v: number) => setDaysMap((m) => ({ ...m, [id]: v }));
+  // Durasi selalu mengikuti pengaturan admin pada paket.
+  const request = async (pkg: PackageRow) => {
+    const { data, error } = await supabase.functions.invoke('reseller-create-membership', {
+      body: { phone: session.phone, pin: session.pin, package_id: pkg.id },
+    });
+    let d: any = data;
+    if (error) {
+      try {
+        const ctx: any = (error as any).context;
+        if (ctx && typeof ctx.json === 'function') d = await ctx.json();
+        else if (ctx && typeof ctx.text === 'function') d = JSON.parse(await ctx.text());
+      } catch { /* ignore */ }
+    }
+    if (!d?.ok) throw new Error(d?.detail || d?.error || (error?.message ?? 'gagal'));
+    return d;
+  };
 
   const create = async (pkg: PackageRow) => {
-    const days = Math.max(2, Math.min(40, Number(daysMap[pkg.id] || 30)));
     setCreatingId(pkg.id);
     try {
-      const { data, error } = await supabase.functions.invoke('reseller-create-membership', {
-        body: { phone: session.phone, pin: session.pin, package_id: pkg.id, days },
-      });
-      let d: any = data;
-      if (error) {
-        try {
-          const ctx: any = (error as any).context;
-          if (ctx && typeof ctx.json === 'function') d = await ctx.json();
-          else if (ctx && typeof ctx.text === 'function') d = JSON.parse(await ctx.text());
-        } catch { /* ignore */ }
-      }
-      if (!d?.ok) throw new Error(d?.detail || d?.error || (error?.message ?? 'gagal'));
+      const d = await request(pkg);
       try { await navigator.clipboard.writeText(d.message); } catch { /* ignore */ }
       onCreated({
         link: d.link, message: d.message, title: d.title || pkg.name,
-        extra: `Membership ${days} hari · ${pkg.max_devices} device · Sandi: ${d.password}`,
+        extra: `Membership ${d.duration_days} hari · ${pkg.max_devices} device · Sandi: ${d.password}`,
         kind: 'membership', targetId: pkg.id, targetTitle: pkg.name,
+        regenerate: async () => {
+          try {
+            const n = await request(pkg);
+            return { link: n.link, message: n.message, extra: `Membership ${n.duration_days} hari · ${pkg.max_devices} device · Sandi: ${n.password}` };
+          } catch (e) {
+            toast({ title: 'Gagal membuat link baru', description: e instanceof Error ? e.message : 'gagal', variant: 'destructive' });
+            return null;
+          }
+        },
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'gagal';
@@ -257,7 +290,6 @@ function MembershipPanel({
       ) : pkgs.length === 0 ? (
         <p className="text-sm text-muted-foreground italic">Belum ada paket membership.</p>
       ) : pkgs.map((p) => {
-        const days = daysMap[p.id] ?? 30;
         const count = statsMap.get(`membership:${p.id}`) ?? 0;
         return (
           <div key={p.id} className="border border-border rounded-xl bg-card p-3 space-y-2">
@@ -269,21 +301,12 @@ function MembershipPanel({
                   {count > 0 && <Badge variant="secondary" className="text-[10px] shrink-0">{count}x salin</Badge>}
                 </div>
                 <p className="text-[11px] text-muted-foreground">
-                  ⏱️ Admin: {p.duration_days || 30} hari · 👤 {p.max_devices} device{p.includes_replays ? ' · 🎬 termasuk replay' : ''}
+                  ⏱️ Durasi admin: {p.duration_days || 30} hari · 👤 {p.max_devices} device{p.includes_replays ? ' · 🎬 termasuk replay' : ''}
                 </p>
                 {p.replay_info && <p className="text-[11px] text-muted-foreground mt-1 line-clamp-2">{p.replay_info}</p>}
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <Label className="text-xs whitespace-nowrap">Durasi:</Label>
-              <Input
-                type="number" min={2} max={40} value={days}
-                onChange={(e) => setDays(p.id, Number(e.target.value) || 0)}
-                className="h-8 w-20 text-sm"
-              />
-              <span className="text-xs text-muted-foreground">hari (2–40)</span>
-            </div>
-            <Button size="sm" className="w-full" disabled={creatingId === p.id || days < 2 || days > 40} onClick={() => create(p)}>
+            <Button size="sm" className="w-full" disabled={creatingId === p.id} onClick={() => create(p)}>
               {creatingId === p.id ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Link2 className="w-4 h-4 mr-1" />}
               Buat & Salin Link Membership
             </Button>
@@ -291,7 +314,7 @@ function MembershipPanel({
         );
       })}
       <p className="text-[11px] text-muted-foreground italic pt-2">
-        ℹ️ Pesan WA otomatis menyertakan info replay membership sesuai pengaturan admin.
+        ℹ️ Durasi membership otomatis mengikuti pengaturan admin · pesan WA menyertakan info replay dari admin.
       </p>
     </div>
   );
@@ -616,7 +639,7 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
   const [page, setPage] = useState(0);
   const PAGE = 20;
   const [creatingId, setCreatingId] = useState<string | null>(null);
-  const [result, setResult] = useState<{ link: string; message: string; title: string; extra?: string; kind: 'show' | 'replay' | 'membership'; targetId: string; targetTitle: string } | null>(null);
+  const [result, setResult] = useState<{ link: string; message: string; title: string; extra?: string; kind: 'show' | 'replay' | 'membership'; targetId: string; targetTitle: string; regenerate?: () => Promise<{ link: string; message: string; extra?: string } | null> } | null>(null);
   const [statsMap, setStatsMap] = useState<Map<string, number>>(new Map());
 
   const loadStats = async () => {
@@ -660,29 +683,47 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
     await logCopy(session, kind, targetId, targetTitle);
   };
 
+  const requestToken = async (kind: 'show' | 'replay', id: string) => {
+    const { data, error } = await supabase.functions.invoke('reseller-create-token', {
+      body: { phone: session.phone, pin: session.pin, kind, target_id: id },
+    });
+    let d: any = data;
+    if (error) {
+      try {
+        const ctx: any = (error as any).context;
+        if (ctx && typeof ctx.json === 'function') d = await ctx.json();
+        else if (ctx && typeof ctx.text === 'function') d = JSON.parse(await ctx.text());
+      } catch { /* ignore */ }
+    }
+    if (!d?.ok) throw new Error(d?.detail || d?.error || (error?.message ?? 'gagal'));
+    return d;
+  };
+
+  const extraFor = (kind: 'show' | 'replay', d: any) => {
+    const expStr = d.expires_at ? new Date(d.expires_at).toLocaleString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+    return kind === 'show' ? `Hanya untuk show ini · 1 device · Berlaku s/d ${expStr}` : `1 device · Berlaku s/d ${expStr}`;
+  };
+
   const create = async (kind: 'show' | 'replay', id: string, title: string) => {
     setCreatingId(id);
     try {
-      const { data, error } = await supabase.functions.invoke('reseller-create-token', {
-        body: { phone: session.phone, pin: session.pin, kind, target_id: id },
-      });
-      let d: any = data;
-      if (error) {
-        try {
-          const ctx: any = (error as any).context;
-          if (ctx && typeof ctx.json === 'function') d = await ctx.json();
-          else if (ctx && typeof ctx.text === 'function') d = JSON.parse(await ctx.text());
-        } catch { /* ignore */ }
-      }
-      if (!d?.ok) throw new Error(d?.detail || d?.error || (error?.message ?? 'gagal'));
+      const d = await requestToken(kind, id);
       try { await navigator.clipboard.writeText(d.message); } catch { /* ignore */ }
-      const expStr = d.expires_at ? new Date(d.expires_at).toLocaleString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
       const finalTitle = d.title || title;
       await bumpStats(kind, id, finalTitle);
       setResult({
         link: d.link, message: d.message, title: finalTitle,
-        extra: kind === 'show' ? `Hanya untuk show ini · 1 device · Berlaku s/d ${expStr}` : `1 device · Berlaku s/d ${expStr}`,
+        extra: extraFor(kind, d),
         kind, targetId: id, targetTitle: finalTitle,
+        regenerate: async () => {
+          try {
+            const n = await requestToken(kind, id);
+            return { link: n.link, message: n.message, extra: extraFor(kind, n) };
+          } catch (e) {
+            toast({ title: 'Gagal membuat link baru', description: e instanceof Error ? e.message : 'gagal', variant: 'destructive' });
+            return null;
+          }
+        },
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'gagal';
@@ -830,6 +871,7 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
           onOpenChange={(v) => { if (!v) setResult(null); }}
           link={result.link} message={result.message} title={result.title} extra={result.extra}
           copyCount={currentCount}
+          regenerate={result.regenerate}
           onCopied={() => { if (result) void bumpStats(result.kind, result.targetId, result.targetTitle); }}
         />
       )}
