@@ -124,6 +124,7 @@ Deno.serve(async (req) => {
             url: "", sources: Array.isArray(upcoming.live_sources) ? upcoming.live_sources : [],
             show_date: upcoming.show_date, show_time: upcoming.show_time,
             idn_show_id: upcoming.idn_show_id || "",
+            show_id: upcoming.id,
           };
         } else {
           const { data: cfg } = await supabase.from("live_config_private").select("*").limit(1).maybeSingle();
