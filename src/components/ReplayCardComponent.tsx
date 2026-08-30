@@ -111,6 +111,49 @@ function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWatch, onUnlockAn
     return () => { cancelled = true; };
   }, [user, replay.id]);
 
+  // Show yang sudah dikonversi jadi replay ini: token show tetap berlaku,
+  // jadi pembeli show (login maupun anon) langsung melihat "Tonton Replay".
+  useEffect(() => {
+    if (purchasedToken || !replay.id) return;
+    let cancelled = false;
+    (async () => {
+      const { data: shows } = await supabase
+        .from('active_shows').select('id').eq('replay_id', replay.id);
+      const ids = (shows || []).map((s: any) => s.id as string);
+      if (cancelled || !ids.length) return;
+
+      // 1) token show tersimpan lokal (berlaku juga untuk user anon/guest)
+      const local = getAllShowPurchases();
+      const localTok = ids.map(id => local[id]?.token).find(Boolean);
+      if (localTok) {
+        try { setReplayPurchase(replay.id, { token: localTok, paidAt: Date.now() }); } catch { /* ignore */ }
+        setPurchasedToken(localTok);
+        return;
+      }
+
+      // 2) user login: cari order show berbayar lintas perangkat
+      if (!user) return;
+      const { data } = await supabase
+        .from('orders')
+        .select('access_token,created_at')
+        .eq('user_id', user.id)
+        .in('show_id', ids)
+        .eq('status', 'paid')
+        .not('access_token', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(1);
+      if (cancelled) return;
+      const tok = (data || [])[0]?.access_token as string | undefined;
+      if (tok) {
+        try { setReplayPurchase(replay.id, { token: tok, paidAt: Date.now() }); } catch { /* ignore */ }
+        setPurchasedToken(tok);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user, replay.id, purchasedToken]);
+
+
+
   const membershipCovered = useMemo(() => isReplayCoveredByMembership(replay.date, membership), [replay.date, membership]);
   const membershipActiveButOutside = !!membership?.token && !membershipCovered && !!membership?.includes_replays;
 
