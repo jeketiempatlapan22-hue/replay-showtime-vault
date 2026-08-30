@@ -118,22 +118,40 @@ function LoginCard({ onLogin }: { onLogin: (s: Session) => void }) {
 }
 
 function TokenResultDialog({
-  open, onOpenChange, link, message: initialMessage, title, extra, copyCount, onCopied,
-}: { open: boolean; onOpenChange: (v: boolean) => void; link: string; message: string; title: string; extra?: string; copyCount: number; onCopied: () => void }) {
+  open, onOpenChange, link: initialLink, message: initialMessage, title, extra: initialExtra, copyCount, onCopied, regenerate,
+}: { open: boolean; onOpenChange: (v: boolean) => void; link: string; message: string; title: string; extra?: string; copyCount: number; onCopied: () => void; regenerate?: () => Promise<{ link: string; message: string; extra?: string } | null> }) {
   const [message, setMessage] = useState(initialMessage);
+  const [link, setLink] = useState(initialLink);
+  const [extra, setExtra] = useState(initialExtra);
   const [editing, setEditing] = useState(false);
   const [justCopied, setJustCopied] = useState(false);
-  useEffect(() => { setMessage(initialMessage); setEditing(false); }, [initialMessage, open]);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { setMessage(initialMessage); setLink(initialLink); setExtra(initialExtra); setEditing(false); }, [initialMessage, initialLink, initialExtra, open]);
 
   const copyAll = async () => {
+    if (busy) return;
+    setBusy(true);
     try {
-      await navigator.clipboard.writeText(message);
+      // Setiap klik salin => buat TOKEN BARU (link unik untuk tiap pembeli).
+      let text = message;
+      if (regenerate && !editing) {
+        const fresh = await regenerate();
+        if (fresh) {
+          text = fresh.message;
+          setMessage(fresh.message);
+          setLink(fresh.link);
+          setExtra(fresh.extra);
+        }
+      }
+      await navigator.clipboard.writeText(text);
       onCopied();
       setJustCopied(true);
       setTimeout(() => setJustCopied(false), 1500);
-      toast({ title: `✅ Link + pesan tersalin`, description: `Total salin untuk ini: ${copyCount + 1}x` });
+      toast({ title: `✅ Link baru tersalin`, description: `Total salin untuk ini: ${copyCount + 1}x` });
     } catch {
       toast({ title: 'Gagal menyalin', variant: 'destructive' });
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -154,6 +172,7 @@ function TokenResultDialog({
             <Label className="text-xs">Link Akses</Label>
             <Input readOnly value={link} className="font-mono text-xs" onFocus={(e) => e.currentTarget.select()} />
           </div>
+
 
           <div className="space-y-1">
             <div className="flex items-center justify-between">
