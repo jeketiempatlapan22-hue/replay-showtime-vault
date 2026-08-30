@@ -1057,7 +1057,7 @@ export default function Live() {
             <div ref={chatHostRef}>
               {chatReady ? (
                 <Suspense fallback={<ChatFallback />}>
-                  <LiveChat lite={playbackPriorityMode} />
+                  <LiveChat lite={playbackPriorityMode} showId={showId || effectiveShowId} />
                 </Suspense>
               ) : <ChatIdle />}
             </div>
