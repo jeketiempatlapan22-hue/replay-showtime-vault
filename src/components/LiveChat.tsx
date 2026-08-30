@@ -154,7 +154,7 @@ export default function LiveChat({ lite = false, showId = '' }: LiveChatProps) {
       )
       .subscribe();
     return () => { supabase.removeChannel(ch); };
-  }, [isAdmin, messageLimit, myBrowserId, refresh]);
+  }, [isAdmin, messageLimit, myBrowserId, refresh, showId, inScope]);
 
   const handleScroll = () => {
     const el = listRef.current;
@@ -261,6 +261,7 @@ export default function LiveChat({ lite = false, showId = '' }: LiveChatProps) {
       is_admin: isAdmin,
       pinned: false,
       reply_to_id: replyTo?.id ?? null,
+      show_id: showId || null,
     });
     if (!error) {
       recordSent(msg);
