@@ -277,6 +277,7 @@ export default function Live() {
           watermark: data.watermark || '',
           enabled: !!data.enabled,
           idn_show_id: data.idn_show_id || '',
+          grant: data.grant || '',
         };
         // For silent revalidation, NEVER overwrite the existing player URL/sources.
         // Doing so would change the React key on the player and remount it, restarting the live stream from the beginning.
