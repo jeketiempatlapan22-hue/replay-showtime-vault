@@ -234,6 +234,8 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
   }, []);
 
   const isPlayingRef = useRef(false);
+  // Ditandai saat user sengaja menekan pause agar autoplay-guard tidak memaksa play lagi.
+  const userPausedRef = useRef(false);
   useEffect(() => { isPlayingRef.current = isPlaying; }, [isPlaying]);
   // Track whether autoplay-mute coercion has already run for the current source so that
   // subsequent iframe.onLoad / YT onReady events don't re-force mute (and re-show the hint)
@@ -516,24 +518,39 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
     fallback?.();
   };
 
+  // Kirim perintah lewat JS API DAN postMessage sekaligus. Beberapa kondisi
+  // (API lambat siap, iframe di-recreate, blokir script) membuat salah satu
+  // jalur diam-diam gagal sehingga tombol play/pause terasa tidak berfungsi.
+  const ytCommand = (func: 'playVideo' | 'pauseVideo') => {
+    let handled = false;
+    const p = ytPlayerRef.current;
+    if (p && typeof p[func] === 'function') {
+      try { p[func]?.(); handled = true; } catch { /* ignore */ }
+    }
+    ytHandshake();
+    ytPost(func);
+    return handled;
+  };
+
   const togglePlay = () => {
     if (type === 'youtube') {
-      const next = !isPlayingRef.current;
-      withYtPlayer(
-        (p) => {
-          const state = p.getPlayerState?.();
-          const playing = state === 1 || (state === undefined && isPlayingRef.current);
-          if (playing) p.pauseVideo?.();
-          else p.playVideo?.();
-          setIsPlaying(!playing);
-          isPlayingRef.current = !playing;
-        },
-        () => {
-          ytPost(next ? 'playVideo' : 'pauseVideo');
-          setIsPlaying(next);
-          isPlayingRef.current = next;
-        },
-      );
+      // Ambil state nyata dari player bila tersedia; fallback ke state React.
+      let state: number | undefined;
+      try { state = ytPlayerRef.current?.getPlayerState?.(); } catch { /* ignore */ }
+      const playing = state === undefined ? isPlayingRef.current : (state === 1 || state === 3);
+      const next = !playing;
+      ytCommand(next ? 'playVideo' : 'pauseVideo');
+      setIsPlaying(next);
+      isPlayingRef.current = next;
+      userPausedRef.current = !next;
+      // Verifikasi & ulangi sekali bila perintah pertama tidak berefek.
+      setTimeout(() => {
+        let s: number | undefined;
+        try { s = ytPlayerRef.current?.getPlayerState?.(); } catch { /* ignore */ }
+        if (s === undefined) return;
+        const nowPlaying = s === 1 || s === 3;
+        if (nowPlaying !== next) ytCommand(next ? 'playVideo' : 'pauseVideo');
+      }, 400);
     } else {
       if (iframeRef.current && iframeRef.current.src === 'about:blank') iframeRef.current.src = cfEmbedUrl;
       cfPost(isPlaying ? 'pause' : 'play');
@@ -630,6 +647,32 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
     }, 5000);
     return () => clearInterval(id);
   }, [type, isLive, ready, applyQualityCap, refreshAvailableQualities]);
+
+  // Autoplay guard (YouTube): sebagian browser/TV mengabaikan autoplay pertama
+  // sehingga video diam di frame awal. Setelah player siap, pastikan playback
+  // benar-benar berjalan — kecuali user memang menekan pause.
+  useEffect(() => {
+    if (type !== 'youtube' || !ready || !ytId) return;
+    let tries = 0;
+    const kick = () => {
+      if (userPausedRef.current) return;
+      let state: number | undefined;
+      try { state = ytPlayerRef.current?.getPlayerState?.(); } catch { /* ignore */ }
+      // 1 = playing, 3 = buffering (sudah jalan)
+      if (state === 1 || state === 3) { setIsPlaying(true); isPlayingRef.current = true; return; }
+      ytHandshake();
+      ytPost('playVideo');
+      try { ytPlayerRef.current?.playVideo?.(); } catch { /* ignore */ }
+    };
+    const id = setInterval(() => {
+      tries += 1;
+      kick();
+      if (tries >= 6) clearInterval(id);
+    }, 700);
+    kick();
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [type, ready, ytId, plainMode]);
 
 
   // Poll YT time/duration — auto-pause saat tab hidden untuk hemat CPU & cegah throttling browser

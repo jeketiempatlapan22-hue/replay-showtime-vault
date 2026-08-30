@@ -642,7 +642,10 @@ export default function Live() {
   const [idnError, setIdnError] = useState<string>('');
   const [idnRetryNonce, setIdnRetryNonce] = useState(0);
   const idnGrant = unlocked?.grant || '';
+  const liveOn = status ? !!status.enabled : !!unlocked?.enabled;
   useEffect(() => {
+    // Live dimatikan admin → hentikan total pencarian sumber (jangan minta token IDN lagi).
+    if (!liveOn) { setIdnResolved(null); setIdnError(''); return; }
     if (!activeSourceUrl.startsWith('idn://')) { setIdnError(''); return; }
     if (!idnGrant) {
       setIdnResolved(null);
@@ -714,7 +717,7 @@ export default function Live() {
       cancelled = true;
       if (refreshTimer) window.clearInterval(refreshTimer);
     };
-  }, [activeSourceUrl, idnRetryNonce, idnGrant]);
+  }, [activeSourceUrl, idnRetryNonce, idnGrant, liveOn]);
 
   const selectSource = (i: number) => {
     setSourceIdx(i);
@@ -730,8 +733,16 @@ export default function Live() {
 
 
   // ON AIR hanya saat admin manual mengaktifkan toggle is_live di admin panel.
-  // status.enabled & unlocked.enabled keduanya bersumber dari kolom is_live.
-  const liveActive = !!(status?.enabled || unlocked?.enabled);
+  // Sumber kebenaran adalah baris `active_shows` terbaru (status). Cache unlock
+  // di sessionStorage bisa basi, jadi jangan dipakai untuk menahan status live.
+  const liveActive = status ? !!status.enabled : !!unlocked?.enabled;
+  // Pernah ON AIR di sesi ini → saat admin mematikan live, tampilkan "Live Telah Selesai".
+  const wasLiveRef = useRef(false);
+  const [liveEnded, setLiveEnded] = useState(false);
+  useEffect(() => {
+    if (liveActive) { wasLiveRef.current = true; setLiveEnded(false); return; }
+    if (wasLiveRef.current) setLiveEnded(true);
+  }, [liveActive]);
 
   useEffect(() => {
     // Chat realtime dimuat hanya saat area chat mendekati layar agar bandwidth/CPU tetap diprioritaskan ke player.
@@ -958,6 +969,16 @@ export default function Live() {
                   </div>
                 )}
               </>
+            ) : liveEnded ? (
+              <div className="aspect-video w-full rounded-2xl border border-border bg-card/80 flex flex-col items-center justify-center gap-2 p-6 text-center">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-muted/50 border border-border text-muted-foreground text-[10px] font-bold uppercase tracking-wider">
+                  Off Air
+                </span>
+                <h3 className="text-lg sm:text-xl font-bold text-foreground">Live Telah Selesai</h3>
+                <p className="text-sm text-muted-foreground max-w-sm">
+                  Siaran {status?.title || unlocked.title || 'live'} telah dihentikan oleh admin. Halaman ini akan otomatis menyala kembali begitu admin mengaktifkan live lagi — tidak perlu muat ulang.
+                </p>
+              </div>
             ) : (
               <ScheduleCountdown
                 title={status?.title || unlocked.title || 'Live'}

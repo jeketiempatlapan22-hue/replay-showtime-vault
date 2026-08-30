@@ -267,11 +267,16 @@ Deno.serve(async (req) => {
         const lockRow = Array.isArray(lock) ? lock[0] : lock;
         if (lockRow?.locked) return json({ valid: false, reason: 'rate_limited', seconds_remaining: lockRow.seconds_remaining });
         let valid = !!show.live_password && show.live_password === password;
-        if (!valid && show.show_date) {
-          const d = new Date(show.show_date);
-          const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+        if (!valid) {
+          // Sandi master bulanan: terima master bulan show DAN master bulan berjalan.
+          const months = new Set<string>();
+          const addMonth = (dt: Date) => {
+            if (!isNaN(dt.getTime())) months.add(`${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}`);
+          };
+          if (show.show_date) addMonth(new Date(show.show_date));
+          addMonth(new Date());
           const { data: masters } = await supabase
-            .from("master_passwords").select("password,paused").eq("month", monthKey);
+            .from("master_passwords").select("password,paused,month").in("month", [...months]);
           valid = (masters || []).some((m: any) => m.paused !== true && m.password === password);
         }
         await supabase.rpc('record_login_attempt', { _identifier: lockId, _success: valid });
