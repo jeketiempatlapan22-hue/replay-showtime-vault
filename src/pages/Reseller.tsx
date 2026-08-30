@@ -871,6 +871,7 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
           onOpenChange={(v) => { if (!v) setResult(null); }}
           link={result.link} message={result.message} title={result.title} extra={result.extra}
           copyCount={currentCount}
+          regenerate={result.regenerate}
           onCopied={() => { if (result) void bumpStats(result.kind, result.targetId, result.targetTitle); }}
         />
       )}
