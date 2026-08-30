@@ -76,6 +76,7 @@ const App = () => (
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/live" element={<Live />} />
+              <Route path="/free" element={<Free />} />
               <Route path="/kunci" element={<Kunci />} />
               <Route path="/auth" element={<Auth />} />
               <Route path="/reset-password" element={<ResetPassword />} />
