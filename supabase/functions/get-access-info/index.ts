@@ -93,7 +93,19 @@ Deno.serve(async (req) => {
       const { data: rt } = await admin
         .from("replay_personal_tokens").select("id,revoked").eq("token", token).eq("replay_id", replayId).maybeSingle();
       if (rt && !rt.revoked) okReplayId = replayId;
+      if (!okReplayId) {
+        // Token show yang shownya sudah dikonversi menjadi replay ini.
+        const { data: linked } = await admin
+          .from("active_shows").select("id").eq("replay_id", replayId);
+        const ids = (linked || []).map((s: any) => s.id);
+        if (ids.length) {
+          const { data: st } = await admin
+            .from("active_show_tokens").select("id,revoked,show_id").eq("token", token).in("show_id", ids).maybeSingle();
+          if (st && !st.revoked) okShowId = String(st.show_id);
+        }
+      }
     }
+
 
     if (!okShowId && !okReplayId) return json({ ok: false, reason: "invalid" });
 
