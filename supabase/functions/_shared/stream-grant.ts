@@ -30,7 +30,7 @@ export type GrantClaims = {
   exp: number;      // unix seconds
 };
 
-export async function signGrant(claims: Omit<GrantClaims, "exp">, ttlSec = 3600): Promise<string> {
+export async function signGrant(claims: Omit<GrantClaims, "exp">, ttlSec = 21600): Promise<string> {
   if (!SECRET) return "";
   const payload: GrantClaims = { ...claims, exp: Math.floor(Date.now() / 1000) + ttlSec };
   const body = b64url(new TextEncoder().encode(JSON.stringify(payload)));
