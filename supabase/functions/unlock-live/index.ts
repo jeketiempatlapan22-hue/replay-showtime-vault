@@ -140,6 +140,8 @@ Deno.serve(async (req) => {
         sid: String(payload?.show_id || ""),
         idn: String(payload?.idn_show_id || ""),
         bid: String(browser_id || ""),
+        kind: "membership",
+        tid: String(r.token?.id || ""),
       });
       return json({ ...payload, grant: mGrant, watermark: `MB-${String(mtoken).slice(-4).toUpperCase()}`, membership: membershipInfo(r.token), soft: r.soft });
     }
@@ -193,11 +195,7 @@ Deno.serve(async (req) => {
         sources: Array.isArray(show.live_sources) ? show.live_sources : [],
         show_date: show.show_date, show_time: show.show_time,
         idn_show_id: show.idn_show_id || "",
-        grant: await signGrant({
-          sid: String(show.id),
-          idn: String(show.idn_show_id || ""),
-          bid: String(browser_id || ""),
-        }),
+        grant: "",
         watermark: `RT-${String(show.id).slice(0, 4).toUpperCase()}`,
       };
 
@@ -205,7 +203,14 @@ Deno.serve(async (req) => {
       if (mtoken) {
         const r = await verifyMembership(supabase, mtoken, mpassword || "", browser_id || "", isSilent);
         if (!r.ok) return json({ valid: false, reason: r.reason, pause_message: (r as any).pause_message, package_name: (r as any).package_name });
-        return json({ ...okPayload, watermark: `MB-${String(mtoken).slice(-4).toUpperCase()}`, membership: membershipInfo(r.token), soft: r.soft });
+        const bGrant = await signGrant({
+          sid: String(show.id),
+          idn: String(show.idn_show_id || ""),
+          bid: String(browser_id || ""),
+          kind: "membership",
+          tid: String(r.token?.id || ""),
+        });
+        return json({ ...okPayload, grant: bGrant, watermark: `MB-${String(mtoken).slice(-4).toUpperCase()}`, membership: membershipInfo(r.token), soft: r.soft });
       }
 
 
@@ -239,7 +244,7 @@ Deno.serve(async (req) => {
           if ((count || 0) >= t.max_devices) {
             // Multi-device/public token: don't kick already-connected user during silent revalidation.
             if (isMulti && isSilent) {
-              return json({ ...okPayload, watermark: `RT-${String(token).slice(-4).toUpperCase()}`, token_kind: t.kind || 'personal', max_devices: t.max_devices || 1, soft: true });
+              return json({ ...okPayload, grant: await signGrant({ sid: String(show.id), idn: String(show.idn_show_id || ""), bid: String(browser_id || ""), kind: "show", tid: String(t.id) }), watermark: `RT-${String(token).slice(-4).toUpperCase()}`, token_kind: t.kind || 'personal', max_devices: t.max_devices || 1, soft: true });
             }
             return json({ valid: false, reason: "device_limit" });
           }
@@ -251,7 +256,8 @@ Deno.serve(async (req) => {
               .eq("id", t.id).is("used_at", null);
           }
         }
-        return json({ ...okPayload, watermark: `RT-${String(token).slice(-4).toUpperCase()}`, token_kind: t.kind || 'personal', max_devices: t.max_devices || 1, expires_at: t.expires_at || null, single_use: !!t.single_use });
+        const tGrant = await signGrant({ sid: String(show.id), idn: String(show.idn_show_id || ""), bid: String(browser_id || ""), kind: "show", tid: String(t.id) });
+        return json({ ...okPayload, grant: tGrant, watermark: `RT-${String(token).slice(-4).toUpperCase()}`, token_kind: t.kind || 'personal', max_devices: t.max_devices || 1, expires_at: t.expires_at || null, single_use: !!t.single_use });
       }
 
       if (show.live_require_password) {
