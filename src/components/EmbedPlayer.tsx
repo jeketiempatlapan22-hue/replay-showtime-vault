@@ -542,6 +542,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
       ytCommand(next ? 'playVideo' : 'pauseVideo');
       setIsPlaying(next);
       isPlayingRef.current = next;
+      userPausedRef.current = !next;
       // Verifikasi & ulangi sekali bila perintah pertama tidak berefek.
       setTimeout(() => {
         let s: number | undefined;
