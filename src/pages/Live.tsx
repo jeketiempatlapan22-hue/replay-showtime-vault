@@ -644,7 +644,11 @@ export default function Live() {
   const idnGrant = unlocked?.grant || '';
   useEffect(() => {
     if (!activeSourceUrl.startsWith('idn://')) { setIdnError(''); return; }
-    if (!idnGrant) { setIdnResolved(null); return; }
+    if (!idnGrant) {
+      setIdnResolved(null);
+      setIdnError('Sesi akses belum siap. Muat ulang halaman atau masukkan ulang sandi/token.');
+      return;
+    }
     const idnId = activeSourceUrl.slice('idn://'.length);
     if (!idnId) {
       setIdnResolved(null);
@@ -693,9 +697,16 @@ export default function Live() {
           return { ...prev, headers: nextHeaders };
         });
       } catch (e: unknown) {
-        const message = e instanceof Error ? e.message : '';
+        const raw = e instanceof Error ? e.message : '';
+        const stale = /non-2xx|401|403|unauthorized|akses_ditolak|grant_mismatch/i.test(raw);
+        if (stale) {
+          // Grant kedaluwarsa/berubah format: minta grant baru diam-diam.
+          setUnlocked(prev => (prev ? { ...prev, grant: '' } : prev));
+        }
+        const message = stale ? 'Sesi akses kedaluwarsa. Memuat ulang akses…' : raw;
         if (!cancelled && initial) setIdnError(message || 'Gagal mengambil token IDN. Pastikan domain ini di-whitelist worker.');
       }
+
     };
     void refreshIdnToken(true);
     refreshTimer = window.setInterval(() => { void refreshIdnToken(false); }, IDN_TOKEN_REFRESH_MS);

@@ -9,11 +9,10 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { bearerFrom, verifyGrant } from '../_shared/stream-grant.ts';
 import { cors, generateApiToken, PLAYBACK_URL, X_SEC_KEY, X_TOKEN_ID } from '../_shared/idn-credentials.ts';
 
-async function tokenStillValid(claims: { kind?: string; tid?: string; bid?: string }): Promise<boolean> {
+async function tokenStillValid(claims: { kind?: string; tid?: string; bid?: string; sid?: string }): Promise<boolean> {
   const kind = claims.kind;
   const tid = claims.tid;
   const bid = claims.bid || '';
-  if (!tid || (kind !== 'show' && kind !== 'membership')) return false;
 
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL')!,
@@ -25,6 +24,17 @@ async function tokenStillValid(claims: { kind?: string; tid?: string; bid?: stri
       .from('blocked_browsers').select('id').eq('browser_id', bid).eq('unblocked', false).maybeSingle();
     if (blk) return false;
   }
+
+  // Jalur sandi show/master: grant pendek (30 menit), cukup pastikan show aktif.
+  if (kind === 'password') {
+    if (!claims.sid) return false;
+    const { data: s } = await supabase
+      .from('active_shows').select('id,is_active').eq('id', claims.sid).maybeSingle();
+    return !!s && !!s.is_active;
+  }
+
+  if (!tid || (kind !== 'show' && kind !== 'membership')) return false;
+
 
   const now = Date.now();
   if (kind === 'show') {
