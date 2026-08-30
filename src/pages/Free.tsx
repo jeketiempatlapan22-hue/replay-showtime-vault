@@ -161,7 +161,7 @@ export default function Free() {
             </Suspense>
 
             <Suspense fallback={null}>
-              <LiveChat lite />
+              <LiveChat lite showId={showId} />
             </Suspense>
           </>
         ) : null}
