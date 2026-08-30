@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { signGrant } from "../_shared/stream-grant.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -108,6 +109,7 @@ Deno.serve(async (req) => {
           sources: Array.isArray(liveShow.live_sources) ? liveShow.live_sources : [],
           show_date: liveShow.show_date, show_time: liveShow.show_time,
           idn_show_id: liveShow.idn_show_id || "",
+          show_id: liveShow.id,
         };
       } else {
         const { data: upcoming } = await supabase
@@ -122,6 +124,7 @@ Deno.serve(async (req) => {
             url: "", sources: Array.isArray(upcoming.live_sources) ? upcoming.live_sources : [],
             show_date: upcoming.show_date, show_time: upcoming.show_time,
             idn_show_id: upcoming.idn_show_id || "",
+            show_id: upcoming.id,
           };
         } else {
           const { data: cfg } = await supabase.from("live_config_private").select("*").limit(1).maybeSingle();
@@ -133,7 +136,12 @@ Deno.serve(async (req) => {
           };
         }
       }
-      return json({ ...payload, watermark: `MB-${String(mtoken).slice(-4).toUpperCase()}`, membership: membershipInfo(r.token), soft: r.soft });
+      const mGrant = await signGrant({
+        sid: String(payload?.show_id || ""),
+        idn: String(payload?.idn_show_id || ""),
+        bid: String(browser_id || ""),
+      });
+      return json({ ...payload, grant: mGrant, watermark: `MB-${String(mtoken).slice(-4).toUpperCase()}`, membership: membershipInfo(r.token), soft: r.soft });
     }
 
 
@@ -185,6 +193,11 @@ Deno.serve(async (req) => {
         sources: Array.isArray(show.live_sources) ? show.live_sources : [],
         show_date: show.show_date, show_time: show.show_time,
         idn_show_id: show.idn_show_id || "",
+        grant: await signGrant({
+          sid: String(show.id),
+          idn: String(show.idn_show_id || ""),
+          bid: String(browser_id || ""),
+        }),
         watermark: `RT-${String(show.id).slice(0, 4).toUpperCase()}`,
       };
 

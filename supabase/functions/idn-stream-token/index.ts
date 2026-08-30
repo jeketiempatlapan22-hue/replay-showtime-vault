@@ -1,13 +1,28 @@
 // Generates IDN (hanabira48) playback credentials server-side.
-// Public (no auth required). Returns { xShowId, xTokenId, xSecKey, xApiToken, playbackUrl }.
-// Client uses these as request headers when calling the worker proxy playback URL.
+// PROTECTED: requires a short-lived signed grant issued by unlock-live, so only
+// viewers that already passed token/membership/password validation can obtain
+// playback credentials. Returns { xShowId, xTokenId, xSecKey, xApiToken, playbackUrl }.
 
+import { verifyGrant } from '../_shared/stream-grant.ts';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-};
+const ALLOWED_ORIGINS = [
+  'https://realtime48stream.my.id',
+  'https://www.realtime48stream.my.id',
+  'https://replaytime.lovable.app',
+  'http://localhost:8080',
+];
+
+function cors(origin: string | null) {
+  const allowed = origin && (ALLOWED_ORIGINS.includes(origin) || /^https:\/\/[a-z0-9-]+\.lovable\.app$/.test(origin))
+    ? origin
+    : ALLOWED_ORIGINS[0];
+  return {
+    'Access-Control-Allow-Origin': allowed,
+    'Vary': 'Origin',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  } as Record<string, string>;
+}
 
 // Static credentials per playback_baru.txt
 const X_TOKEN_ID = '114e0e89-f8b4-44ee-9354-bb06805cc02f';
@@ -52,36 +67,35 @@ async function generateApiToken(showId: string): Promise<string> {
 }
 
 Deno.serve(async (req) => {
+  const corsHeaders = cors(req.headers.get('origin'));
+  const json = (b: unknown, status = 200) =>
+    new Response(JSON.stringify(b), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   try {
-    if (!PARTNER_SECRET) {
-      return new Response(JSON.stringify({ error: 'server_misconfigured' }), {
-        status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-    // Public endpoint — no auth required. Credentials are short-lived (2h) and
-    // tied to a specific showId set by admin.
+    if (!PARTNER_SECRET) return json({ error: 'server_misconfigured' }, 503);
 
     const body = await req.json().catch(() => ({}));
     const showId = String(body?.showId || '').trim();
-    if (!showId || showId.length > 64) {
-      return new Response(JSON.stringify({ error: 'showId tidak valid' }), {
-        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
+    const grant = String(body?.grant || '');
+    if (!showId || showId.length > 64) return json({ error: 'showId tidak valid' }, 400);
+
+    // Gate: hanya penonton yang sudah lolos validasi unlock-live (token / membership /
+    // sandi) yang boleh mengambil kredensial IDN.
+    const claims = await verifyGrant(grant);
+    if (!claims) return json({ error: 'akses_ditolak' }, 401);
+    if (claims.idn !== showId) return json({ error: 'grant_mismatch' }, 403);
 
     const xApiToken = await generateApiToken(showId);
-    return new Response(JSON.stringify({
+    return json({
       xShowId: showId,
       xTokenId: X_TOKEN_ID,
       xSecKey: X_SEC_KEY,
       xApiToken,
       playbackUrl: PLAYBACK_URL,
       expiresIn: 7200,
-    }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-  } catch (e) {
-    return new Response(JSON.stringify({ error: (e as Error).message }), {
-      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
+  } catch (e) {
+    return json({ error: (e as Error).message }, 500);
   }
 });
