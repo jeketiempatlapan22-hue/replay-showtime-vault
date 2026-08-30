@@ -26,7 +26,7 @@ async function key() {
   );
 }
 
-export type GrantKind = "show" | "membership" | "free";
+export type GrantKind = "show" | "membership" | "free" | "password";
 
 export type GrantClaims = {
   sid: string;        // active_shows.id
