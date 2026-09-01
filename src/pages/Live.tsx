@@ -816,7 +816,7 @@ export default function Live() {
           }
           if (unique !== lastCount) { lastCount = unique; setViewerCount(unique); }
         } catch { /* ignore */ }
-      }, 15000);
+      }, 25000);
     };
     let tracked = false;
     let heartbeat: number | null = null;
@@ -829,21 +829,29 @@ export default function Live() {
           tracked = true;
           try { await channel.track({ at: Date.now() }); } catch { /* ignore */ }
           recount();
-          // Heartbeat 2 menit cukup — presence punya auto-timeout sendiri dan ini
+          // Heartbeat 5 menit — presence punya auto-timeout sendiri; interval panjang
           // memangkas trafik websocket signifikan saat 1000+ viewer.
           heartbeat = window.setInterval(() => {
             if (document.visibilityState === 'visible') {
               channel.track({ at: Date.now() }).catch(() => {});
             }
-          }, 120000);
+          }, 300000);
         }
       });
+    // Tab disembunyikan → lepas presence supaya fan-out event berkurang drastis.
+    const onVis = () => {
+      if (document.visibilityState === 'visible') channel.track({ at: Date.now() }).catch(() => {});
+      else channel.untrack().catch(() => {});
+    };
+    document.addEventListener('visibilitychange', onVis);
     return () => {
+      document.removeEventListener('visibilitychange', onVis);
       if (pending) window.clearTimeout(pending);
       if (heartbeat) window.clearInterval(heartbeat);
       try { void channel.untrack(); } catch { /* ignore */ }
       supabase.removeChannel(channel);
     };
+
   }, [liveActive, showKey]);
 
   return (
