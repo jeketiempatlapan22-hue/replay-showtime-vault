@@ -132,15 +132,40 @@ Deno.serve(async (req) => {
             .from("active_shows").select("id").eq("replay_id", replay_id);
           const showIds = (linkedShows || []).map((s: any) => s.id);
           if (showIds.length) {
-            // a) pembelian di website (orders)
-            const { data: ord } = await supabase
+            // a) pembelian di website (orders) — hanya untuk order legacy yang
+            // tidak punya baris di active_show_tokens (yang punya ditangani di (b)).
+            const { data: stExists } = await supabase
+              .from("active_show_tokens").select("id").eq("token", access_token).maybeSingle();
+            const { data: ord } = stExists ? { data: null } : await supabase
               .from("orders")
               .select("id, show_id, status")
               .eq("access_token", access_token)
               .eq("status", "paid")
               .in("show_id", showIds)
               .maybeSingle();
-            if (ord) valid = true;
+            if (ord) {
+              // Satu link pembelian = satu perangkat.
+              if (!browser_id) return json({ valid: false, reason: "no_device" }, 403);
+              const { data: odev } = await supabase
+                .from("order_token_devices")
+                .select("id").eq("order_id", ord.id).eq("browser_id", browser_id).maybeSingle();
+              if (odev) {
+                valid = true;
+              } else {
+                const { count } = await supabase
+                  .from("order_token_devices").select("id", { count: "exact", head: true }).eq("order_id", ord.id);
+                if ((count ?? 0) >= 1) return json({ valid: false, reason: "device_limit" }, 403);
+                const { error: insErr } = await supabase
+                  .from("order_token_devices").insert({ order_id: ord.id, browser_id });
+                if (insErr) {
+                  const { data: re } = await supabase.from("order_token_devices")
+                    .select("id").eq("order_id", ord.id).eq("browser_id", browser_id).maybeSingle();
+                  if (!re) return json({ valid: false, reason: "device_limit" }, 403);
+                }
+                valid = true;
+              }
+            }
+
 
             // b) token dari Token Factory / reseller (active_show_tokens)
             if (!valid) {
