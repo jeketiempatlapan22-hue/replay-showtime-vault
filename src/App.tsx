@@ -31,6 +31,23 @@ const Panduan = lazy(() => import("./pages/Panduan"));
 
 const queryClient = new QueryClient();
 
+function PurchaseSync() {
+  const location = useLocation();
+  useEffect(() => {
+    // Halaman live tidak disentuh.
+    if (location.pathname.startsWith('/live')) return;
+    void syncPurchases();
+    const onFocus = () => void syncPurchases();
+    window.addEventListener('focus', onFocus);
+    const { data: sub } = supabase.auth.onAuthStateChange(() => { void syncPurchases(true); });
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      sub.subscription.unsubscribe();
+    };
+  }, [location.pathname]);
+  return null;
+}
+
 function ProtectedShell({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const [blocked, setBlocked] = useState(false);
