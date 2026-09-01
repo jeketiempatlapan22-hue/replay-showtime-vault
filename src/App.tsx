@@ -9,6 +9,7 @@ import BlockedScreen from "@/components/BlockedScreen";
 import { useDevToolsDetector } from "@/hooks/useDevToolsDetector";
 import { getBrowserId } from "@/lib/browserId";
 import { supabase } from "@/integrations/supabase/client";
+import { syncPurchases } from "@/lib/purchaseSync";
 import BottomNav from "./components/BottomNav";
 import GuestOnboardBanner from "./components/GuestOnboardBanner";
 
@@ -30,6 +31,23 @@ const Reseller = lazy(() => import("./pages/Reseller"));
 const Panduan = lazy(() => import("./pages/Panduan"));
 
 const queryClient = new QueryClient();
+
+function PurchaseSync() {
+  const location = useLocation();
+  useEffect(() => {
+    // Halaman live tidak disentuh.
+    if (location.pathname.startsWith('/live')) return;
+    void syncPurchases();
+    const onFocus = () => void syncPurchases();
+    window.addEventListener('focus', onFocus);
+    const { data: sub } = supabase.auth.onAuthStateChange(() => { void syncPurchases(true); });
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      sub.subscription.unsubscribe();
+    };
+  }, [location.pathname]);
+  return null;
+}
 
 function ProtectedShell({ children }: { children: React.ReactNode }) {
   const location = useLocation();
@@ -72,6 +90,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <ErrorBoundary>
+          <PurchaseSync />
           <ProtectedShell>
             <Suspense fallback={<div className="min-h-screen bg-background" />}>
             <Routes>
