@@ -9,6 +9,7 @@ import BlockedScreen from "@/components/BlockedScreen";
 import { useDevToolsDetector } from "@/hooks/useDevToolsDetector";
 import { getBrowserId } from "@/lib/browserId";
 import { supabase } from "@/integrations/supabase/client";
+import { syncPurchases } from "@/lib/purchaseSync";
 import BottomNav from "./components/BottomNav";
 import GuestOnboardBanner from "./components/GuestOnboardBanner";
 
