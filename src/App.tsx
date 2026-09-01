@@ -90,6 +90,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <ErrorBoundary>
+          <PurchaseSync />
           <ProtectedShell>
             <Suspense fallback={<div className="min-h-screen bg-background" />}>
             <Routes>
