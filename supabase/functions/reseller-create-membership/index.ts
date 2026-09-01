@@ -60,7 +60,7 @@ Deno.serve(async (req) => {
   if (verified !== true) return json({ error: 'unauthorized' }, 401);
 
   const { data: pkg } = await admin.from('membership_packages')
-    .select('id,name,status,paused,max_devices,includes_replays,replay_info,duration_days').eq('id', packageId).maybeSingle();
+    .select('id,name,status,paused,max_devices,includes_replays,replay_info,duration_days,fixed_starts_at,fixed_expires_at').eq('id', packageId).maybeSingle();
   if (!pkg) return json({ error: 'package_not_found' }, 404);
   if (pkg.paused === true) return json({ error: 'package_paused' }, 400);
 
@@ -68,15 +68,21 @@ Deno.serve(async (req) => {
   const days = Math.max(1, Math.floor(Number(pkg.duration_days) || 30));
 
   const { data: settings } = await admin.from('site_settings').select('key,value')
-    .in('key', ['site_origin', 'wa_membership_template', 'reseller_membership_replay_info']);
+    .in('key', ['site_origin', 'wa_membership_template']);
   const sm = new Map((settings ?? []).map((x: any) => [x.key, x.value]));
   const origin = ((sm.get('site_origin') as string) || 'https://realtime48stream.my.id').replace(/\/+$/, '');
   const tpl = (sm.get('wa_membership_template') as string) || DEFAULT_TPL;
-  const replayInfo = String(sm.get('reseller_membership_replay_info') || '').trim() || (pkg.replay_info || '');
+  // Info replay reseller = info replay paket yang diatur admin (disatukan).
+  const replayInfo = String(pkg.replay_info || '');
 
   const token = await freshToken(admin, 12);
   const password = await freshToken(admin, 8);
-  const expiresAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+  // Periode SELALU mengikuti pengaturan admin: pakai tanggal tetap bila diisi.
+  const startsAt = pkg.fixed_starts_at ? new Date(pkg.fixed_starts_at) : new Date();
+  const expiresAt = pkg.fixed_expires_at
+    ? new Date(pkg.fixed_expires_at)
+    : new Date(startsAt.getTime() + days * 24 * 60 * 60 * 1000);
+  const effectiveDays = Math.max(1, Math.round((expiresAt.getTime() - startsAt.getTime()) / 86400000));
 
   const { data: ba } = await admin.from('bot_admins').select('label').eq('phone', phone).maybeSingle();
   const resellerLabel = (ba?.label || '').trim();
@@ -84,8 +90,8 @@ Deno.serve(async (req) => {
   const { data: tk, error } = await admin.from('membership_tokens').insert({
     token, password, phone,
     label: `reseller:${phone} / ${pkg.name}`,
-    duration_days: days,
-    starts_at: new Date().toISOString(),
+    duration_days: effectiveDays,
+    starts_at: startsAt.toISOString(),
     expires_at: expiresAt.toISOString(),
     max_devices: pkg.max_devices || 1,
     includes_replays: pkg.includes_replays !== false,
@@ -101,11 +107,11 @@ Deno.serve(async (req) => {
     package_name: pkg.name,
     link, password,
     expires_at: expStr,
-    duration_days: String(days),
+    duration_days: String(effectiveDays),
     max_devices: String(pkg.max_devices || 1),
     replay_info: replayInfo,
     site: origin.replace(/^https?:\/\//, ''),
-  }) + `\n\n📝 Dibuat oleh reseller (${days} hari).`;
+  }) + `\n\n📝 Dibuat oleh reseller (${effectiveDays} hari).`;
 
   await admin.from('token_deliveries').insert({
     phone, replay_id: null, replay_title: `Membership • ${pkg.name}`,
@@ -114,12 +120,12 @@ Deno.serve(async (req) => {
   await admin.from('reseller_audit_log').insert({
     reseller_phone: phone, reseller_label: resellerLabel,
     kind: 'membership', target_id: pkg.id, target_title: pkg.name,
-    token, expires_at: expiresAt.toISOString(), duration_days: days,
-    meta: { max_devices: pkg.max_devices || 1, includes_replays: pkg.includes_replays !== false, replay_info_source: replayInfo === (pkg.replay_info || '') ? 'package' : 'reseller_setting' },
+    token, expires_at: expiresAt.toISOString(), duration_days: effectiveDays,
+    meta: { max_devices: pkg.max_devices || 1, includes_replays: pkg.includes_replays !== false, replay_info_source: 'package', fixed_period: !!pkg.fixed_expires_at },
   });
 
   return json({
     ok: true, token, password, link, message,
-    title: pkg.name, expires_at: expiresAt.toISOString(), duration_days: days,
+    title: pkg.name, expires_at: expiresAt.toISOString(), duration_days: effectiveDays,
   });
 });
