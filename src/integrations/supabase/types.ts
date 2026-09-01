@@ -786,6 +786,8 @@ export type Database = {
           created_at: string
           id: string
           label: string
+          manual_resets_max: number
+          manual_resets_used: number
           max_devices: number
           revoked: boolean
           token: string
@@ -794,6 +796,8 @@ export type Database = {
           created_at?: string
           id?: string
           label?: string
+          manual_resets_max?: number
+          manual_resets_used?: number
           max_devices?: number
           revoked?: boolean
           token: string
@@ -802,6 +806,8 @@ export type Database = {
           created_at?: string
           id?: string
           label?: string
+          manual_resets_max?: number
+          manual_resets_used?: number
           max_devices?: number
           revoked?: boolean
           token?: string
@@ -1176,6 +1182,35 @@ export type Database = {
         }
         Relationships: []
       }
+      order_token_devices: {
+        Row: {
+          browser_id: string
+          created_at: string
+          id: string
+          order_id: string
+        }
+        Insert: {
+          browser_id: string
+          created_at?: string
+          id?: string
+          order_id: string
+        }
+        Update: {
+          browser_id?: string
+          created_at?: string
+          id?: string
+          order_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_token_devices_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       orders: {
         Row: {
           access_token: string | null
@@ -1186,6 +1221,8 @@ export type Database = {
           id: string
           item_title: string
           kind: string
+          manual_resets_max: number
+          manual_resets_used: number
           paid_at: string | null
           pakasir_order_id: string | null
           pakasir_qr_url: string
@@ -1206,6 +1243,8 @@ export type Database = {
           id?: string
           item_title?: string
           kind?: string
+          manual_resets_max?: number
+          manual_resets_used?: number
           paid_at?: string | null
           pakasir_order_id?: string | null
           pakasir_qr_url?: string
@@ -1226,6 +1265,8 @@ export type Database = {
           id?: string
           item_title?: string
           kind?: string
+          manual_resets_max?: number
+          manual_resets_used?: number
           paid_at?: string | null
           pakasir_order_id?: string | null
           pakasir_qr_url?: string
@@ -1331,6 +1372,8 @@ export type Database = {
           expires_at: string | null
           id: string
           label: string
+          manual_resets_max: number
+          manual_resets_used: number
           max_devices: number
           replay_id: string
           revoked: boolean
@@ -1341,6 +1384,8 @@ export type Database = {
           expires_at?: string | null
           id?: string
           label?: string
+          manual_resets_max?: number
+          manual_resets_used?: number
           max_devices?: number
           replay_id: string
           revoked?: boolean
@@ -1351,6 +1396,8 @@ export type Database = {
           expires_at?: string | null
           id?: string
           label?: string
+          manual_resets_max?: number
+          manual_resets_used?: number
           max_devices?: number
           replay_id?: string
           revoked?: boolean

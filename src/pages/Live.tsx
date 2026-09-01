@@ -538,18 +538,21 @@ export default function Live() {
           .subscribe()
       : null;
 
-    // Fallback revalidate setiap 45 detik jika websocket realtime terputus.
+    // Fallback revalidate (~2 menit) jika websocket realtime terputus.
+    // Jitter ±30s supaya 1000 viewer tidak menembak server bersamaan.
+    const jitter = (base: number, spread: number) => base + Math.floor(Math.random() * spread);
     const revalidate = window.setInterval(() => {
       if (document.visibilityState !== 'visible') return;
       if (tParam) void doUnlock({ token: tParam }, true);
       else if (mtParam) void doUnlock({ mtoken: mtParam, mpassword: search.get('mp') || search.get('mpassword') || '' }, true);
-    }, 45000);
+    }, jitter(120000, 60000));
 
     // Status fallback: realtime UPDATE channel already covers admin changes instantly.
     const statusPoll = window.setInterval(() => {
       if (document.visibilityState !== 'visible') return;
       void fetchStatus();
-    }, 180000);
+    }, jitter(300000, 120000));
+
 
     return () => {
       window.clearInterval(revalidate);
@@ -813,7 +816,7 @@ export default function Live() {
           }
           if (unique !== lastCount) { lastCount = unique; setViewerCount(unique); }
         } catch { /* ignore */ }
-      }, 15000);
+      }, 25000);
     };
     let tracked = false;
     let heartbeat: number | null = null;
@@ -826,21 +829,29 @@ export default function Live() {
           tracked = true;
           try { await channel.track({ at: Date.now() }); } catch { /* ignore */ }
           recount();
-          // Heartbeat 2 menit cukup — presence punya auto-timeout sendiri dan ini
+          // Heartbeat 5 menit — presence punya auto-timeout sendiri; interval panjang
           // memangkas trafik websocket signifikan saat 1000+ viewer.
           heartbeat = window.setInterval(() => {
             if (document.visibilityState === 'visible') {
               channel.track({ at: Date.now() }).catch(() => {});
             }
-          }, 120000);
+          }, 300000);
         }
       });
+    // Tab disembunyikan → lepas presence supaya fan-out event berkurang drastis.
+    const onVis = () => {
+      if (document.visibilityState === 'visible') channel.track({ at: Date.now() }).catch(() => {});
+      else channel.untrack().catch(() => {});
+    };
+    document.addEventListener('visibilitychange', onVis);
     return () => {
+      document.removeEventListener('visibilitychange', onVis);
       if (pending) window.clearTimeout(pending);
       if (heartbeat) window.clearInterval(heartbeat);
       try { void channel.untrack(); } catch { /* ignore */ }
       supabase.removeChannel(channel);
     };
+
   }, [liveActive, showKey]);
 
   return (
