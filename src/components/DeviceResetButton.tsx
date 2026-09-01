@@ -106,7 +106,14 @@ export default function DeviceResetButton(props: Props) {
       </div>
     );
   }
-  if (!quota) return null;
+  if (!quota) {
+    return (
+      <div className="rounded-md border border-border bg-muted/30 p-2.5 text-[11px] leading-snug text-muted-foreground">
+        Info reset perangkat tidak tersedia untuk token ini. Jika tidak bisa dibuka di perangkat ini, hubungi admin.
+      </div>
+    );
+  }
+
 
   // Multi-device banner — no reset button, just info.
   if (quota.reason === 'multi_device') {
