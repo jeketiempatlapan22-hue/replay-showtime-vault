@@ -538,18 +538,21 @@ export default function Live() {
           .subscribe()
       : null;
 
-    // Fallback revalidate setiap 45 detik jika websocket realtime terputus.
+    // Fallback revalidate (~2 menit) jika websocket realtime terputus.
+    // Jitter ±30s supaya 1000 viewer tidak menembak server bersamaan.
+    const jitter = (base: number, spread: number) => base + Math.floor(Math.random() * spread);
     const revalidate = window.setInterval(() => {
       if (document.visibilityState !== 'visible') return;
       if (tParam) void doUnlock({ token: tParam }, true);
       else if (mtParam) void doUnlock({ mtoken: mtParam, mpassword: search.get('mp') || search.get('mpassword') || '' }, true);
-    }, 45000);
+    }, jitter(120000, 60000));
 
     // Status fallback: realtime UPDATE channel already covers admin changes instantly.
     const statusPoll = window.setInterval(() => {
       if (document.visibilityState !== 'visible') return;
       void fetchStatus();
-    }, 180000);
+    }, jitter(300000, 120000));
+
 
     return () => {
       window.clearInterval(revalidate);
