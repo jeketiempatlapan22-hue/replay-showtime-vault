@@ -39,7 +39,7 @@ interface QualityLevel {
   bitrate?: number;
 }
 
-const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, onFatalError, onPipChange, hideSeekButtons = false, headers }, ref) => {
+const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, onFatalError, onPipChange, hideSeekButtons = false, headers, overlay }, ref) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const hideControlsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -982,6 +982,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
         title={title}
       />
       {watermark && <LiveWatermark code={watermark} />}
+      {overlay}
 
       {/* Initial loading overlay */}
       {loading && (
