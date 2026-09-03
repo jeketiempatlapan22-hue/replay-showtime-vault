@@ -49,17 +49,32 @@ export default function ShowLiveControl({ showId, showTitle }: Props) {
   const [freeEnabled, setFreeEnabled] = useState(false);
   const [freeShowId, setFreeShowId] = useState('');
   const [freeSaving, setFreeSaving] = useState(false);
+  const [wmEnabled, setWmEnabled] = useState(false);
+  const [wmText, setWmText] = useState('');
+  const [wmOpacity, setWmOpacity] = useState(25);
+  const [wmSize, setWmSize] = useState(12);
+  const [flEnabled, setFlEnabled] = useState(false);
+  const [flUrl, setFlUrl] = useState('');
+  const [flLabel, setFlLabel] = useState('Join Saluran');
 
   const [newLabel, setNewLabel] = useState('');
   const [newType, setNewType] = useState<SrcType>('m3u8');
   const [newUrl, setNewUrl] = useState('');
 
   useEffect(() => {
-    supabase.from('site_settings').select('key,value').in('key', ['free_mode_enabled', 'free_show_id'])
+    supabase.from('site_settings').select('key,value')
+      .in('key', ['free_mode_enabled', 'free_show_id', 'free_watermark_enabled', 'free_watermark_text', 'free_watermark_opacity', 'free_watermark_size', 'free_link_enabled', 'free_link_url', 'free_link_label'])
       .then(({ data }) => {
         const map = Object.fromEntries((data || []).map((r: any) => [r.key, String(r.value || '')]));
         setFreeEnabled(map.free_mode_enabled === 'true');
         setFreeShowId(map.free_show_id || '');
+        setWmEnabled(map.free_watermark_enabled === 'true');
+        setWmText(map.free_watermark_text || '');
+        setWmOpacity(Number(map.free_watermark_opacity) || 25);
+        setWmSize(Number(map.free_watermark_size) || 12);
+        setFlEnabled(map.free_link_enabled === 'true');
+        setFlUrl(map.free_link_url || '');
+        setFlLabel(map.free_link_label || 'Join Saluran');
       });
   }, []);
 
@@ -84,6 +99,23 @@ export default function ShowLiveControl({ showId, showTitle }: Props) {
       toast({ title: enabled ? 'Mode gratis AKTIF' : 'Mode gratis MATI', description: enabled ? 'Halaman /free bisa diakses untuk show ini.' : 'Endpoint /free-token dinonaktifkan.' });
     } catch (e: any) {
       toast({ title: 'Gagal menyimpan mode gratis', description: e.message, variant: 'destructive' });
+    }
+    setFreeSaving(false);
+  };
+
+  const saveFreeExtras = async () => {
+    setFreeSaving(true);
+    try {
+      await saveSetting('free_watermark_enabled', wmEnabled ? 'true' : 'false');
+      await saveSetting('free_watermark_text', wmText.slice(0, 120));
+      await saveSetting('free_watermark_opacity', String(Math.min(100, Math.max(1, wmOpacity))));
+      await saveSetting('free_watermark_size', String(Math.min(30, Math.max(2, wmSize))));
+      await saveSetting('free_link_enabled', flEnabled ? 'true' : 'false');
+      await saveSetting('free_link_url', flUrl.trim());
+      await saveSetting('free_link_label', flLabel.trim().slice(0, 40) || 'Join Saluran');
+      toast({ title: 'Pengaturan halaman /free disimpan' });
+    } catch (e: any) {
+      toast({ title: 'Gagal menyimpan', description: e.message, variant: 'destructive' });
     }
     setFreeSaving(false);
   };
@@ -350,6 +382,59 @@ export default function ShowLiveControl({ showId, showTitle }: Props) {
             Salin link /free
           </Button>
         </div>
+
+        {/* Watermark selayar khusus /free */}
+        <div className="pt-2 mt-1 border-t border-border/60 space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <Label className="text-sm">Watermark selayar (hanya halaman /free)</Label>
+              <p className="text-[11px] text-muted-foreground">Teks putih menutupi 100% layar player, termasuk saat fullscreen.</p>
+            </div>
+            <Switch checked={wmEnabled} onCheckedChange={setWmEnabled} />
+          </div>
+          <div>
+            <Label className="text-xs">Teks watermark</Label>
+            <Input value={wmText} onChange={e => setWmText(e.target.value)} placeholder="REALTIME48STREAM" />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div>
+              <Label className="text-xs">Transparansi: {wmOpacity}%</Label>
+              <input type="range" min={1} max={100} value={wmOpacity}
+                onChange={e => setWmOpacity(Number(e.target.value))} className="w-full accent-primary" />
+            </div>
+            <div>
+              <Label className="text-xs">Ukuran teks: {wmSize}</Label>
+              <input type="range" min={2} max={30} value={wmSize}
+                onChange={e => setWmSize(Number(e.target.value))} className="w-full accent-primary" />
+            </div>
+          </div>
+        </div>
+
+        {/* Tombol saluran khusus /free */}
+        <div className="pt-2 mt-1 border-t border-border/60 space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <Label className="text-sm">Tombol saluran (hanya halaman /free)</Label>
+              <p className="text-[11px] text-muted-foreground">Tidak tampil di halaman live lain.</p>
+            </div>
+            <Switch checked={flEnabled} onCheckedChange={setFlEnabled} />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div>
+              <Label className="text-xs">Label tombol</Label>
+              <Input value={flLabel} onChange={e => setFlLabel(e.target.value)} placeholder="Join Saluran" />
+            </div>
+            <div>
+              <Label className="text-xs">Link saluran</Label>
+              <Input value={flUrl} onChange={e => setFlUrl(e.target.value)} placeholder="https://..." />
+            </div>
+          </div>
+        </div>
+
+        <Button size="sm" disabled={freeSaving} onClick={saveFreeExtras}>
+          {freeSaving ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Save className="w-4 h-4 mr-1" />}
+          Simpan pengaturan /free
+        </Button>
       </div>
 
       {/* Live URL */}

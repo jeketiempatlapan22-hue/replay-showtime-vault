@@ -1,9 +1,40 @@
 import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Loader2, Gift, RefreshCw } from 'lucide-react';
+import { Loader2, Gift, RefreshCw, Link as LinkIcon } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { getDeviceFingerprint } from '@/lib/fingerprint';
+import FreeScreenWatermark from '@/components/FreeScreenWatermark';
+
+const SETTING_KEYS = [
+  'free_watermark_enabled',
+  'free_watermark_text',
+  'free_watermark_opacity',
+  'free_watermark_size',
+  'free_link_enabled',
+  'free_link_url',
+  'free_link_label',
+];
+
+interface FreeConfig {
+  wmEnabled: boolean;
+  wmText: string;
+  wmOpacity: number;
+  wmSize: number;
+  linkEnabled: boolean;
+  linkUrl: string;
+  linkLabel: string;
+}
+
+const DEFAULT_CONFIG: FreeConfig = {
+  wmEnabled: false,
+  wmText: '',
+  wmOpacity: 25,
+  wmSize: 12,
+  linkEnabled: false,
+  linkUrl: '',
+  linkLabel: 'Join Saluran',
+};
 
 const HlsPlayer = lazy(() => import('@/components/HlsPlayer'));
 const LiveChat = lazy(() => import('@/components/LiveChat'));
@@ -54,6 +85,7 @@ export default function Free() {
   const [error, setError] = useState('');
   const [session, setSession] = useState<FreeSession | null>(null);
   const [rotating, setRotating] = useState(false);
+  const [config, setConfig] = useState<FreeConfig>(DEFAULT_CONFIG);
   const nonceRef = useRef(0);
   const timerRef = useRef<number | null>(null);
 
@@ -94,6 +126,30 @@ export default function Free() {
   }, [fetchToken]);
 
   useEffect(() => { void start(); }, [start]);
+
+  // Pengaturan watermark & tombol saluran khusus halaman /free (diatur admin).
+  useEffect(() => {
+    let active = true;
+    const load = async () => {
+      const { data } = await supabase.from('site_settings').select('key,value').in('key', SETTING_KEYS);
+      if (!active) return;
+      const map = Object.fromEntries((data || []).map((r: any) => [r.key, String(r.value ?? '')]));
+      setConfig({
+        wmEnabled: map.free_watermark_enabled === 'true',
+        wmText: map.free_watermark_text || '',
+        wmOpacity: Number(map.free_watermark_opacity) || DEFAULT_CONFIG.wmOpacity,
+        wmSize: Number(map.free_watermark_size) || DEFAULT_CONFIG.wmSize,
+        linkEnabled: map.free_link_enabled === 'true',
+        linkUrl: map.free_link_url || '',
+        linkLabel: map.free_link_label || DEFAULT_CONFIG.linkLabel,
+      });
+    };
+    void load();
+    const ch = supabase.channel('free-settings')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'site_settings' }, () => { void load(); })
+      .subscribe();
+    return () => { active = false; supabase.removeChannel(ch); };
+  }, []);
 
   // Rotasi diam-diam: hanya memperbarui header (player tidak di-remount, tayangan tidak terputus).
   useEffect(() => {
@@ -155,10 +211,23 @@ export default function Free() {
                 src={session.url}
                 headers={session.headers}
                 title={session.title}
-                watermark="FREE"
                 hideSeekButtons
+                overlay={config.wmEnabled ? (
+                  <FreeScreenWatermark text={config.wmText} opacity={config.wmOpacity} size={config.wmSize} />
+                ) : null}
               />
             </Suspense>
+
+            {config.linkEnabled && config.linkUrl && (
+              <a
+                href={config.linkUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-2 w-full rounded-xl bg-primary text-primary-foreground font-semibold py-3 text-sm hover:opacity-90 transition"
+              >
+                <LinkIcon className="w-4 h-4" /> {config.linkLabel || 'Join Saluran'}
+              </a>
+            )}
 
             <Suspense fallback={null}>
               <LiveChat lite showId={showId} />
