@@ -362,7 +362,6 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
             key={activeSource.id}
             src={activeSource.url}
             title={replay.title}
-            watermark={activeToken ? `RT-${activeToken.slice(-4).toUpperCase()}` : undefined}
             onFatalError={handleHlsFatalError}
             onPipChange={setPipActive}
           />
@@ -372,7 +371,6 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
             type={activeSource.type as 'youtube' | 'cloudflare'}
             source={activeSource.url}
             title={replay.title}
-            watermark={activeToken ? `RT-${activeToken.slice(-4).toUpperCase()}` : undefined}
           />
         )}
 
