@@ -15,7 +15,10 @@ export default function FreeScreenWatermark({ text, opacity, size }: Props) {
   const alpha = Math.min(1, Math.max(0.01, opacity / 100));
   const fontSize = Math.min(30, Math.max(2, size));
   return (
-    <div className="absolute inset-0 z-[26] pointer-events-none select-none flex items-center justify-center overflow-hidden">
+    <div
+      className="absolute inset-0 z-[26] pointer-events-none select-none flex items-center justify-center overflow-hidden"
+      style={{ containerType: 'size' }}
+    >
       <span
         className="font-extrabold uppercase tracking-widest text-center leading-tight whitespace-pre-wrap px-2"
         style={{
