@@ -5,13 +5,30 @@ import { getShowPurchase, setShowPurchase, getReplayPurchase, setReplayPurchase 
 
 let lastRun = 0;
 
+/** Nomor WhatsApp terakhir yang dipakai membeli (dipakai untuk user anon). */
+export function getSyncPhone(): string {
+  const keys = ['replaytime-phone', 'replaytime-last-phone', 'replaytime-wa'];
+  for (const k of keys) {
+    try {
+      const v = (localStorage.getItem(k) || '').trim();
+      if (v) return v;
+    } catch { /* ignore */ }
+  }
+  return '';
+}
+
+export function rememberSyncPhone(phone: string) {
+  const v = String(phone || '').trim();
+  if (!v) return;
+  try { localStorage.setItem('replaytime-phone', v); } catch { /* ignore */ }
+}
+
 export async function syncPurchases(force = false): Promise<void> {
   const now = Date.now();
-  if (!force && now - lastRun < 20_000) return;
+  if (!force && now - lastRun < 10_000) return;
   lastRun = now;
 
-  let phone = '';
-  try { phone = localStorage.getItem('replaytime-phone') || ''; } catch { /* ignore */ }
+  const phone = getSyncPhone();
 
   const { data: sessionData } = await supabase.auth.getSession();
   const hasSession = !!sessionData?.session;

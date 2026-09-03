@@ -37,12 +37,21 @@ function PurchaseSync() {
   useEffect(() => {
     // Halaman live tidak disentuh.
     if (location.pathname.startsWith('/live')) return;
-    void syncPurchases();
+    void syncPurchases(true);
     const onFocus = () => void syncPurchases();
     window.addEventListener('focus', onFocus);
+    const onVis = () => { if (document.visibilityState === 'visible') void syncPurchases(); };
+    document.addEventListener('visibilitychange', onVis);
+    // Polling ringan: pembeli anon (tanpa login) tetap mendapat tombol tonton
+    // secara otomatis setelah pembayaran terkonfirmasi.
+    const iv = window.setInterval(() => {
+      if (document.visibilityState === 'visible') void syncPurchases(true);
+    }, 30000);
     const { data: sub } = supabase.auth.onAuthStateChange(() => { void syncPurchases(true); });
     return () => {
       window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVis);
+      window.clearInterval(iv);
       sub.subscription.unsubscribe();
     };
   }, [location.pathname]);

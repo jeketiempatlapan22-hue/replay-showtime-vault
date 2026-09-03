@@ -877,7 +877,7 @@ export default function Admin() {
                 </div>
                 <div>
                   <Label>Gambar Show</Label>
-                  <ImagePicker value={showForm.image_url} onChange={url => setShowForm({ ...showForm, image_url: url })} />
+                  <ImagePicker value={showForm.image_url} autoMatchTitle={showForm.title} onChange={url => setShowForm({ ...showForm, image_url: url })} />
                 </div>
                 <div className="grid grid-cols-2 gap-3 items-end">
                   <div>
