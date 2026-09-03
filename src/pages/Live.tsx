@@ -157,6 +157,8 @@ export default function Live() {
   const showId = search.get('show') || '';
   // Show yang di-resolve server (untuk membership yang membuka /live tanpa ?show).
   const [resolvedShowId, setResolvedShowId] = useState('');
+  const resolvedShowIdRef = useRef('');
+  useEffect(() => { resolvedShowIdRef.current = resolvedShowId; }, [resolvedShowId]);
   const effectiveShowId = showId || resolvedShowId;
   const isWeakNetwork = useMemo(() => {
     if (typeof navigator === 'undefined') return false;
@@ -274,7 +276,9 @@ export default function Live() {
       });
       if (data?.valid) {
         // Membership tanpa ?show: pakai show yang di-resolve server agar chat & status ikut show terbaru.
-        if (!showId && data.show_id) setResolvedShowId(String(data.show_id));
+        const serverShowId = data.show_id ? String(data.show_id) : '';
+        const showSwitched = !showId && !!serverShowId && !!resolvedShowIdRef.current && serverShowId !== resolvedShowIdRef.current;
+        if (!showId && serverShowId) { resolvedShowIdRef.current = serverShowId; setResolvedShowId(serverShowId); }
         const cfg: UnlockedConfig = {
           title: data.title,
           type: isSrcType(data.type) ? data.type : 'm3u8',
@@ -287,7 +291,12 @@ export default function Live() {
         };
         // For silent revalidation, NEVER overwrite the existing player URL/sources.
         // Doing so would change the React key on the player and remount it, restarting the live stream from the beginning.
-        if (silent) {
+        if (silent && showSwitched) {
+          // Show berganti (misal admin memulai live show berikutnya): pakai
+          // konfigurasi baru sepenuhnya supaya membership langsung ikut live terbaru.
+          setUnlocked(cfg);
+          try { sessionStorage.setItem(`${SS_KEY_BASE}${showId?'-'+showId:''}`, JSON.stringify(cfg)); } catch { /* ignore */ }
+        } else if (silent) {
           // Refresh metadata + flip enabled, and adopt new URL/sources only when current is empty
           // (avoid remounting the player mid-stream).
           setUnlocked(prev => {
@@ -570,6 +579,33 @@ export default function Live() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [effectiveShowId]);
 
+  // Membership tanpa ?show: pantau show mana yang sedang LIVE. Kalau admin
+  // memulai live di show lain, ikuti show tersebut (jangan tersangkut di show lama).
+  useEffect(() => {
+    if (showId) return;
+    const mt = search.get('mtoken');
+    if (!mt) return;
+    const mp = search.get('mp') || search.get('mpassword') || '';
+    let stopped = false;
+    const follow = async () => {
+      if (document.visibilityState !== 'visible') return;
+      const { data } = await supabase.from('active_shows')
+        .select('id').eq('is_active', true).eq('is_live', true)
+        .order('show_date', { ascending: false }).order('show_time', { ascending: false })
+        .limit(1).maybeSingle();
+      const liveId = data?.id ? String(data.id) : '';
+      if (stopped || !liveId || liveId === resolvedShowIdRef.current) return;
+      await doUnlock({ mtoken: mt, mpassword: mp }, true);
+      void fetchStatus();
+    };
+    void follow();
+    const iv = window.setInterval(() => { void follow(); }, 20000);
+    const onVis = () => { if (document.visibilityState === 'visible') void follow(); };
+    document.addEventListener('visibilitychange', onVis);
+    return () => { stopped = true; window.clearInterval(iv); document.removeEventListener('visibilitychange', onVis); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showId, search]);
+
   // Membership tanpa ?show: ikuti perubahan show hasil resolve secara realtime
   // agar status live/jadwal selalu yang terbaru (bukan show yang sudah selesai).
   useEffect(() => {
@@ -759,6 +795,8 @@ export default function Live() {
   // Pernah ON AIR di sesi ini → saat admin mematikan live, tampilkan "Live Telah Selesai".
   const wasLiveRef = useRef(false);
   const [liveEnded, setLiveEnded] = useState(false);
+  // Ganti show (membership mengikuti live terbaru) → status "selesai" direset.
+  useEffect(() => { wasLiveRef.current = false; setLiveEnded(false); }, [effectiveShowId]);
   useEffect(() => {
     if (liveActive) { wasLiveRef.current = true; setLiveEnded(false); return; }
     if (wasLiveRef.current) setLiveEnded(true);
