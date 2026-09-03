@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 
 import { supabase } from '@/integrations/supabase/client';
 import { getBrowserId } from '@/lib/browserId';
+import { setShowPurchase } from '@/lib/purchases';
 import { clearMembershipCredentials, saveMembershipCredentials } from '@/lib/membershipAccess';
 import MemberAvatar from '@/components/MemberAvatar';
 import { useAutoHideOnInteraction } from '@/hooks/useAutoHideOnInteraction';
@@ -279,6 +280,15 @@ export default function Live() {
         const serverShowId = data.show_id ? String(data.show_id) : '';
         const showSwitched = !showId && !!serverShowId && !!resolvedShowIdRef.current && serverShowId !== resolvedShowIdRef.current;
         if (!showId && serverShowId) { resolvedShowIdRef.current = serverShowId; setResolvedShowId(serverShowId); }
+        // Pembeli anon yang membuka link token dari WhatsApp: simpan token
+        // supaya kartu show di beranda langsung menampilkan tombol "Tonton".
+        try {
+          const sidForPurchase = showId || serverShowId;
+          if (opts.token && sidForPurchase) {
+            setShowPurchase(sidForPurchase, { token: String(opts.token), kind: 'show', paidAt: Date.now() });
+            window.dispatchEvent(new Event('replaytime-purchases-updated'));
+          }
+        } catch { /* ignore */ }
         const cfg: UnlockedConfig = {
           title: data.title,
           type: isSrcType(data.type) ? data.type : 'm3u8',
