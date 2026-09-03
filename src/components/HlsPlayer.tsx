@@ -15,6 +15,8 @@ interface Props {
   hideSeekButtons?: boolean;
   /** Optional custom HTTP headers attached to ALL HLS requests (manifest + segments). */
   headers?: Record<string, string>;
+  /** Optional overlay rendered inside the player container (visible in fullscreen too). */
+  overlay?: React.ReactNode;
 }
 
 export interface HlsPlayerHandle {
