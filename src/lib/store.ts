@@ -1,3 +1,4 @@
+import { slugifyName, type GalleryItem } from '@/lib/showImageMatch';
 import { supabase } from '@/integrations/supabase/client';
 import type { Tables } from '@/integrations/supabase/types';
 import { compressImage } from '@/lib/imageUrl';
@@ -200,14 +201,34 @@ export async function setSetting(key: string, value: string) {
 }
 
 
-export async function uploadImage(file: File): Promise<string> {
+export async function uploadImage(file: File, name?: string): Promise<string> {
   const compressed = await compressImage(file, 0, 0.75);
   const ext = compressed.type === 'image/jpeg' ? 'jpg' : (file.name.split('.').pop() || 'jpg');
-  const fileName = `${crypto.randomUUID()}.${ext}`;
-  const { error } = await supabase.storage.from('card-images').upload(fileName, compressed, { contentType: compressed.type });
-  if (error) throw error;
+  // Nama gambar dipakai untuk pencocokan otomatis logo kartu show.
+  const base = name && name.trim()
+    ? slugifyName(name)
+    : slugifyName(file.name.replace(/\.[^.]+$/, '')) || crypto.randomUUID();
+  let fileName = `${base}.${ext}`;
+  let { error } = await supabase.storage.from('card-images').upload(fileName, compressed, { contentType: compressed.type });
+  if (error) {
+    fileName = `${base}-${Date.now().toString(36)}.${ext}`;
+    const retry = await supabase.storage.from('card-images').upload(fileName, compressed, { contentType: compressed.type });
+    if (retry.error) throw retry.error;
+  }
   const { data } = supabase.storage.from('card-images').getPublicUrl(fileName);
   return data.publicUrl;
+}
+
+export async function getGalleryItems(): Promise<GalleryItem[]> {
+  const { data, error } = await supabase.storage.from('card-images').list('', { limit: 200, sortBy: { column: 'created_at', order: 'desc' } });
+  if (error) throw error;
+  return (data || [])
+    .filter(f => f.name !== '.emptyFolderPlaceholder')
+    .map(f => ({
+      file: f.name,
+      name: f.name.replace(/\.[^.]+$/, ''),
+      url: supabase.storage.from('card-images').getPublicUrl(f.name).data.publicUrl,
+    }));
 }
 
 export async function getGalleryImages(): Promise<string[]> {
