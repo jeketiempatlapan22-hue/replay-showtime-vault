@@ -27,8 +27,11 @@ export interface HlsPlayerHandle {
 
 function formatTime(seconds: number): string {
   if (!isFinite(seconds) || seconds < 0) return '0:00';
-  const m = Math.floor(seconds / 60);
-  const s = Math.floor(seconds % 60);
+  const total = Math.floor(seconds);
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  if (h > 0) return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
@@ -78,6 +81,8 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  // Rentang yang benar-benar bisa di-seek (dipakai untuk VOD maupun DVR live).
+  const [seekRange, setSeekRange] = useState<{ start: number; end: number }>({ start: 0, end: 0 });
   const [volume, setVolume] = useState(initialVolume);
   const [muted, setMuted] = useState(initialMuted);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -787,7 +792,6 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
     // Throttle: hanya update saat detik bulat berubah → kurangi re-render dari ~4Hz ke 1Hz
     let lastSec = -1;
       const onTimeUpdate = () => {
-        if (isLiveRef.current) return;
       const t = video.currentTime;
       const sec = Math.floor(t);
       if (sec !== lastSec) {
@@ -829,6 +833,23 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
     const onLoadedMetadata = () => onDurationChange();
     const onProgress = () => {
       lastProgressRef.current = { time: video.currentTime, checkedAt: Date.now(), recoveries: 0 };
+      updateSeekRange();
+    };
+    const updateSeekRange = () => {
+      try {
+        const sk = video.seekable;
+        let start = 0;
+        let end = 0;
+        if (sk && sk.length) {
+          start = sk.start(0);
+          end = sk.end(sk.length - 1);
+        }
+        const d = video.duration;
+        if (Number.isFinite(d) && d > 0 && d > end) end = d;
+        if (!Number.isFinite(start)) start = 0;
+        if (!Number.isFinite(end)) end = 0;
+        setSeekRange(prev => (Math.abs(prev.start - start) < 0.5 && Math.abs(prev.end - end) < 0.5 ? prev : { start, end }));
+      } catch { /* ignore */ }
     };
     const onVolumeChange = () => {
       setVolume(video.volume);
@@ -845,8 +866,11 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
     video.addEventListener('canplay', onCanPlay);
     video.addEventListener('progress', onProgress);
     video.addEventListener('volumechange', onVolumeChange);
+    const rangeTimer = setInterval(updateSeekRange, 2000);
+    updateSeekRange();
 
     return () => {
+      clearInterval(rangeTimer);
       video.removeEventListener('play', onPlay);
       video.removeEventListener('pause', onPause);
       video.removeEventListener('timeupdate', onTimeUpdate);
@@ -899,23 +923,32 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
     resetHideTimer();
   };
 
-  const seek = (delta: number) => {
+  // Batas seek: pakai rentang seekable nyata (VOD penuh atau jendela DVR live).
+  const seekStart = seekRange.start;
+  const seekEnd = seekRange.end > seekRange.start
+    ? seekRange.end
+    : (Number.isFinite(duration) && duration > 0 ? duration : 0);
+  const seekSpan = Math.max(0, seekEnd - seekStart);
+  const canSeek = seekSpan > 2;
+
+  const applySeek = (target: number) => {
     const video = videoRef.current;
-    if (!video || isLiveStream) return;
-    const limit = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : duration;
-    if (!Number.isFinite(limit) || limit <= 0) return;
-    video.currentTime = Math.max(0, Math.min(limit, video.currentTime + delta));
+    if (!video || !canSeek) return;
+    const safeEnd = Math.max(seekStart, seekEnd - (isLiveStream ? 3 : 0.3));
+    const next = Math.max(seekStart, Math.min(safeEnd, target));
+    try { video.currentTime = next; } catch { /* ignore */ }
+    setCurrentTime(next);
     resetHideTimer();
   };
 
-  const seekTo = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const seek = (delta: number) => {
     const video = videoRef.current;
-    if (!video || isLiveStream) return;
-    const limit = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : duration;
-    if (!Number.isFinite(limit) || limit <= 0) return;
-    video.currentTime = Math.max(0, Math.min(limit, Number(e.target.value)));
-    setCurrentTime(video.currentTime);
-    resetHideTimer();
+    if (!video) return;
+    applySeek(video.currentTime + delta);
+  };
+
+  const seekTo = (e: React.ChangeEvent<HTMLInputElement>) => {
+    applySeek(Number(e.target.value));
   };
 
   const changeVolume = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1039,29 +1072,30 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
 
         <div className="relative z-10 px-2 sm:px-4 pb-2 sm:pb-4 space-y-2" onClick={(e) => e.stopPropagation()}>
           <div className="flex items-center gap-1.5 sm:gap-2 text-white text-[10px] sm:text-xs min-w-0">
-            <span className="w-10 sm:w-14 text-left shrink-0 tabular-nums">{isLiveStream ? 'LIVE' : formatTime(currentTime)}</span>
+            <span className="w-12 sm:w-16 text-left shrink-0 tabular-nums">{formatTime(Math.max(0, currentTime - seekStart))}</span>
             <input
               type="range"
-              min={0}
-              max={isLiveStream ? 1 : Math.max(1, duration || 1)}
+              min={seekStart}
+              max={Math.max(seekStart + 1, seekEnd)}
               step={0.1}
-              value={isLiveStream ? 0 : currentTime}
+              value={Math.max(seekStart, Math.min(seekEnd || seekStart + 1, currentTime))}
               onChange={seekTo}
+              onInput={seekTo}
               onPointerDown={(e) => e.stopPropagation()}
               onPointerUp={(e) => e.stopPropagation()}
-              disabled={isLiveStream}
-              className="min-w-0 flex-1 h-2 accent-primary cursor-pointer disabled:cursor-default disabled:opacity-70"
+              onTouchStart={(e) => e.stopPropagation()}
+              disabled={!canSeek}
+              aria-label="Geser posisi video"
+              className="min-w-0 flex-1 h-2 accent-primary cursor-pointer touch-none disabled:cursor-default disabled:opacity-70"
               style={{
-                background: isLiveStream
-                  ? 'linear-gradient(to right, hsl(var(--primary)) 0%, hsl(var(--primary)) 100%)'
-                  : `linear-gradient(to right, hsl(var(--primary)) 0%, hsl(var(--primary)) ${
-                    duration ? (currentTime / duration) * 100 : 0
-                  }%, rgba(255,255,255,0.3) ${duration ? (currentTime / duration) * 100 : 0}%, rgba(255,255,255,0.3) 100%)`,
+                background: `linear-gradient(to right, hsl(var(--primary)) 0%, hsl(var(--primary)) ${
+                  seekSpan ? Math.max(0, Math.min(100, ((currentTime - seekStart) / seekSpan) * 100)) : 0
+                }%, rgba(255,255,255,0.3) ${seekSpan ? Math.max(0, Math.min(100, ((currentTime - seekStart) / seekSpan) * 100)) : 0}%, rgba(255,255,255,0.3) 100%)`,
                 borderRadius: '999px',
                 appearance: 'none',
               }}
             />
-            <span className="w-10 sm:w-14 text-right shrink-0 tabular-nums">{isLiveStream ? 'ON AIR' : formatTime(duration)}</span>
+            <span className="w-12 sm:w-16 text-right shrink-0 tabular-nums">{isLiveStream ? 'LIVE' : formatTime(seekSpan || duration)}</span>
           </div>
 
           <div className="flex items-center gap-0.5 sm:gap-2 min-w-0">
@@ -1070,10 +1104,10 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
             </button>
             {!hideSeekButtons && (
               <>
-                <button type="button" onClick={(e) => { e.stopPropagation(); seek(-10); }} disabled={isLiveStream} className="p-2 text-white hover:text-primary transition-colors disabled:opacity-40 disabled:hover:text-current shrink-0" aria-label="Mundur 10 detik" title="Mundur 10 detik">
+                <button type="button" onClick={(e) => { e.stopPropagation(); seek(-10); }} disabled={!canSeek} className="p-2 text-white hover:text-primary transition-colors disabled:opacity-40 disabled:hover:text-current shrink-0" aria-label="Mundur 10 detik" title="Mundur 10 detik">
                   <RotateCcw className="w-5 h-5" />
                 </button>
-                <button type="button" onClick={(e) => { e.stopPropagation(); seek(10); }} disabled={isLiveStream} className="p-2 text-white hover:text-primary transition-colors disabled:opacity-40 disabled:hover:text-current shrink-0" aria-label="Maju 10 detik" title="Maju 10 detik">
+                <button type="button" onClick={(e) => { e.stopPropagation(); seek(10); }} disabled={!canSeek} className="p-2 text-white hover:text-primary transition-colors disabled:opacity-40 disabled:hover:text-current shrink-0" aria-label="Maju 10 detik" title="Maju 10 detik">
                   <RotateCw className="w-5 h-5" />
                 </button>
               </>
