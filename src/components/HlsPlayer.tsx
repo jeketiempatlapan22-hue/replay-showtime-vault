@@ -498,15 +498,25 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
             hls.capLevelToPlayerSize = false;
             setCurrentQuality(match.index);
           }
-        } else if ((isWeak || isMobile || lowMem) && hls) {
-          // Start conservatively on phones/TV/weak devices, then let users raise quality manually.
-          // This avoids first-minute stalls caused by ABR over-estimating bandwidth.
-          const maxAutoHeight = isVeryWeak ? 270 : isWeak || lowMem ? 360 : 480;
+        } else if ((isWeak || lowMem) && hls) {
+          // Jaringan/perangkat lemah: mulai konservatif agar tidak stall di menit pertama.
+          const maxAutoHeight = isVeryWeak ? 270 : 360;
           const capCandidate = manifestLevels
             .map((lvl, i) => ({ i, h: lvl.height || 0 }))
             .filter(x => x.h > 0 && x.h <= maxAutoHeight)
             .sort((a, b) => b.h - a.h)[0];
           if (capCandidate) hls.autoLevelCapping = capCandidate.i;
+        } else if (hls) {
+          // Default: mulai dari resolusi TERTINGGI. Penjaga ABR di bawah akan
+          // menurunkan satu tingkat secara perlahan jika buffering terus terjadi.
+          hls.capLevelToPlayerSize = false;
+          hls.autoLevelCapping = -1;
+          const best = manifestLevels
+            .map((lvl, i) => ({ i, h: lvl.height || 0 }))
+            .sort((a, b) => b.h - a.h)[0];
+          if (best && best.h > 0) {
+            try { hls.startLevel = best.i; hls.nextLevel = best.i; } catch { /* ignore */ }
+          }
         }
         safePlay();
       });
