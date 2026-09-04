@@ -37,6 +37,7 @@ export default function ShowLiveControl({ showId, showTitle }: Props) {
   const [requirePw, setRequirePw] = useState(true);
 
   const [replayMode, setReplayMode] = useState(false);
+  const [replayId, setReplayId] = useState<string | null>(null);
   const [replayM3u8, setReplayM3u8] = useState('');
   const [replayYt, setReplayYt] = useState('');
   const [idnShowId, setIdnShowId] = useState('');
@@ -136,6 +137,7 @@ export default function ShowLiveControl({ showId, showTitle }: Props) {
         setLivePassword(row.live_password || '');
         setRequirePw(row.live_require_password !== false);
         setReplayMode(!!row.replay_mode);
+        setReplayId((row as any).replay_id || null);
         setReplayM3u8(row.replay_m3u8_url || '');
         setReplayYt(row.replay_youtube_url || '');
         setIdnShowId((row as any).idn_show_id || '');
@@ -223,6 +225,17 @@ export default function ShowLiveControl({ showId, showTitle }: Props) {
       setReplayYt(normalizedReplayYt);
       setLiveSources(normalizedSources);
       toast({ title: 'Pengaturan Live & Replay tersimpan' });
+
+      // Mode Replay ON dan show belum punya replay → konversi otomatis:
+      // kartu keluar dari menu Streaming Show dan pindah ke halaman Replay,
+      // sehingga link token yang sudah dibagikan tetap membuka replaynya.
+      if (replayMode && !replayId) {
+        const { data: conv, error: convErr } = await (supabase as any).rpc('convert_show_to_replay', { _show_id: showId });
+        if (convErr) throw convErr;
+        setReplayId(conv as string);
+        toast({ title: 'Show dipindahkan ke Replay', description: 'Kartu otomatis hilang dari menu Streaming Show.' });
+        setTimeout(() => window.location.reload(), 800);
+      }
     } catch (e: any) {
       toast({ title: 'Gagal menyimpan', description: e.message, variant: 'destructive' });
     }
