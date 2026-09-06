@@ -809,11 +809,22 @@ export default function Live() {
   // Pernah ON AIR di sesi ini → saat admin mematikan live, tampilkan "Live Telah Selesai".
   const wasLiveRef = useRef(false);
   const [liveEnded, setLiveEnded] = useState(false);
+  const liveEndedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Ganti show (membership mengikuti live terbaru) → status "selesai" direset.
   useEffect(() => { wasLiveRef.current = false; setLiveEnded(false); }, [effectiveShowId]);
   useEffect(() => {
-    if (liveActive) { wasLiveRef.current = true; setLiveEnded(false); return; }
-    if (wasLiveRef.current) setLiveEnded(true);
+    if (liveActive) {
+      wasLiveRef.current = true;
+      setLiveEnded(false);
+      if (liveEndedTimerRef.current) { clearTimeout(liveEndedTimerRef.current); liveEndedTimerRef.current = null; }
+      return;
+    }
+    // Jangan langsung latch "selesai" pada pembacaan false pertama — beri grace
+    // 8 detik agar network blip / fetch error sesaat tidak menampilkan layar selesai.
+    if (wasLiveRef.current && !liveEndedTimerRef.current) {
+      liveEndedTimerRef.current = setTimeout(() => { setLiveEnded(true); liveEndedTimerRef.current = null; }, 8000);
+    }
+    return () => { if (liveEndedTimerRef.current) { clearTimeout(liveEndedTimerRef.current); liveEndedTimerRef.current = null; } };
   }, [liveActive]);
 
   useEffect(() => {
