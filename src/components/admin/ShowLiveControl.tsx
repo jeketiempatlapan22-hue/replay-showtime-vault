@@ -50,6 +50,8 @@ export default function ShowLiveControl({ showId, showTitle }: Props) {
   const [freeEnabled, setFreeEnabled] = useState(false);
   const [freeShowId, setFreeShowId] = useState('');
   const [freeSaving, setFreeSaving] = useState(false);
+  const [freeDuration, setFreeDuration] = useState(0);
+  const [freeStartedAt, setFreeStartedAt] = useState('');
   const [wmEnabled, setWmEnabled] = useState(false);
   const [wmText, setWmText] = useState('');
   const [wmOpacity, setWmOpacity] = useState(25);
@@ -57,6 +59,7 @@ export default function ShowLiveControl({ showId, showTitle }: Props) {
   const [flEnabled, setFlEnabled] = useState(false);
   const [flUrl, setFlUrl] = useState('');
   const [flLabel, setFlLabel] = useState('Join Saluran');
+
 
   const [newLabel, setNewLabel] = useState('');
   const [newType, setNewType] = useState<SrcType>('m3u8');
