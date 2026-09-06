@@ -9,6 +9,8 @@ import { setShowPurchase } from '@/lib/purchases';
 import { clearMembershipCredentials, saveMembershipCredentials } from '@/lib/membershipAccess';
 import MemberAvatar from '@/components/MemberAvatar';
 import { useAutoHideOnInteraction } from '@/hooks/useAutoHideOnInteraction';
+import { useViewerCount } from '@/hooks/useViewerCount';
+
 import type { HlsPlayerHandle } from '@/components/HlsPlayer';
 
 // Lazy-load player & chat: bundle awal lebih kecil, terutama di mobile.
