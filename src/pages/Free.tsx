@@ -14,6 +14,8 @@ const SETTING_KEYS = [
   'free_link_enabled',
   'free_link_url',
   'free_link_label',
+  'free_duration_minutes',
+  'free_started_at',
 ];
 
 interface FreeConfig {
@@ -24,6 +26,8 @@ interface FreeConfig {
   linkEnabled: boolean;
   linkUrl: string;
   linkLabel: string;
+  durationMin: number;
+  startedAt: string;
 }
 
 const DEFAULT_CONFIG: FreeConfig = {
@@ -34,6 +38,8 @@ const DEFAULT_CONFIG: FreeConfig = {
   linkEnabled: false,
   linkUrl: '',
   linkLabel: 'Join Saluran',
+  durationMin: 0,
+  startedAt: '',
 };
 
 const HlsPlayer = lazy(() => import('@/components/HlsPlayer'));
@@ -42,6 +48,8 @@ const LiveChat = lazy(() => import('@/components/LiveChat'));
 interface FreeToken {
   title: string;
   xShowId: string;
+  freeEndsAt?: string | null;
+  showId?: string;
   xTokenId: string;
   xSecKey: string;
   xApiToken: string;
@@ -57,6 +65,7 @@ const REASONS: Record<string, string> = {
   idn_belum_diatur: 'Siaran gratis belum dikonfigurasi admin.',
   blocked: 'Perangkat kamu diblokir.',
   fingerprint_required: 'Perangkat tidak dikenali. Muat ulang halaman.',
+  free_ended: 'Waktu siaran gratis sudah habis. Terima kasih sudah menonton!',
 };
 
 // Rotasi kredensial tiap 28 menit (token gratis berlaku 30 menit) agar tayangan tidak terputus.
@@ -142,6 +151,8 @@ export default function Free() {
         linkEnabled: map.free_link_enabled === 'true',
         linkUrl: map.free_link_url || '',
         linkLabel: map.free_link_label || DEFAULT_CONFIG.linkLabel,
+        durationMin: Number(map.free_duration_minutes) || 0,
+        startedAt: map.free_started_at || '',
       });
     };
     void load();
