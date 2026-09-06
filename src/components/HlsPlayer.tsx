@@ -178,8 +178,13 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
   useEffect(() => { srcRef.current = src; }, [src]);
 
   const showCastPicker = useCallback(async () => {
-    // 1) Google Cast (Chromecast) untuk Chromium — kirim URL stream langsung ke TV.
-    if (isGoogleCastCapable()) {
+    // Sumber IDN/Hanabira membutuhkan header khusus (x-api-token, x-showid, dll)
+    // yang tidak bisa disisipkan oleh Chromecast receiver. Cast hanya untuk sumber
+    // URL langsung tanpa header. AirPlay/Remote Playback memakai sesi <video> di
+    // HP ini (tetap terautentikasi) sehingga aman untuk semua sumber dan tidak
+    // memicu reset perangkat.
+    const headerGated = !!headersRef.current && Object.keys(headersRef.current).length > 0;
+    if (isGoogleCastCapable() && !headerGated) {
       const ok = await castMedia({
         url: srcRef.current,
         title,

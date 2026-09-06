@@ -183,7 +183,11 @@ export default function Live() {
       return supabase.from('active_shows')
         .select('id,title,is_live,live_type,live_require_password,lineup,show_date,show_time,is_active,image_url,idn_show_id,group_link,group_link_enabled,group_link_label,group_link_note')
         .eq('id', sid).maybeSingle()
-        .then(({ data }) => {
+        .then(({ data, error }) => {
+          // Jangan anggap live "selesai" hanya karena fetch status gagal sesaat
+          // (network blip / rate limit). Pertahankan status lama; polling/realtime
+          // berikutnya akan mengoreksi. Ini memperbaiki false "Live Telah Selesai".
+          if (error) { setStatusLoading(false); return null; }
           if (!data || !data.is_active) {
             setStatus({ enabled: false, title: 'Live', type: 'm3u8', require_password: true, sources: [], lineup: [] });
             setStatusLoading(false);
