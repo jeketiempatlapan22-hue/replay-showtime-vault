@@ -63,6 +63,8 @@ export default function Kunci() {
         body: { password: pwInput.trim(), browser_id: getBrowserId(), show_id: showId || undefined },
       });
       if (data?.valid) {
+        // Simpan grant & idn_show_id agar pemutar Hanabira/IDN (yang membutuhkan
+        // signed grant) langsung siap di /live tanpa "Sesi akses belum siap".
         const cfg = {
           title: data.title,
           type: data.type || 'm3u8',
@@ -70,6 +72,8 @@ export default function Kunci() {
           sources: Array.isArray(data.sources) ? data.sources : [],
           watermark: data.watermark || '',
           enabled: !!data.enabled,
+          idn_show_id: data.idn_show_id || '',
+          grant: data.grant || '',
         };
         try { sessionStorage.setItem(ssKey, JSON.stringify(cfg)); } catch { /* ignore */ }
         navigate(`/live${showId ? `?show=${showId}` : ''}`, { replace: true });

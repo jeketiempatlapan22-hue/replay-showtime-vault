@@ -183,7 +183,11 @@ export default function Live() {
       return supabase.from('active_shows')
         .select('id,title,is_live,live_type,live_require_password,lineup,show_date,show_time,is_active,image_url,idn_show_id,group_link,group_link_enabled,group_link_label,group_link_note')
         .eq('id', sid).maybeSingle()
-        .then(({ data }) => {
+        .then(({ data, error }) => {
+          // Jangan anggap live "selesai" hanya karena fetch status gagal sesaat
+          // (network blip / rate limit). Pertahankan status lama; polling/realtime
+          // berikutnya akan mengoreksi. Ini memperbaiki false "Live Telah Selesai".
+          if (error) { setStatusLoading(false); return null; }
           if (!data || !data.is_active) {
             setStatus({ enabled: false, title: 'Live', type: 'm3u8', require_password: true, sources: [], lineup: [] });
             setStatusLoading(false);
@@ -472,7 +476,8 @@ export default function Live() {
       void (async () => {
         const { data: liveRow } = await supabase.from('active_shows')
           .select('id').eq('is_active', true).eq('is_live', true)
-          .order('show_date', { ascending: false }).limit(1).maybeSingle();
+          .order('show_date', { ascending: false }).order('show_time', { ascending: false })
+          .limit(1).maybeSingle();
         let targetId = liveRow?.id as string | undefined;
         if (!targetId) {
           const today = new Date().toISOString().slice(0, 10);
@@ -805,11 +810,22 @@ export default function Live() {
   // Pernah ON AIR di sesi ini → saat admin mematikan live, tampilkan "Live Telah Selesai".
   const wasLiveRef = useRef(false);
   const [liveEnded, setLiveEnded] = useState(false);
+  const liveEndedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Ganti show (membership mengikuti live terbaru) → status "selesai" direset.
   useEffect(() => { wasLiveRef.current = false; setLiveEnded(false); }, [effectiveShowId]);
   useEffect(() => {
-    if (liveActive) { wasLiveRef.current = true; setLiveEnded(false); return; }
-    if (wasLiveRef.current) setLiveEnded(true);
+    if (liveActive) {
+      wasLiveRef.current = true;
+      setLiveEnded(false);
+      if (liveEndedTimerRef.current) { clearTimeout(liveEndedTimerRef.current); liveEndedTimerRef.current = null; }
+      return;
+    }
+    // Jangan langsung latch "selesai" pada pembacaan false pertama — beri grace
+    // 8 detik agar network blip / fetch error sesaat tidak menampilkan layar selesai.
+    if (wasLiveRef.current && !liveEndedTimerRef.current) {
+      liveEndedTimerRef.current = setTimeout(() => { setLiveEnded(true); liveEndedTimerRef.current = null; }, 8000);
+    }
+    return () => { if (liveEndedTimerRef.current) { clearTimeout(liveEndedTimerRef.current); liveEndedTimerRef.current = null; } };
   }, [liveActive]);
 
   useEffect(() => {

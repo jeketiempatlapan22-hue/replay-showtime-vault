@@ -178,8 +178,13 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
   useEffect(() => { srcRef.current = src; }, [src]);
 
   const showCastPicker = useCallback(async () => {
-    // 1) Google Cast (Chromecast) untuk Chromium — kirim URL stream langsung ke TV.
-    if (isGoogleCastCapable()) {
+    // Sumber IDN/Hanabira membutuhkan header khusus (x-api-token, x-showid, dll)
+    // yang tidak bisa disisipkan oleh Chromecast receiver. Cast hanya untuk sumber
+    // URL langsung tanpa header. AirPlay/Remote Playback memakai sesi <video> di
+    // HP ini (tetap terautentikasi) sehingga aman untuk semua sumber dan tidak
+    // memicu reset perangkat.
+    const headerGated = !!headersRef.current && Object.keys(headersRef.current).length > 0;
+    if (isGoogleCastCapable() && !headerGated) {
       const ok = await castMedia({
         url: srcRef.current,
         title,
@@ -1199,12 +1204,15 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
               >
                 <Cast className="w-5 h-5" />
               </button>
-              {showTvMenu && (
+              {showTvMenu && (() => {
+                const headerGated = !!headers && Object.keys(headers).length > 0;
+                const castOk = castSupported && castAvailable && !casting && !headerGated;
+                return (
                 <div
                   className="absolute bottom-12 right-0 z-30 w-60 rounded-lg border border-white/15 bg-black/90 backdrop-blur p-1.5 text-xs text-white shadow-xl"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  {castSupported && castAvailable && !casting && (
+                  {castOk && (
                     <button type="button" className="w-full text-left px-2.5 py-2 rounded hover:bg-white/10"
                       onClick={() => { void showCastPicker(); setShowTvMenu(false); resetHideTimer(); }}>
                       Hubungkan ke TV (Cast / AirPlay)
@@ -1216,6 +1224,13 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
                       Hentikan Cast ke TV
                     </button>
                   )}
+                  {/* AirPlay/Remote Playback selalu tersedia & aman untuk semua sumber
+                      (termasuk IDN) karena memakai sesi video di perangkat ini — tidak
+                      membuat ikatan perangkat baru, jadi tidak memicu reset. */}
+                  <button type="button" className="w-full text-left px-2.5 py-2 rounded hover:bg-white/10"
+                    onClick={() => { showNativePicker(videoRef.current); setShowTvMenu(false); resetHideTimer(); }}>
+                    AirPlay / Remote Playback (via HP)
+                  </button>
                   <button type="button" className="w-full text-left px-2.5 py-2 rounded hover:bg-white/10"
                     onClick={() => {
                       const next = !tvMode;
@@ -1231,10 +1246,13 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
                     Salin link untuk browser TV
                   </button>
                   <p className="px-2.5 py-1.5 text-[10px] text-white/60 leading-relaxed">
-                    Tempel link di browser Smart TV / proyektor, atau gunakan Cast bila TV mendukung Chromecast.
+                    {headerGated
+                      ? 'Sumber ini hanya bisa ditonton via AirPlay/Mode TV dari HP ini (tidak perlu reset). Buka link di TV hanya berlaku untuk token multi-perangkat.'
+                      : 'AirPlay/Cast dari HP ini memakai sesi yang sama — token tidak perlu reset. Salin link hanya untuk token multi-perangkat.'}
                   </p>
                 </div>
-              )}
+                );
+              })()}
             </div>
 
             <button type="button" onClick={(e) => { e.stopPropagation(); toggleFullscreen(); resetHideTimer(); }} className="p-2 text-white hover:text-primary transition-colors" aria-label="Fullscreen">
