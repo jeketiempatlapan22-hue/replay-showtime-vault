@@ -236,6 +236,12 @@ export default function Live() {
           return data;
         });
     }
+    // Link membership tanpa ?show sedang menunggu show terbaru dari unlock-live.
+    // Jangan baca konfigurasi legacy yang dapat memberi status OFF palsu.
+    if (search.get('mtoken')) {
+      setStatusLoading(false);
+      return Promise.resolve(null);
+    }
     return supabase.rpc('get_live_status').then(({ data }) => {
       const row = Array.isArray(data) ? data[0] : data;
       setStatus(row ? {
@@ -280,10 +286,22 @@ export default function Live() {
         body: { ...opts, browser_id: getBrowserId(), show_id: showId || undefined, silent },
       });
       if (data?.valid) {
-        // Membership tanpa ?show: pakai show yang di-resolve server agar chat & status ikut show terbaru.
+        // Membership selalu mengikuti show live terbaru yang di-resolve server.
+        // Link lama dari admin/reseller bisa masih membawa ?show= milik show lama;
+        // ganti parameter itu tanpa mengubah token/sandi agar tidak tampil "selesai".
         const serverShowId = data.show_id ? String(data.show_id) : '';
-        const showSwitched = !showId && !!serverShowId && !!resolvedShowIdRef.current && serverShowId !== resolvedShowIdRef.current;
-        if (!showId && serverShowId) { resolvedShowIdRef.current = serverShowId; setResolvedShowId(serverShowId); }
+        const currentResolvedId = showId || resolvedShowIdRef.current;
+        const showSwitched = !!serverShowId && !!currentResolvedId && serverShowId !== currentResolvedId;
+        if (opts.mtoken && serverShowId && showId !== serverShowId) {
+          resolvedShowIdRef.current = serverShowId;
+          setResolvedShowId(serverShowId);
+          const params = new URLSearchParams(search);
+          params.set('show', serverShowId);
+          navigate(`/live?${params.toString()}`, { replace: true });
+        } else if (!showId && serverShowId) {
+          resolvedShowIdRef.current = serverShowId;
+          setResolvedShowId(serverShowId);
+        }
         // Pembeli anon yang membuka link token dari WhatsApp: simpan token
         // supaya kartu show di beranda langsung menampilkan tombol "Tonton".
         try {

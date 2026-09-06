@@ -215,7 +215,7 @@ Deno.serve(async (req) => {
           if (!isNaN(dt.getTime())) months.add(`${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}`);
         };
         addMonth(new Date(replay.date));
-        addMonth(new Date());
+        addMonth(new Date(Date.now() + 7 * 3600 * 1000));
         const { data: masters } = await supabase
           .from("master_passwords")
           .select("password, paused, month")

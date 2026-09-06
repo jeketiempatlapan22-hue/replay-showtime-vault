@@ -65,13 +65,13 @@ export default function ActiveShowCard({ show, index = 0 }: { show: ActiveShow; 
   const showBuyable = showPriced || showCoinPrice > 0;
   const replayBuyable = replayPriced || replayCoinPrice > 0;
 
-  // LIVE detection — semua show otomatis live 20 menit sebelum jam jadwal,
-  // kecuali admin sedang menahan live (override).
+  // LIVE detection — jadwal hanya berlaku jika diaktifkan admin.
   const PRE_LIVE_MS = 20 * 60 * 1000;
   const startMs = target.getTime();
   const nowMs = Date.now();
   const holdActive = !!show.live_hold_until && new Date(show.live_hold_until).getTime() > nowMs;
-  const autoLive = nowMs >= startMs - PRE_LIVE_MS && nowMs <= startMs + 8 * 3600 * 1000;
+  const autoLive = !!show.is_active && !!show.live_auto_schedule
+    && nowMs >= startMs - PRE_LIVE_MS && nowMs <= startMs + 8 * 3600 * 1000;
   const isLiveNow = !holdActive && (!!show.is_live || autoLive);
 
 
