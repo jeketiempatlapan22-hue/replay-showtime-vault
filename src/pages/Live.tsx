@@ -236,6 +236,12 @@ export default function Live() {
           return data;
         });
     }
+    // Link membership tanpa ?show sedang menunggu show terbaru dari unlock-live.
+    // Jangan baca konfigurasi legacy yang dapat memberi status OFF palsu.
+    if (search.get('mtoken')) {
+      setStatusLoading(false);
+      return Promise.resolve(null);
+    }
     return supabase.rpc('get_live_status').then(({ data }) => {
       const row = Array.isArray(data) ? data[0] : data;
       setStatus(row ? {

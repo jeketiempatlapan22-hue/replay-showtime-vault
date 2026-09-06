@@ -288,7 +288,7 @@ Deno.serve(async (req) => {
             if (!isNaN(dt.getTime())) months.add(`${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}`);
           };
           if (show.show_date) addMonth(new Date(show.show_date));
-          addMonth(new Date());
+          addMonth(new Date(Date.now() + 7 * 3600 * 1000));
           const { data: masters } = await supabase
             .from("master_passwords").select("password,paused,month").in("month", [...months]);
           valid = (masters || []).some((m: any) => m.paused !== true && m.password === password);
@@ -369,7 +369,7 @@ Deno.serve(async (req) => {
       if (lockRow?.locked) return json({ valid: false, reason: 'rate_limited', seconds_remaining: lockRow.seconds_remaining });
       let valid = !!cfg.password && cfg.password === password;
       if (!valid) {
-        const now = new Date();
+        const now = new Date(Date.now() + 7 * 3600 * 1000);
         const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
         const { data: masters } = await supabase
           .from("master_passwords").select("password,paused").eq("month", monthKey);
