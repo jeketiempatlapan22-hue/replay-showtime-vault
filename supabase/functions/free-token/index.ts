@@ -26,13 +26,27 @@ Deno.serve(async (req) => {
     );
 
     const { data: settings } = await supabase
-      .from('site_settings').select('key,value').in('key', ['free_mode_enabled', 'free_show_id']);
+      .from('site_settings').select('key,value')
+      .in('key', ['free_mode_enabled', 'free_show_id', 'free_duration_minutes', 'free_started_at']);
     const map = Object.fromEntries((settings || []).map((s: any) => [s.key, String(s.value || '')]));
     if (map.free_mode_enabled !== 'true') return json({ error: 'free_off' }, 403);
+
+    // Durasi siaran gratis (menit). 0 / kosong = tanpa batas.
+    const durationMin = Number(map.free_duration_minutes) || 0;
+    const startedMs = map.free_started_at ? new Date(map.free_started_at).getTime() : 0;
+    const endsMs = durationMin > 0 && Number.isFinite(startedMs) && startedMs > 0
+      ? startedMs + durationMin * 60 * 1000
+      : 0;
+    if (endsMs && Date.now() >= endsMs) {
+      // Waktu habis → matikan mode gratis otomatis agar endpoint benar-benar tertutup.
+      await supabase.from('site_settings').update({ value: 'false' }).eq('key', 'free_mode_enabled');
+      return json({ error: 'free_ended' }, 403);
+    }
 
     const freeShowId = map.free_show_id || '';
     if (!freeShowId) return json({ error: 'free_off' }, 403);
     if (showId && showId !== freeShowId) return json({ error: 'free_show_mismatch' }, 403);
+
 
     const { data: blk } = await supabase
       .from('blocked_browsers').select('id').eq('browser_id', fingerprint).eq('unblocked', false).maybeSingle();
