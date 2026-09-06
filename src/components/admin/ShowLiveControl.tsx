@@ -319,7 +319,33 @@ export default function ShowLiveControl({ showId, showTitle }: Props) {
             <Label className="text-sm">Live Otomatis Sesuai Jadwal</Label>
             <p className="text-[11px] text-muted-foreground">Aktif otomatis pada jam show selama 8 jam.</p>
           </div>
-          <Switch checked={autoSchedule} onCheckedChange={setAutoSchedule} />
+          <Switch
+            checked={autoSchedule}
+            disabled={saving}
+            onCheckedChange={async (v) => {
+              const previous = autoSchedule;
+              setAutoSchedule(v);
+              setSaving(true);
+              try {
+                const { data, error } = await supabase.functions.invoke('manage-live', {
+                  body: {
+                    action: 'upsert_active_show',
+                    show: { id: showId, live_auto_schedule: v },
+                  },
+                });
+                if (error) throw error;
+                if (data?.error) throw new Error(data.error);
+                toast({
+                  title: v ? 'Live otomatis diaktifkan' : 'Live otomatis dinonaktifkan',
+                  description: v ? 'Show akan mulai 20 menit sebelum jadwal.' : 'Jadwal otomatis tidak akan mengubah status live.',
+                });
+              } catch (e: any) {
+                setAutoSchedule(previous);
+                toast({ title: 'Gagal mengubah live otomatis', description: e.message, variant: 'destructive' });
+              }
+              setSaving(false);
+            }}
+          />
         </div>
       </div>
 
