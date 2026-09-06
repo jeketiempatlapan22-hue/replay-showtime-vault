@@ -101,9 +101,21 @@ export default function ShowLiveControl({ showId, showTitle }: Props) {
     try {
       await saveSetting('free_mode_enabled', enabled ? 'true' : 'false');
       await saveSetting('free_show_id', targetShow);
+      let startedAt = freeStartedAt;
+      if (enabled) {
+        // Setiap kali mode gratis dinyalakan, hitung mundur durasi dimulai dari sekarang.
+        startedAt = new Date().toISOString();
+        await saveSetting('free_started_at', startedAt);
+        setFreeStartedAt(startedAt);
+      }
       setFreeEnabled(enabled);
       setFreeShowId(targetShow);
-      toast({ title: enabled ? 'Mode gratis AKTIF' : 'Mode gratis MATI', description: enabled ? 'Halaman /free bisa diakses untuk show ini.' : 'Endpoint /free-token dinonaktifkan.' });
+      toast({
+        title: enabled ? 'Mode gratis AKTIF' : 'Mode gratis MATI',
+        description: enabled
+          ? (freeDuration > 0 ? `Siaran gratis berjalan ${freeDuration} menit lalu mati otomatis.` : 'Halaman /free bisa diakses untuk show ini.')
+          : 'Endpoint /free-token dinonaktifkan.',
+      });
     } catch (e: any) {
       toast({ title: 'Gagal menyimpan mode gratis', description: e.message, variant: 'destructive' });
     }
@@ -113,6 +125,7 @@ export default function ShowLiveControl({ showId, showTitle }: Props) {
   const saveFreeExtras = async () => {
     setFreeSaving(true);
     try {
+      await saveSetting('free_duration_minutes', String(Math.min(1440, Math.max(0, Math.round(freeDuration) || 0))));
       await saveSetting('free_watermark_enabled', wmEnabled ? 'true' : 'false');
       await saveSetting('free_watermark_text', wmText.slice(0, 120));
       await saveSetting('free_watermark_opacity', String(Math.min(100, Math.max(1, wmOpacity))));
@@ -120,6 +133,7 @@ export default function ShowLiveControl({ showId, showTitle }: Props) {
       await saveSetting('free_link_enabled', flEnabled ? 'true' : 'false');
       await saveSetting('free_link_url', flUrl.trim());
       await saveSetting('free_link_label', flLabel.trim().slice(0, 40) || 'Join Saluran');
+
       toast({ title: 'Pengaturan halaman /free disimpan' });
     } catch (e: any) {
       toast({ title: 'Gagal menyimpan', description: e.message, variant: 'destructive' });
