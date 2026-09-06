@@ -1,10 +1,11 @@
 import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Loader2, Gift, RefreshCw, Link as LinkIcon } from 'lucide-react';
+import { Loader2, Gift, RefreshCw, Link as LinkIcon, Timer, Users } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { getDeviceFingerprint } from '@/lib/fingerprint';
 import FreeScreenWatermark from '@/components/FreeScreenWatermark';
+import { useViewerCount } from '@/hooks/useViewerCount';
 
 const SETTING_KEYS = [
   'free_watermark_enabled',
@@ -14,6 +15,8 @@ const SETTING_KEYS = [
   'free_link_enabled',
   'free_link_url',
   'free_link_label',
+  'free_duration_minutes',
+  'free_started_at',
 ];
 
 interface FreeConfig {
@@ -24,6 +27,8 @@ interface FreeConfig {
   linkEnabled: boolean;
   linkUrl: string;
   linkLabel: string;
+  durationMin: number;
+  startedAt: string;
 }
 
 const DEFAULT_CONFIG: FreeConfig = {
@@ -34,6 +39,8 @@ const DEFAULT_CONFIG: FreeConfig = {
   linkEnabled: false,
   linkUrl: '',
   linkLabel: 'Join Saluran',
+  durationMin: 0,
+  startedAt: '',
 };
 
 const HlsPlayer = lazy(() => import('@/components/HlsPlayer'));
@@ -42,6 +49,8 @@ const LiveChat = lazy(() => import('@/components/LiveChat'));
 interface FreeToken {
   title: string;
   xShowId: string;
+  freeEndsAt?: string | null;
+  showId?: string;
   xTokenId: string;
   xSecKey: string;
   xApiToken: string;
@@ -57,6 +66,7 @@ const REASONS: Record<string, string> = {
   idn_belum_diatur: 'Siaran gratis belum dikonfigurasi admin.',
   blocked: 'Perangkat kamu diblokir.',
   fingerprint_required: 'Perangkat tidak dikenali. Muat ulang halaman.',
+  free_ended: 'Waktu siaran gratis sudah habis. Terima kasih sudah menonton!',
 };
 
 // Rotasi kredensial tiap 28 menit (token gratis berlaku 30 menit) agar tayangan tidak terputus.
@@ -86,6 +96,8 @@ export default function Free() {
   const [session, setSession] = useState<FreeSession | null>(null);
   const [rotating, setRotating] = useState(false);
   const [config, setConfig] = useState<FreeConfig>(DEFAULT_CONFIG);
+  const [activeShowId, setActiveShowId] = useState('');
+  const [nowMs, setNowMs] = useState(() => Date.now());
   const nonceRef = useRef(0);
   const timerRef = useRef<number | null>(null);
 
@@ -98,6 +110,7 @@ export default function Free() {
     if (fnErr && !j?.playbackUrl) throw new Error((j?.error && REASONS[j.error]) || REASONS.free_off);
     if (j?.error) throw new Error(REASONS[j.error] || j.error);
     if (!j.playbackUrl || !j.xApiToken) throw new Error('Respon server tidak lengkap.');
+    if (j.showId) setActiveShowId(String(j.showId));
     return {
       url: j.playbackUrl,
       title: j.title || 'Siaran Gratis',
@@ -142,6 +155,8 @@ export default function Free() {
         linkEnabled: map.free_link_enabled === 'true',
         linkUrl: map.free_link_url || '',
         linkLabel: map.free_link_label || DEFAULT_CONFIG.linkLabel,
+        durationMin: Number(map.free_duration_minutes) || 0,
+        startedAt: map.free_started_at || '',
       });
     };
     void load();
@@ -179,6 +194,37 @@ export default function Free() {
     };
   }, [session, fetchToken]);
 
+  // Batas waktu siaran gratis yang diatur admin (0 = tanpa batas).
+  const endsAtMs = config.durationMin > 0 && config.startedAt
+    ? new Date(config.startedAt).getTime() + config.durationMin * 60000
+    : 0;
+  const remainingMs = endsAtMs ? endsAtMs - nowMs : 0;
+
+  useEffect(() => {
+    if (!endsAtMs) return;
+    const id = window.setInterval(() => setNowMs(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, [endsAtMs]);
+
+  // Waktu habis → hentikan pemutaran dan tampilkan pesan.
+  useEffect(() => {
+    if (!endsAtMs || remainingMs > 0) return;
+    setSession(null);
+    setLoading(false);
+    setError(REASONS.free_ended);
+  }, [endsAtMs, remainingMs]);
+
+  const viewerCount = useViewerCount(activeShowId || showId || 'global', !!session);
+
+  const remainingLabel = (() => {
+    const total = Math.max(0, Math.floor(remainingMs / 1000));
+    const h = Math.floor(total / 3600);
+    const m = Math.floor((total % 3600) / 60);
+    const sec = total % 60;
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return h > 0 ? `${h}:${pad(m)}:${pad(sec)}` : `${pad(m)}:${pad(sec)}`;
+  })();
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       <div className="max-w-4xl mx-auto p-3 sm:p-4 space-y-4">
@@ -186,11 +232,23 @@ export default function Free() {
           <h1 className="text-lg sm:text-xl font-bold flex items-center gap-2">
             <Gift className="w-5 h-5 text-amber-400" /> Siaran Gratis
           </h1>
+          <div className="flex items-center gap-2">
+            {viewerCount !== null && (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary/10 border border-primary/30 text-primary text-xs font-semibold">
+                <Users className="w-3.5 h-3.5" /> {viewerCount.toLocaleString('id-ID')} menonton
+              </span>
+            )}
+            {endsAtMs > 0 && remainingMs > 0 && (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-500 text-xs font-semibold tabular-nums">
+                <Timer className="w-3.5 h-3.5" /> {remainingLabel}
+              </span>
+            )}
           {rotating && (
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-500 text-xs font-semibold">
               <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Menyegarkan
             </span>
           )}
+          </div>
         </header>
 
         {loading ? (

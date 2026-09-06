@@ -9,6 +9,8 @@ import { setShowPurchase } from '@/lib/purchases';
 import { clearMembershipCredentials, saveMembershipCredentials } from '@/lib/membershipAccess';
 import MemberAvatar from '@/components/MemberAvatar';
 import { useAutoHideOnInteraction } from '@/hooks/useAutoHideOnInteraction';
+import { useViewerCount } from '@/hooks/useViewerCount';
+
 import type { HlsPlayerHandle } from '@/components/HlsPlayer';
 
 // Lazy-load player & chat: bundle awal lebih kecil, terutama di mobile.
@@ -873,68 +875,11 @@ export default function Live() {
   }, [unlocked, liveActive, playbackPriorityMode]);
 
   // ============ VIEWER COUNTER (presence) — count unique browser_id ============
-  // Heavily throttled to stay light at 1000+ concurrent viewers. Each sync/join/leave
-  // event at scale fans out O(N) updates; we coalesce them into a single recount
-  // every 15 seconds and only when the tab is visible.
-  const showKey = search.get('show') || 'global';
-  const [viewerCount, setViewerCount] = useState<number | null>(null);
-  useEffect(() => {
-    if (!liveActive) { setViewerCount(null); return; }
-    const bid = getBrowserId();
-    const channel = supabase.channel(`live-viewers:${showKey}`, {
-      config: { presence: { key: bid } },
-    });
-    let pending: number | null = null;
-    let lastCount = 0;
-    const recount = () => {
-      if (pending || document.visibilityState !== 'visible') return;
-      pending = window.setTimeout(() => {
-        pending = null;
-        try {
-          const state = channel.presenceState() as Record<string, unknown[]>;
-          let unique = 0;
-          for (const k of Object.keys(state)) {
-            if (k && Array.isArray(state[k]) && state[k].length > 0) unique++;
-          }
-          if (unique !== lastCount) { lastCount = unique; setViewerCount(unique); }
-        } catch { /* ignore */ }
-      }, 25000);
-    };
-    let tracked = false;
-    let heartbeat: number | null = null;
-    channel
-      .on('presence', { event: 'sync' }, recount)
-      .on('presence', { event: 'join' }, recount)
-      .on('presence', { event: 'leave' }, recount)
-      .subscribe(async (status) => {
-        if (status === 'SUBSCRIBED' && !tracked) {
-          tracked = true;
-          try { await channel.track({ at: Date.now() }); } catch { /* ignore */ }
-          recount();
-          // Heartbeat 5 menit — presence punya auto-timeout sendiri; interval panjang
-          // memangkas trafik websocket signifikan saat 1000+ viewer.
-          heartbeat = window.setInterval(() => {
-            if (document.visibilityState === 'visible') {
-              channel.track({ at: Date.now() }).catch(() => {});
-            }
-          }, 300000);
-        }
-      });
-    // Tab disembunyikan → lepas presence supaya fan-out event berkurang drastis.
-    const onVis = () => {
-      if (document.visibilityState === 'visible') channel.track({ at: Date.now() }).catch(() => {});
-      else channel.untrack().catch(() => {});
-    };
-    document.addEventListener('visibilitychange', onVis);
-    return () => {
-      document.removeEventListener('visibilitychange', onVis);
-      if (pending) window.clearTimeout(pending);
-      if (heartbeat) window.clearInterval(heartbeat);
-      try { void channel.untrack(); } catch { /* ignore */ }
-      supabase.removeChannel(channel);
-    };
+  // Channel dibagi dengan halaman /free supaya angka penonton menggabungkan
+  // penonton gratis dan berbayar untuk show yang sama.
+  const showKey = resolvedShowId || search.get('show') || 'global';
+  const viewerCount = useViewerCount(showKey, liveActive);
 
-  }, [liveActive, showKey]);
 
   return (
     <div className="min-h-screen bg-background relative z-10">

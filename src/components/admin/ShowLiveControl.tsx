@@ -50,6 +50,8 @@ export default function ShowLiveControl({ showId, showTitle }: Props) {
   const [freeEnabled, setFreeEnabled] = useState(false);
   const [freeShowId, setFreeShowId] = useState('');
   const [freeSaving, setFreeSaving] = useState(false);
+  const [freeDuration, setFreeDuration] = useState(0);
+  const [freeStartedAt, setFreeStartedAt] = useState('');
   const [wmEnabled, setWmEnabled] = useState(false);
   const [wmText, setWmText] = useState('');
   const [wmOpacity, setWmOpacity] = useState(25);
@@ -58,18 +60,22 @@ export default function ShowLiveControl({ showId, showTitle }: Props) {
   const [flUrl, setFlUrl] = useState('');
   const [flLabel, setFlLabel] = useState('Join Saluran');
 
+
   const [newLabel, setNewLabel] = useState('');
   const [newType, setNewType] = useState<SrcType>('m3u8');
   const [newUrl, setNewUrl] = useState('');
 
   useEffect(() => {
     supabase.from('site_settings').select('key,value')
-      .in('key', ['free_mode_enabled', 'free_show_id', 'free_watermark_enabled', 'free_watermark_text', 'free_watermark_opacity', 'free_watermark_size', 'free_link_enabled', 'free_link_url', 'free_link_label'])
+      .in('key', ['free_mode_enabled', 'free_show_id', 'free_watermark_enabled', 'free_watermark_text', 'free_watermark_opacity', 'free_watermark_size', 'free_link_enabled', 'free_link_url', 'free_link_label', 'free_duration_minutes', 'free_started_at'])
       .then(({ data }) => {
         const map = Object.fromEntries((data || []).map((r: any) => [r.key, String(r.value || '')]));
         setFreeEnabled(map.free_mode_enabled === 'true');
         setFreeShowId(map.free_show_id || '');
+        setFreeDuration(Number(map.free_duration_minutes) || 0);
+        setFreeStartedAt(map.free_started_at || '');
         setWmEnabled(map.free_watermark_enabled === 'true');
+
         setWmText(map.free_watermark_text || '');
         setWmOpacity(Number(map.free_watermark_opacity) || 25);
         setWmSize(Number(map.free_watermark_size) || 12);
@@ -95,9 +101,21 @@ export default function ShowLiveControl({ showId, showTitle }: Props) {
     try {
       await saveSetting('free_mode_enabled', enabled ? 'true' : 'false');
       await saveSetting('free_show_id', targetShow);
+      let startedAt = freeStartedAt;
+      if (enabled) {
+        // Setiap kali mode gratis dinyalakan, hitung mundur durasi dimulai dari sekarang.
+        startedAt = new Date().toISOString();
+        await saveSetting('free_started_at', startedAt);
+        setFreeStartedAt(startedAt);
+      }
       setFreeEnabled(enabled);
       setFreeShowId(targetShow);
-      toast({ title: enabled ? 'Mode gratis AKTIF' : 'Mode gratis MATI', description: enabled ? 'Halaman /free bisa diakses untuk show ini.' : 'Endpoint /free-token dinonaktifkan.' });
+      toast({
+        title: enabled ? 'Mode gratis AKTIF' : 'Mode gratis MATI',
+        description: enabled
+          ? (freeDuration > 0 ? `Siaran gratis berjalan ${freeDuration} menit lalu mati otomatis.` : 'Halaman /free bisa diakses untuk show ini.')
+          : 'Endpoint /free-token dinonaktifkan.',
+      });
     } catch (e: any) {
       toast({ title: 'Gagal menyimpan mode gratis', description: e.message, variant: 'destructive' });
     }
@@ -107,6 +125,7 @@ export default function ShowLiveControl({ showId, showTitle }: Props) {
   const saveFreeExtras = async () => {
     setFreeSaving(true);
     try {
+      await saveSetting('free_duration_minutes', String(Math.min(1440, Math.max(0, Math.round(freeDuration) || 0))));
       await saveSetting('free_watermark_enabled', wmEnabled ? 'true' : 'false');
       await saveSetting('free_watermark_text', wmText.slice(0, 120));
       await saveSetting('free_watermark_opacity', String(Math.min(100, Math.max(1, wmOpacity))));
@@ -114,6 +133,7 @@ export default function ShowLiveControl({ showId, showTitle }: Props) {
       await saveSetting('free_link_enabled', flEnabled ? 'true' : 'false');
       await saveSetting('free_link_url', flUrl.trim());
       await saveSetting('free_link_label', flLabel.trim().slice(0, 40) || 'Join Saluran');
+
       toast({ title: 'Pengaturan halaman /free disimpan' });
     } catch (e: any) {
       toast({ title: 'Gagal menyimpan', description: e.message, variant: 'destructive' });
@@ -421,6 +441,54 @@ export default function ShowLiveControl({ showId, showTitle }: Props) {
             Salin link /free
           </Button>
         </div>
+
+        {/* Durasi siaran gratis */}
+        <div className="pt-2 mt-1 border-t border-border/60 space-y-2">
+          <Label className="text-sm">Durasi siaran gratis</Label>
+          <p className="text-[11px] text-muted-foreground">
+            Isi dalam menit. Siaran gratis mati otomatis saat durasi tercapai. Isi 0 untuk tanpa batas.
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <Input
+              type="number"
+              min={0}
+              max={1440}
+              value={freeDuration}
+              onChange={e => setFreeDuration(Number(e.target.value))}
+              className="w-28"
+            />
+            <span className="text-[11px] text-muted-foreground">menit</span>
+            {[30, 60, 90, 120].map(m => (
+              <Button key={m} size="sm" variant={freeDuration === m ? 'secondary' : 'outline'} onClick={() => setFreeDuration(m)}>
+                {m}m
+              </Button>
+            ))}
+            <Button size="sm" variant="outline" disabled={freeSaving || !freeEnabled} onClick={async () => {
+              setFreeSaving(true);
+              try {
+                const now = new Date().toISOString();
+                await saveSetting('free_started_at', now);
+                setFreeStartedAt(now);
+                toast({ title: 'Hitung mundur gratis dimulai ulang' });
+              } catch (e: any) {
+                toast({ title: 'Gagal', description: e.message, variant: 'destructive' });
+              }
+              setFreeSaving(false);
+            }}>
+              Mulai ulang hitung mundur
+            </Button>
+          </div>
+          {freeEnabled && freeDuration > 0 && freeStartedAt && (
+            <p className="text-[11px] text-muted-foreground">
+              Berakhir sekitar:{' '}
+              <span className="font-mono">
+                {new Date(new Date(freeStartedAt).getTime() + freeDuration * 60000).toLocaleString('id-ID')}
+              </span>
+            </p>
+          )}
+        </div>
+
+
 
         {/* Watermark selayar khusus /free */}
         <div className="pt-2 mt-1 border-t border-border/60 space-y-2">
