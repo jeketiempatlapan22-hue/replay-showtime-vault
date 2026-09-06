@@ -40,15 +40,16 @@ Deno.serve(async (req) => {
 
     const { data: show } = await supabase
       .from('active_shows')
-      .select('id,title,is_active,is_live,show_date,show_time,idn_show_id,live_hold_until')
+      .select('id,title,is_active,is_live,live_auto_schedule,show_date,show_time,idn_show_id,live_hold_until')
       .eq('id', freeShowId).maybeSingle();
     if (!show || !show.is_active) return json({ error: 'free_off' }, 403);
 
     const idn = String(show.idn_show_id || '');
     if (!idn) return json({ error: 'idn_belum_diatur' }, 409);
 
-    // Window live: manual is_live ATAU otomatis 20 menit sebelum jadwal s/d +8 jam.
+    // Window otomatis hanya berlaku jika toggle jadwal show diaktifkan admin.
     const autoLiveNow = (() => {
+      if (!show.live_auto_schedule) return false;
       if (!show.show_date || !show.show_time) return false;
       const startMs = new Date(`${show.show_date}T${String(show.show_time).slice(0, 8)}+07:00`).getTime();
       if (!Number.isFinite(startMs)) return false;

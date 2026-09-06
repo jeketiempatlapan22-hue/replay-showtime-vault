@@ -193,8 +193,9 @@ Deno.serve(async (req) => {
         // fall through to legacy branch
       } else {
 
-      // Auto schedule: semua show otomatis live mulai 20 menit sebelum jam jadwal, sampai +8 jam.
+      // Auto schedule hanya berlaku saat toggle admin diaktifkan.
       const autoLiveNow = (() => {
+        if (!show.live_auto_schedule) return false;
         if (!show.show_date || !show.show_time) return false;
         const startMs = new Date(`${show.show_date}T${String(show.show_time).slice(0, 8)}+07:00`).getTime();
         if (!Number.isFinite(startMs)) return false;
