@@ -93,6 +93,9 @@ Deno.serve(async (req) => {
       playbackUrl: PLAYBACK_URL,
       expiresIn: GRANT_TTL_FREE,
       expiresAt,
+      showId: show.id,
+      freeEndsAt: endsMs ? new Date(endsMs).toISOString() : null,
+
     });
   } catch (e) {
     return json({ error: (e as Error).message }, 500);
