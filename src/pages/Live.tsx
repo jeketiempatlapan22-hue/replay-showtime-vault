@@ -476,7 +476,8 @@ export default function Live() {
       void (async () => {
         const { data: liveRow } = await supabase.from('active_shows')
           .select('id').eq('is_active', true).eq('is_live', true)
-          .order('show_date', { ascending: false }).limit(1).maybeSingle();
+          .order('show_date', { ascending: false }).order('show_time', { ascending: false })
+          .limit(1).maybeSingle();
         let targetId = liveRow?.id as string | undefined;
         if (!targetId) {
           const today = new Date().toISOString().slice(0, 10);

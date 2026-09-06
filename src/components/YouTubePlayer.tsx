@@ -272,7 +272,18 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
                   setShowTvMenu(false);
                 }}
               >
-                Hubungkan ke TV (AirPlay / Cast)
+                AirPlay / Remote Playback (via HP)
+              </button>
+              <button
+                type="button"
+                className="w-full text-left px-2.5 py-2 rounded hover:bg-muted"
+                onClick={() => {
+                  const v = document.querySelector('video') as HTMLVideoElement & { webkitShowPlaybackTargetPicker?: () => void };
+                  if (typeof v?.webkitShowPlaybackTargetPicker === 'function') v.webkitShowPlaybackTargetPicker();
+                  setShowTvMenu(false);
+                }}
+              >
+                Hubungkan ke TV (Cast / AirPlay)
               </button>
               <button
                 type="button"
@@ -285,7 +296,7 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
                 Salin link untuk browser TV
               </button>
               <p className="px-2.5 py-1.5 text-[10px] text-muted-foreground leading-relaxed">
-                Buka link ini di browser Smart TV / proyektor, atau gunakan Cast dari menu browser.
+                AirPlay/Cast dari HP ini memakai sesi yang sama — token tidak perlu reset. Salin link hanya untuk token multi-perangkat.
               </p>
             </div>
           )}
