@@ -442,6 +442,54 @@ export default function ShowLiveControl({ showId, showTitle }: Props) {
           </Button>
         </div>
 
+        {/* Durasi siaran gratis */}
+        <div className="pt-2 mt-1 border-t border-border/60 space-y-2">
+          <Label className="text-sm">Durasi siaran gratis</Label>
+          <p className="text-[11px] text-muted-foreground">
+            Isi dalam menit. Siaran gratis mati otomatis saat durasi tercapai. Isi 0 untuk tanpa batas.
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <Input
+              type="number"
+              min={0}
+              max={1440}
+              value={freeDuration}
+              onChange={e => setFreeDuration(Number(e.target.value))}
+              className="w-28"
+            />
+            <span className="text-[11px] text-muted-foreground">menit</span>
+            {[30, 60, 90, 120].map(m => (
+              <Button key={m} size="sm" variant={freeDuration === m ? 'secondary' : 'outline'} onClick={() => setFreeDuration(m)}>
+                {m}m
+              </Button>
+            ))}
+            <Button size="sm" variant="outline" disabled={freeSaving || !freeEnabled} onClick={async () => {
+              setFreeSaving(true);
+              try {
+                const now = new Date().toISOString();
+                await saveSetting('free_started_at', now);
+                setFreeStartedAt(now);
+                toast({ title: 'Hitung mundur gratis dimulai ulang' });
+              } catch (e: any) {
+                toast({ title: 'Gagal', description: e.message, variant: 'destructive' });
+              }
+              setFreeSaving(false);
+            }}>
+              Mulai ulang hitung mundur
+            </Button>
+          </div>
+          {freeEnabled && freeDuration > 0 && freeStartedAt && (
+            <p className="text-[11px] text-muted-foreground">
+              Berakhir sekitar:{' '}
+              <span className="font-mono">
+                {new Date(new Date(freeStartedAt).getTime() + freeDuration * 60000).toLocaleString('id-ID')}
+              </span>
+            </p>
+          )}
+        </div>
+
+
+
         {/* Watermark selayar khusus /free */}
         <div className="pt-2 mt-1 border-t border-border/60 space-y-2">
           <div className="flex items-center justify-between gap-2">
