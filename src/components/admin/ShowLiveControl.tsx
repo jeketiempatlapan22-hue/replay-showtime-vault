@@ -67,12 +67,15 @@ export default function ShowLiveControl({ showId, showTitle }: Props) {
 
   useEffect(() => {
     supabase.from('site_settings').select('key,value')
-      .in('key', ['free_mode_enabled', 'free_show_id', 'free_watermark_enabled', 'free_watermark_text', 'free_watermark_opacity', 'free_watermark_size', 'free_link_enabled', 'free_link_url', 'free_link_label'])
+      .in('key', ['free_mode_enabled', 'free_show_id', 'free_watermark_enabled', 'free_watermark_text', 'free_watermark_opacity', 'free_watermark_size', 'free_link_enabled', 'free_link_url', 'free_link_label', 'free_duration_minutes', 'free_started_at'])
       .then(({ data }) => {
         const map = Object.fromEntries((data || []).map((r: any) => [r.key, String(r.value || '')]));
         setFreeEnabled(map.free_mode_enabled === 'true');
         setFreeShowId(map.free_show_id || '');
+        setFreeDuration(Number(map.free_duration_minutes) || 0);
+        setFreeStartedAt(map.free_started_at || '');
         setWmEnabled(map.free_watermark_enabled === 'true');
+
         setWmText(map.free_watermark_text || '');
         setWmOpacity(Number(map.free_watermark_opacity) || 25);
         setWmSize(Number(map.free_watermark_size) || 12);
