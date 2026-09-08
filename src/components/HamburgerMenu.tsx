@@ -27,6 +27,24 @@ export default function HamburgerMenu({ whatsappNumber, whatsappLink, lightMode,
     setOpen(false);
   };
 
+  // Kunci scroll body, tutup dengan tombol Esc, dan tombol "kembali" perangkat.
+  useEffect(() => {
+    if (!open) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+    const onPop = () => setOpen(false);
+    window.addEventListener('keydown', onKey);
+    window.history.pushState({ menu: true }, '');
+    window.addEventListener('popstate', onPop);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('popstate', onPop);
+      if (window.history.state?.menu) window.history.back();
+    };
+  }, [open]);
+
   useEffect(() => {
     const fetch = () => supabase.rpc('get_live_status').then(({ data }) => {
       const row = Array.isArray(data) ? data[0] : data;
