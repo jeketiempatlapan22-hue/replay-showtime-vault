@@ -86,14 +86,7 @@ if (typeof window !== 'undefined') {
         localStorage.setItem(BUILD_KEY, current);
         reloadWhenIdle(() => window.location.reload());
       };
-      Promise.all([
-        'serviceWorker' in navigator
-          ? navigator.serviceWorker.getRegistrations().then(rs => Promise.all(rs.map(r => r.unregister()))).catch(() => {})
-          : Promise.resolve(),
-        'caches' in window
-          ? caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k)))).catch(() => {})
-          : Promise.resolve(),
-      ]).then(done, done);
+      done();
     } else {
       localStorage.setItem(BUILD_KEY, current);
       sessionStorage.removeItem(RELOAD_FLAG);
@@ -102,18 +95,6 @@ if (typeof window !== 'undefined') {
 }
 
 
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.getRegistrations()
-      .then((registrations) => Promise.all(registrations.map((registration) => registration.unregister())))
-      .catch(() => {});
-
-    if ('caches' in window) {
-      caches.keys()
-        .then((keys) => Promise.all(keys.filter((key) => key.startsWith('replaytime-')).map((key) => caches.delete(key))))
-        .catch(() => {});
-    }
-  });
-}
+registerServiceWorker();
 
 createRoot(document.getElementById("root")!).render(<App />);
