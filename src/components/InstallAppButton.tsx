@@ -29,6 +29,11 @@ export default function InstallAppButton({ variant = 'icon', className, onDone }
     else onDone?.();
   };
 
+  const handleDirectInstall = async () => {
+    const result = await promptInstall();
+    if (result === 'accepted') { setOpen(false); onDone?.(); }
+  };
+
   return (
     <>
       {variant === 'icon' ? (
@@ -68,6 +73,13 @@ export default function InstallAppButton({ variant = 'icon', className, onDone }
               Setelah dipasang, ReplayTime terbuka seperti aplikasi biasa dengan semua fitur yang sama.
             </DialogDescription>
           </DialogHeader>
+
+          {canPrompt && (
+            <Button className="w-full gap-2" size="lg" onClick={handleDirectInstall}>
+              <Download className="w-5 h-5" />
+              Install Sekarang
+            </Button>
+          )}
 
           <div className="space-y-4 text-sm">
             {ios ? (
