@@ -1,22 +1,33 @@
 {
-  "name": "ReplayTime",
+  "id": "/",
+  "name": "ReplayTime - RealTime48",
   "short_name": "ReplayTime",
-  "description": "Koleksi Replay Show Terlengkap dari RealTime48",
+  "description": "Koleksi Replay & Live Show Terlengkap dari RealTime48",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
+  "lang": "id",
   "background_color": "#0f1420",
   "theme_color": "#c9952b",
   "orientation": "portrait-primary",
   "icons": [
     {
-      "src": "/favicon.png",
+      "src": "/icon-192.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
     },
     {
-      "src": "/favicon.png",
+      "src": "/icon-512.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }
