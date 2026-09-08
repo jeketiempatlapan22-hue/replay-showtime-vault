@@ -74,11 +74,18 @@ export default function InstallAppButton({ variant = 'icon', className, onDone }
             </DialogDescription>
           </DialogHeader>
 
-          {canPrompt && (
-            <Button className="w-full gap-2" size="lg" onClick={handleDirectInstall}>
-              <Download className="w-5 h-5" />
-              Install Sekarang
-            </Button>
+          {!ios && (
+            <>
+              <Button className="w-full gap-2" size="lg" onClick={handleDirectInstall}>
+                <Download className="w-5 h-5" />
+                Install Sekarang
+              </Button>
+              {!canPrompt && (
+                <p className="text-[11px] text-muted-foreground -mt-2">
+                  Jika tombol di atas belum bekerja, browser Anda belum siap memasang. Ikuti langkah manual di bawah.
+                </p>
+              )}
+            </>
           )}
 
           <div className="space-y-4 text-sm">
@@ -113,7 +120,7 @@ export default function InstallAppButton({ variant = 'icon', className, onDone }
             )}
           </div>
 
-          <Button className="w-full mt-2" onClick={() => setOpen(false)}>Mengerti</Button>
+          <Button variant="outline" className="w-full mt-2" onClick={() => setOpen(false)}>Mengerti</Button>
         </DialogContent>
       </Dialog>
     </>
