@@ -74,6 +74,13 @@ export default function InstallAppButton({ variant = 'icon', className, onDone }
             </DialogDescription>
           </DialogHeader>
 
+          {canPrompt && (
+            <Button className="w-full gap-2" size="lg" onClick={handleDirectInstall}>
+              <Download className="w-5 h-5" />
+              Install Sekarang
+            </Button>
+          )}
+
           <div className="space-y-4 text-sm">
             {ios ? (
               <Steps
