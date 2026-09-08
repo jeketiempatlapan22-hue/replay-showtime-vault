@@ -29,6 +29,11 @@ export default function InstallAppButton({ variant = 'icon', className, onDone }
     else onDone?.();
   };
 
+  const handleDirectInstall = async () => {
+    const result = await promptInstall();
+    if (result === 'accepted') { setOpen(false); onDone?.(); }
+  };
+
   return (
     <>
       {variant === 'icon' ? (
