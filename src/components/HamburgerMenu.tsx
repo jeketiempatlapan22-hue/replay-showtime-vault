@@ -192,6 +192,10 @@ export default function HamburgerMenu({ whatsappNumber, whatsappLink, lightMode,
           )}
 
           <div className="pt-2 mt-2 border-t border-border">
+            <InstallAppButton variant="menu" onDone={() => setOpen(false)} />
+          </div>
+
+          <div className="pt-2 mt-2 border-t border-border">
             {user ? (
               <>
                 <div className="flex items-center gap-3 px-4 py-3 rounded-lg text-foreground">
@@ -222,7 +226,7 @@ export default function HamburgerMenu({ whatsappNumber, whatsappLink, lightMode,
         </nav>
 
         {/* Dark/Light toggle at bottom */}
-        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-border">
+        <div className="shrink-0 p-4 border-t border-border bg-card pb-[calc(1rem+env(safe-area-inset-bottom))]">
           <button
             onClick={onToggleMode}
             className="flex items-center gap-3 w-full px-4 py-3 rounded-lg text-foreground hover:bg-secondary transition-colors"
