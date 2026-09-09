@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHandle } from 'react';
+import { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHandle, Suspense, lazy } from 'react';
 import Hls from 'hls.js';
 import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, RotateCcw, RotateCw, Loader2, Settings, Check, Cast } from 'lucide-react';
 import { isFullscreenActive, onFullscreenChange, requestFs, exitFs } from '@/lib/fullscreen';
 import LiveWatermark from '@/components/LiveWatermark';
 import { castMedia, isGoogleCastCapable, requestWakeLock, showNativePicker, stopCastSession } from '@/lib/cast';
+const TvConnectDialog = lazy(() => import('@/components/TvConnectDialog'));
 
 
 interface Props {
@@ -101,6 +102,8 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
   const [casting, setCasting] = useState(false);
   const [tvMode, setTvMode] = useState(false);
   const [showTvMenu, setShowTvMenu] = useState(false);
+  const [showTvConnect, setShowTvConnect] = useState(false);
+  const [tvConnectTab, setTvConnectTab] = useState<'code' | 'mirror'>('code');
   const [netStats, setNetStats] = useState<{ kbps: number; buffer: number; recommendedHeight: number | null } | null>(null);
 
 
@@ -1241,6 +1244,14 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
                     }}>
                     {tvMode ? 'Matikan Mode TV' : 'Mode TV (layar penuh, tidak redup)'}
                   </button>
+                  <button type="button" className="w-full text-left px-2.5 py-2 rounded hover:bg-white/10 font-semibold text-primary"
+                    onClick={() => { setTvConnectTab('code'); setShowTvConnect(true); setShowTvMenu(false); resetHideTimer(); }}>
+                    Kode untuk browser TV (6 angka)
+                  </button>
+                  <button type="button" className="w-full text-left px-2.5 py-2 rounded hover:bg-white/10"
+                    onClick={() => { setTvConnectTab('mirror'); setShowTvConnect(true); setShowTvMenu(false); resetHideTimer(); }}>
+                    Panduan siarkan layar ke TV
+                  </button>
                   <button type="button" className="w-full text-left px-2.5 py-2 rounded hover:bg-white/10"
                     onClick={() => { void copyTvLink(); setShowTvMenu(false); resetHideTimer(); }}>
                     Salin link untuk browser TV
@@ -1299,6 +1310,12 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
         </p>
       </div>
     )}
+
+    <Suspense fallback={null}>
+      {showTvConnect && (
+        <TvConnectDialog open={showTvConnect} onOpenChange={setShowTvConnect} initialTab={tvConnectTab} />
+      )}
+    </Suspense>
     </>
   );
 });
