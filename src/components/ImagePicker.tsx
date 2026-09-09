@@ -23,8 +23,27 @@ export default function ImagePicker({ value, onChange, autoMatchTitle }: ImagePi
   const [loadingGallery, setLoadingGallery] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [pendingName, setPendingName] = useState('');
+  const [renaming, setRenaming] = useState<GalleryItem | null>(null);
+  const [renameName, setRenameName] = useState('');
+  const [savingRename, setSavingRename] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const autoDoneRef = useRef('');
+
+  const doRename = async () => {
+    if (!renaming || !renameName.trim()) return;
+    setSavingRename(true);
+    try {
+      const newUrl = await renameGalleryImage(renaming.file, renameName);
+      if (value === renaming.url) onChange(newUrl);
+      toast({ title: 'Nama gambar diubah', description: 'Show/replay yang memakai gambar ini ikut diperbarui.' });
+      setRenaming(null);
+      await loadGallery();
+    } catch (e: any) {
+      toast({ title: 'Gagal ganti nama', description: e?.message || 'gagal', variant: 'destructive' });
+    }
+    setSavingRename(false);
+  };
+
 
   const loadGallery = async (): Promise<GalleryItem[]> => {
     setLoadingGallery(true);
