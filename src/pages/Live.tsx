@@ -794,6 +794,12 @@ export default function Live() {
         const raw = e instanceof Error ? e.message : '';
         const stale = /non-2xx|401|403|unauthorized|akses_ditolak|grant_mismatch/i.test(raw);
         if (stale) {
+          // Sesi TV (kode 6 angka): perbarui grant diam-diam supaya tayangan lanjut.
+          const fresh = getTvSession() ? await renewTvGrant(showId) : '';
+          if (fresh) {
+            setUnlocked(prev => (prev ? { ...prev, grant: fresh } : prev));
+            return;
+          }
           // Grant kedaluwarsa/berubah format: minta grant baru diam-diam.
           setUnlocked(prev => (prev ? { ...prev, grant: '' } : prev));
         }
