@@ -613,6 +613,24 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
     }
   };
 
+  // Tap langsung di area video adalah gesture user asli — browser mobile hanya
+  // mengizinkan pemutaran (apalagi bersuara) di dalam gesture seperti ini.
+  const playFromGesture = () => {
+    userPausedRef.current = false;
+    if (type === 'youtube') {
+      ytHandshake();
+      ytCommand('playVideo');
+      try { ytPlayerRef.current?.setVolume?.(Math.round(volumeRef.current * 100)); } catch { /* ignore */ }
+    } else {
+      if (iframeRef.current && iframeRef.current.src === 'about:blank') iframeRef.current.src = cfEmbedUrl;
+      cfPost('play');
+    }
+    setIsPlaying(true);
+    isPlayingRef.current = true;
+  };
+
+
+
   const toggleMute = () => {
     const m = !muted;
     setMuted(m);
