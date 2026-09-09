@@ -12,6 +12,7 @@ import { useAutoHideOnInteraction } from '@/hooks/useAutoHideOnInteraction';
 import { useViewerCount } from '@/hooks/useViewerCount';
 
 import type { HlsPlayerHandle } from '@/components/HlsPlayer';
+import { TV_ROTATE_MS, getTvSession, renewTvGrant } from '@/lib/tvSession';
 
 // Lazy-load player & chat: bundle awal lebih kecil, terutama di mobile.
 const HlsPlayer = lazy(() => import('@/components/HlsPlayer'));
