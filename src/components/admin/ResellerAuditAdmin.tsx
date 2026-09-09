@@ -46,6 +46,45 @@ export default function ResellerAuditAdmin() {
   const [pending, setPending] = useState<PendingAction | null>(null);
   const [busy, setBusy] = useState(false);
   const [sel, setSel] = useState<Set<string>>(new Set());
+  const [prices, setPrices] = useState<Record<string, number>>({});
+  const [defaultPrice, setDefaultPrice] = useState(0);
+  const [editing, setEditing] = useState<(StatRow & { phone: string }) | null>(null);
+  const [editCopies, setEditCopies] = useState(0);
+  const [editPrice, setEditPrice] = useState(0);
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  const openEdit = (phone: string, it: StatRow) => {
+    setEditing({ ...it, phone });
+    setEditCopies(Number(it.copies) || 0);
+    setEditPrice(it.target_id ? (prices[it.target_id] ?? defaultPrice) : defaultPrice);
+  };
+
+  const saveEdit = async () => {
+    if (!editing) return;
+    setSavingEdit(true);
+    try {
+      const { error } = await supabase.rpc('admin_set_reseller_copy_count', {
+        _phone: editing.reseller_phone,
+        _kind: editing.kind,
+        _target_id: editing.target_id,
+        _count: Math.max(0, Math.floor(editCopies)),
+      });
+      if (error) throw error;
+      if (editing.target_id) {
+        const { error: pErr } = await supabase.from('reseller_show_prices').upsert(
+          { show_id: editing.target_id, price_per_link: Math.max(0, Math.floor(editPrice)), updated_at: new Date().toISOString() },
+          { onConflict: 'show_id' },
+        );
+        if (pErr) throw pErr;
+      }
+      toast({ title: 'Data diperbarui' });
+      setEditing(null);
+      await load();
+    } catch (e: any) {
+      toast({ title: 'Gagal menyimpan', description: e?.message || 'gagal', variant: 'destructive' });
+    }
+    setSavingEdit(false);
+  };
 
   const keyOf = (phone: string, kind: string, target_id: string | null) => `${phone}|${kind}|${target_id ?? ''}`;
   const toggleSel = (k: string) => setSel(prev => {
