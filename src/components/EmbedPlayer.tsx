@@ -1078,6 +1078,30 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
             style={{ touchAction: 'manipulation' }}
           />
           <div className="flex-1" />
+          {type === 'youtube' && !liveActive && (
+            <div className="relative shrink-0">
+              <button
+                onClick={(e) => { e.stopPropagation(); setShowSpeedMenu(v => !v); resetHideTimer(); }}
+                aria-label="Kecepatan pemutaran"
+                className="px-2 py-1.5 rounded-md text-white text-[11px] sm:text-xs font-semibold hover:text-primary active:scale-95 transition-all tabular-nums"
+              >
+                {playbackRate}x
+              </button>
+              {showSpeedMenu && (
+                <div className="absolute bottom-full right-0 mb-2 rounded-lg bg-black/90 border border-white/15 p-1 shadow-xl flex flex-col min-w-[64px]">
+                  {[0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2].map(r => (
+                    <button
+                      key={r}
+                      onClick={(e) => { e.stopPropagation(); changeRate(r); resetHideTimer(); }}
+                      className={`px-2 py-1 text-[11px] rounded text-left tabular-nums ${r === playbackRate ? 'bg-primary text-primary-foreground' : 'text-white hover:bg-white/10'}`}
+                    >
+                      {r}x
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
           <button onClick={(e) => { e.stopPropagation(); toggleFullscreen(); }} aria-label="Fullscreen" className="p-2.5 landscape:p-3 text-white hover:text-primary active:scale-95 transition-all">
             {isFullscreen || pseudoFs ? <Minimize className="w-5 h-5 landscape:w-6 landscape:h-6" /> : <Maximize className="w-5 h-5 landscape:w-6 landscape:h-6" />}
           </button>
