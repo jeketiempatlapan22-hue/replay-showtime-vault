@@ -24,7 +24,20 @@ export default function ShowLiveControl({ showId, showTitle }: Props) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [tokensOpen, setTokensOpen] = useState(false);
+  const [tokenCount, setTokenCount] = useState<number | null>(null);
   const [resendOpen, setResendOpen] = useState(false);
+
+  useEffect(() => {
+    if (!showId) return;
+    let mounted = true;
+    void supabase
+      .from('active_show_tokens')
+      .select('id', { count: 'exact', head: true })
+      .eq('show_id', showId)
+      .then(({ count }) => { if (mounted) setTokenCount(count ?? 0); });
+    return () => { mounted = false; };
+  }, [showId, tokensOpen]);
+
 
   const [isLive, setIsLive] = useState(false);
   const [holdUntil, setHoldUntil] = useState<string | null>(null);
