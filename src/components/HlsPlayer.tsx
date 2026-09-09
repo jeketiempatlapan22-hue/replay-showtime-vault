@@ -916,7 +916,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
 
   // Fullscreen tracking (cross-browser)
   useEffect(() => {
-    const onChange = () => setIsFullscreen(isFullscreenActive());
+    const onChange = () => setIsFullscreen(isFullscreenActive() || isVideoFullscreen(videoRef.current));
     return onFullscreenChange(onChange);
   }, []);
 
