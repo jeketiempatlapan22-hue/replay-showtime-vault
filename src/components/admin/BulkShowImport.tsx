@@ -1,15 +1,19 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Upload, Trash2, Sparkles } from 'lucide-react';
+import { Upload, Trash2, Sparkles, ImageOff, ImageIcon } from 'lucide-react';
 import { upsertActiveShow } from '@/lib/activeShows';
 import { toast } from '@/hooks/use-toast';
+import { getGalleryItems } from '@/lib/store';
+import { matchGalleryImage, type GalleryItem } from '@/lib/showImageMatch';
+import { thumbUrl } from '@/lib/imageUrl';
 
 import { parseBulkText, type ParsedShow } from '@/lib/bulkShowParser';
+
 
 
 interface Props {
