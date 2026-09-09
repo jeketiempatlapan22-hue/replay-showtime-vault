@@ -1743,6 +1743,36 @@ export type Database = {
         }
         Relationships: []
       }
+      tv_pair_codes: {
+        Row: {
+          browser_id: string | null
+          code: string
+          created_at: string
+          expires_at: string
+          payload: Json
+          show_id: string | null
+          used_at: string | null
+        }
+        Insert: {
+          browser_id?: string | null
+          code: string
+          created_at?: string
+          expires_at: string
+          payload: Json
+          show_id?: string | null
+          used_at?: string | null
+        }
+        Update: {
+          browser_id?: string | null
+          code?: string
+          created_at?: string
+          expires_at?: string
+          payload?: Json
+          show_id?: string | null
+          used_at?: string | null
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           id: string
