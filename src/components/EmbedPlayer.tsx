@@ -377,12 +377,19 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
       }
 
       initialized = true;
-      // Biarkan YT API yang membuat iframe-nya sendiri agar seek/durasi/play-pause
-      // selalu terhubung (attach ke iframe manual sering gagal diam-diam).
-      ytPlayerRef.current = new YT.Player(ytHostRef.current, {
+      // YT API MENGGANTI elemen yang dioper dengan iframe buatannya. Kalau kita
+      // oper div milik React, React kehilangan node-nya dan player bisa berakhir
+      // di node lepas (tampil thumbnail saja / kontrol tidak nyambung).
+      // Karena itu kita buat node mount sendiri di dalam host.
+      const mount = document.createElement('div');
+      mount.style.width = '100%';
+      mount.style.height = '100%';
+      ytHostRef.current.replaceChildren(mount);
+      ytPlayerRef.current = new YT.Player(mount, {
         videoId: ytId,
         width: '100%',
         height: '100%',
+        host: 'https://www.youtube-nocookie.com',
         playerVars: {
           rel: 0,
           modestbranding: 1,
@@ -516,6 +523,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
       if (ytFallbackTimerRef.current) clearTimeout(ytFallbackTimerRef.current);
       try { ytPlayerRef.current?.pauseVideo?.(); } catch { /* ignore */ }
       try { ytPlayerRef.current?.destroy?.(); } catch { /* ignore */ }
+      try { ytHostRef.current?.replaceChildren(); } catch { /* ignore */ }
       ytPlayerRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -604,6 +612,24 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
       setIsPlaying(!isPlaying);
     }
   };
+
+  // Tap langsung di area video adalah gesture user asli — browser mobile hanya
+  // mengizinkan pemutaran (apalagi bersuara) di dalam gesture seperti ini.
+  const playFromGesture = () => {
+    userPausedRef.current = false;
+    if (type === 'youtube') {
+      ytHandshake();
+      ytCommand('playVideo');
+      try { ytPlayerRef.current?.setVolume?.(Math.round(volumeRef.current * 100)); } catch { /* ignore */ }
+    } else {
+      if (iframeRef.current && iframeRef.current.src === 'about:blank') iframeRef.current.src = cfEmbedUrl;
+      cfPost('play');
+    }
+    setIsPlaying(true);
+    isPlayingRef.current = true;
+  };
+
+
 
   const toggleMute = () => {
     const m = !muted;
@@ -993,12 +1019,26 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
       )}
 
 
-      {/* Click-shield over iframe — single tap toggles controls visibility instead of clicking through to YouTube logo. */}
+      {/* Click-shield over iframe — tap memulai pemutaran (gesture asli) atau menampilkan kontrol. */}
       {!plainMode && (
         <div
           className="absolute inset-0 z-[5]"
-          onClick={(e) => { e.preventDefault(); toggleControls(); }}
+          onClick={(e) => { e.preventDefault(); if (!isPlaying) playFromGesture(); toggleControls(); }}
         />
+      )}
+
+      {/* Tombol putar besar di tengah saat video belum berjalan. */}
+      {!plainMode && ready && !isPlaying && (
+        <button
+          type="button"
+          aria-label="Putar"
+          onClick={(e) => { e.stopPropagation(); playFromGesture(); resetHideTimer(); }}
+          className="absolute inset-0 z-[8] flex items-center justify-center"
+        >
+          <span className="w-16 h-16 rounded-full bg-black/60 border border-white/25 flex items-center justify-center shadow-xl active:scale-95 transition-transform">
+            <Play className="w-8 h-8 text-white translate-x-0.5" />
+          </span>
+        </button>
       )}
 
 
