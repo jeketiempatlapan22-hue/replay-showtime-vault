@@ -43,6 +43,15 @@ export default function ResellerAuditAdmin() {
   const [q, setQ] = useState('');
   const [pending, setPending] = useState<PendingAction | null>(null);
   const [busy, setBusy] = useState(false);
+  const [sel, setSel] = useState<Set<string>>(new Set());
+
+  const keyOf = (phone: string, kind: string, target_id: string | null) => `${phone}|${kind}|${target_id ?? ''}`;
+  const toggleSel = (k: string) => setSel(prev => {
+    const n = new Set(prev);
+    if (n.has(k)) n.delete(k); else n.add(k);
+    return n;
+  });
+
 
   const load = async () => {
     setLoading(true);
