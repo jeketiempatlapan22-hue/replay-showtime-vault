@@ -143,6 +143,15 @@ export default function ShowLiveTokensDialog({ open, onOpenChange, showId, showT
           <DialogDescription className="truncate">{showTitle}</DialogDescription>
         </DialogHeader>
 
+        <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-border bg-secondary/30 px-3 py-2">
+          <span className="text-xs text-muted-foreground">Total token show ini:</span>
+          <Badge className="text-[11px] font-semibold">{tokens.length}</Badge>
+          <Badge variant="secondary" className="text-[10px]">Aktif {tokens.filter(t => !t.revoked).length}</Badge>
+          <Badge variant="destructive" className="text-[10px]">Dicabut {tokens.filter(t => t.revoked).length}</Badge>
+          <Badge variant="outline" className="text-[10px]">Device {Object.values(devices).reduce((n, d) => n + d.length, 0)}</Badge>
+        </div>
+
+
         <div className="space-y-3 border border-border rounded-lg p-3 bg-secondary/30">
           <div className="grid grid-cols-2 gap-2">
             <Button size="sm" variant={kind === 'personal' ? 'default' : 'outline'} onClick={() => { setKind('personal'); setMaxDevices(1); }}>

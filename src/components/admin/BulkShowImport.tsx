@@ -1,15 +1,19 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Upload, Trash2, Sparkles } from 'lucide-react';
+import { Upload, Trash2, Sparkles, ImageOff, ImageIcon } from 'lucide-react';
 import { upsertActiveShow } from '@/lib/activeShows';
 import { toast } from '@/hooks/use-toast';
+import { getGalleryItems } from '@/lib/store';
+import { matchGalleryImage, type GalleryItem } from '@/lib/showImageMatch';
+import { thumbUrl } from '@/lib/imageUrl';
 
 import { parseBulkText, type ParsedShow } from '@/lib/bulkShowParser';
+
 
 
 interface Props {
@@ -22,7 +26,13 @@ export default function BulkShowImport({ onImported }: Props) {
   const [parsed, setParsed] = useState<ParsedShow[]>([]);
   const [saving, setSaving] = useState(false);
   const [warnings, setWarnings] = useState<string[]>([]);
+  const [gallery, setGallery] = useState<GalleryItem[]>([]);
+  const [imgOverride, setImgOverride] = useState<Record<number, string>>({});
 
+  useEffect(() => {
+    if (!open) return;
+    getGalleryItems().then(setGallery).catch(() => setGallery([]));
+  }, [open]);
 
   // Defaults applied to ALL parsed shows
   const [defPriceShow, setDefPriceShow] = useState<number>(0);
@@ -32,15 +42,24 @@ export default function BulkShowImport({ onImported }: Props) {
   const [defPassword, setDefPassword] = useState<string>('');
   const [aliasPrefix, setAliasPrefix] = useState<string>('');
 
-  const preview = useMemo(() => parsed.map((s, idx) => ({
-    ...s,
-    admin_alias: aliasPrefix ? `${aliasPrefix}${idx + 1}` : s.admin_alias,
-    live_password: s.live_password || defPassword,
-    price_show: s.price_show || defPriceShow,
-    price_replay: s.price_replay || defPriceReplay,
-    price_show_coins: s.price_show_coins || defCoinsShow,
-    price_replay_coins: s.price_replay_coins || defCoinsReplay,
-  })), [parsed, aliasPrefix, defPassword, defPriceShow, defPriceReplay, defCoinsShow, defCoinsReplay]);
+  const preview = useMemo(() => parsed.map((s, idx) => {
+    const hit = matchGalleryImage(s.title, gallery);
+    const override = imgOverride[idx];
+    return {
+      ...s,
+      admin_alias: aliasPrefix ? `${aliasPrefix}${idx + 1}` : s.admin_alias,
+      live_password: s.live_password || defPassword,
+      price_show: s.price_show || defPriceShow,
+      price_replay: s.price_replay || defPriceReplay,
+      price_show_coins: s.price_show_coins || defCoinsShow,
+      price_replay_coins: s.price_replay_coins || defCoinsReplay,
+      image_url: override ?? (hit?.url || ''),
+      image_name: override ? (gallery.find(g => g.url === override)?.name || 'manual') : (hit?.name || ''),
+    };
+  }), [parsed, gallery, imgOverride, aliasPrefix, defPassword, defPriceShow, defPriceReplay, defCoinsShow, defCoinsReplay]);
+
+  const unmatched = preview.filter(s => !s.image_url).length;
+
 
   const handleParse = () => {
     const { shows, warnings: warns } = parseBulkText(text);
@@ -92,7 +111,7 @@ export default function BulkShowImport({ onImported }: Props) {
           is_active: true,
           sort_order: 0,
           description: s.description || '',
-          image_url: '',
+          image_url: s.image_url || '',
           pakasir_amount: 0,
           replay_id: null,
           replay_enabled: false,
@@ -165,21 +184,53 @@ export default function BulkShowImport({ onImported }: Props) {
             )}
 
             <div className="space-y-3">
-              <p className="text-sm font-medium">Preview ({preview.length} show) — bisa diedit per baris:</p>
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-sm font-medium">Preview ({preview.length} show) — bisa diedit per baris:</p>
+                {unmatched === 0 ? (
+                  <Badge className="text-[10px] bg-green-500/15 text-green-600 border-green-500/30" variant="outline">Semua gambar cocok</Badge>
+                ) : (
+                  <Badge variant="destructive" className="text-[10px]">{unmatched} show tanpa gambar cocok</Badge>
+                )}
+              </div>
               {preview.map((s, idx) => (
                 <div key={idx} className="p-3 rounded-lg border border-border bg-secondary/30 space-y-2">
                   <div className="flex items-start justify-between gap-2">
+                    <div className="w-20 shrink-0 aspect-video rounded overflow-hidden border border-border bg-background flex items-center justify-center">
+                      {s.image_url ? (
+                        <img src={thumbUrl(s.image_url, 200, 55)} alt={s.title} className="w-full h-full object-cover" />
+                      ) : (
+                        <ImageOff className="w-4 h-4 text-muted-foreground" />
+                      )}
+                    </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-sm truncate">{s.title}</p>
                       <p className="text-xs text-muted-foreground">
                         📅 {s.show_date} · 🕒 {s.show_time.slice(0, 5)}
                         {s.lineup.length > 0 && ` · 👥 ${s.lineup.length}`}
                       </p>
+                      <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+                        {s.image_url ? (
+                          <Badge variant="outline" className="text-[10px] bg-green-500/15 text-green-600 border-green-500/30">
+                            <ImageIcon className="w-3 h-3 mr-1" />{s.image_name || 'gambar cocok'}
+                          </Badge>
+                        ) : (
+                          <Badge variant="destructive" className="text-[10px]">Gambar belum cocok — pilih manual</Badge>
+                        )}
+                        <select
+                          className="h-7 rounded border border-border bg-background text-[11px] px-1 max-w-[160px]"
+                          value={imgOverride[idx] ?? (s.image_url || '')}
+                          onChange={e => setImgOverride(prev => ({ ...prev, [idx]: e.target.value }))}
+                        >
+                          <option value="">(tanpa gambar)</option>
+                          {gallery.map(g => <option key={g.url} value={g.url}>{g.name}</option>)}
+                        </select>
+                      </div>
                     </div>
                     <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive shrink-0" onClick={() => removeRow(idx)}>
                       <Trash2 className="w-4 h-4" />
                     </Button>
                   </div>
+
                   <div className="grid grid-cols-2 gap-2">
                     <div>
                       <Label className="text-[10px]">Alias</Label>

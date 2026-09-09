@@ -24,7 +24,20 @@ export default function ShowLiveControl({ showId, showTitle }: Props) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [tokensOpen, setTokensOpen] = useState(false);
+  const [tokenCount, setTokenCount] = useState<number | null>(null);
   const [resendOpen, setResendOpen] = useState(false);
+
+  useEffect(() => {
+    if (!showId) return;
+    let mounted = true;
+    void supabase
+      .from('active_show_tokens')
+      .select('id', { count: 'exact', head: true })
+      .eq('show_id', showId)
+      .then(({ count }) => { if (mounted) setTokenCount(count ?? 0); });
+    return () => { mounted = false; };
+  }, [showId, tokensOpen]);
+
 
   const [isLive, setIsLive] = useState(false);
   const [holdUntil, setHoldUntil] = useState<string | null>(null);
@@ -692,7 +705,9 @@ export default function ShowLiveControl({ showId, showTitle }: Props) {
         </Button>
         <Button type="button" variant="outline" onClick={() => setTokensOpen(true)} className="w-full sm:w-auto">
           <KeyRound className="w-4 h-4 mr-2" />Token & Riwayat Akses
+          <Badge variant="secondary" className="ml-2 text-[10px]">{tokenCount ?? '…'}</Badge>
         </Button>
+
         <Button type="button" variant="outline" onClick={() => setResendOpen(true)} className="w-full sm:w-auto">
           <Send className="w-4 h-4 mr-2" />Resend WA Pembelian
         </Button>

@@ -21,11 +21,15 @@ type StatRow = {
   last_copied: string;
 };
 
+type BulkItem = { phone: string; kind: 'show' | 'replay' | 'membership'; target_id: string | null; target_title: string };
+
 type PendingAction =
   | { type: 'clear_log'; phone?: string; label?: string }
   | { type: 'reset_devices'; phone?: string; label?: string }
   | { type: 'exhaust'; phone: string; label?: string }
-  | { type: 'delete_entry'; phone: string; kind: 'show' | 'replay' | 'membership'; target_id: string | null; target_title: string };
+  | { type: 'delete_entry'; phone: string; kind: 'show' | 'replay' | 'membership'; target_id: string | null; target_title: string }
+  | { type: 'delete_bulk'; items: BulkItem[] };
+
 
 const kindBadge: Record<string, { label: string; cls: string }> = {
   show: { label: '📺 Show', cls: 'bg-red-500/15 text-red-500 border-red-500/30' },
@@ -39,6 +43,15 @@ export default function ResellerAuditAdmin() {
   const [q, setQ] = useState('');
   const [pending, setPending] = useState<PendingAction | null>(null);
   const [busy, setBusy] = useState(false);
+  const [sel, setSel] = useState<Set<string>>(new Set());
+
+  const keyOf = (phone: string, kind: string, target_id: string | null) => `${phone}|${kind}|${target_id ?? ''}`;
+  const toggleSel = (k: string) => setSel(prev => {
+    const n = new Set(prev);
+    if (n.has(k)) n.delete(k); else n.add(k);
+    return n;
+  });
+
 
   const load = async () => {
     setLoading(true);
@@ -87,11 +100,24 @@ export default function ResellerAuditAdmin() {
         if (error) throw error;
         const res = (data ?? {}) as { log_deleted?: number; tokens_deleted?: number };
         toast({ title: `Riwayat dihapus`, description: `${res.log_deleted ?? 0} catatan & ${res.tokens_deleted ?? 0} link token dihapus.` });
+      } else if (pending.type === 'delete_bulk') {
+        let log = 0, tok = 0, fail = 0;
+        for (const it of pending.items) {
+          const { data, error } = await supabase.rpc('admin_delete_reseller_copy_entry', {
+            _phone: it.phone, _kind: it.kind, _target_id: it.target_id,
+          });
+          if (error) { fail++; continue; }
+          const r = (data ?? {}) as { log_deleted?: number; tokens_deleted?: number };
+          log += r.log_deleted ?? 0; tok += r.tokens_deleted ?? 0;
+        }
+        setSel(new Set());
+        toast({ title: `${pending.items.length - fail} riwayat dihapus`, description: `${log} catatan & ${tok} link token dihapus${fail ? ` · ${fail} gagal` : ''}.` });
       } else {
         const { data, error } = await supabase.rpc('admin_exhaust_reseller_tokens', { _phone: pending.phone });
         if (error) throw error;
         toast({ title: `${data ?? 0} token reseller dihabiskan (revoked)` });
       }
+
       setPending(null);
       await load();
     } catch (err: any) {
@@ -113,7 +139,10 @@ export default function ResellerAuditAdmin() {
             : `daftar perangkat SEMUA link token reseller. Semua link tetap aktif.`)
         : pending.type === 'delete_entry'
         ? `riwayat & SEMUA link token "${pending.target_title}" milik +${pending.phone}. Link akan langsung hilang dari website.`
+        : pending.type === 'delete_bulk'
+        ? `riwayat & SEMUA link token dari ${pending.items.length} show/replay yang dicentang. Link akan langsung hilang dari website.`
         : `SEMUA link token aktif +${pending.phone} (link akan tidak bisa dipakai lagi)`)
+
     : '';
 
   return (
@@ -141,6 +170,32 @@ export default function ResellerAuditAdmin() {
             <Input placeholder="Cari nomor / label / judul…" className="pl-9" value={q} onChange={(e) => setQ(e.target.value)} />
           </div>
 
+          {sel.size > 0 && (
+            <div className="flex flex-wrap items-center gap-2 rounded-lg border border-destructive/40 bg-destructive/10 p-2">
+              <span className="text-xs font-medium">{sel.size} show dicentang</span>
+              <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setSel(new Set())}>Batal pilih</Button>
+              <Button
+                size="sm"
+                variant="destructive"
+                className="h-7 text-xs ml-auto"
+                onClick={() => {
+                  const items: BulkItem[] = [];
+                  for (const g of grouped) {
+                    for (const it of g.items) {
+                      if (sel.has(keyOf(g.phone, it.kind, it.target_id))) {
+                        items.push({ phone: g.phone, kind: it.kind, target_id: it.target_id, target_title: it.target_title });
+                      }
+                    }
+                  }
+                  if (items.length) setPending({ type: 'delete_bulk', items });
+                }}
+              >
+                <Trash2 className="w-3.5 h-3.5 mr-1" />Hapus yang dicentang
+              </Button>
+            </div>
+          )}
+
+
           {loading ? (
             <p className="text-center text-muted-foreground py-8 text-sm">Memuat…</p>
           ) : grouped.length === 0 ? (
@@ -151,6 +206,20 @@ export default function ResellerAuditAdmin() {
                 <div key={g.phone} className="border border-border rounded-lg bg-card/50 overflow-hidden min-w-0">
                   <div className="flex flex-col gap-2 p-3 bg-secondary/30 border-b border-border">
                     <div className="flex items-center gap-2 flex-wrap min-w-0">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 accent-primary shrink-0"
+                        title="Centang semua show reseller ini"
+                        checked={g.items.length > 0 && g.items.every(it => sel.has(keyOf(g.phone, it.kind, it.target_id)))}
+                        onChange={(e) => setSel(prev => {
+                          const n = new Set(prev);
+                          for (const it of g.items) {
+                            const k = keyOf(g.phone, it.kind, it.target_id);
+                            if (e.target.checked) n.add(k); else n.delete(k);
+                          }
+                          return n;
+                        })}
+                      />
                       <span className="font-mono text-sm font-semibold truncate">+{g.phone}</span>
                       {g.label && <span className="text-xs text-muted-foreground">({g.label})</span>}
                       <Badge variant="secondary" className="text-[10px]">{g.total} link total</Badge>
@@ -174,12 +243,20 @@ export default function ResellerAuditAdmin() {
                   <div className="p-2 space-y-1">
                     {g.items.map((it, i) => {
                       const kb = kindBadge[it.kind];
+                      const k = keyOf(g.phone, it.kind, it.target_id);
                       return (
-                        <div key={`${it.kind}-${it.target_id}-${i}`} className="flex items-center justify-between gap-2 px-2 py-1.5 rounded hover:bg-secondary/40 min-w-0">
+                        <div key={`${it.kind}-${it.target_id}-${i}`} className={`flex items-center justify-between gap-2 px-2 py-1.5 rounded hover:bg-secondary/40 min-w-0 ${sel.has(k) ? 'bg-primary/10' : ''}`}>
                           <div className="flex items-center gap-2 min-w-0 flex-1">
+                            <input
+                              type="checkbox"
+                              className="h-4 w-4 accent-primary shrink-0"
+                              checked={sel.has(k)}
+                              onChange={() => toggleSel(k)}
+                            />
                             <Badge variant="outline" className={`text-[10px] shrink-0 ${kb.cls}`}>{kb.label}</Badge>
                             <span className="text-sm truncate">{it.target_title || '—'}</span>
                           </div>
+
                           <div className="flex items-center gap-1.5 shrink-0 max-w-[55%] sm:max-w-none">
                             <span className="hidden min-[380px]:inline text-[10px] text-muted-foreground truncate">{fmtDate(it.last_copied)}</span>
                             <Badge className="text-[11px] font-semibold">{it.copies} link</Badge>

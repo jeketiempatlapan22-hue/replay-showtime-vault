@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
-import { Upload, Image as ImageIcon, Check, Wand2 } from 'lucide-react';
+import { Upload, Image as ImageIcon, Check, Wand2, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { uploadImage, getGalleryItems } from '@/lib/store';
+import { uploadImage, getGalleryItems, renameGalleryImage } from '@/lib/store';
 import { toast } from '@/hooks/use-toast';
 import { thumbUrl } from '@/lib/imageUrl';
 import { matchGalleryImage, slugifyName, type GalleryItem } from '@/lib/showImageMatch';
+
 
 interface ImagePickerProps {
   value: string;
@@ -22,8 +23,27 @@ export default function ImagePicker({ value, onChange, autoMatchTitle }: ImagePi
   const [loadingGallery, setLoadingGallery] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [pendingName, setPendingName] = useState('');
+  const [renaming, setRenaming] = useState<GalleryItem | null>(null);
+  const [renameName, setRenameName] = useState('');
+  const [savingRename, setSavingRename] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const autoDoneRef = useRef('');
+
+  const doRename = async () => {
+    if (!renaming || !renameName.trim()) return;
+    setSavingRename(true);
+    try {
+      const newUrl = await renameGalleryImage(renaming.file, renameName);
+      if (value === renaming.url) onChange(newUrl);
+      toast({ title: 'Nama gambar diubah', description: 'Show/replay yang memakai gambar ini ikut diperbarui.' });
+      setRenaming(null);
+      await loadGallery();
+    } catch (e: any) {
+      toast({ title: 'Gagal ganti nama', description: e?.message || 'gagal', variant: 'destructive' });
+    }
+    setSavingRename(false);
+  };
+
 
   const loadGallery = async (): Promise<GalleryItem[]> => {
     setLoadingGallery(true);
@@ -149,26 +169,54 @@ export default function ImagePicker({ value, onChange, autoMatchTitle }: ImagePi
           ) : (
             <div className="grid grid-cols-3 gap-2">
               {gallery.map((item, i) => (
-                <button
+                <div
                   key={i}
                   className={`relative rounded-lg overflow-hidden border-2 transition-all ${value === item.url ? 'border-primary' : 'border-border hover:border-primary/50'}`}
-                  onClick={() => { onChange(item.url); setShowGallery(false); }}
                 >
-                  <div className="aspect-video">
-                    <img src={thumbUrl(item.url, 320, 55)} alt={item.name} className="w-full h-full object-cover" />
-                  </div>
-                  <span className="block px-1 py-0.5 text-[10px] truncate text-muted-foreground">{item.name}</span>
-                  {value === item.url && (
-                    <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
-                      <Check className="w-6 h-6 text-primary" />
+                  <button type="button" className="block w-full text-left" onClick={() => { onChange(item.url); setShowGallery(false); }}>
+                    <div className="aspect-video">
+                      <img src={thumbUrl(item.url, 320, 55)} alt={item.name} className="w-full h-full object-cover" />
                     </div>
+                    <span className="block px-1 py-0.5 text-[10px] truncate text-muted-foreground">{item.name}</span>
+                    {value === item.url && (
+                      <div className="absolute inset-0 bg-primary/20 flex items-center justify-center pointer-events-none">
+                        <Check className="w-6 h-6 text-primary" />
+                      </div>
+                    )}
+                  </button>
+                  {item.file && (
+                    <button
+                      type="button"
+                      title="Ganti nama gambar"
+                      className="absolute top-1 right-1 z-10 rounded bg-background/80 border border-border p-1 hover:bg-background"
+                      onClick={(e) => { e.stopPropagation(); setRenaming(item); setRenameName(item.name); }}
+                    >
+                      <Pencil className="w-3 h-3" />
+                    </button>
                   )}
-                </button>
+                </div>
               ))}
             </div>
           )}
         </DialogContent>
       </Dialog>
+
+      <Dialog open={!!renaming} onOpenChange={o => { if (!o && !savingRename) setRenaming(null); }}>
+        <DialogContent className="bg-card border-border max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="font-sans">Ganti Nama Gambar</DialogTitle>
+          </DialogHeader>
+          <p className="text-xs text-muted-foreground">
+            Nama dipakai untuk mencocokkan gambar dengan judul show (2 kata pertama). Show &amp; replay yang memakai gambar ini otomatis ikut diperbarui.
+          </p>
+          <Input value={renameName} onChange={e => setRenameName(e.target.value)} placeholder="cara meminum ramune" />
+          <p className="text-[10px] text-muted-foreground">Nama file akan menjadi: <code>{slugifyName(renameName) || '—'}</code></p>
+          <Button onClick={doRename} disabled={savingRename || !renameName.trim()}>
+            {savingRename ? 'Menyimpan...' : 'Simpan Nama'}
+          </Button>
+        </DialogContent>
+      </Dialog>
+
     </div>
   );
 }

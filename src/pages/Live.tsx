@@ -635,7 +635,9 @@ export default function Live() {
       void fetchStatus();
     };
     void follow();
-    const iv = window.setInterval(() => { void follow(); }, 20000);
+    // Jitter 45–90 dtk: dengan ribuan penonton, polling serentak dihindari.
+    const iv = window.setInterval(() => { void follow(); }, 45000 + Math.floor(Math.random() * 45000));
+
     const onVis = () => { if (document.visibilityState === 'visible') void follow(); };
     document.addEventListener('visibilitychange', onVis);
     return () => { stopped = true; window.clearInterval(iv); document.removeEventListener('visibilitychange', onVis); };
