@@ -26,6 +26,7 @@ interface YoutubePlayerApi {
   seekTo?: (seconds: number, allowSeekAhead: boolean) => void;
   setPlaybackRate?: (rate: number) => void;
   getPlaybackRate?: () => number;
+  getAvailablePlaybackRates?: () => number[];
   setPlaybackQuality?: (quality: string) => void;
   getPlaybackQuality?: () => string;
   getAvailableQualityLevels?: () => string[];
@@ -170,10 +171,10 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
   const [seeking, setSeeking] = useState(false);
   const [showControls, setShowControls] = useState(true);
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Auto-detect live for YouTube (duration === 0/Infinity sambil currentTime jalan = live).
-  // Prop `isLive` jadi initial hint; deteksi runtime bisa meng-override.
-  const [detectedLive, setDetectedLive] = useState<boolean>(!!isLive);
-  const liveActive = isLive || detectedLive;
+  // Status live harus berasal dari pemanggil. Durasi YouTube replay bernilai 0
+  // selama proses awal, jadi menebaknya sebagai live akan menyembunyikan seek,
+  // menit, dan menu kecepatan pada replay yang sebenarnya valid.
+  const liveActive = isLive;
   const liveEndedRef = useRef(false);
   // Fallback embed sederhana (tanpa JS API / origin) bila YouTube menolak konfigurasi
   // pemutar (error 153 / 101 / 150) sehingga video tidak muncul sama sekali.
@@ -192,7 +193,12 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
     const p = ytPlayerRef.current;
     if (!p?.setPlaybackQuality) return;
     const avail = availableQualitiesRef.current;
-    if (!avail.length) return;
+    // Saat daftar belum siap, tetap minta level tertinggi. YouTube akan memilih
+    // level tertinggi yang benar-benar tersedia untuk video/perangkat tersebut.
+    if (!avail.length) {
+      try { p.setPlaybackQuality('highres'); } catch { /* ignore */ }
+      return;
+    }
     const ordered = YT_QUALITY_LADDER.filter(q => avail.includes(q));
     if (!ordered.length) return;
     const idx = Math.min(qualityCapIdxRef.current, ordered.length - 1);
@@ -247,10 +253,6 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
   // Ditandai saat user sengaja menekan pause agar autoplay-guard tidak memaksa play lagi.
   const userPausedRef = useRef(false);
   useEffect(() => { isPlayingRef.current = isPlaying; }, [isPlaying]);
-  // Track whether autoplay-mute coercion has already run for the current source so that
-  // subsequent iframe.onLoad / YT onReady events don't re-force mute (and re-show the hint)
-  // after the user has already interacted.
-  const autoMuteAppliedRef = useRef(false);
   const userUnmutedRef = useRef(false);
 
   const toggleControls = useCallback(() => {
@@ -260,17 +262,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
   const handleFrameLoaded = useCallback(() => {
     markReady(true);
     setIsPlaying(true);
-    // Apply autoplay-mute coercion only ONCE per source. Once the user has unmuted, never force mute again.
-    if (autoMuteAppliedRef.current || userUnmutedRef.current) return;
-    autoMuteAppliedRef.current = true;
-    if (!mutedRef.current) {
-      mutedRef.current = true;
-      setMuted(true);
-      setShowHint(true);
-    } else {
-      // Persisted-mute case: still show the hint so user can unmute easily.
-      setShowHint(true);
-    }
+    if (!userUnmutedRef.current) setShowHint(true);
   }, [markReady]);
 
   useEffect(() => {
@@ -321,12 +313,10 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
   useEffect(() => {
     markReady(false);
     setIsPlaying(false);
-    autoMuteAppliedRef.current = false;
     userUnmutedRef.current = false;
     liveEndedRef.current = false;
     plainModeRef.current = false;
     setPlainMode(false);
-    setDetectedLive(!!isLive);
 
     // Reset adaptive-quality state untuk source baru.
     qualityCapIdxRef.current = 0;
@@ -402,6 +392,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
           fs: 0,
           iv_load_policy: 3,
           cc_load_policy: 0,
+          vq: 'highres',
           hl: 'id',
           disablekb: 1,
           enablejsapi: 1,
@@ -425,41 +416,14 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
             } catch { /* ignore */ }
             markReady(true);
             try {
-              ytPlayerRef.current.setVolume?.(Math.round(volumeRef.current * 100));
-              if (userUnmutedRef.current || !mutedRef.current) {
-                // Coba mulai langsung dengan suara. Browser yang mengizinkan
-                // autoplay bersuara tidak lagi membutuhkan tombol tambahan.
-                ytPlayerRef.current.setVolume?.(Math.round(Math.max(0.05, volumeRef.current) * 100));
-                ytPlayerRef.current.unMute?.();
-                mutedRef.current = false;
-                setMuted(false);
-                setShowHint(false);
-              } else {
-                // Embed dimulai muted agar autoplay stabil; user bisa aktifkan suara lewat tombol hint.
-                ytPlayerRef.current.mute?.();
-                if (!mutedRef.current) {
-                  mutedRef.current = true;
-                  setMuted(true);
-                }
-                setShowHint(true);
-                autoMuteAppliedRef.current = true;
-              }
+              // Autoplay bersuara diblokir mayoritas browser mobile. Mulai muted
+              // secara stabil; satu gesture berikutnya hanya melakukan unmute.
+              ytPlayerRef.current.setVolume?.(Math.round(Math.max(0.05, volumeRef.current) * 100));
+              ytPlayerRef.current.mute?.();
+              mutedRef.current = true;
+              setMuted(true);
+              setShowHint(true);
               ytPlayerRef.current.playVideo?.();
-              // Autoplay bersuara dapat ditolak oleh kebijakan browser. Jika itu
-              // terjadi, lanjutkan video secara senyap tanpa membuat player macet.
-              setTimeout(() => {
-                if (cancelled || userPausedRef.current || userUnmutedRef.current) return;
-                let state: number | undefined;
-                try { state = ytPlayerRef.current?.getPlayerState?.(); } catch { /* ignore */ }
-                if (state === 1 || state === 3) return;
-                try {
-                  ytPlayerRef.current?.mute?.();
-                  ytPlayerRef.current?.playVideo?.();
-                  mutedRef.current = true;
-                  setMuted(true);
-                  setShowHint(true);
-                } catch { /* ignore */ }
-              }, 900);
               // Pulihkan kecepatan pemutaran pilihan user.
               if (playbackRateRef.current !== 1) {
                 try { ytPlayerRef.current.setPlaybackRate?.(playbackRateRef.current); } catch { /* ignore */ }
@@ -592,18 +556,16 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
     fallback?.();
   };
 
-  // Kirim perintah lewat JS API DAN postMessage sekaligus. Beberapa kondisi
-  // (API lambat siap, iframe di-recreate, blokir script) membuat salah satu
-  // jalur diam-diam gagal sehingga tombol play/pause terasa tidak berfungsi.
+  // Gunakan tepat satu jalur per aksi. Mengirim API dan postMessage bersamaan
+  // dapat membuat perintah beradu dan berakhir pada state pause yang salah.
   const ytCommand = (func: 'playVideo' | 'pauseVideo') => {
-    let handled = false;
     const p = ytPlayerRef.current;
     if (p && typeof p[func] === 'function') {
-      try { p[func]?.(); handled = true; } catch { /* ignore */ }
+      try { p[func]?.(); return true; } catch { /* use fallback */ }
     }
     ytHandshake();
     ytPost(func);
-    return handled;
+    return false;
   };
 
   const togglePlay = () => {
@@ -617,20 +579,6 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
       setIsPlaying(next);
       isPlayingRef.current = next;
       userPausedRef.current = !next;
-      // Verifikasi & ulangi bila perintah pertama tidak berefek (API lambat siap,
-      // iframe baru dibuat ulang, atau postMessage tertahan).
-      [400, 1200, 2000].forEach((delay, i) => {
-        setTimeout(() => {
-          if (userPausedRef.current !== !next) return; // user sudah menekan lagi
-          let s: number | undefined;
-          try { s = ytPlayerRef.current?.getPlayerState?.(); } catch { /* ignore */ }
-          if (s === undefined) return;
-          const nowPlaying = s === 1 || s === 3;
-          if (nowPlaying === next) { setIsPlaying(nowPlaying); isPlayingRef.current = nowPlaying; return; }
-          ytCommand(next ? 'playVideo' : 'pauseVideo');
-        }, delay);
-      });
-
     } else {
       if (iframeRef.current && iframeRef.current.src === 'about:blank') iframeRef.current.src = cfEmbedUrl;
       cfPost(isPlaying ? 'pause' : 'play');
@@ -656,30 +604,11 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
 
 
 
-  // Watchdog: setelah gesture aktivasi suara, pastikan video tetap berjalan.
-  // Jangan pernah mute ulang otomatis karena itu membuat tombol aktivasi suara
-  // muncul berulang walaupun user sudah memberi izin lewat tap langsung.
-  const unmuteWatchdogRef = useRef<ReturnType<typeof setTimeout>[]>([]);
-  const clearUnmuteWatchdog = () => {
-    unmuteWatchdogRef.current.forEach(t => clearTimeout(t));
-    unmuteWatchdogRef.current = [];
-  };
-  useEffect(() => () => clearUnmuteWatchdog(), []);
-
   const ytState = (): number | undefined => {
     try { return ytPlayerRef.current?.getPlayerState?.(); } catch { return undefined; }
   };
 
-  const resumeIfStalled = (attempt: number) => {
-    if (userPausedRef.current) return;
-    const s = ytState();
-    // 1 = playing, 3 = buffering → aman.
-    if (s === 1 || s === 3) { setIsPlaying(true); isPlayingRef.current = true; return; }
-    if (attempt <= 3) ytCommand('playVideo');
-  };
-
   const activateSound = () => {
-    clearUnmuteWatchdog();
     userPausedRef.current = false;
     userUnmutedRef.current = true;
     const audibleVolume = volumeRef.current > 0 ? volumeRef.current : 1;
@@ -695,14 +624,15 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
       localStorage.setItem(MUTED_KEY, '0');
     } catch { /* ignore */ }
 
-    // Jangan kirim play berulang sebelum/sesudah unmute. Pada sebagian browser
-    // mobile, rentetan itu justru mengubah state YouTube menjadi PAUSED.
+    // Seluruh panggilan ini berjalan sinkron dalam gesture pengguna. Unmute tidak
+    // dikombinasikan dengan watchdog/perintah berulang yang sebelumnya mem-pause.
     withYtPlayer(
       (p) => {
         p.setVolume?.(Math.round(audibleVolume * 100));
         p.unMute?.();
-        const state = p.getPlayerState?.();
-        if (state !== 1 && state !== 3) p.playVideo?.();
+        // Selalu akhiri gesture dengan SATU play. Browser tertentu mengubah
+        // state ke paused tepat setelah unmute walau sebelumnya masih playing.
+        p.playVideo?.();
       },
       () => {
         ytHandshake();
@@ -712,19 +642,6 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
       },
     );
 
-    [350, 900, 1800].forEach((delay, i) => {
-      unmuteWatchdogRef.current.push(setTimeout(() => {
-        const p = ytPlayerRef.current;
-        try {
-          if (p?.isMuted?.()) p.unMute?.();
-          if ((p?.getVolume?.() ?? audibleVolume * 100) <= 0) p?.setVolume?.(Math.round(audibleVolume * 100));
-        } catch { /* ignore */ }
-        // Hanya pulihkan bila benar-benar berhenti; jangan sentuh playback yang
-        // sedang PLAYING/BUFFERING karena dapat memicu pause pada embed tertentu.
-        const state = ytState();
-        if (state !== 1 && state !== 3) resumeIfStalled(i);
-      }, delay));
-    });
   };
 
   const toggleMute = () => {
@@ -740,12 +657,11 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
     if (!m) userUnmutedRef.current = true;
     try { localStorage.setItem(MUTED_KEY, m ? '1' : '0'); } catch { /* ignore */ }
     if (type === 'youtube') {
-      clearUnmuteWatchdog();
       const wasPlaying = (() => { const s = ytState(); return s === undefined ? isPlayingRef.current : (s === 1 || s === 3); })();
       withYtPlayer(
         (p) => {
           if (m) { p.mute?.(); }
-          else { p.playVideo?.(); p.setVolume?.(Math.round(Math.max(0.05, volumeRef.current) * 100)); p.unMute?.(); p.playVideo?.(); }
+          else { p.setVolume?.(Math.round(Math.max(0.05, volumeRef.current) * 100)); p.unMute?.(); if (!wasPlaying) p.playVideo?.(); }
         },
         () => {
           if (m) ytPost('mute');
@@ -757,12 +673,6 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
           }
         },
       );
-      if (m && wasPlaying) {
-        // Mute tidak boleh menghentikan video.
-        unmuteWatchdogRef.current.push(setTimeout(() => {
-          if (!userPausedRef.current && ytState() === 2) ytCommand('playVideo');
-        }, 400));
-      }
     } else {
       cfPost(m ? 'mute' : 'unmute');
     }
@@ -783,23 +693,16 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
       try { localStorage.setItem(MUTED_KEY, '0'); } catch { /* ignore */ }
     }
     if (type === 'youtube') {
-      const wasMuted = mutedRef.current === false && v > 0;
       withYtPlayer(
         (p) => {
           p.setVolume?.(Math.round(v * 100));
-          if (v > 0) { p.unMute?.(); if (!userPausedRef.current) p.playVideo?.(); }
+          if (v > 0) p.unMute?.();
         },
         () => {
           ytPost('setVolume', [Math.round(v * 100)]);
-          if (v > 0) { ytPost('unMute'); if (!userPausedRef.current) ytPost('playVideo'); }
+          if (v > 0) ytPost('unMute');
         },
       );
-      if (wasMuted && !userPausedRef.current) {
-        clearUnmuteWatchdog();
-        [250, 700, 1400, 2200].forEach((delay, i) => {
-          unmuteWatchdogRef.current.push(setTimeout(() => resumeIfStalled(i), delay));
-        });
-      }
     } else {
       cfPost('setVolume', v);
     }
@@ -857,9 +760,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
       try { state = ytPlayerRef.current?.getPlayerState?.(); } catch { /* ignore */ }
       // 1 = playing, 3 = buffering (sudah jalan)
       if (state === 1 || state === 3) { setIsPlaying(true); isPlayingRef.current = true; return; }
-      ytHandshake();
-      ytPost('playVideo');
-      try { ytPlayerRef.current?.playVideo?.(); } catch { /* ignore */ }
+      ytCommand('playVideo');
     };
     const id = setInterval(() => {
       tries += 1;
@@ -876,7 +777,6 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
   // membuat polling tertimbun antrian ketika tab kembali aktif.
   useEffect(() => {
     if (type !== 'youtube' || !ready) return;
-    let liveProbeHits = 0;
     let lastSec = -1;
     let id: ReturnType<typeof setInterval> | null = null;
     const tick = () => {
@@ -885,14 +785,6 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
       try {
         const d = p.getDuration?.() ?? 0;
         const t = p.getCurrentTime?.() ?? 0;
-        const looksLive = !Number.isFinite(d) || d === 0;
-        if (looksLive && t > 0) {
-          liveProbeHits += 1;
-          if (liveProbeHits >= 2 && !detectedLive) setDetectedLive(true);
-        } else if (!looksLive && d > 0) {
-          liveProbeHits = 0;
-          if (detectedLive && !isLive) setDetectedLive(false);
-        }
         if (liveActive) return;
         if (seeking) return;
         if (d && Math.abs(d - duration) >= 0.5) setDuration(d);
@@ -903,13 +795,13 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
         }
       } catch { /* ignore */ }
     };
-    const start = () => { if (!id) id = setInterval(tick, 1000); };
+    const start = () => { if (!id) { tick(); id = setInterval(tick, 250); } };
     const stop = () => { if (id) { clearInterval(id); id = null; } };
     const onVis = () => { if (document.hidden) stop(); else start(); };
     if (!document.hidden) start();
     document.addEventListener('visibilitychange', onVis);
     return () => { stop(); document.removeEventListener('visibilitychange', onVis); };
-  }, [ready, type, seeking, duration, isLive, detectedLive, liveActive]);
+  }, [ready, type, seeking, duration, liveActive]);
 
   // Preconnect ke domain media (singleton, dipasang sekali per tipe player).
   useEffect(() => { ensurePreconnect(type); }, [type]);
@@ -953,6 +845,10 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
     if (!handled) { ytHandshake(); ytPost('seekTo', [target, true]); }
     setCurrentTime(target);
   };
+  const commitSeek = (value: number) => {
+    setCurrentTime(value);
+    seekTo(value);
+  };
   const skip = (delta: number) => {
     let base = currentTime || 0;
     try {
@@ -968,7 +864,14 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
     let handled = false;
     const p = ytPlayerRef.current;
     if (p?.setPlaybackRate) {
-      try { p.setPlaybackRate(rate); handled = true; } catch { /* ignore */ }
+      try {
+        const available = p.getAvailablePlaybackRates?.() || [];
+        const target = available.length ? available.reduce((best, item) => Math.abs(item - rate) < Math.abs(best - rate) ? item : best, available[0]) : rate;
+        p.setPlaybackRate(target);
+        setPlaybackRate(target);
+        playbackRateRef.current = target;
+        handled = true;
+      } catch { /* ignore */ }
     }
     if (!handled) { ytHandshake(); ytPost('setPlaybackRate', [rate]); }
   };
@@ -1200,11 +1103,11 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
               max={duration > 0 ? duration : 100}
               step={0.1}
               value={duration > 0 ? Math.min(currentTime, duration) : 0}
-              onChange={(e) => { setSeeking(true); setCurrentTime(Number(e.target.value)); }}
+              disabled={duration <= 0}
+              onChange={(e) => commitSeek(Number(e.target.value))}
               onPointerDown={(e) => { e.stopPropagation(); setSeeking(true); }}
-              onPointerUp={(e) => { e.stopPropagation(); if (duration > 0) seekTo(Number((e.target as HTMLInputElement).value)); setSeeking(false); resetHideTimer(); }}
-              onMouseUp={(e) => { e.stopPropagation(); if (duration > 0) seekTo(Number((e.target as HTMLInputElement).value)); setSeeking(false); }}
-              onTouchEnd={(e) => { e.stopPropagation(); if (duration > 0) seekTo(Number((e.target as HTMLInputElement).value)); setSeeking(false); }}
+              onPointerUp={(e) => { e.stopPropagation(); setSeeking(false); resetHideTimer(); }}
+              onPointerCancel={() => setSeeking(false)}
               aria-label="Seek"
               className="min-w-0 flex-1 h-2 accent-primary cursor-pointer"
               style={{ touchAction: 'manipulation' }}
