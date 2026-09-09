@@ -250,6 +250,8 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
   }, []);
 
   const isPlayingRef = useRef(false);
+  // Tap pertama saat kontrol tersembunyi hanya memunculkan kontrol, tidak menekan tombol.
+  const swallowClickRef = useRef(false);
   // Ditandai saat user sengaja menekan pause agar autoplay-guard tidak memaksa play lagi.
   const userPausedRef = useRef(false);
   useEffect(() => { isPlayingRef.current = isPlaying; }, [isPlaying]);
