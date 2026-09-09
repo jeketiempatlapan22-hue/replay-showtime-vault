@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ClipboardList, RefreshCw, Search, Trash2, ShieldOff, RotateCcw } from 'lucide-react';
+import { ClipboardList, RefreshCw, Search, Trash2, ShieldOff, RotateCcw, Pencil } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -44,6 +46,45 @@ export default function ResellerAuditAdmin() {
   const [pending, setPending] = useState<PendingAction | null>(null);
   const [busy, setBusy] = useState(false);
   const [sel, setSel] = useState<Set<string>>(new Set());
+  const [prices, setPrices] = useState<Record<string, number>>({});
+  const [defaultPrice, setDefaultPrice] = useState(0);
+  const [editing, setEditing] = useState<(StatRow & { phone: string }) | null>(null);
+  const [editCopies, setEditCopies] = useState(0);
+  const [editPrice, setEditPrice] = useState(0);
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  const openEdit = (phone: string, it: StatRow) => {
+    setEditing({ ...it, phone });
+    setEditCopies(Number(it.copies) || 0);
+    setEditPrice(it.target_id ? (prices[it.target_id] ?? defaultPrice) : defaultPrice);
+  };
+
+  const saveEdit = async () => {
+    if (!editing) return;
+    setSavingEdit(true);
+    try {
+      const { error } = await supabase.rpc('admin_set_reseller_copy_count', {
+        _phone: editing.reseller_phone,
+        _kind: editing.kind,
+        _target_id: editing.target_id,
+        _count: Math.max(0, Math.floor(editCopies)),
+      });
+      if (error) throw error;
+      if (editing.target_id) {
+        const { error: pErr } = await supabase.from('reseller_show_prices').upsert(
+          { show_id: editing.target_id, price_per_link: Math.max(0, Math.floor(editPrice)), updated_at: new Date().toISOString() },
+          { onConflict: 'show_id' },
+        );
+        if (pErr) throw pErr;
+      }
+      toast({ title: 'Data diperbarui' });
+      setEditing(null);
+      await load();
+    } catch (e: any) {
+      toast({ title: 'Gagal menyimpan', description: e?.message || 'gagal', variant: 'destructive' });
+    }
+    setSavingEdit(false);
+  };
 
   const keyOf = (phone: string, kind: string, target_id: string | null) => `${phone}|${kind}|${target_id ?? ''}`;
   const toggleSel = (k: string) => setSel(prev => {
@@ -55,9 +96,17 @@ export default function ResellerAuditAdmin() {
 
   const load = async () => {
     setLoading(true);
-    const { data, error } = await supabase.rpc('admin_reseller_copy_stats');
+    const [{ data, error }, { data: pr }, { data: st }] = await Promise.all([
+      supabase.rpc('admin_reseller_copy_stats'),
+      supabase.from('reseller_show_prices').select('show_id,price_per_link'),
+      supabase.from('site_settings').select('value').eq('key', 'reseller_price_per_link').maybeSingle(),
+    ]);
     if (error) toast({ title: 'Gagal memuat', description: error.message, variant: 'destructive' });
     else setRows((data ?? []) as StatRow[]);
+    const m: Record<string, number> = {};
+    for (const p of (pr ?? []) as { show_id: string; price_per_link: number }[]) m[p.show_id] = Number(p.price_per_link) || 0;
+    setPrices(m);
+    setDefaultPrice(Number(st?.value || 0));
     setLoading(false);
   };
   useEffect(() => { load(); }, []);
@@ -260,6 +309,18 @@ export default function ResellerAuditAdmin() {
                           <div className="flex items-center gap-1.5 shrink-0 max-w-[55%] sm:max-w-none">
                             <span className="hidden min-[380px]:inline text-[10px] text-muted-foreground truncate">{fmtDate(it.last_copied)}</span>
                             <Badge className="text-[11px] font-semibold">{it.copies} link</Badge>
+                            <Badge variant="secondary" className="text-[10px] hidden sm:inline-flex">
+                              Rp {new Intl.NumberFormat('id-ID').format(it.target_id ? (prices[it.target_id] ?? defaultPrice) : defaultPrice)}
+                            </Badge>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-7 w-7 shrink-0"
+                              title="Ubah jumlah link & harga"
+                              onClick={() => openEdit(g.phone, it)}
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </Button>
                             <Button
                               size="icon"
                               variant="ghost"
@@ -316,6 +377,28 @@ export default function ResellerAuditAdmin() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={!!editing} onOpenChange={(v) => { if (!v && !savingEdit) setEditing(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-base">Ubah Data Reseller</DialogTitle>
+          </DialogHeader>
+          <p className="text-xs text-muted-foreground">
+            {editing?.target_title || '—'} · +{editing?.reseller_phone}
+          </p>
+          <div className="space-y-1">
+            <Label className="text-xs">Jumlah pengambilan link</Label>
+            <Input type="number" min={0} value={editCopies} onChange={(e) => setEditCopies(Number(e.target.value) || 0)} />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Harga per link (Rp)</Label>
+            <Input type="number" min={0} value={editPrice} onChange={(e) => setEditPrice(Number(e.target.value) || 0)} disabled={!editing?.target_id} />
+            {!editing?.target_id && <p className="text-[10px] text-muted-foreground">Harga hanya bisa diatur untuk show/replay tertentu.</p>}
+          </div>
+          <p className="text-xs">Total tagihan: <strong>Rp {new Intl.NumberFormat('id-ID').format(Math.max(0, editCopies) * Math.max(0, editPrice))}</strong></p>
+          <Button onClick={() => void saveEdit()} disabled={savingEdit}>{savingEdit ? 'Menyimpan…' : 'Simpan'}</Button>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

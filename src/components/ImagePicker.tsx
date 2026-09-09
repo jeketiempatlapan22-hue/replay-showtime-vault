@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
-import { Upload, Image as ImageIcon, Check, Wand2, Pencil } from 'lucide-react';
+import { Upload, Image as ImageIcon, Check, Wand2, Pencil, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { uploadImage, getGalleryItems, renameGalleryImage } from '@/lib/store';
+import { uploadImage, getGalleryItems, renameGalleryImage, deleteGalleryImage } from '@/lib/store';
 import { toast } from '@/hooks/use-toast';
 import { thumbUrl } from '@/lib/imageUrl';
 import { matchGalleryImage, slugifyName, type GalleryItem } from '@/lib/showImageMatch';
@@ -26,6 +26,7 @@ export default function ImagePicker({ value, onChange, autoMatchTitle }: ImagePi
   const [renaming, setRenaming] = useState<GalleryItem | null>(null);
   const [renameName, setRenameName] = useState('');
   const [savingRename, setSavingRename] = useState(false);
+  const [deleting, setDeleting] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const autoDoneRef = useRef('');
 
@@ -43,6 +44,22 @@ export default function ImagePicker({ value, onChange, autoMatchTitle }: ImagePi
     }
     setSavingRename(false);
   };
+
+  const doDelete = async (item: GalleryItem) => {
+    if (!item.file) return;
+    if (!window.confirm(`Hapus gambar "${item.name}"? Show/replay yang memakainya akan kehilangan gambar.`)) return;
+    setDeleting(item.file);
+    try {
+      await deleteGalleryImage(item.file);
+      setGallery(prev => prev.filter(g => g.file !== item.file));
+      if (value === item.url) onChange('');
+      toast({ title: 'Gambar dihapus' });
+    } catch (e: any) {
+      toast({ title: 'Gagal hapus', description: e?.message || 'gagal', variant: 'destructive' });
+    }
+    setDeleting(null);
+  };
+
 
 
   const loadGallery = async (): Promise<GalleryItem[]> => {
@@ -185,14 +202,25 @@ export default function ImagePicker({ value, onChange, autoMatchTitle }: ImagePi
                     )}
                   </button>
                   {item.file && (
-                    <button
-                      type="button"
-                      title="Ganti nama gambar"
-                      className="absolute top-1 right-1 z-10 rounded bg-background/80 border border-border p-1 hover:bg-background"
-                      onClick={(e) => { e.stopPropagation(); setRenaming(item); setRenameName(item.name); }}
-                    >
-                      <Pencil className="w-3 h-3" />
-                    </button>
+                    <div className="absolute top-1 right-1 z-10 flex gap-1">
+                      <button
+                        type="button"
+                        title="Ganti nama gambar"
+                        className="rounded bg-background/80 border border-border p-1 hover:bg-background"
+                        onClick={(e) => { e.stopPropagation(); setRenaming(item); setRenameName(item.name); }}
+                      >
+                        <Pencil className="w-3 h-3" />
+                      </button>
+                      <button
+                        type="button"
+                        title="Hapus gambar"
+                        disabled={deleting === item.file}
+                        className="rounded bg-background/80 border border-border p-1 text-destructive hover:bg-destructive/10 disabled:opacity-50"
+                        onClick={(e) => { e.stopPropagation(); void doDelete(item); }}
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
                   )}
                 </div>
               ))}
