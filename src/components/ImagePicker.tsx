@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
-import { Upload, Image as ImageIcon, Check, Wand2 } from 'lucide-react';
+import { Upload, Image as ImageIcon, Check, Wand2, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { uploadImage, getGalleryItems } from '@/lib/store';
+import { uploadImage, getGalleryItems, renameGalleryImage } from '@/lib/store';
 import { toast } from '@/hooks/use-toast';
 import { thumbUrl } from '@/lib/imageUrl';
 import { matchGalleryImage, slugifyName, type GalleryItem } from '@/lib/showImageMatch';
+
 
 interface ImagePickerProps {
   value: string;
