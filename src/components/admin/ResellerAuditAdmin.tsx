@@ -377,6 +377,28 @@ export default function ResellerAuditAdmin() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={!!editing} onOpenChange={(v) => { if (!v && !savingEdit) setEditing(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-base">Ubah Data Reseller</DialogTitle>
+          </DialogHeader>
+          <p className="text-xs text-muted-foreground">
+            {editing?.target_title || '—'} · +{editing?.reseller_phone}
+          </p>
+          <div className="space-y-1">
+            <Label className="text-xs">Jumlah pengambilan link</Label>
+            <Input type="number" min={0} value={editCopies} onChange={(e) => setEditCopies(Number(e.target.value) || 0)} />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Harga per link (Rp)</Label>
+            <Input type="number" min={0} value={editPrice} onChange={(e) => setEditPrice(Number(e.target.value) || 0)} disabled={!editing?.target_id} />
+            {!editing?.target_id && <p className="text-[10px] text-muted-foreground">Harga hanya bisa diatur untuk show/replay tertentu.</p>}
+          </div>
+          <p className="text-xs">Total tagihan: <strong>Rp {new Intl.NumberFormat('id-ID').format(Math.max(0, editCopies) * Math.max(0, editPrice))}</strong></p>
+          <Button onClick={() => void saveEdit()} disabled={savingEdit}>{savingEdit ? 'Menyimpan…' : 'Simpan'}</Button>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
