@@ -705,7 +705,9 @@ export default function ShowLiveControl({ showId, showTitle }: Props) {
         </Button>
         <Button type="button" variant="outline" onClick={() => setTokensOpen(true)} className="w-full sm:w-auto">
           <KeyRound className="w-4 h-4 mr-2" />Token & Riwayat Akses
+          <Badge variant="secondary" className="ml-2 text-[10px]">{tokenCount ?? '…'}</Badge>
         </Button>
+
         <Button type="button" variant="outline" onClick={() => setResendOpen(true)} className="w-full sm:w-auto">
           <Send className="w-4 h-4 mr-2" />Resend WA Pembelian
         </Button>
