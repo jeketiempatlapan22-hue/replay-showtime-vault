@@ -753,9 +753,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
       try { state = ytPlayerRef.current?.getPlayerState?.(); } catch { /* ignore */ }
       // 1 = playing, 3 = buffering (sudah jalan)
       if (state === 1 || state === 3) { setIsPlaying(true); isPlayingRef.current = true; return; }
-      ytHandshake();
-      ytPost('playVideo');
-      try { ytPlayerRef.current?.playVideo?.(); } catch { /* ignore */ }
+      ytCommand('playVideo');
     };
     const id = setInterval(() => {
       tries += 1;
@@ -839,6 +837,11 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
     }
     if (!handled) { ytHandshake(); ytPost('seekTo', [target, true]); }
     setCurrentTime(target);
+  };
+  const commitSeek = (value: number) => {
+    setSeeking(true);
+    setCurrentTime(value);
+    seekTo(value);
   };
   const skip = (delta: number) => {
     let base = currentTime || 0;
@@ -1094,11 +1097,11 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
               max={duration > 0 ? duration : 100}
               step={0.1}
               value={duration > 0 ? Math.min(currentTime, duration) : 0}
-              onChange={(e) => { setSeeking(true); setCurrentTime(Number(e.target.value)); }}
+              disabled={duration <= 0}
+              onChange={(e) => commitSeek(Number(e.target.value))}
               onPointerDown={(e) => { e.stopPropagation(); setSeeking(true); }}
-              onPointerUp={(e) => { e.stopPropagation(); if (duration > 0) seekTo(Number((e.target as HTMLInputElement).value)); setSeeking(false); resetHideTimer(); }}
-              onMouseUp={(e) => { e.stopPropagation(); if (duration > 0) seekTo(Number((e.target as HTMLInputElement).value)); setSeeking(false); }}
-              onTouchEnd={(e) => { e.stopPropagation(); if (duration > 0) seekTo(Number((e.target as HTMLInputElement).value)); setSeeking(false); }}
+              onPointerUp={(e) => { e.stopPropagation(); setSeeking(false); resetHideTimer(); }}
+              onPointerCancel={() => setSeeking(false)}
               aria-label="Seek"
               className="min-w-0 flex-1 h-2 accent-primary cursor-pointer"
               style={{ touchAction: 'manipulation' }}
