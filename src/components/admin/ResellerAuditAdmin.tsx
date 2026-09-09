@@ -100,11 +100,24 @@ export default function ResellerAuditAdmin() {
         if (error) throw error;
         const res = (data ?? {}) as { log_deleted?: number; tokens_deleted?: number };
         toast({ title: `Riwayat dihapus`, description: `${res.log_deleted ?? 0} catatan & ${res.tokens_deleted ?? 0} link token dihapus.` });
+      } else if (pending.type === 'delete_bulk') {
+        let log = 0, tok = 0, fail = 0;
+        for (const it of pending.items) {
+          const { data, error } = await supabase.rpc('admin_delete_reseller_copy_entry', {
+            _phone: it.phone, _kind: it.kind, _target_id: it.target_id,
+          });
+          if (error) { fail++; continue; }
+          const r = (data ?? {}) as { log_deleted?: number; tokens_deleted?: number };
+          log += r.log_deleted ?? 0; tok += r.tokens_deleted ?? 0;
+        }
+        setSel(new Set());
+        toast({ title: `${pending.items.length - fail} riwayat dihapus`, description: `${log} catatan & ${tok} link token dihapus${fail ? ` · ${fail} gagal` : ''}.` });
       } else {
         const { data, error } = await supabase.rpc('admin_exhaust_reseller_tokens', { _phone: pending.phone });
         if (error) throw error;
         toast({ title: `${data ?? 0} token reseller dihabiskan (revoked)` });
       }
+
       setPending(null);
       await load();
     } catch (err: any) {
