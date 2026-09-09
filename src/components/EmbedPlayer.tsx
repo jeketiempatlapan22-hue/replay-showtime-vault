@@ -600,17 +600,29 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
       userPausedRef.current = !next;
       // Verifikasi & ulangi bila perintah pertama tidak berefek (API lambat siap,
       // iframe baru dibuat ulang, atau postMessage tertahan).
-      [400, 1200].forEach((delay) => {
+      [400, 1200, 2000].forEach((delay, i) => {
         setTimeout(() => {
           if (userPausedRef.current !== !next) return; // user sudah menekan lagi
           let s: number | undefined;
           try { s = ytPlayerRef.current?.getPlayerState?.(); } catch { /* ignore */ }
           if (s === undefined) return;
           const nowPlaying = s === 1 || s === 3;
-          if (nowPlaying !== next) ytCommand(next ? 'playVideo' : 'pauseVideo');
-          else { setIsPlaying(nowPlaying); isPlayingRef.current = nowPlaying; }
+          if (nowPlaying === next) { setIsPlaying(nowPlaying); isPlayingRef.current = nowPlaying; return; }
+          if (next && i === 2 && !mutedRef.current) {
+            // Browser menolak memutar dengan suara di luar gesture — putar senyap
+            // lalu tawarkan tombol aktifkan suara lagi agar video tidak macet.
+            mutedRef.current = true;
+            setMuted(true);
+            userUnmutedRef.current = false;
+            try { localStorage.setItem(MUTED_KEY, '1'); } catch { /* ignore */ }
+            withYtPlayer((p) => { p.mute?.(); p.playVideo?.(); }, () => { ytPost('mute'); ytPost('playVideo'); });
+            setShowHint(true);
+            return;
+          }
+          ytCommand(next ? 'playVideo' : 'pauseVideo');
         }, delay);
       });
+
     } else {
       if (iframeRef.current && iframeRef.current.src === 'about:blank') iframeRef.current.src = cfEmbedUrl;
       cfPost(isPlaying ? 'pause' : 'play');
@@ -636,6 +648,39 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
 
 
 
+  // Watchdog: setelah mengaktifkan suara, sebagian browser (mobile/Safari)
+  // langsung menghentikan pemutaran karena kebijakan autoplay. Kita coba
+  // lanjutkan beberapa kali; jika tetap gagal, kembalikan ke mode senyap agar
+  // video TIDAK pernah berhenti, lalu tampilkan lagi tombol aktifkan suara.
+  const unmuteWatchdogRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const clearUnmuteWatchdog = () => {
+    unmuteWatchdogRef.current.forEach(t => clearTimeout(t));
+    unmuteWatchdogRef.current = [];
+  };
+  useEffect(() => () => clearUnmuteWatchdog(), []);
+
+  const ytState = (): number | undefined => {
+    try { return ytPlayerRef.current?.getPlayerState?.(); } catch { return undefined; }
+  };
+
+  const resumeIfStalled = (attempt: number) => {
+    if (userPausedRef.current) return;
+    const s = ytState();
+    // 1 = playing, 3 = buffering → aman.
+    if (s === 1 || s === 3) { setIsPlaying(true); isPlayingRef.current = true; return; }
+    if (attempt < 3) {
+      ytCommand('playVideo');
+      return;
+    }
+    // Menyerah: pulihkan pemutaran dalam keadaan senyap.
+    mutedRef.current = true;
+    setMuted(true);
+    userUnmutedRef.current = false;
+    try { localStorage.setItem(MUTED_KEY, '1'); } catch { /* ignore */ }
+    withYtPlayer((p) => { p.mute?.(); p.playVideo?.(); }, () => { ytPost('mute'); ytPost('playVideo'); });
+    setShowHint(true);
+  };
+
   const toggleMute = () => {
     const m = !muted;
     setMuted(m);
@@ -643,27 +688,48 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
     if (!m) userUnmutedRef.current = true;
     try { localStorage.setItem(MUTED_KEY, m ? '1' : '0'); } catch { /* ignore */ }
     if (type === 'youtube') {
+      clearUnmuteWatchdog();
+      const wasPlaying = (() => { const s = ytState(); return s === undefined ? isPlayingRef.current : (s === 1 || s === 3); })();
       withYtPlayer(
         (p) => {
-          if (m) p.mute?.();
-          else { p.unMute?.(); p.setVolume?.(Math.round(volumeRef.current * 100)); p.playVideo?.(); }
+          if (m) { p.mute?.(); }
+          else {
+            // Urutan penting: volume dulu, lalu unmute, lalu pastikan tetap main.
+            try { p.setVolume?.(Math.round(Math.max(0.05, volumeRef.current) * 100)); } catch { /* ignore */ }
+            p.unMute?.();
+            p.playVideo?.();
+          }
         },
         () => {
           if (m) ytPost('mute');
           else {
+            ytHandshake();
+            ytPost('setVolume', [Math.round(Math.max(0.05, volumeRef.current) * 100)]);
             ytPost('unMute');
-            ytPost('setVolume', [Math.round(volumeRef.current * 100)]);
             ytPost('playVideo');
-            setIsPlaying(true);
-            isPlayingRef.current = true;
           }
         },
       );
+      if (!m) {
+        userPausedRef.current = false;
+        setIsPlaying(true);
+        isPlayingRef.current = true;
+        // Cek berkala; jika player berhenti akibat kebijakan suara, lanjutkan.
+        [250, 700, 1400, 2200].forEach((delay, i) => {
+          unmuteWatchdogRef.current.push(setTimeout(() => resumeIfStalled(i), delay));
+        });
+      } else if (wasPlaying) {
+        // Mute tidak boleh menghentikan video.
+        unmuteWatchdogRef.current.push(setTimeout(() => {
+          if (!userPausedRef.current && ytState() === 2) ytCommand('playVideo');
+        }, 400));
+      }
     } else {
       cfPost(m ? 'mute' : 'unmute');
     }
     if (!m) setShowHint(false);
   };
+
 
   const changeVolume = (e: React.ChangeEvent<HTMLInputElement>) => {
     const v = Number(e.target.value);
@@ -678,19 +744,27 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
       try { localStorage.setItem(MUTED_KEY, '0'); } catch { /* ignore */ }
     }
     if (type === 'youtube') {
+      const wasMuted = mutedRef.current === false && v > 0;
       withYtPlayer(
         (p) => {
           p.setVolume?.(Math.round(v * 100));
-          if (v > 0) p.unMute?.();
+          if (v > 0) { p.unMute?.(); if (!userPausedRef.current) p.playVideo?.(); }
         },
         () => {
           ytPost('setVolume', [Math.round(v * 100)]);
-          if (v > 0) ytPost('unMute');
+          if (v > 0) { ytPost('unMute'); if (!userPausedRef.current) ytPost('playVideo'); }
         },
       );
+      if (wasMuted && !userPausedRef.current) {
+        clearUnmuteWatchdog();
+        [250, 700, 1400, 2200].forEach((delay, i) => {
+          unmuteWatchdogRef.current.push(setTimeout(() => resumeIfStalled(i), delay));
+        });
+      }
     } else {
       cfPost('setVolume', v);
     }
+
   };
 
   useEffect(() => {
@@ -1032,7 +1106,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
       {!plainMode && (
         <div
           className="absolute inset-0 z-[5]"
-          onClick={(e) => { e.preventDefault(); if (!isPlaying) playFromGesture(); toggleControls(); }}
+          onClick={(e) => { e.preventDefault(); const s = type === 'youtube' ? ytState() : undefined; const reallyPlaying = s === undefined ? isPlaying : (s === 1 || s === 3); if (!reallyPlaying) playFromGesture(); toggleControls(); }}
         />
       )}
 
