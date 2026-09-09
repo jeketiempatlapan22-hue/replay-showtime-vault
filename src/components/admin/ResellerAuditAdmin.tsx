@@ -139,7 +139,10 @@ export default function ResellerAuditAdmin() {
             : `daftar perangkat SEMUA link token reseller. Semua link tetap aktif.`)
         : pending.type === 'delete_entry'
         ? `riwayat & SEMUA link token "${pending.target_title}" milik +${pending.phone}. Link akan langsung hilang dari website.`
+        : pending.type === 'delete_bulk'
+        ? `riwayat & SEMUA link token dari ${pending.items.length} show/replay yang dicentang. Link akan langsung hilang dari website.`
         : `SEMUA link token aktif +${pending.phone} (link akan tidak bisa dipakai lagi)`)
+
     : '';
 
   return (
