@@ -57,3 +57,6 @@ verify_jwt = false
 
 [functions.tv-pair]
 verify_jwt = false
+
+[functions.tv-stream]
+verify_jwt = false
