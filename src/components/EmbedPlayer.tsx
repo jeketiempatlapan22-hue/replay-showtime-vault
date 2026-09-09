@@ -30,6 +30,8 @@ interface YoutubePlayerApi {
   getPlaybackQuality?: () => string;
   getAvailableQualityLevels?: () => string[];
   getVideoLoadedFraction?: () => number;
+  isMuted?: () => boolean;
+  getVolume?: () => number;
   unloadModule?: (module: string) => void;
   setOption?: (module: string, option: string, value: unknown) => void;
 }
@@ -648,10 +650,9 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
 
 
 
-  // Watchdog: setelah mengaktifkan suara, sebagian browser (mobile/Safari)
-  // langsung menghentikan pemutaran karena kebijakan autoplay. Kita coba
-  // lanjutkan beberapa kali; jika tetap gagal, kembalikan ke mode senyap agar
-  // video TIDAK pernah berhenti, lalu tampilkan lagi tombol aktifkan suara.
+  // Watchdog: setelah gesture aktivasi suara, pastikan video tetap berjalan.
+  // Jangan pernah mute ulang otomatis karena itu membuat tombol aktivasi suara
+  // muncul berulang walaupun user sudah memberi izin lewat tap langsung.
   const unmuteWatchdogRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const clearUnmuteWatchdog = () => {
     unmuteWatchdogRef.current.forEach(t => clearTimeout(t));
@@ -668,21 +669,64 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
     const s = ytState();
     // 1 = playing, 3 = buffering → aman.
     if (s === 1 || s === 3) { setIsPlaying(true); isPlayingRef.current = true; return; }
-    if (attempt < 3) {
-      ytCommand('playVideo');
-      return;
-    }
-    // Menyerah: pulihkan pemutaran dalam keadaan senyap.
-    mutedRef.current = true;
-    setMuted(true);
-    userUnmutedRef.current = false;
-    try { localStorage.setItem(MUTED_KEY, '1'); } catch { /* ignore */ }
-    withYtPlayer((p) => { p.mute?.(); p.playVideo?.(); }, () => { ytPost('mute'); ytPost('playVideo'); });
-    setShowHint(true);
+    if (attempt <= 3) ytCommand('playVideo');
+  };
+
+  const activateSound = () => {
+    clearUnmuteWatchdog();
+    userPausedRef.current = false;
+    userUnmutedRef.current = true;
+    const audibleVolume = volumeRef.current > 0 ? volumeRef.current : 1;
+    volumeRef.current = audibleVolume;
+    mutedRef.current = false;
+    setVolume(audibleVolume);
+    setMuted(false);
+    setShowHint(false);
+    setIsPlaying(true);
+    isPlayingRef.current = true;
+    try {
+      localStorage.setItem(VOL_KEY, String(audibleVolume));
+      localStorage.setItem(MUTED_KEY, '0');
+    } catch { /* ignore */ }
+
+    // Seluruh perintah dijalankan sinkron di dalam gesture klik. Urutan play →
+    // volume → unmute → play paling stabil di Chrome mobile, Safari/iOS, dan PC.
+    withYtPlayer(
+      (p) => {
+        p.playVideo?.();
+        p.setVolume?.(Math.round(audibleVolume * 100));
+        p.unMute?.();
+        p.playVideo?.();
+      },
+      () => {
+        ytHandshake();
+        ytPost('playVideo');
+        ytPost('setVolume', [Math.round(audibleVolume * 100)]);
+        ytPost('unMute');
+        ytPost('playVideo');
+      },
+    );
+
+    [250, 700, 1400, 2200].forEach((delay, i) => {
+      unmuteWatchdogRef.current.push(setTimeout(() => {
+        const p = ytPlayerRef.current;
+        try {
+          if (p?.isMuted?.()) p.unMute?.();
+          if ((p?.getVolume?.() ?? audibleVolume * 100) <= 0) p?.setVolume?.(Math.round(audibleVolume * 100));
+        } catch { /* ignore */ }
+        resumeIfStalled(i);
+      }, delay));
+    });
   };
 
   const toggleMute = () => {
-    const m = !muted;
+    let currentlyMuted = mutedRef.current || volumeRef.current <= 0;
+    try { currentlyMuted = ytPlayerRef.current?.isMuted?.() ?? currentlyMuted; } catch { /* ignore */ }
+    const m = !currentlyMuted;
+    if (!m && type === 'youtube') {
+      activateSound();
+      return;
+    }
     setMuted(m);
     mutedRef.current = m;
     if (!m) userUnmutedRef.current = true;
@@ -693,12 +737,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
       withYtPlayer(
         (p) => {
           if (m) { p.mute?.(); }
-          else {
-            // Urutan penting: volume dulu, lalu unmute, lalu pastikan tetap main.
-            try { p.setVolume?.(Math.round(Math.max(0.05, volumeRef.current) * 100)); } catch { /* ignore */ }
-            p.unMute?.();
-            p.playVideo?.();
-          }
+          else { p.playVideo?.(); p.setVolume?.(Math.round(Math.max(0.05, volumeRef.current) * 100)); p.unMute?.(); p.playVideo?.(); }
         },
         () => {
           if (m) ytPost('mute');
@@ -710,15 +749,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
           }
         },
       );
-      if (!m) {
-        userPausedRef.current = false;
-        setIsPlaying(true);
-        isPlayingRef.current = true;
-        // Cek berkala; jika player berhenti akibat kebijakan suara, lanjutkan.
-        [250, 700, 1400, 2200].forEach((delay, i) => {
-          unmuteWatchdogRef.current.push(setTimeout(() => resumeIfStalled(i), delay));
-        });
-      } else if (wasPlaying) {
+      if (m && wasPlaying) {
         // Mute tidak boleh menghentikan video.
         unmuteWatchdogRef.current.push(setTimeout(() => {
           if (!userPausedRef.current && ytState() === 2) ytCommand('playVideo');
@@ -1136,7 +1167,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
 
       {showHint && !plainMode && (
         <button
-          onClick={(e) => { e.stopPropagation(); toggleMute(); }}
+          onClick={(e) => { e.stopPropagation(); activateSound(); resetHideTimer(); }}
           className="absolute top-3 left-1/2 -translate-x-1/2 z-20 px-4 py-2 rounded-full bg-primary text-primary-foreground text-xs font-semibold shadow-lg animate-fade-in"
         >
           🔊 Tap untuk aktifkan suara
