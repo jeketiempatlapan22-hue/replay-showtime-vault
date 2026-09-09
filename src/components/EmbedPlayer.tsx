@@ -598,14 +598,19 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
       setIsPlaying(next);
       isPlayingRef.current = next;
       userPausedRef.current = !next;
-      // Verifikasi & ulangi sekali bila perintah pertama tidak berefek.
-      setTimeout(() => {
-        let s: number | undefined;
-        try { s = ytPlayerRef.current?.getPlayerState?.(); } catch { /* ignore */ }
-        if (s === undefined) return;
-        const nowPlaying = s === 1 || s === 3;
-        if (nowPlaying !== next) ytCommand(next ? 'playVideo' : 'pauseVideo');
-      }, 400);
+      // Verifikasi & ulangi bila perintah pertama tidak berefek (API lambat siap,
+      // iframe baru dibuat ulang, atau postMessage tertahan).
+      [400, 1200].forEach((delay) => {
+        setTimeout(() => {
+          if (userPausedRef.current !== !next) return; // user sudah menekan lagi
+          let s: number | undefined;
+          try { s = ytPlayerRef.current?.getPlayerState?.(); } catch { /* ignore */ }
+          if (s === undefined) return;
+          const nowPlaying = s === 1 || s === 3;
+          if (nowPlaying !== next) ytCommand(next ? 'playVideo' : 'pauseVideo');
+          else { setIsPlaying(nowPlaying); isPlayingRef.current = nowPlaying; }
+        }, delay);
+      });
     } else {
       if (iframeRef.current && iframeRef.current.src === 'about:blank') iframeRef.current.src = cfEmbedUrl;
       cfPost(isPlaying ? 'pause' : 'play');
