@@ -815,7 +815,19 @@ export default function Live() {
       cancelled = true;
       if (refreshTimer) window.clearInterval(refreshTimer);
     };
-  }, [activeSourceUrl, idnRetryNonce, idnGrant, liveOn]);
+  }, [activeSourceUrl, idnRetryNonce, idnGrant, liveOn, showId]);
+
+  // Browser TV yang masuk lewat kode 6 angka: rotasi grant tiap 28 menit supaya
+  // bisa menonton siaran penuh tanpa jeda dan tanpa memasukkan kode lagi.
+  useEffect(() => {
+    if (!getTvSession()) return;
+    const id = window.setInterval(async () => {
+      const fresh = await renewTvGrant(showId);
+      if (fresh) setUnlocked(prev => (prev ? { ...prev, grant: fresh } : prev));
+    }, TV_ROTATE_MS);
+    return () => window.clearInterval(id);
+  }, [showId]);
+
 
   const selectSource = (i: number) => {
     setSourceIdx(i);
