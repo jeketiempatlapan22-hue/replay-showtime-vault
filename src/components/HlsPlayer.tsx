@@ -101,6 +101,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
   const [castSupported, setCastSupported] = useState(false);
   const [castAvailable, setCastAvailable] = useState(false);
   const [casting, setCasting] = useState(false);
+  const [castPreparing, setCastPreparing] = useState(false);
   const [tvMode, setTvMode] = useState(false);
   const [showTvMenu, setShowTvMenu] = useState(false);
   const [showTvConnect, setShowTvConnect] = useState(false);
