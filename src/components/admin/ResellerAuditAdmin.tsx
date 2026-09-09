@@ -309,6 +309,18 @@ export default function ResellerAuditAdmin() {
                           <div className="flex items-center gap-1.5 shrink-0 max-w-[55%] sm:max-w-none">
                             <span className="hidden min-[380px]:inline text-[10px] text-muted-foreground truncate">{fmtDate(it.last_copied)}</span>
                             <Badge className="text-[11px] font-semibold">{it.copies} link</Badge>
+                            <Badge variant="secondary" className="text-[10px] hidden sm:inline-flex">
+                              Rp {new Intl.NumberFormat('id-ID').format(it.target_id ? (prices[it.target_id] ?? defaultPrice) : defaultPrice)}
+                            </Badge>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-7 w-7 shrink-0"
+                              title="Ubah jumlah link & harga"
+                              onClick={() => openEdit(g.phone, it)}
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </Button>
                             <Button
                               size="icon"
                               variant="ghost"
