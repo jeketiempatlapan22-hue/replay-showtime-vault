@@ -7,3 +7,6 @@
 - [x] Fix "Sesi akses belum siap" — cache grant + idn_show_id in Kunci.tsx password unlock
 - [x] TV/Projector: disable Google Cast for IDN (header-gated) sources; keep AirPlay/Mode TV; warn on single-device "Salin Link TV"
 - [x] Stale membership ?show redirect query: add show_time sort
+
+## In progress
+- [ ] Rebuild YouTube replay controls so sound, play/pause, time, seek, speed, and quality work together
