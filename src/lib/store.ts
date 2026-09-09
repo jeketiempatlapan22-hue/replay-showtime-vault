@@ -238,3 +238,26 @@ export async function getGalleryImages(): Promise<string[]> {
     .filter(f => f.name !== '.emptyFolderPlaceholder')
     .map(f => supabase.storage.from('card-images').getPublicUrl(f.name).data.publicUrl);
 }
+
+/**
+ * Ganti nama file gambar galeri tanpa upload ulang.
+ * Semua show/replay yang memakai gambar lama otomatis diarahkan ke URL baru.
+ */
+export async function renameGalleryImage(file: string, newName: string): Promise<string> {
+  const ext = (file.split('.').pop() || 'jpg').toLowerCase();
+  const base = slugifyName(newName);
+  if (!base) throw new Error('Nama tidak boleh kosong');
+  let target = `${base}.${ext}`;
+  const oldUrl = supabase.storage.from('card-images').getPublicUrl(file).data.publicUrl;
+  if (target === file) return oldUrl;
+  let { error } = await supabase.storage.from('card-images').move(file, target);
+  if (error) {
+    target = `${base}-${Date.now().toString(36)}.${ext}`;
+    const retry = await supabase.storage.from('card-images').move(file, target);
+    if (retry.error) throw retry.error;
+  }
+  const url = supabase.storage.from('card-images').getPublicUrl(target).data.publicUrl;
+  await supabase.from('active_shows').update({ image_url: url }).eq('image_url', oldUrl);
+  await supabase.from('replays').update({ image_url: url }).eq('image_url', oldUrl);
+  return url;
+}
