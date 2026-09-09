@@ -788,16 +788,40 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
   }, [type, liveActive]);
 
   const seekTo = (t: number) => {
-    if (!duration) return;
-    const target = Math.max(0, Math.min(duration, t));
     const p = ytPlayerRef.current;
-    if (p?.seekTo) {
-      try { p.seekTo(target, true); setCurrentTime(target); return; } catch { /* ignore */ }
+    let dur = duration;
+    if (!dur) {
+      try { dur = p?.getDuration?.() ?? 0; } catch { /* ignore */ }
+      if (dur > 0) setDuration(dur);
     }
-    ytPost('seekTo', [target, true]);
+    if (!dur || !isFinite(dur)) return;
+    const target = Math.max(0, Math.min(dur, t));
+    let handled = false;
+    if (p?.seekTo) {
+      try { p.seekTo(target, true); handled = true; } catch { /* ignore */ }
+    }
+    if (!handled) { ytHandshake(); ytPost('seekTo', [target, true]); }
     setCurrentTime(target);
   };
-  const skip = (delta: number) => seekTo((currentTime || 0) + delta);
+  const skip = (delta: number) => {
+    let base = currentTime || 0;
+    try {
+      const t = ytPlayerRef.current?.getCurrentTime?.();
+      if (typeof t === 'number' && isFinite(t)) base = t;
+    } catch { /* ignore */ }
+    seekTo(base + delta);
+  };
+  const changeRate = (rate: number) => {
+    setPlaybackRate(rate);
+    playbackRateRef.current = rate;
+    setShowSpeedMenu(false);
+    let handled = false;
+    const p = ytPlayerRef.current;
+    if (p?.setPlaybackRate) {
+      try { p.setPlaybackRate(rate); handled = true; } catch { /* ignore */ }
+    }
+    if (!handled) { ytHandshake(); ytPost('setPlaybackRate', [rate]); }
+  };
   const fmtTime = (s: number) => {
     if (!isFinite(s) || s < 0) s = 0;
     const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = Math.floor(s % 60);
