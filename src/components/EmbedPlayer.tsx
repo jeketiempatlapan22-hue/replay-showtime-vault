@@ -358,16 +358,15 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
     let initTries = 0;
     const init = () => {
       if (cancelled || plainModeRef.current || initialized) return;
-      // Iframe mungkin belum ter-mount pada tick pertama — coba lagi sebentar.
-      if (!iframeRef.current) {
+      // Host div mungkin belum ter-mount pada tick pertama — coba lagi sebentar.
+      if (!ytHostRef.current) {
         if (initTries++ < 40) setTimeout(init, 100);
         return;
       }
 
       const YT = (window as YoutubeWindow).YT;
       if (!YT?.Player) {
-        // API diblokir/lambat: iframe standar sudah terpasang dan tetap dapat
-        // diputar. Beralih ke mode polos agar tidak terjadi retry selamanya.
+        // API diblokir/lambat → jatuh ke embed polos (kontrol bawaan YouTube).
         if (initTries++ < 20) setTimeout(init, 150);
         else {
           plainModeRef.current = true;
@@ -378,7 +377,27 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
       }
 
       initialized = true;
-      ytPlayerRef.current = new YT.Player(iframeRef.current, {
+      // Biarkan YT API yang membuat iframe-nya sendiri agar seek/durasi/play-pause
+      // selalu terhubung (attach ke iframe manual sering gagal diam-diam).
+      ytPlayerRef.current = new YT.Player(ytHostRef.current, {
+        videoId: ytId,
+        width: '100%',
+        height: '100%',
+        playerVars: {
+          rel: 0,
+          modestbranding: 1,
+          playsinline: 1,
+          autoplay: 1,
+          mute: 1,
+          controls: 0,
+          fs: 0,
+          iv_load_policy: 3,
+          cc_load_policy: 0,
+          hl: 'id',
+          disablekb: 1,
+          enablejsapi: 1,
+          ...(safeOrigin ? { origin: safeOrigin } : {}),
+        },
         events: {
           onReady: () => {
             if (cancelled) return;
