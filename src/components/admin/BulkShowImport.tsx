@@ -26,7 +26,13 @@ export default function BulkShowImport({ onImported }: Props) {
   const [parsed, setParsed] = useState<ParsedShow[]>([]);
   const [saving, setSaving] = useState(false);
   const [warnings, setWarnings] = useState<string[]>([]);
+  const [gallery, setGallery] = useState<GalleryItem[]>([]);
+  const [imgOverride, setImgOverride] = useState<Record<number, string>>({});
 
+  useEffect(() => {
+    if (!open) return;
+    getGalleryItems().then(setGallery).catch(() => setGallery([]));
+  }, [open]);
 
   // Defaults applied to ALL parsed shows
   const [defPriceShow, setDefPriceShow] = useState<number>(0);
@@ -36,15 +42,24 @@ export default function BulkShowImport({ onImported }: Props) {
   const [defPassword, setDefPassword] = useState<string>('');
   const [aliasPrefix, setAliasPrefix] = useState<string>('');
 
-  const preview = useMemo(() => parsed.map((s, idx) => ({
-    ...s,
-    admin_alias: aliasPrefix ? `${aliasPrefix}${idx + 1}` : s.admin_alias,
-    live_password: s.live_password || defPassword,
-    price_show: s.price_show || defPriceShow,
-    price_replay: s.price_replay || defPriceReplay,
-    price_show_coins: s.price_show_coins || defCoinsShow,
-    price_replay_coins: s.price_replay_coins || defCoinsReplay,
-  })), [parsed, aliasPrefix, defPassword, defPriceShow, defPriceReplay, defCoinsShow, defCoinsReplay]);
+  const preview = useMemo(() => parsed.map((s, idx) => {
+    const hit = matchGalleryImage(s.title, gallery);
+    const override = imgOverride[idx];
+    return {
+      ...s,
+      admin_alias: aliasPrefix ? `${aliasPrefix}${idx + 1}` : s.admin_alias,
+      live_password: s.live_password || defPassword,
+      price_show: s.price_show || defPriceShow,
+      price_replay: s.price_replay || defPriceReplay,
+      price_show_coins: s.price_show_coins || defCoinsShow,
+      price_replay_coins: s.price_replay_coins || defCoinsReplay,
+      image_url: override ?? (hit?.url || ''),
+      image_name: override ? (gallery.find(g => g.url === override)?.name || 'manual') : (hit?.name || ''),
+    };
+  }), [parsed, gallery, imgOverride, aliasPrefix, defPassword, defPriceShow, defPriceReplay, defCoinsShow, defCoinsReplay]);
+
+  const unmatched = preview.filter(s => !s.image_url).length;
+
 
   const handleParse = () => {
     const { shows, warnings: warns } = parseBulkText(text);
