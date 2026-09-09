@@ -4,6 +4,7 @@ import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, RotateCcw, RotateCw,
 import { isFullscreenActive, onFullscreenChange, requestFs, exitFs } from '@/lib/fullscreen';
 import LiveWatermark from '@/components/LiveWatermark';
 import { castMedia, isGoogleCastCapable, requestWakeLock, showNativePicker, stopCastSession } from '@/lib/cast';
+import { readUnlockPayload, requestCastUrl } from '@/lib/tvSession';
 const TvConnectDialog = lazy(() => import('@/components/TvConnectDialog'));
 
 
