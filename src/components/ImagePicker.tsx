@@ -202,14 +202,25 @@ export default function ImagePicker({ value, onChange, autoMatchTitle }: ImagePi
                     )}
                   </button>
                   {item.file && (
-                    <button
-                      type="button"
-                      title="Ganti nama gambar"
-                      className="absolute top-1 right-1 z-10 rounded bg-background/80 border border-border p-1 hover:bg-background"
-                      onClick={(e) => { e.stopPropagation(); setRenaming(item); setRenameName(item.name); }}
-                    >
-                      <Pencil className="w-3 h-3" />
-                    </button>
+                    <div className="absolute top-1 right-1 z-10 flex gap-1">
+                      <button
+                        type="button"
+                        title="Ganti nama gambar"
+                        className="rounded bg-background/80 border border-border p-1 hover:bg-background"
+                        onClick={(e) => { e.stopPropagation(); setRenaming(item); setRenameName(item.name); }}
+                      >
+                        <Pencil className="w-3 h-3" />
+                      </button>
+                      <button
+                        type="button"
+                        title="Hapus gambar"
+                        disabled={deleting === item.file}
+                        className="rounded bg-background/80 border border-border p-1 text-destructive hover:bg-destructive/10 disabled:opacity-50"
+                        onClick={(e) => { e.stopPropagation(); void doDelete(item); }}
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
                   )}
                 </div>
               ))}
