@@ -24,6 +24,8 @@ interface YoutubePlayerApi {
   getDuration?: () => number;
   getCurrentTime?: () => number;
   seekTo?: (seconds: number, allowSeekAhead: boolean) => void;
+  setPlaybackRate?: (rate: number) => void;
+  getPlaybackRate?: () => number;
   setPlaybackQuality?: (quality: string) => void;
   getPlaybackQuality?: () => string;
   getAvailableQualityLevels?: () => string[];
@@ -131,6 +133,12 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
   const containerRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const ytPlayerRef = useRef<YoutubePlayerApi | null>(null);
+  // Host div tempat YT.Player dibuat (API membuat iframe-nya sendiri → kontrol
+  // seek/durasi/play-pause selalu tersedia, tidak bergantung attach ke iframe manual).
+  const ytHostRef = useRef<HTMLDivElement | null>(null);
+  const [playbackRate, setPlaybackRate] = useState(1);
+  const playbackRateRef = useRef(1);
+  const [showSpeedMenu, setShowSpeedMenu] = useState(false);
   const ytFallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const readyRef = useRef(false);
   const [ready, setReady] = useState(false);
