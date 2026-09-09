@@ -184,21 +184,53 @@ export default function BulkShowImport({ onImported }: Props) {
             )}
 
             <div className="space-y-3">
-              <p className="text-sm font-medium">Preview ({preview.length} show) — bisa diedit per baris:</p>
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-sm font-medium">Preview ({preview.length} show) — bisa diedit per baris:</p>
+                {unmatched === 0 ? (
+                  <Badge className="text-[10px] bg-green-500/15 text-green-600 border-green-500/30" variant="outline">Semua gambar cocok</Badge>
+                ) : (
+                  <Badge variant="destructive" className="text-[10px]">{unmatched} show tanpa gambar cocok</Badge>
+                )}
+              </div>
               {preview.map((s, idx) => (
                 <div key={idx} className="p-3 rounded-lg border border-border bg-secondary/30 space-y-2">
                   <div className="flex items-start justify-between gap-2">
+                    <div className="w-20 shrink-0 aspect-video rounded overflow-hidden border border-border bg-background flex items-center justify-center">
+                      {s.image_url ? (
+                        <img src={thumbUrl(s.image_url, 200, 55)} alt={s.title} className="w-full h-full object-cover" />
+                      ) : (
+                        <ImageOff className="w-4 h-4 text-muted-foreground" />
+                      )}
+                    </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-sm truncate">{s.title}</p>
                       <p className="text-xs text-muted-foreground">
                         📅 {s.show_date} · 🕒 {s.show_time.slice(0, 5)}
                         {s.lineup.length > 0 && ` · 👥 ${s.lineup.length}`}
                       </p>
+                      <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+                        {s.image_url ? (
+                          <Badge variant="outline" className="text-[10px] bg-green-500/15 text-green-600 border-green-500/30">
+                            <ImageIcon className="w-3 h-3 mr-1" />{s.image_name || 'gambar cocok'}
+                          </Badge>
+                        ) : (
+                          <Badge variant="destructive" className="text-[10px]">Gambar belum cocok — pilih manual</Badge>
+                        )}
+                        <select
+                          className="h-7 rounded border border-border bg-background text-[11px] px-1 max-w-[160px]"
+                          value={imgOverride[idx] ?? (s.image_url || '')}
+                          onChange={e => setImgOverride(prev => ({ ...prev, [idx]: e.target.value }))}
+                        >
+                          <option value="">(tanpa gambar)</option>
+                          {gallery.map(g => <option key={g.url} value={g.url}>{g.name}</option>)}
+                        </select>
+                      </div>
                     </div>
                     <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive shrink-0" onClick={() => removeRow(idx)}>
                       <Trash2 className="w-4 h-4" />
                     </Button>
                   </div>
+
                   <div className="grid grid-cols-2 gap-2">
                     <div>
                       <Label className="text-[10px]">Alias</Label>
