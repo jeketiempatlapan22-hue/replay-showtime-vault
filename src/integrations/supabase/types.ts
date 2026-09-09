@@ -1773,6 +1773,42 @@ export type Database = {
         }
         Relationships: []
       }
+      tv_sessions: {
+        Row: {
+          browser_id: string | null
+          claims: Json
+          created_at: string
+          expires_at: string
+          id: string
+          payload: Json
+          revoked: boolean
+          session_token: string
+          show_id: string | null
+        }
+        Insert: {
+          browser_id?: string | null
+          claims?: Json
+          created_at?: string
+          expires_at?: string
+          id?: string
+          payload?: Json
+          revoked?: boolean
+          session_token: string
+          show_id?: string | null
+        }
+        Update: {
+          browser_id?: string | null
+          claims?: Json
+          created_at?: string
+          expires_at?: string
+          id?: string
+          payload?: Json
+          revoked?: boolean
+          session_token?: string
+          show_id?: string | null
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           id: string
