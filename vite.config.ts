@@ -27,8 +27,10 @@ export default defineConfig(({ mode }) => ({
       includeAssets: ["favicon.ico", "favicon.png", "apple-touch-icon.png", "icon-192.png", "icon-512.png"],
       manifest: false,
       workbox: {
-        globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
-        navigateFallbackDenylist: [/^\/~oauth/],
+        // Jangan precache HTML/JS/CSS. Precache dapat mengalahkan NetworkFirst
+        // dan membuat PWA terus membuka paket lama setelah publish.
+        globPatterns: ["**/*.{ico,png,svg,woff2}"],
+        navigateFallback: null,
         cleanupOutdatedCaches: true,
         clientsClaim: true,
         skipWaiting: true,
@@ -36,14 +38,15 @@ export default defineConfig(({ mode }) => ({
           {
             urlPattern: ({ request, sameOrigin }) => sameOrigin && request.mode === "navigate",
             handler: "NetworkFirst",
-            options: { cacheName: "html-nav", networkTimeoutSeconds: 5 },
+            options: { cacheName: "html-nav-v3", networkTimeoutSeconds: 5 },
           },
           {
-            // JS/CSS harus selalu diperiksa ke jaringan supaya rilis baru langsung terpakai.
+            // Paket tampilan harus selalu diperiksa ke jaringan agar hasil publish
+            // terbaru langsung menggantikan versi yang tersimpan di aplikasi.
             urlPattern: ({ request, sameOrigin }) =>
               sameOrigin && ["script", "style"].includes(request.destination),
-            handler: "StaleWhileRevalidate",
-            options: { cacheName: "app-code-v2" },
+            handler: "NetworkFirst",
+            options: { cacheName: "app-code-v3", networkTimeoutSeconds: 5 },
           },
           {
             urlPattern: ({ request, sameOrigin }) =>
