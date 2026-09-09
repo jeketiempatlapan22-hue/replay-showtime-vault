@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
-import { Upload, Image as ImageIcon, Check, Wand2, Pencil } from 'lucide-react';
+import { Upload, Image as ImageIcon, Check, Wand2, Pencil, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { uploadImage, getGalleryItems, renameGalleryImage } from '@/lib/store';
+import { uploadImage, getGalleryItems, renameGalleryImage, deleteGalleryImage } from '@/lib/store';
 import { toast } from '@/hooks/use-toast';
 import { thumbUrl } from '@/lib/imageUrl';
 import { matchGalleryImage, slugifyName, type GalleryItem } from '@/lib/showImageMatch';
@@ -26,6 +26,7 @@ export default function ImagePicker({ value, onChange, autoMatchTitle }: ImagePi
   const [renaming, setRenaming] = useState<GalleryItem | null>(null);
   const [renameName, setRenameName] = useState('');
   const [savingRename, setSavingRename] = useState(false);
+  const [deleting, setDeleting] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const autoDoneRef = useRef('');
 
