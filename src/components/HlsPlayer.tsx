@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHandle } from 'react';
+import { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHandle, Suspense, lazy } from 'react';
 import Hls from 'hls.js';
 import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, RotateCcw, RotateCw, Loader2, Settings, Check, Cast } from 'lucide-react';
 import { isFullscreenActive, onFullscreenChange, requestFs, exitFs } from '@/lib/fullscreen';
 import LiveWatermark from '@/components/LiveWatermark';
 import { castMedia, isGoogleCastCapable, requestWakeLock, showNativePicker, stopCastSession } from '@/lib/cast';
+const TvConnectDialog = lazy(() => import('@/components/TvConnectDialog'));
 
 
 interface Props {
