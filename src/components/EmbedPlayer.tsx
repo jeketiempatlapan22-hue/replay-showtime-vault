@@ -246,7 +246,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
     hideTimerRef.current = setTimeout(() => {
       // Only hide while actually playing
       setShowControls(prev => (isPlayingRef.current ? false : prev));
-    }, 3000);
+    }, 5000);
   }, []);
 
   const isPlayingRef = useRef(false);
