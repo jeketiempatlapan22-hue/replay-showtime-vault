@@ -69,11 +69,8 @@ export default function MembershipUsersAdmin() {
   const loadPkgs = async () => {
     setPkgLoading(true);
     setPkgError(null);
-    const { data, error } = await supabase
-      .from('membership_packages')
-      .select('id,name,duration_days,max_devices,includes_replays,replay_info,sort_order,created_at')
-      .order('sort_order', { ascending: true })
-      .order('created_at', { ascending: true });
+    // Kolom replay_info hanya boleh dibaca lewat jalur admin server-side.
+    const { data, error } = await (supabase as any).rpc('admin_get_membership_packages');
     setPkgLoading(false);
     if (error) {
       setPkgError(error.message);
@@ -81,7 +78,9 @@ export default function MembershipUsersAdmin() {
       setPkgs([]);
       return;
     }
-    const list = (data || []) as Pkg[];
+    const list = ([...((data || []) as Pkg[])] as Pkg[]).sort(
+      (a: any, b: any) => (a.sort_order - b.sort_order) || String(a.created_at || '').localeCompare(String(b.created_at || '')),
+    );
     setPkgs(list);
     setCreateForm(f => {
       if (f.package_id && list.some(p => p.id === f.package_id)) return f;
