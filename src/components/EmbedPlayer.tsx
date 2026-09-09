@@ -689,7 +689,13 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
   };
 
   useEffect(() => {
-    const onChange = () => setIsFullscreen(isFullscreenActive());
+    const onChange = () => {
+      const active = isFullscreenActive();
+      setIsFullscreen(active);
+      // Native fullscreen menang atas fallback CSS; saat keluar, bersihkan keduanya.
+      if (active) setPseudoFs(false);
+      if (!active) void lockLandscape(false);
+    };
     return onFullscreenChange(onChange);
   }, []);
 
