@@ -426,8 +426,10 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
             markReady(true);
             try {
               ytPlayerRef.current.setVolume?.(Math.round(volumeRef.current * 100));
-              if (userUnmutedRef.current) {
-                // User already activated sound — keep it on.
+              if (userUnmutedRef.current || !mutedRef.current) {
+                // Coba mulai langsung dengan suara. Browser yang mengizinkan
+                // autoplay bersuara tidak lagi membutuhkan tombol tambahan.
+                ytPlayerRef.current.setVolume?.(Math.round(Math.max(0.05, volumeRef.current) * 100));
                 ytPlayerRef.current.unMute?.();
                 mutedRef.current = false;
                 setMuted(false);
@@ -443,6 +445,21 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
                 autoMuteAppliedRef.current = true;
               }
               ytPlayerRef.current.playVideo?.();
+              // Autoplay bersuara dapat ditolak oleh kebijakan browser. Jika itu
+              // terjadi, lanjutkan video secara senyap tanpa membuat player macet.
+              setTimeout(() => {
+                if (cancelled || userPausedRef.current || userUnmutedRef.current) return;
+                let state: number | undefined;
+                try { state = ytPlayerRef.current?.getPlayerState?.(); } catch { /* ignore */ }
+                if (state === 1 || state === 3) return;
+                try {
+                  ytPlayerRef.current?.mute?.();
+                  ytPlayerRef.current?.playVideo?.();
+                  mutedRef.current = true;
+                  setMuted(true);
+                  setShowHint(true);
+                } catch { /* ignore */ }
+              }, 900);
               // Pulihkan kecepatan pemutaran pilihan user.
               if (playbackRateRef.current !== 1) {
                 try { ytPlayerRef.current.setPlaybackRate?.(playbackRateRef.current); } catch { /* ignore */ }
@@ -610,17 +627,6 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
           if (s === undefined) return;
           const nowPlaying = s === 1 || s === 3;
           if (nowPlaying === next) { setIsPlaying(nowPlaying); isPlayingRef.current = nowPlaying; return; }
-          if (next && i === 2 && !mutedRef.current) {
-            // Browser menolak memutar dengan suara di luar gesture — putar senyap
-            // lalu tawarkan tombol aktifkan suara lagi agar video tidak macet.
-            mutedRef.current = true;
-            setMuted(true);
-            userUnmutedRef.current = false;
-            try { localStorage.setItem(MUTED_KEY, '1'); } catch { /* ignore */ }
-            withYtPlayer((p) => { p.mute?.(); p.playVideo?.(); }, () => { ytPost('mute'); ytPost('playVideo'); });
-            setShowHint(true);
-            return;
-          }
           ytCommand(next ? 'playVideo' : 'pauseVideo');
         }, delay);
       });
@@ -689,32 +695,34 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
       localStorage.setItem(MUTED_KEY, '0');
     } catch { /* ignore */ }
 
-    // Seluruh perintah dijalankan sinkron di dalam gesture klik. Urutan play →
-    // volume → unmute → play paling stabil di Chrome mobile, Safari/iOS, dan PC.
+    // Jangan kirim play berulang sebelum/sesudah unmute. Pada sebagian browser
+    // mobile, rentetan itu justru mengubah state YouTube menjadi PAUSED.
     withYtPlayer(
       (p) => {
-        p.playVideo?.();
         p.setVolume?.(Math.round(audibleVolume * 100));
         p.unMute?.();
-        p.playVideo?.();
+        const state = p.getPlayerState?.();
+        if (state !== 1 && state !== 3) p.playVideo?.();
       },
       () => {
         ytHandshake();
-        ytPost('playVideo');
         ytPost('setVolume', [Math.round(audibleVolume * 100)]);
         ytPost('unMute');
         ytPost('playVideo');
       },
     );
 
-    [250, 700, 1400, 2200].forEach((delay, i) => {
+    [350, 900, 1800].forEach((delay, i) => {
       unmuteWatchdogRef.current.push(setTimeout(() => {
         const p = ytPlayerRef.current;
         try {
           if (p?.isMuted?.()) p.unMute?.();
           if ((p?.getVolume?.() ?? audibleVolume * 100) <= 0) p?.setVolume?.(Math.round(audibleVolume * 100));
         } catch { /* ignore */ }
-        resumeIfStalled(i);
+        // Hanya pulihkan bila benar-benar berhenti; jangan sentuh playback yang
+        // sedang PLAYING/BUFFERING karena dapat memicu pause pada embed tertentu.
+        const state = ytState();
+        if (state !== 1 && state !== 3) resumeIfStalled(i);
       }, delay));
     });
   };
