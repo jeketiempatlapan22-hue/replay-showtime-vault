@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { isFullscreenActive, onFullscreenChange, requestFs, exitFs } from '@/lib/fullscreen';
+import { isFullscreenActive, onFullscreenChange, requestFs, exitFs, lockLandscape } from '@/lib/fullscreen';
 import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, SkipBack, SkipForward } from 'lucide-react';
 import LiveWatermark from '@/components/LiveWatermark';
 
