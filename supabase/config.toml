@@ -54,3 +54,6 @@ verify_jwt = false
 
 [functions.free-token]
 verify_jwt = false
+
+[functions.tv-pair]
+verify_jwt = false
