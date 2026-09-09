@@ -1094,13 +1094,15 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
         style={{ touchAction: 'manipulation' }}
         onPointerDownCapture={(e) => {
           if (!plainMode && !showControls && isPlaying) {
+            swallowClickRef.current = true;
             e.preventDefault();
             e.stopPropagation();
             resetHideTimer();
           }
         }}
         onClickCapture={(e) => {
-          if (!plainMode && !showControls && isPlaying) {
+          if (swallowClickRef.current) {
+            swallowClickRef.current = false;
             e.preventDefault();
             e.stopPropagation();
             resetHideTimer();
