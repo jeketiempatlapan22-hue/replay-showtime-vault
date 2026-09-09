@@ -193,7 +193,12 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
     const p = ytPlayerRef.current;
     if (!p?.setPlaybackQuality) return;
     const avail = availableQualitiesRef.current;
-    if (!avail.length) return;
+    // Saat daftar belum siap, tetap minta level tertinggi. YouTube akan memilih
+    // level tertinggi yang benar-benar tersedia untuk video/perangkat tersebut.
+    if (!avail.length) {
+      try { p.setPlaybackQuality('highres'); } catch { /* ignore */ }
+      return;
+    }
     const ordered = YT_QUALITY_LADDER.filter(q => avail.includes(q));
     if (!ordered.length) return;
     const idx = Math.min(qualityCapIdxRef.current, ordered.length - 1);
@@ -387,6 +392,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
           fs: 0,
           iv_load_policy: 3,
           cc_load_policy: 0,
+          vq: 'highres',
           hl: 'id',
           disablekb: 1,
           enablejsapi: 1,
@@ -624,8 +630,9 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
       (p) => {
         p.setVolume?.(Math.round(audibleVolume * 100));
         p.unMute?.();
-        const state = p.getPlayerState?.();
-        if (state !== 1 && state !== 3) p.playVideo?.();
+        // Selalu akhiri gesture dengan SATU play. Browser tertentu mengubah
+        // state ke paused tepat setelah unmute walau sebelumnya masih playing.
+        p.playVideo?.();
       },
       () => {
         ytHandshake();
@@ -839,7 +846,6 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
     setCurrentTime(target);
   };
   const commitSeek = (value: number) => {
-    setSeeking(true);
     setCurrentTime(value);
     seekTo(value);
   };
