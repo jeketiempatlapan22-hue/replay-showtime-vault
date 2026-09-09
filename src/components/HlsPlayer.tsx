@@ -1221,7 +1221,8 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
               </button>
               {showTvMenu && (() => {
                 const headerGated = !!headers && Object.keys(headers).length > 0;
-                const castOk = castSupported && castAvailable && !casting && !headerGated;
+                // Sumber terproteksi kini tetap bisa di-Cast lewat alamat sementara.
+                const castOk = castSupported && castAvailable && !casting;
                 return (
                 <div
                   className="absolute bottom-12 right-0 z-30 w-60 rounded-lg border border-white/15 bg-black/90 backdrop-blur p-1.5 text-xs text-white shadow-xl"
