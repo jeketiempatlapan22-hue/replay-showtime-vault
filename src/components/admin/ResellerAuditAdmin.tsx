@@ -180,6 +180,20 @@ export default function ResellerAuditAdmin() {
                 <div key={g.phone} className="border border-border rounded-lg bg-card/50 overflow-hidden min-w-0">
                   <div className="flex flex-col gap-2 p-3 bg-secondary/30 border-b border-border">
                     <div className="flex items-center gap-2 flex-wrap min-w-0">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 accent-primary shrink-0"
+                        title="Centang semua show reseller ini"
+                        checked={g.items.length > 0 && g.items.every(it => sel.has(keyOf(g.phone, it.kind, it.target_id)))}
+                        onChange={(e) => setSel(prev => {
+                          const n = new Set(prev);
+                          for (const it of g.items) {
+                            const k = keyOf(g.phone, it.kind, it.target_id);
+                            if (e.target.checked) n.add(k); else n.delete(k);
+                          }
+                          return n;
+                        })}
+                      />
                       <span className="font-mono text-sm font-semibold truncate">+{g.phone}</span>
                       {g.label && <span className="text-xs text-muted-foreground">({g.label})</span>}
                       <Badge variant="secondary" className="text-[10px]">{g.total} link total</Badge>
@@ -203,12 +217,20 @@ export default function ResellerAuditAdmin() {
                   <div className="p-2 space-y-1">
                     {g.items.map((it, i) => {
                       const kb = kindBadge[it.kind];
+                      const k = keyOf(g.phone, it.kind, it.target_id);
                       return (
-                        <div key={`${it.kind}-${it.target_id}-${i}`} className="flex items-center justify-between gap-2 px-2 py-1.5 rounded hover:bg-secondary/40 min-w-0">
+                        <div key={`${it.kind}-${it.target_id}-${i}`} className={`flex items-center justify-between gap-2 px-2 py-1.5 rounded hover:bg-secondary/40 min-w-0 ${sel.has(k) ? 'bg-primary/10' : ''}`}>
                           <div className="flex items-center gap-2 min-w-0 flex-1">
+                            <input
+                              type="checkbox"
+                              className="h-4 w-4 accent-primary shrink-0"
+                              checked={sel.has(k)}
+                              onChange={() => toggleSel(k)}
+                            />
                             <Badge variant="outline" className={`text-[10px] shrink-0 ${kb.cls}`}>{kb.label}</Badge>
                             <span className="text-sm truncate">{it.target_title || '—'}</span>
                           </div>
+
                           <div className="flex items-center gap-1.5 shrink-0 max-w-[55%] sm:max-w-none">
                             <span className="hidden min-[380px]:inline text-[10px] text-muted-foreground truncate">{fmtDate(it.last_copied)}</span>
                             <Badge className="text-[11px] font-semibold">{it.copies} link</Badge>
