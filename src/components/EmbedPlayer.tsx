@@ -529,8 +529,15 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
 
   // Fallback kontrol YouTube lewat postMessage (iframe API) — dipakai ketika
   // objek YT.Player belum/tidak pernah ter-attach (API diblokir, init lambat).
+  const ytWindow = (): Window | null => {
+    try {
+      const ifr = ytPlayerRef.current?.getIframe?.();
+      if (ifr?.contentWindow) return ifr.contentWindow;
+    } catch { /* ignore */ }
+    return iframeRef.current?.contentWindow ?? null;
+  };
   const ytPost = (func: string, args: unknown[] = []) => {
-    const w = iframeRef.current?.contentWindow;
+    const w = ytWindow();
     if (!w) return;
     const msg = JSON.stringify({ event: 'command', func, args });
     try { w.postMessage(msg, 'https://www.youtube-nocookie.com'); } catch { /* ignore */ }
@@ -540,7 +547,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
 
   // Handshake wajib agar iframe YouTube menerima perintah postMessage.
   const ytHandshake = () => {
-    const w = iframeRef.current?.contentWindow;
+    const w = ytWindow();
     if (!w) return;
     const msg = JSON.stringify({ event: 'listening', id: ytId || 'yt-embed', channel: 'widget' });
     try { w.postMessage(msg, 'https://www.youtube-nocookie.com'); } catch { /* ignore */ }
