@@ -170,6 +170,32 @@ export default function ResellerAuditAdmin() {
             <Input placeholder="Cari nomor / label / judul…" className="pl-9" value={q} onChange={(e) => setQ(e.target.value)} />
           </div>
 
+          {sel.size > 0 && (
+            <div className="flex flex-wrap items-center gap-2 rounded-lg border border-destructive/40 bg-destructive/10 p-2">
+              <span className="text-xs font-medium">{sel.size} show dicentang</span>
+              <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setSel(new Set())}>Batal pilih</Button>
+              <Button
+                size="sm"
+                variant="destructive"
+                className="h-7 text-xs ml-auto"
+                onClick={() => {
+                  const items: BulkItem[] = [];
+                  for (const g of grouped) {
+                    for (const it of g.items) {
+                      if (sel.has(keyOf(g.phone, it.kind, it.target_id))) {
+                        items.push({ phone: g.phone, kind: it.kind, target_id: it.target_id, target_title: it.target_title });
+                      }
+                    }
+                  }
+                  if (items.length) setPending({ type: 'delete_bulk', items });
+                }}
+              >
+                <Trash2 className="w-3.5 h-3.5 mr-1" />Hapus yang dicentang
+              </Button>
+            </div>
+          )}
+
+
           {loading ? (
             <p className="text-center text-muted-foreground py-8 text-sm">Memuat…</p>
           ) : grouped.length === 0 ? (
