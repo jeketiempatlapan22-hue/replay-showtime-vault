@@ -377,12 +377,19 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
       }
 
       initialized = true;
-      // Biarkan YT API yang membuat iframe-nya sendiri agar seek/durasi/play-pause
-      // selalu terhubung (attach ke iframe manual sering gagal diam-diam).
-      ytPlayerRef.current = new YT.Player(ytHostRef.current, {
+      // YT API MENGGANTI elemen yang dioper dengan iframe buatannya. Kalau kita
+      // oper div milik React, React kehilangan node-nya dan player bisa berakhir
+      // di node lepas (tampil thumbnail saja / kontrol tidak nyambung).
+      // Karena itu kita buat node mount sendiri di dalam host.
+      const mount = document.createElement('div');
+      mount.style.width = '100%';
+      mount.style.height = '100%';
+      ytHostRef.current.replaceChildren(mount);
+      ytPlayerRef.current = new YT.Player(mount, {
         videoId: ytId,
         width: '100%',
         height: '100%',
+        host: 'https://www.youtube-nocookie.com',
         playerVars: {
           rel: 0,
           modestbranding: 1,
