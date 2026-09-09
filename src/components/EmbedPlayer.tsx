@@ -24,6 +24,8 @@ interface YoutubePlayerApi {
   getDuration?: () => number;
   getCurrentTime?: () => number;
   seekTo?: (seconds: number, allowSeekAhead: boolean) => void;
+  setPlaybackRate?: (rate: number) => void;
+  getPlaybackRate?: () => number;
   setPlaybackQuality?: (quality: string) => void;
   getPlaybackQuality?: () => string;
   getAvailableQualityLevels?: () => string[];
@@ -131,6 +133,12 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
   const containerRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const ytPlayerRef = useRef<YoutubePlayerApi | null>(null);
+  // Host div tempat YT.Player dibuat (API membuat iframe-nya sendiri → kontrol
+  // seek/durasi/play-pause selalu tersedia, tidak bergantung attach ke iframe manual).
+  const ytHostRef = useRef<HTMLDivElement | null>(null);
+  const [playbackRate, setPlaybackRate] = useState(1);
+  const playbackRateRef = useRef(1);
+  const [showSpeedMenu, setShowSpeedMenu] = useState(false);
   const ytFallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const readyRef = useRef(false);
   const [ready, setReady] = useState(false);
@@ -350,16 +358,15 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
     let initTries = 0;
     const init = () => {
       if (cancelled || plainModeRef.current || initialized) return;
-      // Iframe mungkin belum ter-mount pada tick pertama — coba lagi sebentar.
-      if (!iframeRef.current) {
+      // Host div mungkin belum ter-mount pada tick pertama — coba lagi sebentar.
+      if (!ytHostRef.current) {
         if (initTries++ < 40) setTimeout(init, 100);
         return;
       }
 
       const YT = (window as YoutubeWindow).YT;
       if (!YT?.Player) {
-        // API diblokir/lambat: iframe standar sudah terpasang dan tetap dapat
-        // diputar. Beralih ke mode polos agar tidak terjadi retry selamanya.
+        // API diblokir/lambat → jatuh ke embed polos (kontrol bawaan YouTube).
         if (initTries++ < 20) setTimeout(init, 150);
         else {
           plainModeRef.current = true;
@@ -370,7 +377,27 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
       }
 
       initialized = true;
-      ytPlayerRef.current = new YT.Player(iframeRef.current, {
+      // Biarkan YT API yang membuat iframe-nya sendiri agar seek/durasi/play-pause
+      // selalu terhubung (attach ke iframe manual sering gagal diam-diam).
+      ytPlayerRef.current = new YT.Player(ytHostRef.current, {
+        videoId: ytId,
+        width: '100%',
+        height: '100%',
+        playerVars: {
+          rel: 0,
+          modestbranding: 1,
+          playsinline: 1,
+          autoplay: 1,
+          mute: 1,
+          controls: 0,
+          fs: 0,
+          iv_load_policy: 3,
+          cc_load_policy: 0,
+          hl: 'id',
+          disablekb: 1,
+          enablejsapi: 1,
+          ...(safeOrigin ? { origin: safeOrigin } : {}),
+        },
         events: {
           onReady: () => {
             if (cancelled) return;
@@ -407,6 +434,17 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
                 autoMuteAppliedRef.current = true;
               }
               ytPlayerRef.current.playVideo?.();
+              // Pulihkan kecepatan pemutaran pilihan user.
+              if (playbackRateRef.current !== 1) {
+                try { ytPlayerRef.current.setPlaybackRate?.(playbackRateRef.current); } catch { /* ignore */ }
+              }
+              // Durasi sering sudah tersedia tepat setelah ready.
+              setTimeout(() => {
+                try {
+                  const d = ytPlayerRef.current?.getDuration?.() ?? 0;
+                  if (d > 0) setDuration(d);
+                } catch { /* ignore */ }
+              }, 600);
               // Matikan subtitle di replay (jangan sentuh Live).
               if (!isLive) {
                 disableCaptions();
@@ -477,8 +515,10 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
       cancelled = true;
       if (ytFallbackTimerRef.current) clearTimeout(ytFallbackTimerRef.current);
       try { ytPlayerRef.current?.pauseVideo?.(); } catch { /* ignore */ }
+      try { ytPlayerRef.current?.destroy?.(); } catch { /* ignore */ }
       ytPlayerRef.current = null;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ytId, type, inView, markReady, isLive, refreshAvailableQualities, applyQualityCap, disableCaptions]);
 
   // Cloudflare via Stream SDK postMessage (basic play/pause/volume via iframe contentWindow)
@@ -489,8 +529,15 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
 
   // Fallback kontrol YouTube lewat postMessage (iframe API) — dipakai ketika
   // objek YT.Player belum/tidak pernah ter-attach (API diblokir, init lambat).
+  const ytWindow = (): Window | null => {
+    try {
+      const ifr = ytPlayerRef.current?.getIframe?.();
+      if (ifr?.contentWindow) return ifr.contentWindow;
+    } catch { /* ignore */ }
+    return iframeRef.current?.contentWindow ?? null;
+  };
   const ytPost = (func: string, args: unknown[] = []) => {
-    const w = iframeRef.current?.contentWindow;
+    const w = ytWindow();
     if (!w) return;
     const msg = JSON.stringify({ event: 'command', func, args });
     try { w.postMessage(msg, 'https://www.youtube-nocookie.com'); } catch { /* ignore */ }
@@ -500,7 +547,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
 
   // Handshake wajib agar iframe YouTube menerima perintah postMessage.
   const ytHandshake = () => {
-    const w = iframeRef.current?.contentWindow;
+    const w = ytWindow();
     if (!w) return;
     const msg = JSON.stringify({ event: 'listening', id: ytId || 'yt-embed', channel: 'widget' });
     try { w.postMessage(msg, 'https://www.youtube-nocookie.com'); } catch { /* ignore */ }
@@ -741,16 +788,40 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
   }, [type, liveActive]);
 
   const seekTo = (t: number) => {
-    if (!duration) return;
-    const target = Math.max(0, Math.min(duration, t));
     const p = ytPlayerRef.current;
-    if (p?.seekTo) {
-      try { p.seekTo(target, true); setCurrentTime(target); return; } catch { /* ignore */ }
+    let dur = duration;
+    if (!dur) {
+      try { dur = p?.getDuration?.() ?? 0; } catch { /* ignore */ }
+      if (dur > 0) setDuration(dur);
     }
-    ytPost('seekTo', [target, true]);
+    if (!dur || !isFinite(dur)) return;
+    const target = Math.max(0, Math.min(dur, t));
+    let handled = false;
+    if (p?.seekTo) {
+      try { p.seekTo(target, true); handled = true; } catch { /* ignore */ }
+    }
+    if (!handled) { ytHandshake(); ytPost('seekTo', [target, true]); }
     setCurrentTime(target);
   };
-  const skip = (delta: number) => seekTo((currentTime || 0) + delta);
+  const skip = (delta: number) => {
+    let base = currentTime || 0;
+    try {
+      const t = ytPlayerRef.current?.getCurrentTime?.();
+      if (typeof t === 'number' && isFinite(t)) base = t;
+    } catch { /* ignore */ }
+    seekTo(base + delta);
+  };
+  const changeRate = (rate: number) => {
+    setPlaybackRate(rate);
+    playbackRateRef.current = rate;
+    setShowSpeedMenu(false);
+    let handled = false;
+    const p = ytPlayerRef.current;
+    if (p?.setPlaybackRate) {
+      try { p.setPlaybackRate(rate); handled = true; } catch { /* ignore */ }
+    }
+    if (!handled) { ytHandshake(); ytPost('setPlaybackRate', [rate]); }
+  };
   const fmtTime = (s: number) => {
     if (!isFinite(s) || s < 0) s = 0;
     const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = Math.floor(s % 60);
@@ -870,23 +941,29 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
         <div className="absolute inset-0 bg-muted/20 animate-pulse" aria-hidden />
       ) : type === 'youtube' ? (
         ytId ? (
-          <iframe
-            ref={iframeRef}
-            key={plainMode ? 'plain' : 'api'}
-            id={ytIframeId}
-            src={ytEmbedUrl}
-            onLoad={() => { handleFrameLoaded(); ytHandshake(); setTimeout(ytHandshake, 800); }}
-            className={`absolute inset-0 w-full h-full ${plainMode ? '' : 'pointer-events-none'}`}
-            title={title}
-            allow="autoplay; encrypted-media; picture-in-picture; fullscreen; accelerometer; gyroscope"
-            allowFullScreen
-            loading="eager"
-            referrerPolicy="origin-when-cross-origin"
-            // @ts-expect-error - fetchpriority valid HTML attr
-            fetchpriority="high"
-            style={{ border: 0 }}
-          />
-
+          plainMode ? (
+            <iframe
+              ref={iframeRef}
+              key="plain"
+              id={ytIframeId}
+              src={ytEmbedUrl}
+              onLoad={() => { handleFrameLoaded(); ytHandshake(); setTimeout(ytHandshake, 800); }}
+              className="absolute inset-0 w-full h-full"
+              title={title}
+              allow="autoplay; encrypted-media; picture-in-picture; fullscreen; accelerometer; gyroscope"
+              allowFullScreen
+              loading="eager"
+              referrerPolicy="origin-when-cross-origin"
+              // @ts-expect-error - fetchpriority valid HTML attr
+              fetchpriority="high"
+              style={{ border: 0 }}
+            />
+          ) : (
+            // YT API akan mengganti div ini dengan iframe-nya sendiri.
+            <div key="api" className="absolute inset-0 w-full h-full pointer-events-none">
+              <div ref={ytHostRef} className="w-full h-full" />
+            </div>
+          )
         ) : (
           <div className="absolute inset-0 flex items-center justify-center bg-black text-white/80 text-sm px-4 text-center">
             Link YouTube tidak valid. Hubungi admin untuk memeriksa sumber.
@@ -1001,6 +1078,30 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
             style={{ touchAction: 'manipulation' }}
           />
           <div className="flex-1" />
+          {type === 'youtube' && !liveActive && (
+            <div className="relative shrink-0">
+              <button
+                onClick={(e) => { e.stopPropagation(); setShowSpeedMenu(v => !v); resetHideTimer(); }}
+                aria-label="Kecepatan pemutaran"
+                className="px-2 py-1.5 rounded-md text-white text-[11px] sm:text-xs font-semibold hover:text-primary active:scale-95 transition-all tabular-nums"
+              >
+                {playbackRate}x
+              </button>
+              {showSpeedMenu && (
+                <div className="absolute bottom-full right-0 mb-2 rounded-lg bg-black/90 border border-white/15 p-1 shadow-xl flex flex-col min-w-[64px]">
+                  {[0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2].map(r => (
+                    <button
+                      key={r}
+                      onClick={(e) => { e.stopPropagation(); changeRate(r); resetHideTimer(); }}
+                      className={`px-2 py-1 text-[11px] rounded text-left tabular-nums ${r === playbackRate ? 'bg-primary text-primary-foreground' : 'text-white hover:bg-white/10'}`}
+                    >
+                      {r}x
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
           <button onClick={(e) => { e.stopPropagation(); toggleFullscreen(); }} aria-label="Fullscreen" className="p-2.5 landscape:p-3 text-white hover:text-primary active:scale-95 transition-all">
             {isFullscreen || pseudoFs ? <Minimize className="w-5 h-5 landscape:w-6 landscape:h-6" /> : <Maximize className="w-5 h-5 landscape:w-6 landscape:h-6" />}
           </button>
