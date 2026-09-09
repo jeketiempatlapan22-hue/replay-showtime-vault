@@ -856,31 +856,29 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
     return h ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
   };
 
-  const lockLandscape = async (on: boolean) => {
-    try {
-      const so = (screen as unknown as { orientation?: { lock?: (o: string) => Promise<void>; unlock?: () => void } }).orientation;
-      if (!so) return;
-      if (on) await so.lock?.('landscape');
-      else so.unlock?.();
-    } catch { /* ignore */ }
-  };
+  const fsBusyRef = useRef(false);
 
   const toggleFullscreen = async () => {
     const el = containerRef.current;
-    if (!el) return;
-    if (isFullscreenActive() || pseudoFs) {
-      await exitFs();
-      setPseudoFs(false);
-      void lockLandscape(false);
-      return;
+    if (!el || fsBusyRef.current) return;
+    fsBusyRef.current = true;
+    try {
+      if (isFullscreenActive() || pseudoFs) {
+        await exitFs(el.querySelector('video'));
+        setPseudoFs(false);
+        setIsFullscreen(isFullscreenActive());
+        await lockLandscape(false);
+        return;
+      }
+      const ok = await requestFs(el, el.querySelector('video'));
+      setIsFullscreen(isFullscreenActive());
+      // Fallback: beberapa browser (iOS Safari, sebagian WebView TV) menolak
+      // fullscreen untuk elemen non-video → pakai mode fullscreen CSS.
+      if (!ok) setPseudoFs(true);
+      await lockLandscape(true);
+    } finally {
+      fsBusyRef.current = false;
     }
-    await requestFs(el, el.querySelector('video'));
-    void lockLandscape(true);
-    // Fallback: beberapa browser (iOS Safari, sebagian WebView TV) menolak
-    // fullscreen untuk elemen non-video → pakai mode fullscreen CSS.
-    setTimeout(() => {
-      if (!isFullscreenActive()) setPseudoFs(true);
-    }, 350);
   };
 
   // iOS/iPadOS tidak mendukung screen.orientation.lock. Saat mode fullscreen CSS
