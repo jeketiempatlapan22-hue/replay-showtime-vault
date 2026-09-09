@@ -56,10 +56,12 @@ const MIRROR_STEPS: Record<Platform, { title: string; steps: string[]; note: str
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  initialTab?: 'code' | 'mirror';
 }
 
-export default function TvConnectDialog({ open, onOpenChange }: Props) {
-  const [tab, setTab] = useState<'code' | 'mirror'>('code');
+export default function TvConnectDialog({ open, onOpenChange, initialTab = 'code' }: Props) {
+  const [tab, setTab] = useState<'code' | 'mirror'>(initialTab);
+  useEffect(() => { if (open) setTab(initialTab); }, [open, initialTab]);
   const [platform, setPlatform] = useState<Platform>('desktop');
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);

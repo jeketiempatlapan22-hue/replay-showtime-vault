@@ -101,6 +101,8 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
   const [casting, setCasting] = useState(false);
   const [tvMode, setTvMode] = useState(false);
   const [showTvMenu, setShowTvMenu] = useState(false);
+  const [showTvConnect, setShowTvConnect] = useState(false);
+  const [tvConnectTab, setTvConnectTab] = useState<'code' | 'mirror'>('code');
   const [netStats, setNetStats] = useState<{ kbps: number; buffer: number; recommendedHeight: number | null } | null>(null);
 
 
