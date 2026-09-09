@@ -744,19 +744,27 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
       try { localStorage.setItem(MUTED_KEY, '0'); } catch { /* ignore */ }
     }
     if (type === 'youtube') {
+      const wasMuted = mutedRef.current === false && v > 0;
       withYtPlayer(
         (p) => {
           p.setVolume?.(Math.round(v * 100));
-          if (v > 0) p.unMute?.();
+          if (v > 0) { p.unMute?.(); if (!userPausedRef.current) p.playVideo?.(); }
         },
         () => {
           ytPost('setVolume', [Math.round(v * 100)]);
-          if (v > 0) ytPost('unMute');
+          if (v > 0) { ytPost('unMute'); if (!userPausedRef.current) ytPost('playVideo'); }
         },
       );
+      if (wasMuted && !userPausedRef.current) {
+        clearUnmuteWatchdog();
+        [250, 700, 1400, 2200].forEach((delay, i) => {
+          unmuteWatchdogRef.current.push(setTimeout(() => resumeIfStalled(i), delay));
+        });
+      }
     } else {
       cfPost('setVolume', v);
     }
+
   };
 
   useEffect(() => {
