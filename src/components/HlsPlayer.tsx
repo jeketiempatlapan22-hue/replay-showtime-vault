@@ -4,6 +4,7 @@ import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, RotateCcw, RotateCw,
 import { isFullscreenActive, onFullscreenChange, requestFs, exitFs } from '@/lib/fullscreen';
 import LiveWatermark from '@/components/LiveWatermark';
 import { castMedia, isGoogleCastCapable, requestWakeLock, showNativePicker, stopCastSession } from '@/lib/cast';
+import { readUnlockPayload, requestCastUrl } from '@/lib/tvSession';
 const TvConnectDialog = lazy(() => import('@/components/TvConnectDialog'));
 
 
@@ -100,6 +101,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
   const [castSupported, setCastSupported] = useState(false);
   const [castAvailable, setCastAvailable] = useState(false);
   const [casting, setCasting] = useState(false);
+  const [castPreparing, setCastPreparing] = useState(false);
   const [tvMode, setTvMode] = useState(false);
   const [showTvMenu, setShowTvMenu] = useState(false);
   const [showTvConnect, setShowTvConnect] = useState(false);
@@ -181,22 +183,32 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
   useEffect(() => { srcRef.current = src; }, [src]);
 
   const showCastPicker = useCallback(async () => {
-    // Sumber IDN/Hanabira membutuhkan header khusus (x-api-token, x-showid, dll)
-    // yang tidak bisa disisipkan oleh Chromecast receiver. Cast hanya untuk sumber
-    // URL langsung tanpa header. AirPlay/Remote Playback memakai sesi <video> di
-    // HP ini (tetap terautentikasi) sehingga aman untuk semua sumber dan tidak
-    // memicu reset perangkat.
+    // Sumber IDN/Hanabira butuh header khusus (x-api-token, x-showid, dll) yang
+    // tidak bisa dikirim Chromecast. Untuk itu kita minta alamat sementara ke
+    // server (proxy bertanda tangan) supaya TV cukup membuka URL biasa.
+    // Alamat ini memakai sesi yang sama, jadi token tidak perlu direset.
     const headerGated = !!headersRef.current && Object.keys(headersRef.current).length > 0;
-    if (isGoogleCastCapable() && !headerGated) {
-      const ok = await castMedia({
-        url: srcRef.current,
-        title,
-        isLive: isLiveRef.current,
-      });
-      if (ok) {
-        setCasting(true);
-        try { videoRef.current?.pause(); } catch { /* ignore */ }
-        return;
+    if (isGoogleCastCapable()) {
+      let url = srcRef.current;
+      if (headerGated) {
+        setCastPreparing(true);
+        const params = new URLSearchParams(window.location.search);
+        const payload = readUnlockPayload(params.get('show') || '');
+        url = await requestCastUrl(String(payload?.grant || ''));
+        setCastPreparing(false);
+      }
+      if (url) {
+        const ok = await castMedia({
+          url,
+          title,
+          contentType: 'application/x-mpegURL',
+          isLive: isLiveRef.current,
+        });
+        if (ok) {
+          setCasting(true);
+          try { videoRef.current?.pause(); } catch { /* ignore */ }
+          return;
+        }
       }
     }
     // 2) AirPlay / Remote Playback bawaan browser.
@@ -1209,16 +1221,17 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
               </button>
               {showTvMenu && (() => {
                 const headerGated = !!headers && Object.keys(headers).length > 0;
-                const castOk = castSupported && castAvailable && !casting && !headerGated;
+                // Sumber terproteksi kini tetap bisa di-Cast lewat alamat sementara.
+                const castOk = castSupported && castAvailable && !casting;
                 return (
                 <div
                   className="absolute bottom-12 right-0 z-30 w-60 rounded-lg border border-white/15 bg-black/90 backdrop-blur p-1.5 text-xs text-white shadow-xl"
                   onClick={(e) => e.stopPropagation()}
                 >
                   {castOk && (
-                    <button type="button" className="w-full text-left px-2.5 py-2 rounded hover:bg-white/10"
-                      onClick={() => { void showCastPicker(); setShowTvMenu(false); resetHideTimer(); }}>
-                      Hubungkan ke TV (Cast / AirPlay)
+                    <button type="button" disabled={castPreparing} className="w-full text-left px-2.5 py-2 rounded hover:bg-white/10 disabled:opacity-60"
+                      onClick={() => { void showCastPicker(); resetHideTimer(); }}>
+                      {castPreparing ? 'Menyiapkan alamat TV…' : 'Sambungkan ke TV (Cast / AirPlay)'}
                     </button>
                   )}
                   {casting && (

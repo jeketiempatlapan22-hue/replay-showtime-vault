@@ -4,6 +4,7 @@ import { Tv, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { supabase } from '@/integrations/supabase/client';
+import { saveTvSession } from '@/lib/tvSession';
 
 const SS_KEY_BASE = 'replaytime-live-unlocked';
 
@@ -36,6 +37,7 @@ export default function TvPage() {
         const showId = String(data.show_id || '');
         const key = `${SS_KEY_BASE}${showId ? '-' + showId : ''}`;
         try { sessionStorage.setItem(key, JSON.stringify(data.payload)); } catch { /* ignore */ }
+        if (data?.session_token) saveTvSession(String(data.session_token));
         navigate(`/live${showId ? `?show=${showId}` : ''}`, { replace: true });
         return;
       }

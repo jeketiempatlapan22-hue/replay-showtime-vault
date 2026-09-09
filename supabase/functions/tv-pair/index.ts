@@ -1,9 +1,12 @@
-// Pairing kode 6 digit untuk menonton di browser TV.
+// Pairing kode 6 digit untuk menonton di browser TV + sesi TV jangka panjang.
 // - action=create : HP mengirim payload akses (sudah terbuka) -> dapat kode 6 digit.
-// - action=claim  : TV mengirim kode -> dapat payload akses, kode langsung hangus.
+// - action=claim  : TV mengirim kode -> dapat payload akses + session token, kode hangus.
+// - action=renew  : TV memperbarui grant tiap ~28 menit agar siaran tidak terputus.
+// - action=cast   : HP meminta alamat sementara (proxy) yang bisa dibuka Chromecast.
 // Payload TIDAK pernah bisa dibaca publik dari tabel (RLS tertutup, hanya service role).
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { signGrant, verifyGrant } from '../_shared/stream-grant.ts';
 
 const cors = (origin: string | null) => ({
   'Access-Control-Allow-Origin': origin || '*',
@@ -12,6 +15,12 @@ const cors = (origin: string | null) => ({
 });
 
 const randomCode = () => String(Math.floor(100000 + Math.random() * 900000));
+const randomToken = () => crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, '');
+
+// Grant yang diterbitkan ulang untuk TV: 35 menit, dirotasi tiap 28 menit oleh TV.
+const TV_GRANT_TTL = 35 * 60;
+// Alamat Chromecast: 6 jam (batas maksimum grant) agar cukup untuk satu siaran penuh.
+const CAST_TTL = 6 * 3600;
 
 Deno.serve(async (req) => {
   const corsHeaders = cors(req.headers.get('origin'));
@@ -37,8 +46,9 @@ Deno.serve(async (req) => {
       const browserId = String(body?.browser_id || '').slice(0, 200);
       const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
 
-      // Bersihkan kode kedaluwarsa sekalian.
+      // Bersihkan kode & sesi kedaluwarsa sekalian.
       await supabase.from('tv_pair_codes').delete().lt('expires_at', new Date().toISOString());
+      await supabase.from('tv_sessions').delete().lt('expires_at', new Date().toISOString());
 
       for (let i = 0; i < 8; i++) {
         const code = randomCode();
@@ -56,7 +66,7 @@ Deno.serve(async (req) => {
 
       const { data } = await supabase
         .from('tv_pair_codes')
-        .select('code,payload,show_id,expires_at,used_at')
+        .select('code,payload,show_id,browser_id,expires_at,used_at')
         .eq('code', code)
         .maybeSingle();
 
@@ -68,7 +78,62 @@ Deno.serve(async (req) => {
         .update({ used_at: new Date().toISOString() })
         .eq('code', code);
 
-      return json({ ok: true, payload: data.payload, show_id: data.show_id || '' });
+      // Simpan sesi TV agar grant bisa dirotasi tanpa memakai kode lagi.
+      const payload = (data.payload || {}) as Record<string, unknown>;
+      const claims = await verifyGrant(String(payload.grant || ''));
+      let sessionToken = '';
+      if (claims) {
+        sessionToken = randomToken();
+        await supabase.from('tv_sessions').insert({
+          session_token: sessionToken,
+          show_id: data.show_id,
+          browser_id: data.browser_id,
+          claims: { sid: claims.sid, idn: claims.idn, bid: claims.bid, kind: claims.kind, tid: claims.tid },
+          payload,
+        });
+      }
+
+      return json({ ok: true, payload, show_id: data.show_id || '', session_token: sessionToken });
+    }
+
+    if (action === 'renew') {
+      const sessionToken = String(body?.session_token || '').slice(0, 128);
+      if (!sessionToken) return json({ error: 'session_required' }, 400);
+
+      const { data: s } = await supabase
+        .from('tv_sessions')
+        .select('id,claims,payload,show_id,revoked,expires_at')
+        .eq('session_token', sessionToken)
+        .maybeSingle();
+      if (!s || s.revoked) return json({ error: 'session_invalid' }, 403);
+      if (new Date(s.expires_at).getTime() < Date.now()) return json({ error: 'session_expired' }, 410);
+
+      const c = (s.claims || {}) as Record<string, string>;
+      if (!c.sid || !c.idn) return json({ error: 'session_invalid' }, 403);
+      const grant = await signGrant(
+        { sid: c.sid, idn: c.idn, bid: c.bid || '', kind: (c.kind as any) || 'show', tid: c.tid },
+        TV_GRANT_TTL,
+      );
+      const payload = { ...((s.payload || {}) as Record<string, unknown>), grant };
+      return json({ ok: true, grant, payload, show_id: s.show_id || '' });
+    }
+
+    if (action === 'cast') {
+      // HP sudah punya grant valid → terbitkan alamat proxy sementara untuk Chromecast.
+      const grant = String(body?.grant || '');
+      const claims = await verifyGrant(grant);
+      if (!claims?.idn) return json({ error: 'unauthorized' }, 401);
+
+      const castGrant = await signGrant(
+        { sid: claims.sid, idn: claims.idn, bid: claims.bid, kind: claims.kind, tid: claims.tid },
+        CAST_TTL,
+      );
+      const base = (Deno.env.get('SUPABASE_URL') || '').replace(/\/$/, '');
+      return json({
+        ok: true,
+        url: `${base}/functions/v1/tv-stream?t=${encodeURIComponent(castGrant)}`,
+        expires_in: CAST_TTL,
+      });
     }
 
     return json({ error: 'bad_action' }, 400);

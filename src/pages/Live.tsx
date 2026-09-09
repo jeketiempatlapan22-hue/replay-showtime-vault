@@ -12,6 +12,7 @@ import { useAutoHideOnInteraction } from '@/hooks/useAutoHideOnInteraction';
 import { useViewerCount } from '@/hooks/useViewerCount';
 
 import type { HlsPlayerHandle } from '@/components/HlsPlayer';
+import { TV_ROTATE_MS, getTvSession, renewTvGrant } from '@/lib/tvSession';
 
 // Lazy-load player & chat: bundle awal lebih kecil, terutama di mobile.
 const HlsPlayer = lazy(() => import('@/components/HlsPlayer'));
@@ -794,6 +795,12 @@ export default function Live() {
         const raw = e instanceof Error ? e.message : '';
         const stale = /non-2xx|401|403|unauthorized|akses_ditolak|grant_mismatch/i.test(raw);
         if (stale) {
+          // Sesi TV (kode 6 angka): perbarui grant diam-diam supaya tayangan lanjut.
+          const fresh = getTvSession() ? await renewTvGrant(showId) : '';
+          if (fresh) {
+            setUnlocked(prev => (prev ? { ...prev, grant: fresh } : prev));
+            return;
+          }
           // Grant kedaluwarsa/berubah format: minta grant baru diam-diam.
           setUnlocked(prev => (prev ? { ...prev, grant: '' } : prev));
         }
@@ -808,7 +815,19 @@ export default function Live() {
       cancelled = true;
       if (refreshTimer) window.clearInterval(refreshTimer);
     };
-  }, [activeSourceUrl, idnRetryNonce, idnGrant, liveOn]);
+  }, [activeSourceUrl, idnRetryNonce, idnGrant, liveOn, showId]);
+
+  // Browser TV yang masuk lewat kode 6 angka: rotasi grant tiap 28 menit supaya
+  // bisa menonton siaran penuh tanpa jeda dan tanpa memasukkan kode lagi.
+  useEffect(() => {
+    if (!getTvSession()) return;
+    const id = window.setInterval(async () => {
+      const fresh = await renewTvGrant(showId);
+      if (fresh) setUnlocked(prev => (prev ? { ...prev, grant: fresh } : prev));
+    }, TV_ROTATE_MS);
+    return () => window.clearInterval(id);
+  }, [showId]);
+
 
   const selectSource = (i: number) => {
     setSourceIdx(i);
