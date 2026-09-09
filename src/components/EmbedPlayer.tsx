@@ -246,10 +246,12 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
     hideTimerRef.current = setTimeout(() => {
       // Only hide while actually playing
       setShowControls(prev => (isPlayingRef.current ? false : prev));
-    }, 3000);
+    }, 5000);
   }, []);
 
   const isPlayingRef = useRef(false);
+  // Tap pertama saat kontrol tersembunyi hanya memunculkan kontrol, tidak menekan tombol.
+  const swallowClickRef = useRef(false);
   // Ditandai saat user sengaja menekan pause agar autoplay-guard tidak memaksa play lagi.
   const userPausedRef = useRef(false);
   useEffect(() => { isPlayingRef.current = isPlaying; }, [isPlaying]);
@@ -1088,10 +1090,26 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
       {/* Controls */}
       <div
         className={`absolute inset-x-0 bottom-0 z-10 px-2 sm:px-3 pb-2 sm:pb-3 pt-8 bg-gradient-to-t from-black/80 to-transparent transition-opacity duration-300 ${
-          plainMode ? 'hidden' : showControls || !isPlaying ? 'opacity-100' : 'opacity-0 pointer-events-none'
+          plainMode ? 'hidden' : showControls || !isPlaying ? 'opacity-100' : 'opacity-0'
         }`}
 
         style={{ touchAction: 'manipulation' }}
+        onPointerDownCapture={(e) => {
+          if (!plainMode && !showControls && isPlaying) {
+            swallowClickRef.current = true;
+            e.preventDefault();
+            e.stopPropagation();
+            resetHideTimer();
+          }
+        }}
+        onClickCapture={(e) => {
+          if (swallowClickRef.current) {
+            swallowClickRef.current = false;
+            e.preventDefault();
+            e.stopPropagation();
+            resetHideTimer();
+          }
+        }}
         onClick={(e) => e.stopPropagation()}
       >
         {type === 'youtube' && !liveActive && (
