@@ -36,6 +36,7 @@ export default function TvPage() {
         const showId = String(data.show_id || '');
         const key = `${SS_KEY_BASE}${showId ? '-' + showId : ''}`;
         try { sessionStorage.setItem(key, JSON.stringify(data.payload)); } catch { /* ignore */ }
+        if (data?.session_token) saveTvSession(String(data.session_token));
         navigate(`/live${showId ? `?show=${showId}` : ''}`, { replace: true });
         return;
       }
