@@ -79,7 +79,9 @@ export function registerServiceWorker() {
   window.addEventListener('load', () => {
     void purgeLegacyCaches();
     navigator.serviceWorker
-      .register(SW_URL, { scope: '/' })
+      // Abaikan cache HTTP saat memeriksa sw.js. Ini penting pada aplikasi
+      // terpasang dan custom domain agar worker lama tidak tertahan oleh CDN.
+      .register(SW_URL, { scope: '/', updateViaCache: 'none' })
       .then((reg) => watchForUpdates(reg))
       .catch(() => {});
   });
