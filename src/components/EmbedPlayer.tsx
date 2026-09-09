@@ -941,23 +941,29 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
         <div className="absolute inset-0 bg-muted/20 animate-pulse" aria-hidden />
       ) : type === 'youtube' ? (
         ytId ? (
-          <iframe
-            ref={iframeRef}
-            key={plainMode ? 'plain' : 'api'}
-            id={ytIframeId}
-            src={ytEmbedUrl}
-            onLoad={() => { handleFrameLoaded(); ytHandshake(); setTimeout(ytHandshake, 800); }}
-            className={`absolute inset-0 w-full h-full ${plainMode ? '' : 'pointer-events-none'}`}
-            title={title}
-            allow="autoplay; encrypted-media; picture-in-picture; fullscreen; accelerometer; gyroscope"
-            allowFullScreen
-            loading="eager"
-            referrerPolicy="origin-when-cross-origin"
-            // @ts-expect-error - fetchpriority valid HTML attr
-            fetchpriority="high"
-            style={{ border: 0 }}
-          />
-
+          plainMode ? (
+            <iframe
+              ref={iframeRef}
+              key="plain"
+              id={ytIframeId}
+              src={ytEmbedUrl}
+              onLoad={() => { handleFrameLoaded(); ytHandshake(); setTimeout(ytHandshake, 800); }}
+              className="absolute inset-0 w-full h-full"
+              title={title}
+              allow="autoplay; encrypted-media; picture-in-picture; fullscreen; accelerometer; gyroscope"
+              allowFullScreen
+              loading="eager"
+              referrerPolicy="origin-when-cross-origin"
+              // @ts-expect-error - fetchpriority valid HTML attr
+              fetchpriority="high"
+              style={{ border: 0 }}
+            />
+          ) : (
+            // YT API akan mengganti div ini dengan iframe-nya sendiri.
+            <div key="api" className="absolute inset-0 w-full h-full pointer-events-none">
+              <div ref={ytHostRef} className="w-full h-full" />
+            </div>
+          )
         ) : (
           <div className="absolute inset-0 flex items-center justify-center bg-black text-white/80 text-sm px-4 text-center">
             Link YouTube tidak valid. Hubungi admin untuk memeriksa sumber.
