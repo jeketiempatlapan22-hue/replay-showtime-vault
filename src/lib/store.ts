@@ -261,3 +261,9 @@ export async function renameGalleryImage(file: string, newName: string): Promise
   await supabase.from('replays').update({ image_url: url }).eq('image_url', oldUrl);
   return url;
 }
+
+/** Hapus gambar galeri (file storage). */
+export async function deleteGalleryImage(file: string): Promise<void> {
+  const { error } = await supabase.storage.from('card-images').remove([file]);
+  if (error) throw error;
+}
