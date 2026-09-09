@@ -1019,12 +1019,26 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
       )}
 
 
-      {/* Click-shield over iframe — single tap toggles controls visibility instead of clicking through to YouTube logo. */}
+      {/* Click-shield over iframe — tap memulai pemutaran (gesture asli) atau menampilkan kontrol. */}
       {!plainMode && (
         <div
           className="absolute inset-0 z-[5]"
-          onClick={(e) => { e.preventDefault(); toggleControls(); }}
+          onClick={(e) => { e.preventDefault(); if (!isPlaying) playFromGesture(); toggleControls(); }}
         />
+      )}
+
+      {/* Tombol putar besar di tengah saat video belum berjalan. */}
+      {!plainMode && ready && !isPlaying && (
+        <button
+          type="button"
+          aria-label="Putar"
+          onClick={(e) => { e.stopPropagation(); playFromGesture(); resetHideTimer(); }}
+          className="absolute inset-0 z-[8] flex items-center justify-center"
+        >
+          <span className="w-16 h-16 rounded-full bg-black/60 border border-white/25 flex items-center justify-center shadow-xl active:scale-95 transition-transform">
+            <Play className="w-8 h-8 text-white translate-x-0.5" />
+          </span>
+        </button>
       )}
 
 
