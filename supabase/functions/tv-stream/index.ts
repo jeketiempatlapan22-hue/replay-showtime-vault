@@ -69,9 +69,6 @@ Deno.serve(async (req) => {
   const proxied = (abs: string) => `${self}?t=${encodeURIComponent(t)}&u=${encodeURIComponent(b64urlEncode(abs))}`;
 
   // Segmen media / biner: teruskan apa adanya (streaming).
-  if (!/mpegurl|text|application\/(json|octet-stream)/i.test(ct) && !ct.startsWith('')) {
-    // unreachable guard; kept simple below
-  }
   if (!/mpegurl/i.test(ct) && !/text\/plain/i.test(ct)) {
     const out = new Headers(CORS);
     const passthrough = ['content-type', 'content-length', 'content-range', 'accept-ranges', 'cache-control'];
