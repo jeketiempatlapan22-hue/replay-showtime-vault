@@ -1106,7 +1106,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
       {!plainMode && (
         <div
           className="absolute inset-0 z-[5]"
-          onClick={(e) => { e.preventDefault(); if (!isPlaying) playFromGesture(); toggleControls(); }}
+          onClick={(e) => { e.preventDefault(); const s = type === 'youtube' ? ytState() : undefined; const reallyPlaying = s === undefined ? isPlaying : (s === 1 || s === 3); if (!reallyPlaying) playFromGesture(); toggleControls(); }}
         />
       )}
 
