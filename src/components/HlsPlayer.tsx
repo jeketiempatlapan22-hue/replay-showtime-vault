@@ -1229,9 +1229,9 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
                   onClick={(e) => e.stopPropagation()}
                 >
                   {castOk && (
-                    <button type="button" className="w-full text-left px-2.5 py-2 rounded hover:bg-white/10"
-                      onClick={() => { void showCastPicker(); setShowTvMenu(false); resetHideTimer(); }}>
-                      Hubungkan ke TV (Cast / AirPlay)
+                    <button type="button" disabled={castPreparing} className="w-full text-left px-2.5 py-2 rounded hover:bg-white/10 disabled:opacity-60"
+                      onClick={() => { void showCastPicker(); resetHideTimer(); }}>
+                      {castPreparing ? 'Menyiapkan alamat TV…' : 'Sambungkan ke TV (Cast / AirPlay)'}
                     </button>
                   )}
                   {casting && (
