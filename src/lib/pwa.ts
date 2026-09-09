@@ -35,17 +35,21 @@ async function purgeLegacyCaches() {
   if (!('caches' in window)) return;
   try {
     const keys = await caches.keys();
-    await Promise.all(keys.filter((k) => k === 'static-assets').map((k) => caches.delete(k)));
+    const obsolete = new Set(['static-assets', 'html-nav', 'app-code-v2']);
+    await Promise.all(keys.filter((k) => obsolete.has(k)).map((k) => caches.delete(k)));
   } catch { /* ignore */ }
 }
 
 function watchForUpdates(reg: ServiceWorkerRegistration) {
-  // Cek update tiap 5 menit + saat tab kembali aktif.
+  // Cek setiap menit serta saat aplikasi dibuka kembali atau jaringan pulih.
   const check = () => { reg.update().catch(() => {}); };
-  window.setInterval(check, 5 * 60 * 1000);
+  check();
+  window.setInterval(check, 60_000);
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') check();
   });
+  window.addEventListener('pageshow', check);
+  window.addEventListener('online', check);
 }
 
 export function registerServiceWorker() {
@@ -75,7 +79,9 @@ export function registerServiceWorker() {
   window.addEventListener('load', () => {
     void purgeLegacyCaches();
     navigator.serviceWorker
-      .register(SW_URL, { scope: '/' })
+      // Abaikan cache HTTP saat memeriksa sw.js. Ini penting pada aplikasi
+      // terpasang dan custom domain agar worker lama tidak tertahan oleh CDN.
+      .register(SW_URL, { scope: '/', updateViaCache: 'none' })
       .then((reg) => watchForUpdates(reg))
       .catch(() => {});
   });
