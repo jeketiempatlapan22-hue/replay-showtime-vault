@@ -2329,6 +2329,15 @@ export type Database = {
         Args: { _offline: boolean; _reason?: string; _replay_id: string }
         Returns: undefined
       }
+      admin_set_reseller_copy_count: {
+        Args: {
+          _count: number
+          _kind: string
+          _phone: string
+          _target_id: string
+        }
+        Returns: number
+      }
       admin_sync_package_duration: {
         Args: { _include_expired?: boolean; _package_id: string }
         Returns: number
