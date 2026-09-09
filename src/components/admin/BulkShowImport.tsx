@@ -111,7 +111,7 @@ export default function BulkShowImport({ onImported }: Props) {
           is_active: true,
           sort_order: 0,
           description: s.description || '',
-          image_url: '',
+          image_url: s.image_url || '',
           pakasir_amount: 0,
           replay_id: null,
           replay_enabled: false,
