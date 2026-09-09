@@ -216,18 +216,17 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
   const toggleFullscreen = useCallback(async () => {
     const el = containerRef.current;
     if (!el) return;
-    if (isFullscreenActive()) {
-      await exitFs();
+    const video = el.querySelector('video') as HTMLVideoElement | null;
+    if (isFullscreenActive() || isVideoFullscreen(video)) {
+      await exitFs(video);
       setIsFullscreen(false);
+      await lockLandscape(false);
       return;
     }
     const target = (el.querySelector('[data-player-root]') as HTMLElement) || el;
     await requestFs(target, target.querySelector('video'));
     setIsFullscreen(isFullscreenActive());
-    try {
-      const so = (screen as unknown as { orientation?: { lock?: (o: string) => Promise<void> } }).orientation;
-      await so?.lock?.('landscape');
-    } catch { /* ignore */ }
+    await lockLandscape(true);
   }, []);
 
 
