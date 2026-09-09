@@ -434,6 +434,17 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
                 autoMuteAppliedRef.current = true;
               }
               ytPlayerRef.current.playVideo?.();
+              // Pulihkan kecepatan pemutaran pilihan user.
+              if (playbackRateRef.current !== 1) {
+                try { ytPlayerRef.current.setPlaybackRate?.(playbackRateRef.current); } catch { /* ignore */ }
+              }
+              // Durasi sering sudah tersedia tepat setelah ready.
+              setTimeout(() => {
+                try {
+                  const d = ytPlayerRef.current?.getDuration?.() ?? 0;
+                  if (d > 0) setDuration(d);
+                } catch { /* ignore */ }
+              }, 600);
               // Matikan subtitle di replay (jangan sentuh Live).
               if (!isLive) {
                 disableCaptions();
