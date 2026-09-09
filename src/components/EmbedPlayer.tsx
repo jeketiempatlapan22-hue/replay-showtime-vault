@@ -600,17 +600,29 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
       userPausedRef.current = !next;
       // Verifikasi & ulangi bila perintah pertama tidak berefek (API lambat siap,
       // iframe baru dibuat ulang, atau postMessage tertahan).
-      [400, 1200].forEach((delay) => {
+      [400, 1200, 2000].forEach((delay, i) => {
         setTimeout(() => {
           if (userPausedRef.current !== !next) return; // user sudah menekan lagi
           let s: number | undefined;
           try { s = ytPlayerRef.current?.getPlayerState?.(); } catch { /* ignore */ }
           if (s === undefined) return;
           const nowPlaying = s === 1 || s === 3;
-          if (nowPlaying !== next) ytCommand(next ? 'playVideo' : 'pauseVideo');
-          else { setIsPlaying(nowPlaying); isPlayingRef.current = nowPlaying; }
+          if (nowPlaying === next) { setIsPlaying(nowPlaying); isPlayingRef.current = nowPlaying; return; }
+          if (next && i === 2 && !mutedRef.current) {
+            // Browser menolak memutar dengan suara di luar gesture — putar senyap
+            // lalu tawarkan tombol aktifkan suara lagi agar video tidak macet.
+            mutedRef.current = true;
+            setMuted(true);
+            userUnmutedRef.current = false;
+            try { localStorage.setItem(MUTED_KEY, '1'); } catch { /* ignore */ }
+            withYtPlayer((p) => { p.mute?.(); p.playVideo?.(); }, () => { ytPost('mute'); ytPost('playVideo'); });
+            setShowHint(true);
+            return;
+          }
+          ytCommand(next ? 'playVideo' : 'pauseVideo');
         }, delay);
       });
+
     } else {
       if (iframeRef.current && iframeRef.current.src === 'about:blank') iframeRef.current.src = cfEmbedUrl;
       cfPost(isPlaying ? 'pause' : 'play');
