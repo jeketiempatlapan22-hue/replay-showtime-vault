@@ -1002,10 +1002,24 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
     try { localStorage.setItem('replaytime-muted', video.muted ? '1' : '0'); } catch { /* ignore */ }
   };
 
-  const toggleFullscreen = () => {
-    if (!containerRef.current) return;
-    if (!isFullscreenActive()) requestFs(containerRef.current, videoRef.current);
-    else exitFs();
+  const fsBusyRef = useRef(false);
+  const toggleFullscreen = async () => {
+    const el = containerRef.current;
+    if (!el || fsBusyRef.current) return;
+    fsBusyRef.current = true;
+    try {
+      if (isFullscreenActive() || isVideoFullscreen(videoRef.current)) {
+        await exitFs(videoRef.current);
+        setIsFullscreen(false);
+        await lockLandscape(false);
+        return;
+      }
+      await requestFs(el, videoRef.current);
+      setIsFullscreen(isFullscreenActive());
+      await lockLandscape(true);
+    } finally {
+      fsBusyRef.current = false;
+    }
   };
 
   if (error) {
