@@ -515,8 +515,10 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
       cancelled = true;
       if (ytFallbackTimerRef.current) clearTimeout(ytFallbackTimerRef.current);
       try { ytPlayerRef.current?.pauseVideo?.(); } catch { /* ignore */ }
+      try { ytPlayerRef.current?.destroy?.(); } catch { /* ignore */ }
       ytPlayerRef.current = null;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ytId, type, inView, markReady, isLive, refreshAvailableQualities, applyQualityCap, disableCaptions]);
 
   // Cloudflare via Stream SDK postMessage (basic play/pause/volume via iframe contentWindow)
