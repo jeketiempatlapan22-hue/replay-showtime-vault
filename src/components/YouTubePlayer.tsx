@@ -1,6 +1,6 @@
 import { ArrowLeft, Maximize, Minimize, Eye, Loader2, Lock, PictureInPicture2, ListVideo, Cast } from 'lucide-react';
 import { showNativePicker } from '@/lib/cast';
-import { isFullscreenActive, onFullscreenChange, requestFs, exitFs } from '@/lib/fullscreen';
+import { isFullscreenActive, isVideoFullscreen, onFullscreenChange, requestFs, exitFs, lockLandscape } from '@/lib/fullscreen';
 
 
 import { useState, useRef, useCallback, useEffect, useMemo, lazy, Suspense } from 'react';
