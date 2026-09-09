@@ -1241,6 +1241,14 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
                     }}>
                     {tvMode ? 'Matikan Mode TV' : 'Mode TV (layar penuh, tidak redup)'}
                   </button>
+                  <button type="button" className="w-full text-left px-2.5 py-2 rounded hover:bg-white/10 font-semibold text-primary"
+                    onClick={() => { setShowTvConnect(true); setShowTvMenu(false); resetHideTimer(); }}>
+                    Kode untuk browser TV (6 angka)
+                  </button>
+                  <button type="button" className="w-full text-left px-2.5 py-2 rounded hover:bg-white/10"
+                    onClick={() => { setShowTvConnect(true); setShowTvMenu(false); resetHideTimer(); }}>
+                    Panduan siarkan layar ke TV
+                  </button>
                   <button type="button" className="w-full text-left px-2.5 py-2 rounded hover:bg-white/10"
                     onClick={() => { void copyTvLink(); setShowTvMenu(false); resetHideTimer(); }}>
                     Salin link untuk browser TV
