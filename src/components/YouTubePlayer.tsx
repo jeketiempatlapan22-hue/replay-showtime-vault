@@ -1,6 +1,6 @@
 import { ArrowLeft, Maximize, Minimize, Eye, Loader2, Lock, PictureInPicture2, ListVideo, Cast } from 'lucide-react';
 import { showNativePicker } from '@/lib/cast';
-import { isFullscreenActive, onFullscreenChange, requestFs, exitFs } from '@/lib/fullscreen';
+import { isFullscreenActive, isVideoFullscreen, onFullscreenChange, requestFs, exitFs, lockLandscape } from '@/lib/fullscreen';
 
 
 import { useState, useRef, useCallback, useEffect, useMemo, lazy, Suspense } from 'react';
@@ -216,18 +216,17 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
   const toggleFullscreen = useCallback(async () => {
     const el = containerRef.current;
     if (!el) return;
-    if (isFullscreenActive()) {
-      await exitFs();
+    const video = el.querySelector('video') as HTMLVideoElement | null;
+    if (isFullscreenActive() || isVideoFullscreen(video)) {
+      await exitFs(video);
       setIsFullscreen(false);
+      await lockLandscape(false);
       return;
     }
     const target = (el.querySelector('[data-player-root]') as HTMLElement) || el;
     await requestFs(target, target.querySelector('video'));
     setIsFullscreen(isFullscreenActive());
-    try {
-      const so = (screen as unknown as { orientation?: { lock?: (o: string) => Promise<void> } }).orientation;
-      await so?.lock?.('landscape');
-    } catch { /* ignore */ }
+    await lockLandscape(true);
   }, []);
 
 

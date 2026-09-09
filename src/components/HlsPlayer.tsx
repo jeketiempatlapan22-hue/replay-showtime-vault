@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHandle, Suspense, lazy } from 'react';
 import Hls from 'hls.js';
 import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, RotateCcw, RotateCw, Loader2, Settings, Check, Cast } from 'lucide-react';
-import { isFullscreenActive, onFullscreenChange, requestFs, exitFs } from '@/lib/fullscreen';
+import { isFullscreenActive, isVideoFullscreen, onFullscreenChange, requestFs, exitFs, lockLandscape } from '@/lib/fullscreen';
 import LiveWatermark from '@/components/LiveWatermark';
 import { castMedia, isGoogleCastCapable, requestWakeLock, showNativePicker, stopCastSession } from '@/lib/cast';
 import { readUnlockPayload, requestCastUrl } from '@/lib/tvSession';
@@ -916,7 +916,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
 
   // Fullscreen tracking (cross-browser)
   useEffect(() => {
-    const onChange = () => setIsFullscreen(isFullscreenActive());
+    const onChange = () => setIsFullscreen(isFullscreenActive() || isVideoFullscreen(videoRef.current));
     return onFullscreenChange(onChange);
   }, []);
 
@@ -1002,10 +1002,24 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
     try { localStorage.setItem('replaytime-muted', video.muted ? '1' : '0'); } catch { /* ignore */ }
   };
 
-  const toggleFullscreen = () => {
-    if (!containerRef.current) return;
-    if (!isFullscreenActive()) requestFs(containerRef.current, videoRef.current);
-    else exitFs();
+  const fsBusyRef = useRef(false);
+  const toggleFullscreen = async () => {
+    const el = containerRef.current;
+    if (!el || fsBusyRef.current) return;
+    fsBusyRef.current = true;
+    try {
+      if (isFullscreenActive() || isVideoFullscreen(videoRef.current)) {
+        await exitFs(videoRef.current);
+        setIsFullscreen(false);
+        await lockLandscape(false);
+        return;
+      }
+      await requestFs(el, videoRef.current);
+      setIsFullscreen(isFullscreenActive());
+      await lockLandscape(true);
+    } finally {
+      fsBusyRef.current = false;
+    }
   };
 
   if (error) {
