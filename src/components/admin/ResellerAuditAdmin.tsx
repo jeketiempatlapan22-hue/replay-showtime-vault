@@ -96,9 +96,17 @@ export default function ResellerAuditAdmin() {
 
   const load = async () => {
     setLoading(true);
-    const { data, error } = await supabase.rpc('admin_reseller_copy_stats');
+    const [{ data, error }, { data: pr }, { data: st }] = await Promise.all([
+      supabase.rpc('admin_reseller_copy_stats'),
+      supabase.from('reseller_show_prices').select('show_id,price_per_link'),
+      supabase.from('site_settings').select('value').eq('key', 'reseller_price_per_link').maybeSingle(),
+    ]);
     if (error) toast({ title: 'Gagal memuat', description: error.message, variant: 'destructive' });
     else setRows((data ?? []) as StatRow[]);
+    const m: Record<string, number> = {};
+    for (const p of (pr ?? []) as { show_id: string; price_per_link: number }[]) m[p.show_id] = Number(p.price_per_link) || 0;
+    setPrices(m);
+    setDefaultPrice(Number(st?.value || 0));
     setLoading(false);
   };
   useEffect(() => { load(); }, []);
