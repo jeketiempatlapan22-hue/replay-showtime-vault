@@ -45,6 +45,22 @@ export default function ImagePicker({ value, onChange, autoMatchTitle }: ImagePi
     setSavingRename(false);
   };
 
+  const doDelete = async (item: GalleryItem) => {
+    if (!item.file) return;
+    if (!window.confirm(`Hapus gambar "${item.name}"? Show/replay yang memakainya akan kehilangan gambar.`)) return;
+    setDeleting(item.file);
+    try {
+      await deleteGalleryImage(item.file);
+      setGallery(prev => prev.filter(g => g.file !== item.file));
+      if (value === item.url) onChange('');
+      toast({ title: 'Gambar dihapus' });
+    } catch (e: any) {
+      toast({ title: 'Gagal hapus', description: e?.message || 'gagal', variant: 'destructive' });
+    }
+    setDeleting(null);
+  };
+
+
 
   const loadGallery = async (): Promise<GalleryItem[]> => {
     setLoadingGallery(true);
