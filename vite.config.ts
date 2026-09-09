@@ -39,10 +39,17 @@ export default defineConfig(({ mode }) => ({
             options: { cacheName: "html-nav", networkTimeoutSeconds: 5 },
           },
           {
+            // JS/CSS harus selalu diperiksa ke jaringan supaya rilis baru langsung terpakai.
             urlPattern: ({ request, sameOrigin }) =>
-              sameOrigin && ["script", "style", "font", "image"].includes(request.destination),
+              sameOrigin && ["script", "style"].includes(request.destination),
+            handler: "StaleWhileRevalidate",
+            options: { cacheName: "app-code-v2" },
+          },
+          {
+            urlPattern: ({ request, sameOrigin }) =>
+              sameOrigin && ["font", "image"].includes(request.destination),
             handler: "CacheFirst",
-            options: { cacheName: "static-assets", expiration: { maxEntries: 200, maxAgeSeconds: 60 * 60 * 24 * 30 } },
+            options: { cacheName: "static-media-v2", expiration: { maxEntries: 200, maxAgeSeconds: 60 * 60 * 24 * 30 } },
           },
         ],
       },
