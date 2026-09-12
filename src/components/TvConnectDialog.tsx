@@ -190,6 +190,11 @@ export default function TvConnectDialog({ open, onOpenChange, initialTab = 'code
               )}
             </div>
 
+            <Button size="sm" className="w-full gap-1.5 text-xs" onClick={copyCode} disabled={!code || loading}>
+              {copiedCode ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+              {copiedCode ? 'Kode disalin' : 'Salin 6 kode'}
+            </Button>
+
             <div className="flex gap-2">
               <Button variant="outline" size="sm" className="flex-1 gap-1.5 text-xs" onClick={() => { setError(''); void createCode(); }} disabled={loading}>
                 <RefreshCw className="w-3.5 h-3.5" /> Buat kode baru
