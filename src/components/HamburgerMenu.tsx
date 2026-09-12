@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Menu, X, Home, MessageCircle, Phone, Sun, Moon, Radio, LogIn, LogOut, User as UserIcon, Crown, BookOpen, Clapperboard } from 'lucide-react';
+import { Menu, X, Home, MessageCircle, Phone, Sun, Moon, Radio, LogIn, LogOut, User as UserIcon, Crown, BookOpen, Clapperboard, Tv } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -153,6 +153,18 @@ export default function HamburgerMenu({ whatsappNumber, whatsappLink, lightMode,
           </Link>
 
 
+
+          <Link
+            to="/tv"
+            onClick={() => setOpen(false)}
+            className="flex items-center gap-3 px-4 py-3 rounded-lg text-foreground hover:bg-secondary transition-colors"
+          >
+            <Tv className="w-5 h-5 text-primary" />
+            <div className="min-w-0">
+              <span className="font-medium block">Hubungkan TV/Proyektor</span>
+              <span className="text-xs text-muted-foreground">Masukkan 6 kode dari halaman live</span>
+            </div>
+          </Link>
 
           <Link
             to="/panduan"

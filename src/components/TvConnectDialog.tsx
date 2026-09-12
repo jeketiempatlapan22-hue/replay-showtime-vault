@@ -70,6 +70,7 @@ export default function TvConnectDialog({ open, onOpenChange, initialTab = 'code
   const [expiresAt, setExpiresAt] = useState<number>(0);
   const [now, setNow] = useState(Date.now());
   const [copied, setCopied] = useState(false);
+  const [copiedCode, setCopiedCode] = useState(false);
 
   const tvUrl = useMemo(() => {
     if (typeof window === 'undefined') return '';
@@ -122,6 +123,15 @@ export default function TvConnectDialog({ open, onOpenChange, initialTab = 'code
       await navigator.clipboard.writeText(siteLink('/tv'));
       setCopied(true);
       setTimeout(() => setCopied(false), 1800);
+    } catch { /* ignore */ }
+  };
+
+  const copyCode = async () => {
+    if (!code) return;
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopiedCode(true);
+      setTimeout(() => setCopiedCode(false), 1800);
     } catch { /* ignore */ }
   };
 
@@ -179,6 +189,11 @@ export default function TvConnectDialog({ open, onOpenChange, initialTab = 'code
                 </>
               )}
             </div>
+
+            <Button size="sm" className="w-full gap-1.5 text-xs" onClick={copyCode} disabled={!code || loading}>
+              {copiedCode ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+              {copiedCode ? 'Kode disalin' : 'Salin 6 kode'}
+            </Button>
 
             <div className="flex gap-2">
               <Button variant="outline" size="sm" className="flex-1 gap-1.5 text-xs" onClick={() => { setError(''); void createCode(); }} disabled={loading}>
