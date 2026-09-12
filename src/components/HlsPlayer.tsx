@@ -19,6 +19,8 @@ interface Props {
   headers?: Record<string, string>;
   /** Optional overlay rendered inside the player container (visible in fullscreen too). */
   overlay?: React.ReactNode;
+  /** Show aktif yang dipakai untuk pairing TV dan pemilihan payload akses. */
+  showId?: string;
 }
 
 export interface HlsPlayerHandle {
@@ -44,7 +46,7 @@ interface QualityLevel {
   bitrate?: number;
 }
 
-const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, onFatalError, onPipChange, hideSeekButtons = false, headers, overlay }, ref) => {
+const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, onFatalError, onPipChange, hideSeekButtons = false, headers, overlay, showId = '' }, ref) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const hideControlsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -102,6 +104,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
   const [castAvailable, setCastAvailable] = useState(false);
   const [casting, setCasting] = useState(false);
   const [castPreparing, setCastPreparing] = useState(false);
+  const [castError, setCastError] = useState('');
   const [tvMode, setTvMode] = useState(false);
   const [showTvMenu, setShowTvMenu] = useState(false);
   const [showTvConnect, setShowTvConnect] = useState(false);
@@ -188,14 +191,22 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
     // server (proxy bertanda tangan) supaya TV cukup membuka URL biasa.
     // Alamat ini memakai sesi yang sama, jadi token tidak perlu direset.
     const headerGated = !!headersRef.current && Object.keys(headersRef.current).length > 0;
+    setCastError('');
     if (isGoogleCastCapable()) {
       let url = srcRef.current;
       if (headerGated) {
         setCastPreparing(true);
-        const params = new URLSearchParams(window.location.search);
-        const payload = readUnlockPayload(params.get('show') || '');
-        url = await requestCastUrl(String(payload?.grant || ''));
-        setCastPreparing(false);
+        try {
+          const payload = readUnlockPayload(showId);
+          url = await requestCastUrl(typeof payload?.grant === 'string' ? payload.grant : '');
+        } finally {
+          setCastPreparing(false);
+        }
+        if (!url) {
+          setCastError('Alamat TV tidak dapat dibuat. Buat Kode untuk TV, atau gunakan Siarkan layar HP.');
+          setShowTvMenu(true);
+          return;
+        }
       }
       if (url) {
         const ok = await castMedia({
@@ -209,11 +220,17 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
           try { videoRef.current?.pause(); } catch { /* ignore */ }
           return;
         }
+        setCastError('Perangkat Cast tidak ditemukan. Pastikan HP dan TV memakai WiFi yang sama.');
+        setShowTvMenu(true);
+        return;
       }
     }
     // 2) AirPlay / Remote Playback bawaan browser.
-    showNativePicker(videoRef.current);
-  }, [title]);
+    if (!showNativePicker(videoRef.current)) {
+      setCastError('Browser ini tidak mendukung koneksi langsung. Gunakan Kode untuk TV atau Siarkan layar HP.');
+      setShowTvMenu(true);
+    }
+  }, [showId, title]);
 
   const stopCasting = useCallback(() => {
     stopCastSession();
@@ -1248,6 +1265,11 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
                       {castPreparing ? 'Menyiapkan alamat TV…' : 'Sambungkan ke TV (Cast / AirPlay)'}
                     </button>
                   )}
+                  {castError && (
+                    <p role="alert" className="px-2.5 py-2 text-[11px] leading-relaxed text-destructive">
+                      {castError}
+                    </p>
+                  )}
                   {casting && (
                     <button type="button" className="w-full text-left px-2.5 py-2 rounded hover:bg-white/10 text-primary"
                       onClick={() => { stopCasting(); setShowTvMenu(false); }}>
@@ -1340,7 +1362,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
 
     <Suspense fallback={null}>
       {showTvConnect && (
-        <TvConnectDialog open={showTvConnect} onOpenChange={setShowTvConnect} initialTab={tvConnectTab} />
+        <TvConnectDialog open={showTvConnect} onOpenChange={setShowTvConnect} initialTab={tvConnectTab} showId={showId} />
       )}
     </Suspense>
     </>

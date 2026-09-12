@@ -4,8 +4,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { getBrowserId } from '@/lib/browserId';
-
-const SS_KEY_BASE = 'replaytime-live-unlocked';
+import { readUnlockPayload } from '@/lib/tvSession';
+import { siteLink } from '@/lib/siteOrigin';
 
 type Platform = 'android' | 'ios' | 'desktop';
 
@@ -57,9 +57,10 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   initialTab?: 'code' | 'mirror';
+  showId?: string;
 }
 
-export default function TvConnectDialog({ open, onOpenChange, initialTab = 'code' }: Props) {
+export default function TvConnectDialog({ open, onOpenChange, initialTab = 'code', showId = '' }: Props) {
   const [tab, setTab] = useState<'code' | 'mirror'>(initialTab);
   useEffect(() => { if (open) setTab(initialTab); }, [open, initialTab]);
   const [platform, setPlatform] = useState<Platform>('desktop');
@@ -72,7 +73,7 @@ export default function TvConnectDialog({ open, onOpenChange, initialTab = 'code
 
   const tvUrl = useMemo(() => {
     if (typeof window === 'undefined') return '';
-    return `${window.location.origin.replace(/^https?:\/\//, '')}/tv`;
+    return siteLink('/tv').replace(/^https?:\/\//, '');
   }, []);
 
   useEffect(() => { setPlatform(detectPlatform()); }, []);
@@ -86,25 +87,12 @@ export default function TvConnectDialog({ open, onOpenChange, initialTab = 'code
   const createCode = useCallback(async () => {
     setLoading(true); setError(''); setCode('');
     try {
-      const params = new URLSearchParams(window.location.search);
-      const showId = params.get('show') || '';
-      const key = `${SS_KEY_BASE}${showId ? '-' + showId : ''}`;
-      let raw = '';
-      try { raw = sessionStorage.getItem(key) || ''; } catch { /* ignore */ }
-      if (!raw && !showId) {
-        try {
-          for (let i = 0; i < sessionStorage.length; i++) {
-            const k = sessionStorage.key(i) || '';
-            if (k.startsWith(SS_KEY_BASE)) { raw = sessionStorage.getItem(k) || ''; break; }
-          }
-        } catch { /* ignore */ }
-      }
-      if (!raw) {
+      const payload = readUnlockPayload(showId);
+      if (!payload || typeof payload.grant !== 'string' || !payload.grant) {
         setError('Akses belum terbuka di perangkat ini. Buka siarannya dulu, lalu coba lagi.');
         setLoading(false);
         return;
       }
-      const payload = JSON.parse(raw);
       const { data, error: fnErr } = await supabase.functions.invoke('tv-pair', {
         body: { action: 'create', payload, show_id: showId, browser_id: getBrowserId() },
       });
@@ -119,7 +107,7 @@ export default function TvConnectDialog({ open, onOpenChange, initialTab = 'code
       setError('Gagal membuat kode. Coba lagi sebentar.');
     }
     setLoading(false);
-  }, []);
+  }, [showId]);
 
   useEffect(() => {
     if (open && tab === 'code' && !code && !loading && !error) void createCode();
@@ -131,7 +119,7 @@ export default function TvConnectDialog({ open, onOpenChange, initialTab = 'code
 
   const copyUrl = async () => {
     try {
-      await navigator.clipboard.writeText(`${window.location.origin}/tv`);
+      await navigator.clipboard.writeText(siteLink('/tv'));
       setCopied(true);
       setTimeout(() => setCopied(false), 1800);
     } catch { /* ignore */ }

@@ -10,3 +10,4 @@
 
 ## Done
 - [x] Rebuild YouTube replay controls so sound, play/pause, time, seek, speed, and quality work together
+- [x] Repair TV pairing/Cast show matching, server-authoritative grant rotation, and visible connection errors
