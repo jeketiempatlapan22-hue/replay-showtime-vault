@@ -126,6 +126,15 @@ export default function TvConnectDialog({ open, onOpenChange, initialTab = 'code
     } catch { /* ignore */ }
   };
 
+  const copyCode = async () => {
+    if (!code) return;
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopiedCode(true);
+      setTimeout(() => setCopiedCode(false), 1800);
+    } catch { /* ignore */ }
+  };
+
   const guide = MIRROR_STEPS[platform];
 
   return (
