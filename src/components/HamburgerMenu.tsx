@@ -155,6 +155,18 @@ export default function HamburgerMenu({ whatsappNumber, whatsappLink, lightMode,
 
 
           <Link
+            to="/tv"
+            onClick={() => setOpen(false)}
+            className="flex items-center gap-3 px-4 py-3 rounded-lg text-foreground hover:bg-secondary transition-colors"
+          >
+            <Tv className="w-5 h-5 text-primary" />
+            <div className="min-w-0">
+              <span className="font-medium block">Hubungkan TV/Proyektor</span>
+              <span className="text-xs text-muted-foreground">Masukkan 6 kode dari halaman live</span>
+            </div>
+          </Link>
+
+          <Link
             to="/panduan"
             onClick={() => setOpen(false)}
             className="flex items-center gap-3 px-4 py-3 rounded-lg text-foreground hover:bg-secondary transition-colors"
