@@ -13,16 +13,22 @@ export function unlockKey(showId?: string) {
   return `${SS_UNLOCK_BASE}${showId ? `-${showId}` : ''}`;
 }
 
-export function readUnlockPayload(showId?: string): Record<string, any> | null {
+export function readUnlockPayload(showId?: string): Record<string, unknown> | null {
   try {
     let raw = sessionStorage.getItem(unlockKey(showId)) || '';
     if (!raw) {
+      const matches: string[] = [];
       for (let i = 0; i < sessionStorage.length; i++) {
         const k = sessionStorage.key(i) || '';
-        if (k.startsWith(SS_UNLOCK_BASE)) { raw = sessionStorage.getItem(k) || ''; break; }
+        if (k === SS_UNLOCK_BASE || k.startsWith(`${SS_UNLOCK_BASE}-`)) matches.push(k);
       }
+      // Jangan pernah memilih akses show lain secara acak. Fallback hanya aman
+      // saat memang ada satu-satunya payload akses di tab ini.
+      if (matches.length === 1) raw = sessionStorage.getItem(matches[0]) || '';
     }
-    return raw ? JSON.parse(raw) : null;
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed as Record<string, unknown> : null;
   } catch {
     return null;
   }
@@ -53,8 +59,10 @@ export async function renewTvGrant(showId?: string): Promise<string> {
       return '';
     }
     try {
-      const key = unlockKey(showId || data.show_id || '');
-      const prev = readUnlockPayload(showId || data.show_id || '') || {};
+      // ID show dari server adalah sumber kebenaran sesi TV.
+      const resolvedShowId = String(data.show_id || showId || '');
+      const key = unlockKey(resolvedShowId);
+      const prev = readUnlockPayload(resolvedShowId) || {};
       sessionStorage.setItem(key, JSON.stringify({ ...prev, ...(data.payload || {}), grant: data.grant }));
     } catch { /* ignore */ }
     return String(data.grant);
