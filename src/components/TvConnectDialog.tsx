@@ -70,6 +70,7 @@ export default function TvConnectDialog({ open, onOpenChange, initialTab = 'code
   const [expiresAt, setExpiresAt] = useState<number>(0);
   const [now, setNow] = useState(Date.now());
   const [copied, setCopied] = useState(false);
+  const [copiedCode, setCopiedCode] = useState(false);
 
   const tvUrl = useMemo(() => {
     if (typeof window === 'undefined') return '';
