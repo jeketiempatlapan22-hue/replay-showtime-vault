@@ -694,11 +694,14 @@ export default function Live() {
     if (!unlocked) return [];
     const list: PrivateSource[] = [];
     const idnShowId = status?.idn_show_id || unlocked.idn_show_id || '';
-    // IDN source tampil di depan player utama dan memakai ID dari status terbaru
-    // atau dari payload unlock agar link token langsung jalan tanpa reload kedua.
-    if (idnShowId) list.push({ label: 'IDN', type: 'm3u8', url: `idn://${idnShowId}` });
     const main: PrivateSource = { label: 'Player Utama', type: unlocked.type, url: unlocked.url };
-    if (main.url) list.push(main);
+    // URL langsung (mis. worker playback) diputar apa adanya oleh player tanpa
+    // perlu token dari edge function, jadi ditaruh paling depan bila tersedia.
+    const mainIsDirect = /^https?:\/\//i.test(main.url || '');
+    if (mainIsDirect) list.push(main);
+    // IDN/hanabira tetap tersedia sebagai sumber (aturan tidak diubah).
+    if (idnShowId) list.push({ label: 'IDN', type: 'm3u8', url: `idn://${idnShowId}` });
+    if (main.url && !mainIsDirect) list.push(main);
     list.push(...(unlocked.sources || []).filter(s => s.url));
     return list;
   }, [unlocked, status?.idn_show_id]);
