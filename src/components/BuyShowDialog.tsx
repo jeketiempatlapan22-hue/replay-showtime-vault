@@ -83,12 +83,23 @@ export default function BuyShowDialog({ open, onOpenChange, showId = '', showTit
         if (kind === 'bundle') {
           const b = await getShowBundle();
           price = b?.price_coins || 0;
+          if (b) setLiveAmount(Number(b.price_idr || 0));
         } else if (kind === 'replay_only' && replayId) {
-          const { data: r } = await supabase.from('replays').select('price_coins').eq('id', replayId).maybeSingle();
+          const { data: r } = await supabase.from('replays').select('price_coins,price_idr').eq('id', replayId).maybeSingle();
           price = (r as any)?.price_coins || 0;
+          const pr = Number((r as any)?.price_idr || 0);
+          if (pr >= 100) setLiveAmount(pr);
         } else if (showId) {
-          const { data: s } = await supabase.from('active_shows').select('price_show_coins,price_replay_coins').eq('id', showId).maybeSingle();
+          const { data: s } = await supabase
+            .from('active_shows')
+            .select('price_show_coins,price_replay_coins,price_show,price_replay,pakasir_amount')
+            .eq('id', showId)
+            .maybeSingle();
           price = kind === 'replay' ? ((s as any)?.price_replay_coins || 0) : ((s as any)?.price_show_coins || 0);
+          const sa = kind === 'replay'
+            ? Number((s as any)?.price_replay || 0) || Number((s as any)?.pakasir_amount || 0)
+            : Number((s as any)?.price_show || 0) || Number((s as any)?.pakasir_amount || 0);
+          if (sa >= 100) setLiveAmount(sa);
         }
         setCoinPrice(price);
         // Default to coin tab when QRIS is unavailable but coin price is set
