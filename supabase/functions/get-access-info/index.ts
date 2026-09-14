@@ -141,6 +141,28 @@ Deno.serve(async (req) => {
 
     if (!okShowId && !okReplayId) return json({ ok: false, reason: "invalid" });
 
+    // Show yang sudah dikonversi/dihapus: pakai replay hasil konversinya supaya
+    // pembeli tetap melihat link + sandi replay.
+    if (okShowId) {
+      const { data: showExists } = await admin
+        .from("active_shows").select("id,replay_id").eq("id", okShowId).maybeSingle();
+      if (!showExists) {
+        if (!okReplayId) {
+          const raw = String(order?.item_title || "").replace(/^Show\s*•\s*/i, "").trim();
+          const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "");
+          const firstTwo = (s: string) => norm(s.split(/\s+/).slice(0, 2).join(" "));
+          const { data: reps } = await admin
+            .from("replays").select("id,title,date").order("date", { ascending: false }).limit(500);
+          const list = reps || [];
+          const exact = list.find((r: any) => norm(String(r.title)) === norm(raw));
+          const loose = exact || list.find((r: any) => firstTwo(String(r.title)) === firstTwo(raw));
+          if (loose) okReplayId = String(loose.id);
+        }
+        if (okReplayId) okShowId = "";
+        else return json({ ok: false, reason: "invalid" });
+      }
+    }
+
     // Replay purchase
     if (okReplayId && !okShowId) {
       const { data: rep } = await admin

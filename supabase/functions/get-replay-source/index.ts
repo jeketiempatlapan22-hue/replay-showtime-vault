@@ -125,6 +125,39 @@ Deno.serve(async (req) => {
           }
         }
 
+        // 3b) pembelian di website yang langsung menunjuk replay ini
+        // (termasuk order show lama yang shownya sudah dipindah ke replay).
+        if (!valid) {
+          const { data: ordRep } = await supabase
+            .from("orders")
+            .select("id")
+            .eq("access_token", access_token)
+            .eq("status", "paid")
+            .eq("replay_id", replay_id)
+            .maybeSingle();
+          if (ordRep) {
+            if (!browser_id) return json({ valid: false, reason: "no_device" }, 403);
+            const { data: odev } = await supabase
+              .from("order_token_devices")
+              .select("id").eq("order_id", ordRep.id).eq("browser_id", browser_id).maybeSingle();
+            if (odev) {
+              valid = true;
+            } else {
+              const { count } = await supabase
+                .from("order_token_devices").select("id", { count: "exact", head: true }).eq("order_id", ordRep.id);
+              if ((count ?? 0) >= 1) return json({ valid: false, reason: "device_limit" }, 403);
+              const { error: insErr } = await supabase
+                .from("order_token_devices").insert({ order_id: ordRep.id, browser_id });
+              if (insErr) {
+                const { data: re } = await supabase.from("order_token_devices")
+                  .select("id").eq("order_id", ordRep.id).eq("browser_id", browser_id).maybeSingle();
+                if (!re) return json({ valid: false, reason: "device_limit" }, 403);
+              }
+              valid = true;
+            }
+          }
+        }
+
         // 4) token SHOW yang sudah dikonversi jadi replay ini.
         // Link nonton live dan link replay saling terhubung: token show tetap
         // berlaku untuk menonton replay hasil konversinya.
