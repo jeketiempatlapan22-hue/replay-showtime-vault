@@ -1,6 +1,7 @@
 // Create a Pakasir dynamic QRIS order for an active show purchase.
 // Each call creates a NEW order_id; webhook will deliver token via WhatsApp.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { getBundle } from '../_shared/bundle.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -41,7 +42,7 @@ Deno.serve(async (req) => {
 
     if (!tgChatId && !validPhone(phone)) return new Response(JSON.stringify({ error: 'invalid phone' }), { status: 400, headers: corsHeaders });
 
-    if (!['show', 'replay', 'replay_only'].includes(kind)) {
+    if (!['show', 'replay', 'replay_only', 'bundle'].includes(kind)) {
       return new Response(JSON.stringify({ error: 'invalid kind' }), { status: 400, headers: corsHeaders });
     }
 
@@ -80,7 +81,17 @@ Deno.serve(async (req) => {
     let resolvedShowId: string | null = null;
     let resolvedReplayId: string | null = null;
 
-    if (kind === 'replay_only') {
+    if (kind === 'bundle') {
+      const bundle = await getBundle(admin);
+      if (!bundle || !bundle.is_active) {
+        return new Response(JSON.stringify({ error: 'bundle_unavailable' }), { status: 400, headers: corsHeaders });
+      }
+      if (!bundle.show_ids.length) {
+        return new Response(JSON.stringify({ error: 'bundle_empty' }), { status: 400, headers: corsHeaders });
+      }
+      amount = Number(bundle.price_idr || 0);
+      itemTitle = `Bundel • ${bundle.name} (${bundle.show_ids.length} show)`;
+    } else if (kind === 'replay_only') {
       // Standalone replay purchase — default Rp 2.000 if not provided.
       if (!replayId) return new Response(JSON.stringify({ error: 'missing replay_id' }), { status: 400, headers: corsHeaders });
       const { data: replay, error: rerr } = await admin

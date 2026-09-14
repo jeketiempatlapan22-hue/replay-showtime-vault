@@ -1,5 +1,6 @@
 // Spend coins to purchase a show or replay. Authenticated only. Atomic debit + token issuance + WhatsApp delivery.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { getBundle, findBundleToken, issueBundleToken, bundleShowTokens } from '../_shared/bundle.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -62,9 +63,76 @@ Deno.serve(async (req) => {
     const replayId: string | undefined = body.replay_id || undefined;
     const kind = String(body.kind ?? 'show'); // 'show' | 'replay' | 'replay_only'
     if (!validPhone(phone)) return new Response(JSON.stringify({ error: 'invalid_phone' }), { status: 400, headers: corsHeaders });
-    if (!['show','replay','replay_only'].includes(kind)) return new Response(JSON.stringify({ error: 'invalid_kind' }), { status: 400, headers: corsHeaders });
+    if (!['show','replay','replay_only','bundle'].includes(kind)) return new Response(JSON.stringify({ error: 'invalid_kind' }), { status: 400, headers: corsHeaders });
 
     const admin = createClient(url, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+
+    // ===== Bundel Show: satu token + satu sandi untuk semua show di bundel =====
+    if (kind === 'bundle') {
+      const bundle = await getBundle(admin);
+      if (!bundle || !bundle.is_active || !bundle.show_ids.length) {
+        return new Response(JSON.stringify({ error: 'bundle_unavailable' }), { status: 400, headers: corsHeaders });
+      }
+      const bundlePrice = Number(bundle.price_coins || 0);
+      if (bundlePrice <= 0) {
+        return new Response(JSON.stringify({ error: 'coin_price_unset' }), { status: 400, headers: corsHeaders });
+      }
+      const { data: st } = await admin.from('site_settings').select('key,value').eq('key', 'site_origin');
+      const bundleOrigin = ((st ?? [])[0]?.value || 'https://realtime48stream.my.id').replace(/\/+$/, '');
+      const bundleTitle = `Bundel • ${bundle.name} (${bundle.show_ids.length} show)`;
+
+      const existingBundle = await findBundleToken(admin, { bundleId: bundle.id, userId: user.id, phone });
+      if (existingBundle) {
+        const link = `${bundleOrigin}/shows?bt=${existingBundle.token}`;
+        return new Response(JSON.stringify({
+          ok: true, already: true, access_token: existingBundle.token,
+          password: existingBundle.password || bundle.password, link,
+          show_tokens: await bundleShowTokens(admin, existingBundle.token),
+        }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+
+      const { data: newBal, error: debitErr } = await admin.rpc('debit_coins_for_purchase', {
+        _user_id: user.id, _price: bundlePrice, _reason: 'purchase_show',
+        _show_id: null, _replay_id: null,
+        _meta: { item_title: bundleTitle, kind: 'bundle' } as any,
+      });
+      if (debitErr) return new Response(JSON.stringify({ error: 'debit_failed', detail: debitErr.message }), { status: 500, headers: corsHeaders });
+      if (newBal === null) return new Response(JSON.stringify({ error: 'insufficient_balance' }), { status: 402, headers: corsHeaders });
+
+      const issued = await issueBundleToken(admin, { userId: user.id, phone, label: `coin:${user.id}` });
+      if (!issued) return new Response(JSON.stringify({ error: 'bundle_issue_failed' }), { status: 500, headers: corsHeaders });
+
+      const { data: bOrder } = await admin.from('orders').insert({
+        user_id: user.id, user_phone: phone, item_title: bundleTitle,
+        amount: 0, kind: 'bundle', coin_amount: bundlePrice, status: 'paid',
+        paid_at: new Date().toISOString(), access_token: issued.token,
+      }).select('id').single();
+
+      const link = `${bundleOrigin}/shows?bt=${issued.token}`;
+      const message = [
+        '🎁 *BUNDEL SHOW*', '',
+        `📦 ${bundleTitle}`, '',
+        '🔗 *Link Semua Show*', link, '',
+        `🗝️ *Sandi Replay Bundel:* ${issued.password}`, '',
+        '👤 Berlaku untuk *1 perangkat pertama* per show.', '',
+        '— *ReplayTime* 💖',
+      ].join('\n');
+      const bSent = await sendFonnte(phone, message);
+      if (bSent.ok && bOrder?.id) {
+        await admin.from('orders').update({ token_sent_at: new Date().toISOString() }).eq('id', bOrder.id);
+      }
+      await admin.from('wa_outbox').insert({
+        phone, message, status: bSent.ok ? 'sent' : 'failed',
+        error: bSent.ok ? null : JSON.stringify(bSent.data),
+        related_order_id: bOrder?.id || null, fonnte_response: bSent.data,
+      });
+
+      return new Response(JSON.stringify({
+        ok: true, access_token: issued.token, password: issued.password, link,
+        show_tokens: issued.show_tokens, balance: newBal, new_balance: newBal, sent: bSent.ok,
+      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
 
     // Resolve price + ids
     let price = 0; let itemTitle = ''; let resolvedShowId: string | null = null; let resolvedReplayId: string | null = null;

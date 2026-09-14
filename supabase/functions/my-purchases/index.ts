@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { bundleShowTokens } from '../_shared/bundle.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -62,6 +63,22 @@ Deno.serve(async (req) => {
     const rid = (o as any).replay_id as string | null;
     if (sid) { showIds.add(sid); if (!shows[sid]) shows[sid] = { token: tok, kind: (o as any).kind === 'replay' ? 'replay' : 'show' }; }
     if (rid && !replays[rid]) replays[rid] = { token: tok };
+  }
+
+  // Bundel show: satu token bundel membuka semua show anggotanya (sub-token per show).
+  {
+    let bq = admin.from('show_bundle_tokens').select('token,revoked,user_id,phone').eq('revoked', false).limit(20);
+    if (userId && phone) bq = bq.or(`user_id.eq.${userId},phone.eq.${phone}`);
+    else if (userId) bq = bq.eq('user_id', userId);
+    else bq = bq.eq('phone', phone);
+    const { data: bundleTokens } = await bq;
+    for (const bt of bundleTokens || []) {
+      const map = await bundleShowTokens(admin, String((bt as any).token));
+      for (const [sid, tok] of Object.entries(map)) {
+        showIds.add(sid);
+        if (!shows[sid]) shows[sid] = { token: tok, kind: 'show' };
+      }
+    }
   }
 
   // Show yang sudah dikonversi jadi replay: token show berlaku untuk replay-nya.

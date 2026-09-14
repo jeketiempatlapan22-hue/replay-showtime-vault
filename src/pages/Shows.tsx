@@ -5,6 +5,9 @@ import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { getActiveShows, type ActiveShow } from '@/lib/activeShows';
 import ActiveShowCard from '@/components/ActiveShowCard';
+import ShowBundleCard from '@/components/ShowBundleCard';
+import { claimBundleToken } from '@/lib/bundle';
+import { toast } from 'sonner';
 import HamburgerMenu from '@/components/HamburgerMenu';
 import logoImg from '@/assets/logo.png';
 
@@ -23,6 +26,16 @@ export default function Shows() {
       localStorage.setItem('replaytime-mode', lightMode ? 'light' : 'dark');
     } catch { /* ignore */ }
   }, [lightMode]);
+
+  // Link bundel (?bt=) → buka akses semua show di perangkat ini.
+  useEffect(() => {
+    const bt = new URLSearchParams(window.location.search).get('bt');
+    if (!bt) return;
+    void claimBundleToken(bt).then((res) => {
+      if (res) toast.success(`Bundel aktif: ${res.shows.length} show terbuka`);
+      else toast.error('Link bundel tidak valid atau sudah dicabut');
+    });
+  }, []);
 
   useEffect(() => {
     supabase.from('site_settings').select('key,value').then(({ data }) => {
@@ -66,6 +79,10 @@ export default function Shows() {
           <p className="text-sm text-muted-foreground max-w-md mx-auto">
             Beli tiket show secara digital atau tonton replay langsung dari halaman ini.
           </p>
+        </div>
+
+        <div className="mb-6">
+          <ShowBundleCard />
         </div>
 
         {loading ? (

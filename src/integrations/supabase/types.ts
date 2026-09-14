@@ -1653,6 +1653,178 @@ export type Database = {
         }
         Relationships: []
       }
+      show_bundle_items: {
+        Row: {
+          bundle_id: string
+          created_at: string
+          excluded: boolean
+          id: string
+          show_id: string
+          updated_at: string
+        }
+        Insert: {
+          bundle_id: string
+          created_at?: string
+          excluded?: boolean
+          id?: string
+          show_id: string
+          updated_at?: string
+        }
+        Update: {
+          bundle_id?: string
+          created_at?: string
+          excluded?: boolean
+          id?: string
+          show_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "show_bundle_items_bundle_id_fkey"
+            columns: ["bundle_id"]
+            isOneToOne: false
+            referencedRelation: "show_bundles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "show_bundle_items_show_id_fkey"
+            columns: ["show_id"]
+            isOneToOne: false
+            referencedRelation: "active_shows"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      show_bundle_passwords: {
+        Row: {
+          bundle_id: string
+          created_at: string
+          id: string
+          is_current: boolean
+          password: string
+        }
+        Insert: {
+          bundle_id: string
+          created_at?: string
+          id?: string
+          is_current?: boolean
+          password: string
+        }
+        Update: {
+          bundle_id?: string
+          created_at?: string
+          id?: string
+          is_current?: boolean
+          password?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "show_bundle_passwords_bundle_id_fkey"
+            columns: ["bundle_id"]
+            isOneToOne: false
+            referencedRelation: "show_bundles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      show_bundle_tokens: {
+        Row: {
+          bundle_id: string
+          created_at: string
+          id: string
+          label: string
+          max_devices: number
+          order_id: string | null
+          password: string
+          phone: string
+          revoked: boolean
+          show_ids: string[]
+          token: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          bundle_id: string
+          created_at?: string
+          id?: string
+          label?: string
+          max_devices?: number
+          order_id?: string | null
+          password?: string
+          phone?: string
+          revoked?: boolean
+          show_ids?: string[]
+          token: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          bundle_id?: string
+          created_at?: string
+          id?: string
+          label?: string
+          max_devices?: number
+          order_id?: string | null
+          password?: string
+          phone?: string
+          revoked?: boolean
+          show_ids?: string[]
+          token?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "show_bundle_tokens_bundle_id_fkey"
+            columns: ["bundle_id"]
+            isOneToOne: false
+            referencedRelation: "show_bundles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      show_bundles: {
+        Row: {
+          created_at: string
+          description: string
+          discount_coins: number
+          discount_idr: number
+          id: string
+          is_active: boolean
+          name: string
+          price_coins: number
+          price_idr: number
+          show_count: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string
+          discount_coins?: number
+          discount_idr?: number
+          id?: string
+          is_active?: boolean
+          name?: string
+          price_coins?: number
+          price_idr?: number
+          show_count?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          discount_coins?: number
+          discount_idr?: number
+          id?: string
+          is_active?: boolean
+          name?: string
+          price_coins?: number
+          price_idr?: number
+          show_count?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       site_settings: {
         Row: {
           id: string
@@ -2119,6 +2291,7 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      admin_get_show_bundle: { Args: never; Returns: Json }
       admin_list_blocked_ips: {
         Args: never
         Returns: {
@@ -2321,6 +2494,15 @@ export type Database = {
         Args: { _audit_id: string }
         Returns: boolean
       }
+      admin_rotate_bundle_password: { Args: never; Returns: string }
+      admin_set_bundle_active: {
+        Args: { _active: boolean }
+        Returns: undefined
+      }
+      admin_set_bundle_show: {
+        Args: { _excluded: boolean; _show_id: string }
+        Returns: undefined
+      }
       admin_set_proof_handled: {
         Args: { _handled: boolean; _id: string }
         Returns: undefined
@@ -2414,6 +2596,7 @@ export type Database = {
           token: string
         }[]
       }
+      gen_bundle_password: { Args: never; Returns: string }
       get_active_live: {
         Args: never
         Returns: {
@@ -2470,6 +2653,19 @@ export type Database = {
           starts_at: string
           status: string
           token: string
+        }[]
+      }
+      get_show_bundle: {
+        Args: never
+        Returns: {
+          description: string
+          id: string
+          is_active: boolean
+          name: string
+          price_coins: number
+          price_idr: number
+          show_count: number
+          show_ids: string[]
         }[]
       }
       grant_coins: {
@@ -2688,6 +2884,7 @@ export type Database = {
           reserved_until: string
         }[]
       }
+      sync_show_bundle: { Args: never; Returns: undefined }
     }
     Enums: {
       app_role: "admin" | "user"
