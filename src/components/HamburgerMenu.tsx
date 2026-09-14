@@ -1,5 +1,17 @@
 import { useEffect, useState } from 'react';
-import { Menu, X, Home, MessageCircle, Phone, Sun, Moon, Radio, LogIn, LogOut, User as UserIcon, Crown, BookOpen, Clapperboard, Tv } from 'lucide-react';
+import { Menu, X, Home, MessageCircle, Phone, Sun, Moon, Radio, LogIn, LogOut, User as UserIcon, Crown, BookOpen, Clapperboard, Tv, ChevronDown } from 'lucide-react';
+
+const GUIDE_LINKS = [
+  { id: 'buy-show', label: 'Panduan Pembelian' },
+  { id: 'watch-live', label: 'Panduan Nonton Live' },
+  { id: 'watch-replay', label: 'Panduan Nonton Replay' },
+  { id: 'live-tv', label: 'Nonton Live di TV' },
+  { id: 'live-projector', label: 'Nonton Live di Proyektor' },
+  { id: 'token', label: 'Link Token & Reset Perangkat' },
+  { id: 'membership', label: 'Panduan Membership' },
+  { id: 'coin', label: 'Panduan Koin' },
+  { id: 'tips', label: 'Token Belum Diterima?' },
+];
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -19,6 +31,7 @@ interface HamburgerMenuProps {
 export default function HamburgerMenu({ whatsappNumber, whatsappLink, lightMode, onToggleMode, visible = true }: HamburgerMenuProps) {
   const [open, setOpen] = useState(false);
   const [liveOn, setLiveOn] = useState(false);
+  const [guideOpen, setGuideOpen] = useState(false);
   const { user } = useAuth();
   const navigate = useNavigate();
 
