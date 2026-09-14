@@ -413,6 +413,7 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
             type={activeSource.type as 'youtube' | 'cloudflare'}
             source={activeSource.url}
             title={replay.title}
+            altYoutubeId={source?.youtube_alt_id || ''}
           />
         )}
 

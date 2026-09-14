@@ -1,0 +1,1 @@
+ALTER TABLE public.replays ADD COLUMN IF NOT EXISTS youtube_alt_id text NOT NULL DEFAULT '';

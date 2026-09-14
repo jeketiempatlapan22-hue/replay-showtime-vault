@@ -1460,6 +1460,7 @@ export type Database = {
           title: string
           updated_at: string
           view_count: number
+          youtube_alt_id: string
           youtube_id: string
         }
         Insert: {
@@ -1487,6 +1488,7 @@ export type Database = {
           title: string
           updated_at?: string
           view_count?: number
+          youtube_alt_id?: string
           youtube_id?: string
         }
         Update: {
@@ -1514,6 +1516,7 @@ export type Database = {
           title?: string
           updated_at?: string
           view_count?: number
+          youtube_alt_id?: string
           youtube_id?: string
         }
         Relationships: []
@@ -2288,6 +2291,7 @@ export type Database = {
           title: string
           updated_at: string
           view_count: number
+          youtube_alt_id: string
           youtube_id: string
         }[]
         SetofOptions: {

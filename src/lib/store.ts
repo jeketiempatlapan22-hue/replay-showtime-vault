@@ -42,6 +42,7 @@ export interface PlaylistSource {
 
 export interface ReplaySource {
   youtube_id: string;
+  youtube_alt_id: string;
   m3u8_url: string;
   source_type: string;
   sources: PlaylistSource[];
@@ -83,6 +84,7 @@ export async function getReplaySource(
     return {
       data: {
         youtube_id: data.youtube_id || '',
+        youtube_alt_id: data.youtube_alt_id || '',
         m3u8_url: data.m3u8_url || '',
         source_type: data.source_type || 'youtube',
         sources: Array.isArray(data.sources) ? data.sources : [],

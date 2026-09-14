@@ -79,7 +79,7 @@ export default function Admin() {
   const [editingReplay, setEditingReplay] = useState<ReplayRow | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ReplayRow | null>(null);
 
-  const [form, setForm] = useState({ title: '', showName: '', date: '', showTime: '19:00', criteria: 'reguler', featuredMember: '', lineup: '', password: '', adminAlias: '', youtubeId: '', imageUrl: '', sourceType: 'youtube', m3u8Url: '', sources: [] as PlaylistSource[], priceCoins: 1, priceIdr: 2000, imageFit: 'contain' });
+  const [form, setForm] = useState({ title: '', showName: '', date: '', showTime: '19:00', criteria: 'reguler', featuredMember: '', lineup: '', password: '', adminAlias: '', youtubeId: '', youtubeAltId: '', imageUrl: '', sourceType: 'youtube', m3u8Url: '', sources: [] as PlaylistSource[], priceCoins: 1, priceIdr: 2000, imageFit: 'contain' });
   const [liveChatEnabled, setLiveChatEnabled] = useState(true);
 
   const [mpYear, setMpYear] = useState(String(new Date().getFullYear()));
@@ -382,7 +382,7 @@ export default function Admin() {
   const handleLogout = async () => { await supabase.auth.signOut(); setIsLoggedIn(false); };
 
   const resetForm = () => {
-    setForm({ title: '', showName: '', date: '', showTime: '19:00', criteria: 'reguler', featuredMember: '', lineup: '', password: '', adminAlias: '', youtubeId: '', imageUrl: '', sourceType: 'youtube', m3u8Url: '', sources: [], priceCoins: 1, priceIdr: 2000, imageFit: 'contain' });
+    setForm({ title: '', showName: '', date: '', showTime: '19:00', criteria: 'reguler', featuredMember: '', lineup: '', password: '', adminAlias: '', youtubeId: '', youtubeAltId: '', imageUrl: '', sourceType: 'youtube', m3u8Url: '', sources: [], priceCoins: 1, priceIdr: 2000, imageFit: 'contain' });
     setEditingReplay(null);
   };
 
@@ -419,6 +419,7 @@ export default function Admin() {
         lineup: lineupArr, password: form.password,
         admin_alias: form.adminAlias.trim(),
         youtube_id: normalizedYoutubeId,
+        youtube_alt_id: form.youtubeAltId.trim() ? (parseYouTubeId(form.youtubeAltId) || form.youtubeAltId.trim()) : '',
         image_url: form.imageUrl,
         source_type: form.sourceType,
         m3u8_url: isYoutube ? '' : form.m3u8Url,
@@ -448,7 +449,7 @@ export default function Admin() {
       title: r.title, showName: r.show_name, date: r.date, showTime: (r.show_time || '19:00:00').slice(0, 5), criteria: r.criteria,
       featuredMember: r.featured_member, lineup: r.lineup.join(', '), password: r.password,
       adminAlias: ((r as any).admin_alias as string) || '',
-      youtubeId: r.youtube_id, imageUrl: r.image_url,
+      youtubeId: r.youtube_id, youtubeAltId: ((r as any).youtube_alt_id as string) || '', imageUrl: r.image_url,
       sourceType: (r as any).source_type || 'youtube', m3u8Url: (r as any).m3u8_url || '',
       sources: Array.isArray((r as any).sources) ? (r as any).sources : [],
       priceCoins: ((r as any).price_coins ?? 1),
@@ -1587,7 +1588,13 @@ export default function Admin() {
                 </button>
               </div>
               {form.sourceType === 'youtube' ? (
-                <YouTubeIdInput value={form.youtubeId} onChange={(v) => setForm(f => ({ ...f, youtubeId: v }))} placeholder="URL YouTube atau ID 11 karakter (fallback)" />
+                <div className="space-y-2">
+                  <YouTubeIdInput value={form.youtubeId} onChange={(v) => setForm(f => ({ ...f, youtubeId: v }))} placeholder="URL YouTube atau ID 11 karakter (utama)" />
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Link YouTube alternatif (opsional)</Label>
+                    <YouTubeIdInput value={form.youtubeAltId} onChange={(v) => setForm(f => ({ ...f, youtubeAltId: v }))} placeholder="URL/ID YouTube cadangan untuk tombol 'Tonton di YouTube'" />
+                  </div>
+                </div>
               ) : (
                 <Input placeholder="Link M3U8 (fallback)" value={form.m3u8Url} onChange={e => setForm(f => ({ ...f, m3u8Url: e.target.value }))} />
               )}

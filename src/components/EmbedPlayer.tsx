@@ -10,6 +10,8 @@ interface Props {
   watermark?: string;
   hideSeekButtons?: boolean;
   isLive?: boolean;
+  /** ID/link YouTube alternatif; dipakai hanya bila player tersendat saat suara diaktifkan. */
+  altYoutubeId?: string;
 }
 
 interface YoutubePlayerApi {
@@ -134,7 +136,7 @@ function loadYouTubeApi(): Promise<void> {
   return ytApiLoadingPromise;
 }
 
-export default function EmbedPlayer({ type, source, title, watermark, hideSeekButtons = false, isLive = false }: Props) {
+export default function EmbedPlayer({ type, source, title, watermark, hideSeekButtons = false, isLive = false, altYoutubeId = '' }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const ytPlayerRef = useRef<YoutubePlayerApi | null>(null);
@@ -168,6 +170,11 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
   const volumeRef = useRef(initialVolume);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showHint, setShowHint] = useState(false);
+  // Sebagian perangkat mem-pause video begitu suara diaktifkan dan tidak mau
+  // jalan lagi. Hanya pada kondisi itu tombol "Tonton di YouTube" ditampilkan.
+  const [soundStuck, setSoundStuck] = useState(false);
+  const soundStuckRef = useRef(false);
+  const markSoundStuck = (v: boolean) => { soundStuckRef.current = v; setSoundStuck(v); };
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   // Ref dipakai agar gesture range yang dibatalkan iOS/Android tidak membuat
@@ -669,6 +676,14 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
         }
       }, delay);
     });
+
+    // Pemeriksaan akhir: bila setelah semua percobaan video tetap terhenti
+    // (bukan karena user menekan jeda), tampilkan alternatif tonton di YouTube.
+    window.setTimeout(() => {
+      if (userPausedRef.current) { markSoundStuck(false); return; }
+      const s = ytState();
+      if (s === 2 || s === 5 || s === -1) markSoundStuck(true);
+    }, 2600);
   };
 
   const toggleMute = () => {
@@ -850,6 +865,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
         if (d && Math.abs(d - duration) >= 0.5) setDuration(d);
         const sec = Math.floor(t);
         if (sec !== lastSec) {
+          if (lastSec >= 0 && soundStuckRef.current) markSoundStuck(false);
           lastSec = sec;
           setCurrentTime(t);
         }
@@ -1187,6 +1203,18 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
         >
           🔊 Tap untuk aktifkan suara
         </button>
+      )}
+
+      {soundStuck && type === 'youtube' && !liveActive && (ytId || altYoutubeId) && (
+        <a
+          href={`https://www.youtube.com/watch?v=${extractYoutubeId(altYoutubeId) || altYoutubeId || ytId}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          className="absolute top-3 left-1/2 -translate-x-1/2 z-30 px-4 py-2 rounded-full bg-red-600 text-white text-xs font-semibold shadow-lg animate-fade-in"
+        >
+          ▶ Video terjeda? Tonton di YouTube
+        </a>
       )}
 
       {/* Controls */}
