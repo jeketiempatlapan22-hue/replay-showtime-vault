@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, User, Mail, Phone, Save, LogOut, Coins, AtSign, KeyRound, MessageCircle, Eye, EyeOff, Crown, Copy, ExternalLink, Clock, Loader2 } from 'lucide-react';
+import { ArrowLeft, User, Mail, Phone, Save, LogOut, Coins, AtSign, KeyRound, MessageCircle, Eye, EyeOff, Crown, Copy, ExternalLink, Clock, Loader2, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -70,6 +70,7 @@ export default function Profil() {
   const [memLoading, setMemLoading] = useState(true);
   const [myOrders, setMyOrders] = useState<MyOrder[]>([]);
   const [guest, setGuest] = useState<GuestAccount | null>(() => getGuestAccount());
+  const [openMem, setOpenMem] = useState<string | null>(null);
 
 
   const [tgCode, setTgCode] = useState('');
@@ -392,82 +393,69 @@ export default function Profil() {
                   if (cancelled) return <Badge variant="secondary">Dibatalkan</Badge>;
                   return <Badge variant="outline">{m.status}</Badge>;
                 })();
+                const isOpen = openMem === m.order_id;
                 return (
-                  <div key={m.order_id} className="rounded-lg border border-border p-3 space-y-2 bg-card/50">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <div className="font-semibold text-sm leading-tight">{m.package_name || 'Membership'}</div>
-                        <div className="text-[10px] text-muted-foreground font-mono">#{m.order_id.slice(0, 8)}</div>
-                      </div>
+                  <div key={m.order_id} className="rounded-lg border border-border bg-card/50 overflow-hidden">
+                    <button
+                      type="button"
+                      aria-expanded={isOpen}
+                      onClick={() => setOpenMem(isOpen ? null : m.order_id)}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-muted/40 transition-colors"
+                    >
+                      <Crown className="w-3.5 h-3.5 text-primary shrink-0" />
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-sm font-semibold leading-tight truncate">{m.package_name || 'Membership'}</span>
+                        <span className="block text-[10px] text-muted-foreground">
+                          {isPaid && m.expires_at
+                            ? (tokenExpired ? 'Masa berlaku habis' : `Sisa ${m.days_remaining ?? 0} hari`)
+                            : isReserved ? 'Menunggu pembayaran' : `#${m.order_id.slice(0, 8)}`}
+                        </span>
+                      </span>
                       {statusBadge}
-                    </div>
+                      <ChevronDown className={`w-4 h-4 text-muted-foreground shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                    </button>
 
-                    {m.package_paused && isPaid && !tokenExpired && (
-                      <div className="text-[11px] text-amber-600 bg-amber-500/10 border border-amber-500/30 rounded px-2 py-1.5">
-                        ⏸ Membership dijeda admin. {m.pause_message}
-                      </div>
-                    )}
+                    {isOpen && (
+                      <div className="px-3 pb-3 space-y-2">
+                        {m.package_paused && isPaid && !tokenExpired && (
+                          <div className="text-[11px] text-amber-600 bg-amber-500/10 border border-amber-500/30 rounded px-2 py-1.5">
+                            ⏸ Membership dijeda admin. {m.pause_message}
+                          </div>
+                        )}
 
-                    <div className="grid grid-cols-2 gap-2 text-[11px]">
-                      <div>
-                        <div className="text-muted-foreground">Metode</div>
-                        <div className="font-medium">
+                        <div className="text-[11px] text-muted-foreground">
                           {m.kind === 'coins' ? `${m.coin_amount} koin` : `Rp ${Number(m.amount || 0).toLocaleString('id-ID')}`}
+                          {isPaid && m.expires_at && (
+                            <> · <Clock className="w-3 h-3 inline -mt-0.5" /> berlaku hingga {new Date(m.expires_at).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}</>
+                          )}
+                          {isReserved && m.reserved_until && (
+                            <> · slot hingga {new Date(m.reserved_until).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</>
+                          )}
                         </div>
-                      </div>
-                      {isPaid && m.expires_at && (
-                        <div>
-                          <div className="text-muted-foreground">Sisa Berlaku</div>
-                          <div className="font-medium flex items-center gap-1">
-                            <Clock className="w-3 h-3" />
-                            {tokenExpired ? 'Habis' : `${m.days_remaining ?? 0} hari`}
+
+                        {isPaid && link && !tokenExpired && !m.revoked && (
+                          <div className="space-y-1.5">
+                            <div className="grid grid-cols-3 gap-1.5">
+                              <Button size="sm" variant="outline" className="h-8 text-[11px]" onClick={() => copyText(link, 'Link disalin')}>
+                                <Copy className="w-3 h-3 mr-1" /> Link
+                              </Button>
+                              <Button size="sm" variant="outline" className="h-8 text-[11px]" onClick={() => copyText(m.password!, 'Sandi disalin')}>
+                                <Copy className="w-3 h-3 mr-1" /> Sandi
+                              </Button>
+                              <Button size="sm" className="h-8 text-[11px]" onClick={() => openMembership(m)}>
+                                <ExternalLink className="w-3 h-3 mr-1" /> Buka
+                              </Button>
+                            </div>
+                            <AccessInfoCard mtoken={m.token!} mpassword={m.password!} fallbackLink={link} compact />
                           </div>
-                        </div>
-                      )}
-                      {isReserved && m.reserved_until && (
-                        <div>
-                          <div className="text-muted-foreground">Slot Hingga</div>
-                          <div className="font-medium">
-                            {new Date(m.reserved_until).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
-                          </div>
-                        </div>
-                      )}
-                    </div>
+                        )}
 
-                    {isPaid && m.expires_at && (
-                      <div className="text-[11px] text-muted-foreground">
-                        Berlaku hingga {new Date(m.expires_at).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })}
+                        {isReserved && (
+                          <p className="text-[10px] text-muted-foreground">
+                            Selesaikan pembayaran QRIS sebelum slot dilepas. Kuota akan otomatis dikembalikan jika belum dibayar.
+                          </p>
+                        )}
                       </div>
-                    )}
-
-                    {isPaid && link && !tokenExpired && !m.revoked && (
-                      <div className="space-y-1.5 pt-1">
-                        <div className="rounded bg-muted px-2 py-1.5 text-[10px] font-mono break-all">{link}</div>
-                        <div className="grid grid-cols-3 gap-1.5">
-                          <Button size="sm" variant="outline" className="h-8 text-[11px]" onClick={() => copyText(link, 'Link disalin')}>
-                            <Copy className="w-3 h-3 mr-1" /> Link
-                          </Button>
-                          <Button size="sm" variant="outline" className="h-8 text-[11px]" onClick={() => copyText(m.password!, 'Sandi disalin')}>
-                            <Copy className="w-3 h-3 mr-1" /> Sandi
-                          </Button>
-                          <Button size="sm" className="h-8 text-[11px]" onClick={() => openMembership(m)}>
-                            <ExternalLink className="w-3 h-3 mr-1" /> Buka
-                          </Button>
-                        </div>
-                        <AccessInfoCard mtoken={m.token!} mpassword={m.password!} fallbackLink={link} compact />
-                      </div>
-                    )}
-
-
-                    {isPaid && !tokenExpired && !m.revoked && m.token && m.password && (m.max_devices ?? 1) <= 1 && (
-                      <DeviceResetButton kind="membership" token={m.token} password={m.password} />
-                    )}
-
-
-                    {isReserved && (
-                      <p className="text-[10px] text-muted-foreground">
-                        Selesaikan pembayaran QRIS sebelum slot dilepas. Kuota akan otomatis dikembalikan jika belum dibayar.
-                      </p>
                     )}
                   </div>
                 );
