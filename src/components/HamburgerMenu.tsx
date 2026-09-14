@@ -166,14 +166,39 @@ export default function HamburgerMenu({ whatsappNumber, whatsappLink, lightMode,
             </div>
           </Link>
 
-          <Link
-            to="/panduan"
-            onClick={() => setOpen(false)}
-            className="flex items-center gap-3 px-4 py-3 rounded-lg text-foreground hover:bg-secondary transition-colors"
-          >
-            <BookOpen className="w-5 h-5 text-primary" />
-            <span className="font-medium">Panduan</span>
-          </Link>
+          <div className="rounded-lg overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setGuideOpen(v => !v)}
+              aria-expanded={guideOpen}
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-foreground hover:bg-secondary transition-colors"
+            >
+              <BookOpen className="w-5 h-5 text-primary" />
+              <span className="font-medium flex-1 text-left">Panduan</span>
+              <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${guideOpen ? 'rotate-180' : ''}`} />
+            </button>
+            {guideOpen && (
+              <div className="pl-8 pr-2 pb-2 space-y-0.5">
+                {GUIDE_LINKS.map((g) => (
+                  <Link
+                    key={g.id}
+                    to={`/panduan#guide-${g.id}`}
+                    onClick={() => setOpen(false)}
+                    className="block px-3 py-2 rounded-md text-sm text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
+                  >
+                    {g.label}
+                  </Link>
+                ))}
+                <Link
+                  to="/panduan"
+                  onClick={() => setOpen(false)}
+                  className="block px-3 py-2 rounded-md text-sm font-medium text-primary hover:bg-secondary transition-colors"
+                >
+                  Lihat Semua Panduan
+                </Link>
+              </div>
+            )}
+          </div>
 
 
           {whatsappNumber && (
