@@ -60,6 +60,8 @@ function extractCloudflareUid(raw: string): string {
 
 const VOL_KEY = 'replaytime-volume';
 const MUTED_KEY = 'replaytime-muted';
+// Ditandai setelah user menyalakan suara sekali dalam sesi ini.
+const SOUND_ON_KEY = 'replaytime-sound-on';
 
 // Preconnect ke domain media — dipasang SEKALI per tipe player, idempotent,
 // agar tidak ada churn DOM saat player re-mount (mempercepat handshake awal).
