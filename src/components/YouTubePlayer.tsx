@@ -16,6 +16,7 @@ import EmbedPlayer from '@/components/EmbedPlayer';
 import DeviceResetButton from '@/components/DeviceResetButton';
 import { prefetchM3U8, prefetchYouTube, prefetchCloudflare } from '@/lib/prefetch';
 import { useAutoHideOnInteraction } from '@/hooks/useAutoHideOnInteraction';
+import { getReplayPurchase, getAllShowPurchases } from '@/lib/purchases';
 
 interface Props {
   replay: ReplayRow;
