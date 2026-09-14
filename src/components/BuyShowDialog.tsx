@@ -25,15 +25,16 @@ interface Props {
   itemTitle: string;
   replayId?: string | null;
   kind?: 'show' | 'replay' | 'replay_only' | 'bundle';
+  defaultMethod?: 'qris' | 'coin';
 }
 
 type Status = 'form' | 'creating' | 'qr' | 'paid' | 'expired' | 'static_qris';
 const EXPIRY_MS = 30 * 60 * 1000;
 
-export default function BuyShowDialog({ open, onOpenChange, showId = '', showTitle, amount, itemTitle, replayId, kind = 'show' }: Props) {
+export default function BuyShowDialog({ open, onOpenChange, showId = '', showTitle, amount, itemTitle, replayId, kind = 'show', defaultMethod }: Props) {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [method, setMethod] = useState<'qris' | 'coin'>('qris');
+  const [method, setMethod] = useState<'qris' | 'coin'>(defaultMethod || 'qris');
   const qrisAvailable = amount >= 100;
   const [coinPrice, setCoinPrice] = useState<number>(0);
   const [coinBalance, setCoinBalance] = useState<number>(0);
@@ -60,6 +61,7 @@ export default function BuyShowDialog({ open, onOpenChange, showId = '', showTit
   // Load admin contact + static QRIS settings + coin price/balance when dialog opens
   useEffect(() => {
     if (!open) return;
+    if (defaultMethod) setMethod(defaultMethod);
     (async () => {
       try {
         const { data } = await supabase

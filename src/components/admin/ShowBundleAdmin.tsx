@@ -1,9 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Gift, RefreshCw, KeyRound, Copy } from 'lucide-react';
+import { Gift, RefreshCw, KeyRound, Copy, Palette } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { BUNDLE_THEMES } from '@/lib/bundle';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -28,16 +32,47 @@ export default function ShowBundleAdmin() {
   const [data, setData] = useState<BundleData | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [form, setForm] = useState({
+    name: '', description: '', theme: 'gold', promo_label: '',
+    discount_idr: '0', discount_coins: '0',
+  });
 
   const load = useCallback(async () => {
     setLoading(true);
     const { data: res, error } = await (supabase as any).rpc('admin_get_show_bundle');
     if (error) toast.error(error.message);
-    setData((res as BundleData) || null);
+    const d = (res as BundleData) || null;
+    setData(d);
+    if (d?.bundle) {
+      setForm({
+        name: d.bundle.name || '',
+        description: d.bundle.description || '',
+        theme: d.bundle.theme || 'gold',
+        promo_label: d.bundle.promo_label || '',
+        discount_idr: String(d.bundle.discount_idr ?? 0),
+        discount_coins: String(d.bundle.discount_coins ?? 0),
+      });
+    }
     setLoading(false);
   }, []);
 
   useEffect(() => { void load(); }, [load]);
+
+  const saveStyle = async () => {
+    setBusy(true);
+    const { error } = await (supabase as any).rpc('admin_update_bundle_style', {
+      _name: form.name,
+      _description: form.description,
+      _theme: form.theme,
+      _promo_label: form.promo_label,
+      _discount_idr: Math.max(0, Number(form.discount_idr) || 0),
+      _discount_coins: Math.max(0, Number(form.discount_coins) || 0),
+    });
+    setBusy(false);
+    if (error) return toast.error(error.message);
+    toast.success('Tampilan & diskon bundel disimpan');
+    void load();
+  };
 
   const copy = async (text: string, label: string) => {
     try { await navigator.clipboard.writeText(text); toast.success(`${label} disalin`); } catch { /* ignore */ }
@@ -106,8 +141,48 @@ export default function ShowBundleAdmin() {
             </Button>
           </div>
           <p className="text-[11px] text-muted-foreground">
-            Harga bundel otomatis = total harga show tercakup dikurangi Rp2.000 (atau 1 koin).
+            Harga bundel otomatis = total harga show tercakup dikurangi diskon di bawah.
           </p>
+
+          <div className="grid grid-cols-2 gap-2 pt-2 border-t border-border">
+            <div className="col-span-2 space-y-1">
+              <Label className="text-xs">Nama bundel</Label>
+              <Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
+            </div>
+            <div className="col-span-2 space-y-1">
+              <Label className="text-xs">Deskripsi singkat</Label>
+              <Input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Diskon (Rp)</Label>
+              <Input type="number" min={0} value={form.discount_idr}
+                onChange={e => setForm(f => ({ ...f, discount_idr: e.target.value }))} />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Diskon (koin)</Label>
+              <Input type="number" min={0} value={form.discount_coins}
+                onChange={e => setForm(f => ({ ...f, discount_coins: e.target.value }))} />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Tema kartu</Label>
+              <Select value={form.theme} onValueChange={(v) => setForm(f => ({ ...f, theme: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {Object.entries(BUNDLE_THEMES).map(([k, v]) => (
+                    <SelectItem key={k} value={k}>{v.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Label promo</Label>
+              <Input placeholder="mis. Promo Spesial" value={form.promo_label}
+                onChange={e => setForm(f => ({ ...f, promo_label: e.target.value }))} />
+            </div>
+            <Button className="col-span-2" size="sm" disabled={busy} onClick={saveStyle}>
+              <Palette className="w-3.5 h-3.5 mr-1" /> Simpan Tampilan & Diskon
+            </Button>
+          </div>
         </CardContent>
       </Card>
 

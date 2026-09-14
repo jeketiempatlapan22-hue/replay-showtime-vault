@@ -1794,7 +1794,9 @@ export type Database = {
           name: string
           price_coins: number
           price_idr: number
+          promo_label: string
           show_count: number
+          theme: string
           updated_at: string
         }
         Insert: {
@@ -1807,7 +1809,9 @@ export type Database = {
           name?: string
           price_coins?: number
           price_idr?: number
+          promo_label?: string
           show_count?: number
+          theme?: string
           updated_at?: string
         }
         Update: {
@@ -1820,7 +1824,9 @@ export type Database = {
           name?: string
           price_coins?: number
           price_idr?: number
+          promo_label?: string
           show_count?: number
+          theme?: string
           updated_at?: string
         }
         Relationships: []
@@ -2529,6 +2535,17 @@ export type Database = {
         Args: { _kind: string; _token_id: string }
         Returns: number
       }
+      admin_update_bundle_style: {
+        Args: {
+          _description?: string
+          _discount_coins?: number
+          _discount_idr?: number
+          _name?: string
+          _promo_label?: string
+          _theme?: string
+        }
+        Returns: undefined
+      }
       admin_update_membership_user: {
         Args: {
           _email: string
@@ -2659,13 +2676,17 @@ export type Database = {
         Args: never
         Returns: {
           description: string
+          discount_coins: number
+          discount_idr: number
           id: string
           is_active: boolean
           name: string
           price_coins: number
           price_idr: number
+          promo_label: string
           show_count: number
           show_ids: string[]
+          theme: string
         }[]
       }
       grant_coins: {

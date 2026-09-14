@@ -1,5 +1,17 @@
 import { useEffect, useState } from 'react';
-import { Menu, X, Home, MessageCircle, Phone, Sun, Moon, Radio, LogIn, LogOut, User as UserIcon, Crown, BookOpen, Clapperboard, Tv } from 'lucide-react';
+import { Menu, X, Home, MessageCircle, Phone, Sun, Moon, Radio, LogIn, LogOut, User as UserIcon, Crown, BookOpen, Clapperboard, Tv, ChevronDown } from 'lucide-react';
+
+const GUIDE_LINKS = [
+  { id: 'buy-show', label: 'Panduan Pembelian' },
+  { id: 'watch-live', label: 'Panduan Nonton Live' },
+  { id: 'watch-replay', label: 'Panduan Nonton Replay' },
+  { id: 'live-tv', label: 'Nonton Live di TV' },
+  { id: 'live-projector', label: 'Nonton Live di Proyektor' },
+  { id: 'token', label: 'Link Token & Reset Perangkat' },
+  { id: 'membership', label: 'Panduan Membership' },
+  { id: 'coin', label: 'Panduan Koin' },
+  { id: 'tips', label: 'Token Belum Diterima?' },
+];
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -19,6 +31,7 @@ interface HamburgerMenuProps {
 export default function HamburgerMenu({ whatsappNumber, whatsappLink, lightMode, onToggleMode, visible = true }: HamburgerMenuProps) {
   const [open, setOpen] = useState(false);
   const [liveOn, setLiveOn] = useState(false);
+  const [guideOpen, setGuideOpen] = useState(false);
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -166,14 +179,39 @@ export default function HamburgerMenu({ whatsappNumber, whatsappLink, lightMode,
             </div>
           </Link>
 
-          <Link
-            to="/panduan"
-            onClick={() => setOpen(false)}
-            className="flex items-center gap-3 px-4 py-3 rounded-lg text-foreground hover:bg-secondary transition-colors"
-          >
-            <BookOpen className="w-5 h-5 text-primary" />
-            <span className="font-medium">Panduan</span>
-          </Link>
+          <div className="rounded-lg overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setGuideOpen(v => !v)}
+              aria-expanded={guideOpen}
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-foreground hover:bg-secondary transition-colors"
+            >
+              <BookOpen className="w-5 h-5 text-primary" />
+              <span className="font-medium flex-1 text-left">Panduan</span>
+              <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${guideOpen ? 'rotate-180' : ''}`} />
+            </button>
+            {guideOpen && (
+              <div className="pl-8 pr-2 pb-2 space-y-0.5">
+                {GUIDE_LINKS.map((g) => (
+                  <Link
+                    key={g.id}
+                    to={`/panduan#guide-${g.id}`}
+                    onClick={() => setOpen(false)}
+                    className="block px-3 py-2 rounded-md text-sm text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
+                  >
+                    {g.label}
+                  </Link>
+                ))}
+                <Link
+                  to="/panduan"
+                  onClick={() => setOpen(false)}
+                  className="block px-3 py-2 rounded-md text-sm font-medium text-primary hover:bg-secondary transition-colors"
+                >
+                  Lihat Semua Panduan
+                </Link>
+              </div>
+            )}
+          </div>
 
 
           {whatsappNumber && (

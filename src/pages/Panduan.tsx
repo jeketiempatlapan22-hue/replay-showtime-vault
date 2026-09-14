@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Smartphone, Tv, Projector, UserPlus, Coins, Ticket,
@@ -178,6 +178,35 @@ const GUIDES: Guide[] = [
     ],
   },
   {
+    id: 'watch-live',
+    title: 'Cara Nonton Live',
+    icon: Tv,
+    image: imgLiveTv,
+    summary: 'Langkah menonton siaran live setelah beli show atau punya membership.',
+    steps: [
+      { title: 'Pastikan akses sudah aktif', desc: 'Beli show-nya, pakai link token, atau aktifkan membership. Kartu show akan berubah jadi tombol "Tonton".' },
+      { title: 'Buka halaman Live', desc: 'Klik tombol "Tonton Live" di kartu show, atau buka menu Live dari hamburger menu.' },
+      { title: 'Masukkan sandi bila diminta', desc: 'Sandi ada di kartu akses (tombol salin sandi) atau pesan WhatsApp yang kamu terima.' },
+      { title: 'Atur tampilan', desc: 'Ketuk ikon fullscreen / putar HP ke landscape. Untuk layar besar, pakai menu Hubungkan TV/Proyektor.' },
+      { title: 'Jika video macet', desc: 'Refresh halaman satu kali. Kualitas akan menyesuaikan otomatis jika jaringan melemah.' },
+    ],
+    note: 'Live baru bisa ditonton saat admin sudah menyalakan siaran atau jadwal live otomatis sudah masuk.',
+  },
+  {
+    id: 'watch-replay',
+    title: 'Cara Nonton Replay',
+    icon: Smartphone,
+    image: imgMobile,
+    summary: 'Menonton ulang show yang sudah selesai, kapan saja.',
+    steps: [
+      { title: 'Buka halaman utama', desc: 'Daftar replay dikelompokkan per bulan pada halaman depan.' },
+      { title: 'Pilih replay & buka', desc: 'Klik kartu replay yang sudah kamu beli, atau beli dulu jika belum.' },
+      { title: 'Masukkan sandi replay', desc: 'Sandi replay ada di kartu akses di halaman Profil atau di pesan WhatsApp.' },
+      { title: 'Gunakan kontrol pemutar', desc: 'Tersedia play/pause, maju–mundur 10 detik, geser waktu, pengatur kecepatan, dan fullscreen.' },
+    ],
+    note: 'Sandi bundel juga membuka replay dari show yang termasuk dalam bundel.',
+  },
+  {
     id: 'tips',
     title: 'Tips: Fonnte Pause / Token Belum Diterima',
     icon: KeyRound,
@@ -194,8 +223,27 @@ const GUIDES: Guide[] = [
 
 export default function Panduan() {
   const navigate = useNavigate();
-  const [openId, setOpenId] = useState<string | null>('mobile');
+  const initialId = (() => {
+    const h = typeof window !== 'undefined' ? window.location.hash.replace('#guide-', '') : '';
+    return h && GUIDES.some(g => g.id === h) ? h : 'mobile';
+  })();
+  const [openId, setOpenId] = useState<string | null>(initialId);
   const [lightMode, setLightMode] = useState(() => { try { return localStorage.getItem('replaytime-mode') === 'light'; } catch { return false; } });
+
+  // Buka & gulirkan ke panduan yang dituju dari menu (#guide-<id>)
+  useEffect(() => {
+    const apply = () => {
+      const id = window.location.hash.replace('#guide-', '');
+      if (!id || !GUIDES.some(g => g.id === id)) return;
+      setOpenId(id);
+      setTimeout(() => {
+        document.getElementById(`guide-anchor-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 120);
+    };
+    apply();
+    window.addEventListener('hashchange', apply);
+    return () => window.removeEventListener('hashchange', apply);
+  }, []);
 
   const toggle = (mode: boolean) => {
     setLightMode(mode);
@@ -247,7 +295,8 @@ export default function Panduan() {
             return (
               <article
                 key={g.id}
-                className="rounded-xl border border-border bg-card overflow-hidden transition-shadow hover:shadow-md"
+                id={`guide-anchor-${g.id}`}
+                className="scroll-mt-20 rounded-xl border border-border bg-card overflow-hidden transition-shadow hover:shadow-md"
               >
                 <button
                   type="button"
