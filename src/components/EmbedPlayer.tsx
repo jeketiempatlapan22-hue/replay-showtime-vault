@@ -624,6 +624,9 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
     try {
       localStorage.setItem(VOL_KEY, String(audibleVolume));
       localStorage.setItem(MUTED_KEY, '0');
+      // Sesi ini user sudah menyatakan mau bersuara — replay berikutnya dicoba
+      // langsung bersuara tanpa perlu tap lagi.
+      sessionStorage.setItem(SOUND_ON_KEY, '1');
     } catch { /* ignore */ }
 
     // Seluruh panggilan ini berjalan sinkron dalam gesture pengguna. Unmute tidak
