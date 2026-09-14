@@ -250,8 +250,14 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
       return;
     }
     const target = (el.querySelector('[data-player-root]') as HTMLElement) || el;
-    await requestFs(target, target.querySelector('video'));
+    const ok = await requestFs(target, target.querySelector('video'));
     setIsFullscreen(isFullscreenActive());
+    if (!ok) {
+      // iPhone/WebView menolak fullscreen untuk elemen non-video → minta player
+      // memakai mode layar penuh CSS-nya sendiri.
+      try { target.dispatchEvent(new CustomEvent('replaytime-toggle-fs')); } catch { /* ignore */ }
+      return;
+    }
     await lockLandscape(true);
   }, []);
 
