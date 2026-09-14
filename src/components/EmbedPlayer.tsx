@@ -1050,7 +1050,20 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
       {!plainMode && (
         <div
           className="absolute inset-0 z-[5]"
-          onClick={(e) => { e.preventDefault(); const s = type === 'youtube' ? ytState() : undefined; const reallyPlaying = s === undefined ? isPlaying : (s === 1 || s === 3); if (!reallyPlaying) playFromGesture(); toggleControls(); }}
+          onClick={(e) => {
+            e.preventDefault();
+            const s = type === 'youtube' ? ytState() : undefined;
+            const reallyPlaying = s === undefined ? isPlaying : (s === 1 || s === 3);
+            // Selagi masih bisu, tap di mana pun pada area video langsung menyalakan
+            // suara dalam gesture yang sama (tanpa reload player, tanpa pause).
+            if (type === 'youtube' && !userUnmutedRef.current) {
+              activateSound();
+              toggleControls();
+              return;
+            }
+            if (!reallyPlaying) playFromGesture();
+            toggleControls();
+          }}
         />
       )}
 
