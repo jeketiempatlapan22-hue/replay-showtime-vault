@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ChevronDown, Ticket } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import AccessInfoCard from '@/components/AccessInfoCard';
+import DeviceResetButton from '@/components/DeviceResetButton';
 
 export interface PurchaseHistoryEntry {
   key: string;
