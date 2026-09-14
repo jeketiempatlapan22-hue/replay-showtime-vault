@@ -35,7 +35,11 @@ export default function BuyShowDialog({ open, onOpenChange, showId = '', showTit
   const navigate = useNavigate();
   const { user } = useAuth();
   const [method, setMethod] = useState<'qris' | 'coin'>(defaultMethod || 'qris');
-  const qrisAvailable = amount >= 100;
+  // Harga terbaru dari server (bundel/show bisa berubah setelah kartu dirender),
+  // supaya nominal yang ditampilkan selalu sama dengan QRIS dinamis yang dibuat.
+  const [liveAmount, setLiveAmount] = useState<number | null>(null);
+  const payAmount = liveAmount ?? amount;
+  const qrisAvailable = payAmount >= 100;
   const [coinPrice, setCoinPrice] = useState<number>(0);
   const [coinBalance, setCoinBalance] = useState<number>(0);
   const [coinBusy, setCoinBusy] = useState(false);
