@@ -223,8 +223,27 @@ const GUIDES: Guide[] = [
 
 export default function Panduan() {
   const navigate = useNavigate();
-  const [openId, setOpenId] = useState<string | null>('mobile');
+  const initialId = (() => {
+    const h = typeof window !== 'undefined' ? window.location.hash.replace('#guide-', '') : '';
+    return h && GUIDES.some(g => g.id === h) ? h : 'mobile';
+  })();
+  const [openId, setOpenId] = useState<string | null>(initialId);
   const [lightMode, setLightMode] = useState(() => { try { return localStorage.getItem('replaytime-mode') === 'light'; } catch { return false; } });
+
+  // Buka & gulirkan ke panduan yang dituju dari menu (#guide-<id>)
+  useEffect(() => {
+    const apply = () => {
+      const id = window.location.hash.replace('#guide-', '');
+      if (!id || !GUIDES.some(g => g.id === id)) return;
+      setOpenId(id);
+      setTimeout(() => {
+        document.getElementById(`guide-anchor-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 120);
+    };
+    apply();
+    window.addEventListener('hashchange', apply);
+    return () => window.removeEventListener('hashchange', apply);
+  }, []);
 
   const toggle = (mode: boolean) => {
     setLightMode(mode);
