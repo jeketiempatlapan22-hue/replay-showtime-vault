@@ -597,7 +597,13 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
     if (type === 'youtube') {
       ytHandshake();
       ytCommand('playVideo');
-      try { ytPlayerRef.current?.setVolume?.(Math.round(volumeRef.current * 100)); } catch { /* ignore */ }
+      try {
+        ytPlayerRef.current?.setVolume?.(Math.round(volumeRef.current * 100));
+        // Gesture yang sama sekalian menyalakan suara bila sesi ini memang mau bersuara.
+        let wanted = false;
+        try { wanted = sessionStorage.getItem(SOUND_ON_KEY) === '1'; } catch { /* ignore */ }
+        if (wanted) { ytPlayerRef.current?.unMute?.(); userUnmutedRef.current = true; mutedRef.current = false; setMuted(false); setShowHint(false); }
+      } catch { /* ignore */ }
     } else {
       if (iframeRef.current && iframeRef.current.src === 'about:blank') iframeRef.current.src = cfEmbedUrl;
       cfPost('play');
