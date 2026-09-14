@@ -84,6 +84,7 @@ export async function getReplaySource(
     return {
       data: {
         youtube_id: data.youtube_id || '',
+        youtube_alt_id: data.youtube_alt_id || '',
         m3u8_url: data.m3u8_url || '',
         source_type: data.source_type || 'youtube',
         sources: Array.isArray(data.sources) ? data.sources : [],

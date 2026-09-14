@@ -34,7 +34,7 @@ Deno.serve(async (req) => {
 
     const { data: replay } = await supabase
       .from("replays")
-      .select("password, date, youtube_id, m3u8_url, source_type, sources, access_token")
+      .select("password, date, youtube_id, youtube_alt_id, m3u8_url, source_type, sources, access_token")
       .eq("id", replay_id)
       .single();
 
@@ -296,6 +296,7 @@ Deno.serve(async (req) => {
     return json({
       valid: true,
       youtube_id: replay.youtube_id || "",
+      youtube_alt_id: (replay as any).youtube_alt_id || "",
       m3u8_url: replay.m3u8_url || "",
       source_type: replay.source_type || "youtube",
       sources: Array.isArray(replay.sources) ? replay.sources : [],
