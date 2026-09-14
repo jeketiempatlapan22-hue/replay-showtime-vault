@@ -20,7 +20,7 @@ function rnd(len = 24) {
 export async function getBundle(admin: any): Promise<BundleInfo | null> {
   const { data: b } = await admin
     .from('show_bundles')
-    .select('id,name,is_active,price_idr,price_coins')
+    .select('id,name,is_active,price_idr,price_coins,discount_idr,discount_coins')
     .order('created_at', { ascending: true })
     .limit(1)
     .maybeSingle();
@@ -28,13 +28,25 @@ export async function getBundle(admin: any): Promise<BundleInfo | null> {
 
   const { data: items } = await admin
     .from('show_bundle_items')
-    .select('show_id, excluded, active_shows!inner(id,is_active,replay_id)')
+    .select('show_id, excluded, active_shows!inner(id,is_active,replay_id,price_show,price_show_coins,pakasir_amount)')
     .eq('bundle_id', b.id)
     .eq('excluded', false);
 
-  const showIds = (items || [])
-    .filter((i: any) => i.active_shows?.is_active && !i.active_shows?.replay_id)
-    .map((i: any) => String(i.show_id));
+  const members = (items || [])
+    .filter((i: any) => i.active_shows?.is_active && !i.active_shows?.replay_id);
+  const showIds = members.map((i: any) => String(i.show_id));
+
+  // Harga dihitung ulang dari show yang benar-benar tercakup saat ini supaya
+  // QRIS dinamis selalu memakai nominal bundel yang berlaku (bukan nilai basi).
+  let sumIdr = 0;
+  let sumCoins = 0;
+  for (const i of members) {
+    const s = i.active_shows || {};
+    sumIdr += Number(s.price_show || 0) || Number(s.pakasir_amount || 0) || 0;
+    sumCoins += Number(s.price_show_coins || 0);
+  }
+  const priceIdr = showIds.length ? Math.max(0, sumIdr - Number(b.discount_idr || 0)) : 0;
+  const priceCoins = showIds.length ? Math.max(0, sumCoins - Number(b.discount_coins || 0)) : 0;
 
   const { data: pw } = await admin
     .from('show_bundle_passwords')
