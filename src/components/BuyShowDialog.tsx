@@ -34,7 +34,7 @@ const EXPIRY_MS = 30 * 60 * 1000;
 export default function BuyShowDialog({ open, onOpenChange, showId = '', showTitle, amount, itemTitle, replayId, kind = 'show', defaultMethod }: Props) {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [method, setMethod] = useState<'qris' | 'coin'>('qris');
+  const [method, setMethod] = useState<'qris' | 'coin'>(defaultMethod || 'qris');
   const qrisAvailable = amount >= 100;
   const [coinPrice, setCoinPrice] = useState<number>(0);
   const [coinBalance, setCoinBalance] = useState<number>(0);
