@@ -676,6 +676,14 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
         }
       }, delay);
     });
+
+    // Pemeriksaan akhir: bila setelah semua percobaan video tetap terhenti
+    // (bukan karena user menekan jeda), tampilkan alternatif tonton di YouTube.
+    window.setTimeout(() => {
+      if (userPausedRef.current) { markSoundStuck(false); return; }
+      const s = ytState();
+      if (s === 2 || s === 5 || s === -1) markSoundStuck(true);
+    }, 2600);
   };
 
   const toggleMute = () => {
