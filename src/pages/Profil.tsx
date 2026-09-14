@@ -327,6 +327,8 @@ export default function Profil() {
           </CardContent>
         </Card>
 
+        <DeviceResetPicker targets={resetTargets} />
+
         <Card>
           <CardHeader className="flex-row items-center justify-between">
             <CardTitle className="flex items-center gap-2 text-base"><Coins className="w-4 h-4 text-primary" /> Saldo Koin</CardTitle>
