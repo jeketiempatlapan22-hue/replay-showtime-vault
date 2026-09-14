@@ -655,6 +655,19 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
       },
     );
 
+    // Sebagian perangkat (Android WebView/iOS) menghentikan video tepat setelah
+    // unmute. Pulihkan playback diam-diam selama user tidak menekan jeda sendiri.
+    [250, 700, 1500].forEach((delay) => {
+      window.setTimeout(() => {
+        if (userPausedRef.current) return;
+        const s = ytState();
+        if (s === 2 || s === 5 || s === -1) {
+          withYtPlayer((p) => p.playVideo?.(), () => ytPost('playVideo'));
+          setIsPlaying(true);
+          isPlayingRef.current = true;
+        }
+      }, delay);
+    });
   };
 
   const toggleMute = () => {
