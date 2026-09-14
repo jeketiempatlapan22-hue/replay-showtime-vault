@@ -865,6 +865,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
         if (d && Math.abs(d - duration) >= 0.5) setDuration(d);
         const sec = Math.floor(t);
         if (sec !== lastSec) {
+          if (lastSec >= 0 && soundStuckRef.current) markSoundStuck(false);
           lastSec = sec;
           setCurrentTime(t);
         }
