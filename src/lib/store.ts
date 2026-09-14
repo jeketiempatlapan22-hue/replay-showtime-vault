@@ -42,6 +42,7 @@ export interface PlaylistSource {
 
 export interface ReplaySource {
   youtube_id: string;
+  youtube_alt_id: string;
   m3u8_url: string;
   source_type: string;
   sources: PlaylistSource[];
