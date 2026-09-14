@@ -295,7 +295,8 @@ export default function Panduan() {
             return (
               <article
                 key={g.id}
-                className="rounded-xl border border-border bg-card overflow-hidden transition-shadow hover:shadow-md"
+                id={`guide-anchor-${g.id}`}
+                className="scroll-mt-20 rounded-xl border border-border bg-card overflow-hidden transition-shadow hover:shadow-md"
               >
                 <button
                   type="button"
