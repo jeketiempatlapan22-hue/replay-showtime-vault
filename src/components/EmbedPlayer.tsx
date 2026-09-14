@@ -60,6 +60,8 @@ function extractCloudflareUid(raw: string): string {
 
 const VOL_KEY = 'replaytime-volume';
 const MUTED_KEY = 'replaytime-muted';
+// Ditandai setelah user menyalakan suara sekali dalam sesi ini.
+const SOUND_ON_KEY = 'replaytime-sound-on';
 
 // Preconnect ke domain media — dipasang SEKALI per tipe player, idempotent,
 // agar tidak ada churn DOM saat player re-mount (mempercepat handshake awal).
@@ -595,7 +597,13 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
     if (type === 'youtube') {
       ytHandshake();
       ytCommand('playVideo');
-      try { ytPlayerRef.current?.setVolume?.(Math.round(volumeRef.current * 100)); } catch { /* ignore */ }
+      try {
+        ytPlayerRef.current?.setVolume?.(Math.round(volumeRef.current * 100));
+        // Gesture yang sama sekalian menyalakan suara bila sesi ini memang mau bersuara.
+        let wanted = false;
+        try { wanted = sessionStorage.getItem(SOUND_ON_KEY) === '1'; } catch { /* ignore */ }
+        if (wanted) { ytPlayerRef.current?.unMute?.(); userUnmutedRef.current = true; mutedRef.current = false; setMuted(false); setShowHint(false); }
+      } catch { /* ignore */ }
     } else {
       if (iframeRef.current && iframeRef.current.src === 'about:blank') iframeRef.current.src = cfEmbedUrl;
       cfPost('play');
@@ -624,6 +632,9 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
     try {
       localStorage.setItem(VOL_KEY, String(audibleVolume));
       localStorage.setItem(MUTED_KEY, '0');
+      // Sesi ini user sudah menyatakan mau bersuara — replay berikutnya dicoba
+      // langsung bersuara tanpa perlu tap lagi.
+      sessionStorage.setItem(SOUND_ON_KEY, '1');
     } catch { /* ignore */ }
 
     // Seluruh panggilan ini berjalan sinkron dalam gesture pengguna. Unmute tidak
@@ -772,6 +783,38 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
     kick();
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [type, ready, ytId, plainMode]);
+
+  // Suara otomatis: bila user sudah pernah menyalakan suara di sesi ini, coba
+  // unmute sendiri saat player siap. Kalau browser menolak (kebijakan autoplay),
+  // player tetap berjalan bisu dan petunjuk tap ditampilkan kembali.
+  useEffect(() => {
+    if (type !== 'youtube' || !ready || !ytId || plainMode) return;
+    let wanted = false;
+    try { wanted = sessionStorage.getItem(SOUND_ON_KEY) === '1'; } catch { /* ignore */ }
+    if (!wanted || userUnmutedRef.current) return;
+
+    const vol = volumeRef.current > 0 ? volumeRef.current : 1;
+    const t = setTimeout(() => {
+      const p = ytPlayerRef.current;
+      try {
+        p?.setVolume?.(Math.round(vol * 100));
+        p?.unMute?.();
+      } catch { /* ignore */ }
+      // Verifikasi: hanya anggap berhasil bila player benar-benar tidak bisu.
+      setTimeout(() => {
+        let stillMuted = true;
+        try { stillMuted = ytPlayerRef.current?.isMuted?.() ?? true; } catch { /* ignore */ }
+        if (stillMuted) return;
+        userUnmutedRef.current = true;
+        mutedRef.current = false;
+        volumeRef.current = vol;
+        setMuted(false);
+        setVolume(vol);
+        setShowHint(false);
+      }, 400);
+    }, 600);
+    return () => clearTimeout(t);
   }, [type, ready, ytId, plainMode]);
 
 
@@ -1050,7 +1093,20 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
       {!plainMode && (
         <div
           className="absolute inset-0 z-[5]"
-          onClick={(e) => { e.preventDefault(); const s = type === 'youtube' ? ytState() : undefined; const reallyPlaying = s === undefined ? isPlaying : (s === 1 || s === 3); if (!reallyPlaying) playFromGesture(); toggleControls(); }}
+          onClick={(e) => {
+            e.preventDefault();
+            const s = type === 'youtube' ? ytState() : undefined;
+            const reallyPlaying = s === undefined ? isPlaying : (s === 1 || s === 3);
+            // Selagi masih bisu, tap di mana pun pada area video langsung menyalakan
+            // suara dalam gesture yang sama (tanpa reload player, tanpa pause).
+            if (type === 'youtube' && !userUnmutedRef.current) {
+              activateSound();
+              toggleControls();
+              return;
+            }
+            if (!reallyPlaying) playFromGesture();
+            toggleControls();
+          }}
         />
       )}
 
