@@ -170,7 +170,10 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
   const [showHint, setShowHint] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [seeking, setSeeking] = useState(false);
+  // Ref dipakai agar gesture range yang dibatalkan iOS/Android tidak membuat
+  // polling waktu berhenti permanen karena state "seeking" tertinggal.
+  const seekingRef = useRef(false);
+  const seekPreviewRef = useRef(0);
   const [showControls, setShowControls] = useState(true);
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Status live harus berasal dari pemanggil. Durasi YouTube replay bernilai 0
@@ -252,8 +255,6 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
   }, []);
 
   const isPlayingRef = useRef(false);
-  // Tap pertama saat kontrol tersembunyi hanya memunculkan kontrol, tidak menekan tombol.
-  const swallowClickRef = useRef(false);
   // Ditandai saat user sengaja menekan pause agar autoplay-guard tidak memaksa play lagi.
   const userPausedRef = useRef(false);
   useEffect(() => { isPlayingRef.current = isPlaying; }, [isPlaying]);
@@ -831,7 +832,8 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
   }, [type, ready, ytId, plainMode]);
 
 
-  // Poll YT time/duration — auto-pause saat tab hidden untuk hemat CPU & cegah throttling browser
+  // Poll YT time/duration — berhenti sementara hanya selama jari benar-benar
+  // menahan timeline. Global pointer/touch end memastikan status selalu pulih.
   // membuat polling tertimbun antrian ketika tab kembali aktif.
   useEffect(() => {
     if (type !== 'youtube' || !ready) return;
@@ -844,7 +846,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
         const d = p.getDuration?.() ?? 0;
         const t = p.getCurrentTime?.() ?? 0;
         if (liveActive) return;
-        if (seeking) return;
+        if (seekingRef.current) return;
         if (d && Math.abs(d - duration) >= 0.5) setDuration(d);
         const sec = Math.floor(t);
         if (sec !== lastSec) {
@@ -859,7 +861,25 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
     if (!document.hidden) start();
     document.addEventListener('visibilitychange', onVis);
     return () => { stop(); document.removeEventListener('visibilitychange', onVis); };
-  }, [ready, type, seeking, duration, liveActive]);
+  }, [ready, type, duration, liveActive]);
+
+  useEffect(() => {
+    const finishSeek = () => {
+      if (!seekingRef.current) return;
+      seekingRef.current = false;
+      seekTo(seekPreviewRef.current);
+    };
+    window.addEventListener('pointerup', finishSeek);
+    window.addEventListener('pointercancel', finishSeek);
+    window.addEventListener('touchend', finishSeek);
+    window.addEventListener('touchcancel', finishSeek);
+    return () => {
+      window.removeEventListener('pointerup', finishSeek);
+      window.removeEventListener('pointercancel', finishSeek);
+      window.removeEventListener('touchend', finishSeek);
+      window.removeEventListener('touchcancel', finishSeek);
+    };
+  });
 
   // Preconnect ke domain media (singleton, dipasang sekali per tipe player).
   useEffect(() => { ensurePreconnect(type); }, [type]);
@@ -904,6 +924,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
     setCurrentTime(target);
   };
   const commitSeek = (value: number) => {
+    seekPreviewRef.current = value;
     setCurrentTime(value);
     seekTo(value);
   };
@@ -1159,26 +1180,10 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
       {/* Controls */}
       <div
         className={`absolute inset-x-0 bottom-0 z-10 px-2 sm:px-3 pb-2 sm:pb-3 pt-8 bg-gradient-to-t from-black/80 to-transparent transition-opacity duration-300 ${
-          plainMode ? 'hidden' : showControls || !isPlaying ? 'opacity-100' : 'opacity-0'
+          plainMode ? 'hidden' : showControls || !isPlaying ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
         }`}
 
         style={{ touchAction: 'manipulation' }}
-        onPointerDownCapture={(e) => {
-          if (!plainMode && !showControls && isPlaying) {
-            swallowClickRef.current = true;
-            e.preventDefault();
-            e.stopPropagation();
-            resetHideTimer();
-          }
-        }}
-        onClickCapture={(e) => {
-          if (swallowClickRef.current) {
-            swallowClickRef.current = false;
-            e.preventDefault();
-            e.stopPropagation();
-            resetHideTimer();
-          }
-        }}
         onClick={(e) => e.stopPropagation()}
       >
         {type === 'youtube' && !liveActive && (
@@ -1192,9 +1197,29 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
               value={duration > 0 ? Math.min(currentTime, duration) : 0}
               disabled={duration <= 0}
               onChange={(e) => commitSeek(Number(e.target.value))}
-              onPointerDown={(e) => { e.stopPropagation(); setSeeking(true); }}
-              onPointerUp={(e) => { e.stopPropagation(); setSeeking(false); resetHideTimer(); }}
-              onPointerCancel={() => setSeeking(false)}
+              onPointerDown={(e) => {
+                e.stopPropagation();
+                seekingRef.current = true;
+                seekPreviewRef.current = Number(e.currentTarget.value);
+              }}
+              onPointerUp={(e) => {
+                e.stopPropagation();
+                seekingRef.current = false;
+                commitSeek(Number(e.currentTarget.value));
+                resetHideTimer();
+              }}
+              onPointerCancel={(e) => {
+                seekingRef.current = false;
+                commitSeek(Number(e.currentTarget.value));
+              }}
+              onTouchEnd={(e) => {
+                seekingRef.current = false;
+                commitSeek(Number(e.currentTarget.value));
+              }}
+              onBlur={(e) => {
+                seekingRef.current = false;
+                commitSeek(Number(e.currentTarget.value));
+              }}
               aria-label="Seek"
               className="min-w-0 flex-1 h-2 accent-primary cursor-pointer"
               style={{ touchAction: 'manipulation' }}
