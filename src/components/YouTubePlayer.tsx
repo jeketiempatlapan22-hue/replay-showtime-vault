@@ -90,30 +90,55 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
 
     let password = '';
     let token = '';
-    let wmSource = '';
+    // Riwayat pembelian permanen (localStorage) dipakai sebagai kunci,
+    // jadi pembeli tidak perlu memasukkan sandi lagi di sesi/perangkat berikutnya.
+    const tokens: string[] = [];
+    const pushToken = (t?: string | null) => {
+      const v = String(t || '').trim();
+      if (v && !tokens.includes(v)) tokens.push(v);
+    };
     try {
       password = sessionStorage.getItem(`replaytime-pw-${replay.id}`) || '';
       token = sessionStorage.getItem(`replaytime-tok-${replay.id}`) || '';
-      if (!token) {
-        const url = new URL(window.location.href);
-        const urlTok = url.searchParams.get('token') || '';
-        if (urlTok) token = urlTok;
-      }
-      wmSource = token || localStorage.getItem('replaytime-browser-id') || '';
+      pushToken(token);
+      const bought = getReplayPurchase(replay.id);
+      pushToken(bought?.token);
+      if (!password && bought?.password) password = bought.password;
+      const url = new URL(window.location.href);
+      pushToken(url.searchParams.get('token'));
     } catch { /* ignore */ }
-    setActiveToken(wmSource);
 
-    if (!password && !token) {
-      setSourceLoading(false);
-      setNeedsPassword(true);
-      return;
-    }
+    let wmSource = '';
+    try { wmSource = tokens[0] || localStorage.getItem('replaytime-browser-id') || ''; } catch { /* ignore */ }
+    setActiveToken(wmSource);
 
     // Coba semua kredensial yang tersedia (token lalu sandi, atau sebaliknya).
     // Token yang basi/terikat perangkat lain tidak boleh membatalkan sandi yang valid.
     (async () => {
+      // Show yang sudah dikonversi jadi replay: token show-nya juga berlaku.
+      try {
+        const showPurchases = getAllShowPurchases();
+        const ids = Object.keys(showPurchases);
+        if (ids.length) {
+          const { data } = await supabase
+            .from('active_shows')
+            .select('id,replay_id')
+            .eq('replay_id', replay.id)
+            .in('id', ids);
+          for (const row of (data as any[]) || []) pushToken(showPurchases[(row as any).id]?.token);
+        }
+      } catch { /* ignore */ }
+      if (cancelled) return;
+
+      if (!tokens.length && !password) {
+        setSourceLoading(false);
+        setNeedsPassword(true);
+        return;
+      }
+      if (!wmSource && tokens[0]) setActiveToken(tokens[0]);
+
       const attempts: Array<{ kind: 'token' | 'password'; run: () => Promise<Awaited<ReturnType<typeof getReplaySource>>> }> = [];
-      if (token) attempts.push({ kind: 'token', run: () => getReplaySource(replay.id, { accessToken: token }) });
+      for (const t of tokens) attempts.push({ kind: 'token', run: () => getReplaySource(replay.id, { accessToken: t }) });
       if (password) attempts.push({ kind: 'password', run: () => getReplaySource(replay.id, { password }) });
 
       let lastReason: string | undefined;
