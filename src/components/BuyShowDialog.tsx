@@ -14,22 +14,23 @@ import { setShowPurchase, setReplayPurchase } from '@/lib/purchases';
 import MembershipProofUpload from '@/components/MembershipProofUpload';
 import { adminWaNumber } from '@/lib/adminWa';
 import AccessInfoCard from '@/components/AccessInfoCard';
+import { getShowBundle, claimBundleToken, persistBundleShowTokens, rememberBundleToken } from '@/lib/bundle';
 
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  showId: string;
+  showId?: string;
   showTitle: string;
   amount: number;
   itemTitle: string;
   replayId?: string | null;
-  kind?: 'show' | 'replay' | 'replay_only';
+  kind?: 'show' | 'replay' | 'replay_only' | 'bundle';
 }
 
 type Status = 'form' | 'creating' | 'qr' | 'paid' | 'expired' | 'static_qris';
 const EXPIRY_MS = 30 * 60 * 1000;
 
-export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, amount, itemTitle, replayId, kind = 'show' }: Props) {
+export default function BuyShowDialog({ open, onOpenChange, showId = '', showTitle, amount, itemTitle, replayId, kind = 'show' }: Props) {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [method, setMethod] = useState<'qris' | 'coin'>('qris');
@@ -73,7 +74,10 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
       // Coin price for the item
       try {
         let price = 0;
-        if (kind === 'replay_only' && replayId) {
+        if (kind === 'bundle') {
+          const b = await getShowBundle();
+          price = b?.price_coins || 0;
+        } else if (kind === 'replay_only' && replayId) {
           const { data: r } = await supabase.from('replays').select('price_coins').eq('id', replayId).maybeSingle();
           price = (r as any)?.price_coins || 0;
         } else if (showId) {
@@ -133,9 +137,13 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
   }, [now, createdAt, status]);
 
   // Persist purchase locally so user does not need to repurchase next visit.
-  const persistPaid = (token: string) => {
+  const persistPaid = (token: string, showTokens?: Record<string, string>) => {
     if (!token) return;
-    if (kind === 'replay_only' && replayId) {
+    if (kind === 'bundle') {
+      rememberBundleToken(token);
+      if (showTokens && Object.keys(showTokens).length) persistBundleShowTokens(showTokens);
+      else void claimBundleToken(token);
+    } else if (kind === 'replay_only' && replayId) {
       setReplayPurchase(replayId, { token, paidAt: Date.now() });
     } else if (showId) {
       setShowPurchase(showId, { token, kind: kind === 'replay' ? 'replay' : 'show', paidAt: Date.now() });
@@ -218,7 +226,7 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
       const { data, error } = await supabase.functions.invoke('create-pakasir-order', {
         body: {
           phone: norm,
-          show_id: kind === 'replay_only' ? undefined : showId,
+          show_id: (kind === 'replay_only' || kind === 'bundle') ? undefined : showId,
           replay_id: replayId || undefined,
           item_title: itemTitle,
           amount,
@@ -274,7 +282,7 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
       const { data, error } = await supabase.functions.invoke('purchase-with-coins', {
         body: {
           phone: norm,
-          show_id: kind === 'replay_only' ? undefined : showId,
+          show_id: (kind === 'replay_only' || kind === 'bundle') ? undefined : showId,
           replay_id: replayId || undefined,
           item_title: itemTitle,
           kind,
@@ -285,7 +293,7 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
       if (!r?.ok) throw new Error(r?.error || 'Gagal memproses pembelian');
       setAccessToken(r.access_token || '');
       setWaSent(typeof r.sent === 'boolean' ? r.sent : null);
-      persistPaid(r.access_token || '');
+      persistPaid(r.access_token || '', r.show_tokens || undefined);
       setCoinBalance(r.new_balance ?? Math.max(0, coinBalance - coinPrice));
       setStatus('paid');
       toast.success(r.sent === false ? 'Pembelian berhasil! WA gagal/lambat, salin link token di bawah.' : 'Pembelian berhasil! Token dikirim via WhatsApp.');
@@ -311,7 +319,9 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
   };
 
   const accessLink = accessToken
-    ? (kind === 'show' && showId && !replayId
+    ? (kind === 'bundle'
+      ? `${window.location.origin}/shows?bt=${accessToken}`
+      : kind === 'show' && showId && !replayId
       ? `${window.location.origin}/live?show=${showId}&t=${accessToken}`
       : `${window.location.origin}/akses?token=${accessToken}${replayId ? `&replay=${replayId}` : ''}`)
     : '';
@@ -470,7 +480,7 @@ export default function BuyShowDialog({ open, onOpenChange, showId, showTitle, a
               <>
                 <AccessInfoCard
                   token={accessToken}
-                  showId={kind === 'replay_only' ? undefined : showId}
+                  showId={(kind === 'replay_only' || kind === 'bundle') ? undefined : showId}
                   replayId={replayId || undefined}
                   fallbackLink={accessLink}
                   compact

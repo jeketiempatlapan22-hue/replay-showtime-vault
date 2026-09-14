@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { bundlePasswordValidForReplay } from "../_shared/bundle.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -79,6 +80,12 @@ Deno.serve(async (req) => {
     if (replay.password === password) {
       await supabase.rpc('record_login_attempt', { _identifier: lockId, _success: true });
       return json({ valid: true });
+    }
+
+    // Sandi bundel show (sandi lama maupun yang berlaku sekarang).
+    if (await bundlePasswordValidForReplay(supabase, replay_id, password)) {
+      await supabase.rpc('record_login_attempt', { _identifier: lockId, _success: true });
+      return json({ valid: true, via: 'bundle' });
     }
 
     const d = new Date(replay.date);

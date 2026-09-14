@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { bundlePasswordValidForReplay } from "../_shared/bundle.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -208,6 +209,10 @@ Deno.serve(async (req) => {
 
     } else if (password) {
       valid = !!replay.password && replay.password === password;
+      if (!valid) {
+        // Sandi bundel show — berlaku untuk semua replay hasil show di bundel.
+        valid = await bundlePasswordValidForReplay(supabase, replay_id, password);
+      }
       if (!valid) {
         // Sandi master bulanan: terima master bulan replay DAN master bulan berjalan.
         const months = new Set<string>();

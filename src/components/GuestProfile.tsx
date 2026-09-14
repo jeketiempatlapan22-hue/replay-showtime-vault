@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import AccessInfoCard from '@/components/AccessInfoCard';
+import PurchaseHistoryList from '@/components/PurchaseHistoryList';
 import { getAllReplayPurchases, getAllShowPurchases } from '@/lib/purchases';
 import { clearGuestAccount, type GuestAccount } from '@/lib/guest';
 import { supabase } from '@/integrations/supabase/client';
@@ -151,32 +152,19 @@ export default function GuestProfile({ guest }: { guest: GuestAccount }) {
         <CardContent className="space-y-3">
           {loading ? (
             <p className="text-xs text-muted-foreground text-center py-2">Memuat...</p>
-          ) : items.length === 0 ? (
-            <p className="text-xs text-muted-foreground text-center py-2">
-              Belum ada pembelian di perangkat ini. Setelah pembayaran terkonfirmasi, link + sandi replay muncul di sini.
-            </p>
           ) : (
-            items.map((it) => (
-              <div key={it.key} className="rounded-lg border border-border p-3 space-y-2 bg-card/50">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <div className="font-semibold text-sm leading-tight">{it.title}</div>
-                    <div className="text-[10px] text-muted-foreground">
-                      {it.dateLabel || (it.paidAt ? new Date(it.paidAt).toLocaleDateString('id-ID') : '')}
-                    </div>
-                  </div>
-                  <Badge variant="outline" className="text-[10px] shrink-0">
-                    {it.kind === 'show' ? 'Show' : 'Replay'}
-                  </Badge>
-                </div>
-                <AccessInfoCard
-                  token={it.token}
-                  showId={it.kind === 'show' ? it.id : undefined}
-                  replayId={it.kind === 'replay' ? it.id : undefined}
-                  compact
-                />
-              </div>
-            ))
+            <PurchaseHistoryList
+              emptyText="Belum ada pembelian di perangkat ini. Setelah pembayaran terkonfirmasi, link + sandi replay muncul di sini."
+              items={items.map((it) => ({
+                key: it.key,
+                title: it.title,
+                dateLabel: it.dateLabel || (it.paidAt ? new Date(it.paidAt).toLocaleDateString('id-ID') : ''),
+                badge: it.kind === 'show' ? 'Show' : 'Replay',
+                token: it.token,
+                showId: it.kind === 'show' ? it.id : undefined,
+                replayId: it.kind === 'replay' ? it.id : undefined,
+              }))}
+            />
           )}
         </CardContent>
       </Card>

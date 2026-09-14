@@ -9,6 +9,7 @@ import ResellerPricingAdmin from '@/components/admin/ResellerPricingAdmin';
 import MembershipAdmin from '@/components/admin/MembershipAdmin';
 import MembershipPackagesAdmin from '@/components/admin/MembershipPackagesAdmin';
 import MembershipUsersAdmin from '@/components/admin/MembershipUsersAdmin';
+import ShowBundleAdmin from '@/components/admin/ShowBundleAdmin';
 import TokenFactoryAdmin from '@/components/admin/TokenFactoryAdmin';
 import MembershipProofsAdmin from '@/components/admin/MembershipProofsAdmin';
 import ReplayOffAdmin from '@/components/admin/ReplayOffAdmin';
@@ -716,6 +717,7 @@ export default function Admin() {
                 { v: 'membership', label: 'Membership Token', Icon: Users },
                 { v: 'mb_users', label: 'User Membership', Icon: Users },
                 { v: 'token_factory', label: 'Token Factory', Icon: Key },
+                { v: 'bundle', label: 'Bundel Show', Icon: Key },
                 { v: 'mb_packages', label: 'Paket Membership', Icon: Sparkles },
                 { v: 'mb_proofs', label: 'Bukti Transaksi', Icon: Upload },
                 { v: 'replay_off', label: 'Replay Off', Icon: Eye },
@@ -741,7 +743,7 @@ export default function Admin() {
           </SheetContent>
         </Sheet>
         <Button variant="ghost" size="icon" onClick={() => navigate('/')} className="shrink-0" title="Beranda"><ArrowLeft className="w-5 h-5" /></Button>
-        <h1 className="text-base sm:text-xl font-bold font-sans text-foreground flex-1 min-w-0 truncate">Admin · {({ replays: 'Replay', shows: 'Streaming Show', members: 'Member', bot: 'Bot WA', history: 'Riwayat', reseller_audit: 'Audit Reseller', reseller_billing: 'Tagihan Reseller', reseller_pricing: 'Harga Reseller', membership: 'Membership Token', mb_users: 'User Membership', token_factory: 'Token Factory', mb_packages: 'Paket Membership', mb_proofs: 'Bukti Transaksi', replay_off: 'Replay Off', pakasir: 'Pakasir Webhook', coins: 'Koin', users: 'Manajemen User', preview: 'Preview', comments: 'Komentar', security: 'Blokir', ip_manager: 'IP & Rate Limit', settings: 'Setelan' } as Record<string, string>)[activeTab]}</h1>
+        <h1 className="text-base sm:text-xl font-bold font-sans text-foreground flex-1 min-w-0 truncate">Admin · {({ replays: 'Replay', shows: 'Streaming Show', members: 'Member', bot: 'Bot WA', history: 'Riwayat', reseller_audit: 'Audit Reseller', reseller_billing: 'Tagihan Reseller', reseller_pricing: 'Harga Reseller', membership: 'Membership Token', mb_users: 'User Membership', token_factory: 'Token Factory', bundle: 'Bundel Show', mb_packages: 'Paket Membership', mb_proofs: 'Bukti Transaksi', replay_off: 'Replay Off', pakasir: 'Pakasir Webhook', coins: 'Koin', users: 'Manajemen User', preview: 'Preview', comments: 'Komentar', security: 'Blokir', ip_manager: 'IP & Rate Limit', settings: 'Setelan' } as Record<string, string>)[activeTab]}</h1>
         <div className="flex items-center gap-1 sm:gap-2 shrink-0">
           <Button size="sm" onClick={() => { resetForm(); setShowAddDialog(true); }} className="text-xs sm:text-sm">
             <Plus className="w-4 h-4 sm:mr-1" /> <span className="hidden sm:inline">Tambah</span>
@@ -764,6 +766,7 @@ export default function Admin() {
           <TabsContent value="membership"><MembershipAdmin /></TabsContent>
           <TabsContent value="mb_users"><MembershipUsersAdmin /></TabsContent>
           <TabsContent value="token_factory"><TokenFactoryAdmin /></TabsContent>
+          <TabsContent value="bundle"><ShowBundleAdmin /></TabsContent>
           <TabsContent value="mb_packages"><MembershipPackagesAdmin /></TabsContent>
           <TabsContent value="mb_proofs"><MembershipProofsAdmin /></TabsContent>
           <TabsContent value="replay_off"><ReplayOffAdmin /></TabsContent>

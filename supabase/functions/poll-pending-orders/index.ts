@@ -4,6 +4,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { waDedupKey, claimWaSend, markWaSent } from '../_shared/wa-guard.ts';
 import { sendTelegramByPhone } from '../_shared/telegram.ts';
 import { verifyPakasirPaidStrict, PAID_STATUSES as STRICT_PAID_STATUSES } from '../_shared/pakasir.ts';
+import { issueBundleToken } from '../_shared/bundle.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -35,6 +36,15 @@ async function verifyPakasirPaid(apiKey: string, slug: string, pakasirOrderId: s
 // with max_devices = 1. Idempotent: if a row already exists for the order's
 // current token, returns it as-is.
 async function ensurePurchaseToken(admin: ReturnType<typeof createClient>, order: any): Promise<string> {
+  if (order.kind === 'bundle') {
+    const issued = await issueBundleToken(admin, {
+      userId: order.user_id || null,
+      phone: order.user_phone || null,
+      orderId: order.id || null,
+      label: `pakasir:${order.user_phone || ''}`.slice(0, 120),
+    });
+    return issued?.token || order.access_token || '';
+  }
   // If we previously provisioned a token row for this order, reuse it.
   if (order.access_token) {
     if (order.show_id && !order.replay_id) {
@@ -206,9 +216,11 @@ async function processOrder(admin: ReturnType<typeof createClient>, order: any, 
 
   const isShowPurchase = !!order.show_id && !order.replay_id;
   const isReplayOnlyPurchase = !!order.replay_id && !order.show_id;
-  const link = isShowPurchase
-    ? `${origin}/live?show=${order.show_id}&t=${accessToken}`
-    : `${origin}/akses?token=${accessToken}${order.replay_id ? `&replay=${order.replay_id}` : ''}`;
+  const link = order.kind === 'bundle'
+    ? `${origin}/shows?bt=${accessToken}`
+    : isShowPurchase
+      ? `${origin}/live?show=${order.show_id}&t=${accessToken}`
+      : `${origin}/akses?token=${accessToken}${order.replay_id ? `&replay=${order.replay_id}` : ''}`;
 
   let password = '';
   let liveLink = '';

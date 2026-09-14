@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { bundleShowTokens } from "../_shared/bundle.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -70,6 +71,37 @@ Deno.serve(async (req) => {
     }
 
     if (!token) return json({ ok: false, reason: "no_token" });
+
+    // ===== Bundel Show =====
+    {
+      const { data: bt } = await admin
+        .from("show_bundle_tokens")
+        .select("token,password,show_ids,revoked")
+        .eq("token", token).maybeSingle();
+      if (bt && !bt.revoked) {
+        const subTokens = await bundleShowTokens(admin, bt.token);
+        const ids = Object.keys(subTokens);
+        const { data: rows } = ids.length
+          ? await admin.from("active_shows").select("id,title,show_date,replay_id").in("id", ids)
+          : { data: [] as any[] };
+        const shows = (rows || []).map((s: any) => ({
+          id: s.id,
+          title: s.title,
+          date: s.show_date,
+          token: subTokens[s.id],
+          link: `${origin}/live?show=${s.id}&t=${subTokens[s.id]}`,
+          replay_link: s.replay_id ? `${origin}/akses?token=${subTokens[s.id]}&replay=${s.replay_id}` : "",
+        }));
+        const link = `${origin}/shows?bt=${bt.token}`;
+        const password = String(bt.password || "");
+        const title = `Bundel Show (${shows.length} show)`;
+        return json({
+          ok: true, bundle: true, title, date: "", link, password, replay_info: "",
+          shows,
+          message: buildMessage({ title, date: "", link, password, replayInfo: "", kindLabel: "Link Bundel" }),
+        });
+      }
+    }
 
     // ===== Order-based access (show / replay) =====
     const { data: order } = await admin
