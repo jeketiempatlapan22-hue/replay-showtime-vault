@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import AccessInfoCard from '@/components/AccessInfoCard';
+import PurchaseHistoryList from '@/components/PurchaseHistoryList';
 import { getAllReplayPurchases, getAllShowPurchases } from '@/lib/purchases';
 import { clearGuestAccount, type GuestAccount } from '@/lib/guest';
 import { supabase } from '@/integrations/supabase/client';
