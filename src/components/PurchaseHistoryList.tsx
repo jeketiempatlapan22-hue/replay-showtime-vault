@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { ChevronDown, Ticket } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import AccessInfoCard from '@/components/AccessInfoCard';
-import DeviceResetButton from '@/components/DeviceResetButton';
+
 
 export interface PurchaseHistoryEntry {
   key: string;
@@ -50,7 +50,6 @@ export default function PurchaseHistoryList({
             {isOpen && (
               <div className="px-3 pb-3 space-y-2">
                 <AccessInfoCard token={it.token} showId={it.showId} replayId={it.replayId} compact />
-                <DeviceResetButton kind="show" token={it.token} />
               </div>
             )}
           </div>
