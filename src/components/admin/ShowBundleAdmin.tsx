@@ -32,16 +32,47 @@ export default function ShowBundleAdmin() {
   const [data, setData] = useState<BundleData | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [form, setForm] = useState({
+    name: '', description: '', theme: 'gold', promo_label: '',
+    discount_idr: '0', discount_coins: '0',
+  });
 
   const load = useCallback(async () => {
     setLoading(true);
     const { data: res, error } = await (supabase as any).rpc('admin_get_show_bundle');
     if (error) toast.error(error.message);
-    setData((res as BundleData) || null);
+    const d = (res as BundleData) || null;
+    setData(d);
+    if (d?.bundle) {
+      setForm({
+        name: d.bundle.name || '',
+        description: d.bundle.description || '',
+        theme: d.bundle.theme || 'gold',
+        promo_label: d.bundle.promo_label || '',
+        discount_idr: String(d.bundle.discount_idr ?? 0),
+        discount_coins: String(d.bundle.discount_coins ?? 0),
+      });
+    }
     setLoading(false);
   }, []);
 
   useEffect(() => { void load(); }, [load]);
+
+  const saveStyle = async () => {
+    setBusy(true);
+    const { error } = await (supabase as any).rpc('admin_update_bundle_style', {
+      _name: form.name,
+      _description: form.description,
+      _theme: form.theme,
+      _promo_label: form.promo_label,
+      _discount_idr: Math.max(0, Number(form.discount_idr) || 0),
+      _discount_coins: Math.max(0, Number(form.discount_coins) || 0),
+    });
+    setBusy(false);
+    if (error) return toast.error(error.message);
+    toast.success('Tampilan & diskon bundel disimpan');
+    void load();
+  };
 
   const copy = async (text: string, label: string) => {
     try { await navigator.clipboard.writeText(text); toast.success(`${label} disalin`); } catch { /* ignore */ }
