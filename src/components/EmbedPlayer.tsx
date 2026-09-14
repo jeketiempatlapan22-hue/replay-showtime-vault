@@ -1205,6 +1205,18 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
         </button>
       )}
 
+      {soundStuck && type === 'youtube' && !liveActive && (ytId || altYoutubeId) && (
+        <a
+          href={`https://www.youtube.com/watch?v=${extractYoutubeId(altYoutubeId) || altYoutubeId || ytId}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          className="absolute top-3 left-1/2 -translate-x-1/2 z-30 px-4 py-2 rounded-full bg-red-600 text-white text-xs font-semibold shadow-lg animate-fade-in"
+        >
+          ▶ Video terjeda? Tonton di YouTube
+        </a>
+      )}
+
       {/* Controls */}
       <div
         className={`absolute inset-x-0 bottom-0 z-10 px-2 sm:px-3 pb-2 sm:pb-3 pt-8 bg-gradient-to-t from-black/80 to-transparent transition-opacity duration-300 ${
