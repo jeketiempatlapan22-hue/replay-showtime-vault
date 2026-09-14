@@ -10,6 +10,8 @@ interface Props {
   watermark?: string;
   hideSeekButtons?: boolean;
   isLive?: boolean;
+  /** ID/link YouTube alternatif; dipakai hanya bila player tersendat saat suara diaktifkan. */
+  altYoutubeId?: string;
 }
 
 interface YoutubePlayerApi {
