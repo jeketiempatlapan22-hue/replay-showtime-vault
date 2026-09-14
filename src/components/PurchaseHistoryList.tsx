@@ -48,8 +48,9 @@ export default function PurchaseHistoryList({
               <ChevronDown className={`w-4 h-4 text-muted-foreground shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
             </button>
             {isOpen && (
-              <div className="px-3 pb-3">
+              <div className="px-3 pb-3 space-y-2">
                 <AccessInfoCard token={it.token} showId={it.showId} replayId={it.replayId} compact />
+                <DeviceResetButton kind="show" token={it.token} />
               </div>
             )}
           </div>
