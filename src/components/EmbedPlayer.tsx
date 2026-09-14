@@ -170,6 +170,11 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
   const volumeRef = useRef(initialVolume);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showHint, setShowHint] = useState(false);
+  // Sebagian perangkat mem-pause video begitu suara diaktifkan dan tidak mau
+  // jalan lagi. Hanya pada kondisi itu tombol "Tonton di YouTube" ditampilkan.
+  const [soundStuck, setSoundStuck] = useState(false);
+  const soundStuckRef = useRef(false);
+  const markSoundStuck = (v: boolean) => { soundStuckRef.current = v; setSoundStuck(v); };
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   // Ref dipakai agar gesture range yang dibatalkan iOS/Android tidak membuat
