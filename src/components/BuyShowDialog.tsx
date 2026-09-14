@@ -25,12 +25,13 @@ interface Props {
   itemTitle: string;
   replayId?: string | null;
   kind?: 'show' | 'replay' | 'replay_only' | 'bundle';
+  defaultMethod?: 'qris' | 'coin';
 }
 
 type Status = 'form' | 'creating' | 'qr' | 'paid' | 'expired' | 'static_qris';
 const EXPIRY_MS = 30 * 60 * 1000;
 
-export default function BuyShowDialog({ open, onOpenChange, showId = '', showTitle, amount, itemTitle, replayId, kind = 'show' }: Props) {
+export default function BuyShowDialog({ open, onOpenChange, showId = '', showTitle, amount, itemTitle, replayId, kind = 'show', defaultMethod }: Props) {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [method, setMethod] = useState<'qris' | 'coin'>('qris');
