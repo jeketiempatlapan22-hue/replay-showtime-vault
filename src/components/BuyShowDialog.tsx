@@ -35,7 +35,11 @@ export default function BuyShowDialog({ open, onOpenChange, showId = '', showTit
   const navigate = useNavigate();
   const { user } = useAuth();
   const [method, setMethod] = useState<'qris' | 'coin'>(defaultMethod || 'qris');
-  const qrisAvailable = amount >= 100;
+  // Harga terbaru dari server (bundel/show bisa berubah setelah kartu dirender),
+  // supaya nominal yang ditampilkan selalu sama dengan QRIS dinamis yang dibuat.
+  const [liveAmount, setLiveAmount] = useState<number | null>(null);
+  const payAmount = liveAmount ?? amount;
+  const qrisAvailable = payAmount >= 100;
   const [coinPrice, setCoinPrice] = useState<number>(0);
   const [coinBalance, setCoinBalance] = useState<number>(0);
   const [coinBusy, setCoinBusy] = useState(false);
@@ -79,12 +83,23 @@ export default function BuyShowDialog({ open, onOpenChange, showId = '', showTit
         if (kind === 'bundle') {
           const b = await getShowBundle();
           price = b?.price_coins || 0;
+          if (b) setLiveAmount(Number(b.price_idr || 0));
         } else if (kind === 'replay_only' && replayId) {
-          const { data: r } = await supabase.from('replays').select('price_coins').eq('id', replayId).maybeSingle();
+          const { data: r } = await supabase.from('replays').select('price_coins,price_idr').eq('id', replayId).maybeSingle();
           price = (r as any)?.price_coins || 0;
+          const pr = Number((r as any)?.price_idr || 0);
+          if (pr >= 100) setLiveAmount(pr);
         } else if (showId) {
-          const { data: s } = await supabase.from('active_shows').select('price_show_coins,price_replay_coins').eq('id', showId).maybeSingle();
+          const { data: s } = await supabase
+            .from('active_shows')
+            .select('price_show_coins,price_replay_coins,price_show,price_replay,pakasir_amount')
+            .eq('id', showId)
+            .maybeSingle();
           price = kind === 'replay' ? ((s as any)?.price_replay_coins || 0) : ((s as any)?.price_show_coins || 0);
+          const sa = kind === 'replay'
+            ? Number((s as any)?.price_replay || 0) || Number((s as any)?.pakasir_amount || 0)
+            : Number((s as any)?.price_show || 0) || Number((s as any)?.pakasir_amount || 0);
+          if (sa >= 100) setLiveAmount(sa);
         }
         setCoinPrice(price);
         // Default to coin tab when QRIS is unavailable but coin price is set
@@ -116,6 +131,7 @@ export default function BuyShowDialog({ open, onOpenChange, showId = '', showTit
       setStatus('form');
       setOrderId(null);
       setQrUrl(''); setQrString(''); setQrDataUrl(''); setTotalPayment(0);
+      setLiveAmount(null);
       setPakasirOrderId('');
       setAccessToken('');
       setWaSent(null);
@@ -216,7 +232,7 @@ export default function BuyShowDialog({ open, onOpenChange, showId = '', showTit
       toast.error('Nomor WhatsApp tidak valid. Contoh: 0812xxxx');
       return;
     }
-    if (!amount || amount <= 0) {
+    if (!payAmount || payAmount <= 0) {
       toast.error('Nominal pembayaran belum diatur. Hubungi admin.');
       return;
     }
@@ -231,7 +247,7 @@ export default function BuyShowDialog({ open, onOpenChange, showId = '', showTit
           show_id: (kind === 'replay_only' || kind === 'bundle') ? undefined : showId,
           replay_id: replayId || undefined,
           item_title: itemTitle,
-          amount,
+          amount: payAmount,
           kind,
         },
       });
@@ -242,7 +258,11 @@ export default function BuyShowDialog({ open, onOpenChange, showId = '', showTit
       setPakasirOrderId(r.pakasir_order_id);
       setQrUrl(r.qr_url || '');
       setQrString(r.qr_string || '');
-      setTotalPayment(Number(r.total_payment || amount));
+      // Server adalah sumber kebenaran harga: tampilkan nominal yang benar-benar
+      // dipakai pada QRIS dinamis.
+      const serverAmount = Number(r.amount || 0);
+      if (serverAmount >= 100) setLiveAmount(serverAmount);
+      setTotalPayment(Number(r.total_payment || serverAmount || payAmount));
       if (r.qr_string) {
         try {
           const dataUrl = await QRCode.toDataURL(r.qr_string, { width: 512, margin: 1, errorCorrectionLevel: 'M' });
@@ -308,7 +328,7 @@ export default function BuyShowDialog({ open, onOpenChange, showId = '', showTit
 
   const adminWaUrl = (() => {
     const num = adminWaNumber(ownerWa);
-    const desc = `Halo Admin, saya ingin konfirmasi pembayaran:%0A%0A• Item: ${encodeURIComponent(itemTitle)}%0A• Show: ${encodeURIComponent(showTitle)}%0A• Nominal: Rp ${amount.toLocaleString('id-ID')}%0A• Nomor saya: ${normalizePhone(phone) || '-'}${pakasirOrderId ? `%0A• Order ID: ${pakasirOrderId}` : ''}%0A%0AMohon dikirimkan token akses setelah pembayaran terkonfirmasi. Terima kasih 🙏`;
+    const desc = `Halo Admin, saya ingin konfirmasi pembayaran:%0A%0A• Item: ${encodeURIComponent(itemTitle)}%0A• Show: ${encodeURIComponent(showTitle)}%0A• Nominal: Rp ${payAmount.toLocaleString('id-ID')}%0A• Nomor saya: ${normalizePhone(phone) || '-'}${pakasirOrderId ? `%0A• Order ID: ${pakasirOrderId}` : ''}%0A%0AMohon dikirimkan token akses setelah pembayaran terkonfirmasi. Terima kasih 🙏`;
     return `https://wa.me/${num}?text=${desc}`;
   })();
 
@@ -366,7 +386,7 @@ export default function BuyShowDialog({ open, onOpenChange, showId = '', showTit
               <TabsContent value="qris" className="space-y-4 mt-4">
                 <div className="rounded-lg bg-primary/10 border border-primary/20 p-3 text-center">
                   <div className="text-xs text-muted-foreground">Total Pembayaran</div>
-                  <div className="text-2xl font-bold text-primary">Rp {amount.toLocaleString('id-ID')}</div>
+                  <div className="text-2xl font-bold text-primary">Rp {payAmount.toLocaleString('id-ID')}</div>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="phone-buy">Nomor WhatsApp</Label>
@@ -428,7 +448,7 @@ export default function BuyShowDialog({ open, onOpenChange, showId = '', showTit
                 </div>
               )}
               <div className="text-base font-bold text-primary">
-                Rp {(totalPayment || amount).toLocaleString('id-ID')}
+                Rp {(totalPayment || payAmount).toLocaleString('id-ID')}
               </div>
               <div className="text-[10px] text-muted-foreground">Order ID: {pakasirOrderId}</div>
               {qrUrl && (
@@ -549,7 +569,7 @@ export default function BuyShowDialog({ open, onOpenChange, showId = '', showTit
                   <img src={staticQrisUrl} alt="QRIS Statis" className="max-w-[260px] max-h-[260px] block" />
                 </div>
                 <div className="text-xs text-muted-foreground">Nominal yang harus dibayar</div>
-                <div className="text-xl font-bold text-primary">Rp {amount.toLocaleString('id-ID')}</div>
+                <div className="text-xl font-bold text-primary">Rp {payAmount.toLocaleString('id-ID')}</div>
               </div>
             ) : (
               <div className="rounded-lg border border-border bg-card p-4 text-center text-sm text-muted-foreground">
@@ -579,7 +599,7 @@ export default function BuyShowDialog({ open, onOpenChange, showId = '', showTit
           onOpenChange={setProofOpen}
           showOrderId={orderId}
           packageName={itemTitle}
-          amount={totalPayment || amount}
+          amount={totalPayment || payAmount}
           defaultEmail={''}
           defaultPhone={phone}
         />

@@ -13,10 +13,20 @@ export default function ShowBundleCard() {
   const [owned, setOwned] = useState(getBundleToken());
 
   useEffect(() => {
-    void getShowBundle().then(setBundle);
+    const refresh = () => { void getShowBundle().then(setBundle); };
+    refresh();
     const onUpdate = () => setOwned(getBundleToken());
+    // Harga bundel bisa berubah saat admin mengubah show; segarkan agar nominal
+    // pada kartu selalu sama dengan QRIS yang nanti dibuat.
+    const onFocus = () => refresh();
+    const timer = window.setInterval(refresh, 60000);
     window.addEventListener('replaytime-purchases-updated', onUpdate);
-    return () => window.removeEventListener('replaytime-purchases-updated', onUpdate);
+    window.addEventListener('focus', onFocus);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener('replaytime-purchases-updated', onUpdate);
+      window.removeEventListener('focus', onFocus);
+    };
   }, []);
 
   if (!bundle || !bundle.is_active || bundle.show_count < 2) return null;
