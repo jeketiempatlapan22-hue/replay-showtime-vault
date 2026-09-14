@@ -61,8 +61,8 @@ export async function getBundle(admin: any): Promise<BundleInfo | null> {
     id: b.id,
     name: b.name,
     is_active: !!b.is_active,
-    price_idr: Number(b.price_idr || 0),
-    price_coins: Number(b.price_coins || 0),
+    price_idr: priceIdr,
+    price_coins: priceCoins,
     show_ids: showIds,
     password: String(pw?.password || ''),
   };
