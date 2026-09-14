@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { isFullscreenActive, onFullscreenChange, requestFs, exitFs, lockLandscape } from '@/lib/fullscreen';
+import { isFullscreenActive, onFullscreenChange, requestFs, exitFs, lockLandscape, neutralizeFsAncestors } from '@/lib/fullscreen';
 import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, SkipBack, SkipForward } from 'lucide-react';
 import LiveWatermark from '@/components/LiveWatermark';
 
@@ -1004,13 +1004,25 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
   }, [pseudoFs]);
   const rotateFs = pseudoFs && portrait;
 
-  // Cegah scroll body saat fullscreen CSS aktif.
+  // Cegah scroll body saat fullscreen CSS aktif + netralkan induk ber-transform
+  // (kalau tidak, elemen fixed terkurung di dalam kartu → layar penuh gagal).
   useEffect(() => {
     if (!pseudoFs) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = prev; };
+    const restore = containerRef.current ? neutralizeFsAncestors(containerRef.current) : () => undefined;
+    return () => { document.body.style.overflow = prev; restore(); };
   }, [pseudoFs]);
+
+  // Tombol layar penuh di luar player (mis. header halaman replay) dapat
+  // meminta player ini masuk/keluar layar penuh lewat event.
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const handler = () => { void toggleFullscreen(); };
+    el.addEventListener('replaytime-toggle-fs', handler as EventListener);
+    return () => el.removeEventListener('replaytime-toggle-fs', handler as EventListener);
+  });
 
 
   // Origin hanya dikirim jika benar-benar valid. Di iframe sandbox/webview,
