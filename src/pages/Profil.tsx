@@ -11,7 +11,7 @@ import { adminWaNumber, normalizeWa } from '@/lib/adminWa';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { saveMembershipCredentials } from '@/lib/membershipAccess';
-import DeviceResetButton from '@/components/DeviceResetButton';
+import DeviceResetPicker, { type ResetTarget } from '@/components/DeviceResetPicker';
 import AccessInfoCard from '@/components/AccessInfoCard';
 import PurchaseHistoryList from '@/components/PurchaseHistoryList';
 import GuestChoice from '@/components/GuestChoice';
@@ -184,6 +184,28 @@ export default function Profil() {
   }, [user]);
 
 
+
+  // Semua akses yang bisa direset perangkatnya, dikumpulkan di satu tempat.
+  const resetTargets: ResetTarget[] = [
+    ...memberships
+      .filter((m) => m.status === 'paid' && !m.revoked && m.token && m.password
+        && !(m.expires_at && new Date(m.expires_at).getTime() < Date.now()))
+      .map((m) => ({
+        id: `m-${m.order_id}`,
+        label: `Membership · ${m.package_name || 'Membership'}`,
+        kind: 'membership' as const,
+        token: m.token!,
+        password: m.password!,
+      })),
+    ...myOrders
+      .filter((o) => !!o.access_token)
+      .map((o) => ({
+        id: `o-${o.id}`,
+        label: o.item_title || 'Pembelian',
+        kind: 'show' as const,
+        token: o.access_token!,
+      })),
+  ];
 
   const copyText = async (text: string, label = 'Disalin') => {
     try { await navigator.clipboard.writeText(text); toast.success(label); }
