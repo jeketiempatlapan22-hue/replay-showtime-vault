@@ -11,6 +11,10 @@ export interface ShowBundle {
   price_coins: number;
   show_count: number;
   show_ids: string[];
+  theme: string;
+  promo_label: string;
+  discount_idr: number;
+  discount_coins: number;
 }
 
 export const BUNDLE_TOKEN_KEY = 'replaytime-bundle-token';
@@ -29,6 +33,10 @@ export async function getShowBundle(): Promise<ShowBundle | null> {
     price_coins: Number(row.price_coins || 0),
     show_count: Number(row.show_count || 0),
     show_ids: (row.show_ids || []) as string[],
+    theme: String(row.theme || 'gold'),
+    promo_label: String(row.promo_label || ''),
+    discount_idr: Number(row.discount_idr || 0),
+    discount_coins: Number(row.discount_coins || 0),
   };
 }
 
@@ -76,4 +84,55 @@ export async function claimBundleToken(token: string): Promise<BundleAccess | nu
   } catch {
     return null;
   }
+}
+
+export interface BundleTheme {
+  label: string;
+  wrap: string;
+  glow: string;
+  badge: string;
+  accent: string;
+}
+
+/** Preset tema kartu bundel (semua memakai token semantik + utilitas Tailwind). */
+export const BUNDLE_THEMES: Record<string, BundleTheme> = {
+  gold: {
+    label: 'Emas',
+    wrap: 'from-amber-500/20 via-amber-400/10 to-transparent border-amber-500/50',
+    glow: 'shadow-[0_0_30px_-10px_hsl(45_93%_47%/0.7)]',
+    badge: 'bg-amber-500 text-black',
+    accent: 'text-amber-600 dark:text-amber-400',
+  },
+  neon: {
+    label: 'Ungu Neon',
+    wrap: 'from-fuchsia-500/20 via-violet-500/10 to-transparent border-fuchsia-500/50',
+    glow: 'shadow-[0_0_30px_-10px_hsl(292_84%_61%/0.7)]',
+    badge: 'bg-fuchsia-500 text-white',
+    accent: 'text-fuchsia-600 dark:text-fuchsia-400',
+  },
+  ocean: {
+    label: 'Biru Laut',
+    wrap: 'from-sky-500/20 via-cyan-500/10 to-transparent border-sky-500/50',
+    glow: 'shadow-[0_0_30px_-10px_hsl(199_89%_48%/0.7)]',
+    badge: 'bg-sky-500 text-white',
+    accent: 'text-sky-600 dark:text-sky-400',
+  },
+  fire: {
+    label: 'Merah Api',
+    wrap: 'from-rose-500/20 via-orange-500/10 to-transparent border-rose-500/50',
+    glow: 'shadow-[0_0_30px_-10px_hsl(347_77%_50%/0.7)]',
+    badge: 'bg-rose-500 text-white',
+    accent: 'text-rose-600 dark:text-rose-400',
+  },
+  neutral: {
+    label: 'Netral',
+    wrap: 'from-primary/15 via-primary/5 to-transparent border-primary/40',
+    glow: 'shadow-[0_0_30px_-12px_hsl(var(--primary)/0.7)]',
+    badge: 'bg-primary text-primary-foreground',
+    accent: 'text-primary',
+  },
+};
+
+export function bundleTheme(key?: string): BundleTheme {
+  return BUNDLE_THEMES[key || 'gold'] || BUNDLE_THEMES.gold;
 }

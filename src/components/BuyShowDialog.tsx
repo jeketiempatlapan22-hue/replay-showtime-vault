@@ -61,6 +61,7 @@ export default function BuyShowDialog({ open, onOpenChange, showId = '', showTit
   // Load admin contact + static QRIS settings + coin price/balance when dialog opens
   useEffect(() => {
     if (!open) return;
+    if (defaultMethod) setMethod(defaultMethod);
     (async () => {
       try {
         const { data } = await supabase
