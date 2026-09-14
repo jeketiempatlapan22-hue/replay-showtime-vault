@@ -88,6 +88,37 @@ export async function lockLandscape(on: boolean): Promise<void> {
   } catch { /* ignore */ }
 }
 
+/**
+ * Fallback fullscreen CSS memakai position:fixed. Bila ada elemen induk dengan
+ * transform/filter/contain, elemen fixed justru terkurung di dalam kartu dan
+ * layar penuh terlihat "tidak berfungsi" (umum di iPhone). Fungsi ini
+ * menetralkan properti tersebut sementara dan mengembalikan aslinya.
+ */
+export function neutralizeFsAncestors(el: HTMLElement): () => void {
+  const undo: Array<() => void> = [];
+  const props = ['transform', 'filter', 'backdrop-filter', 'perspective', 'contain', 'will-change'];
+  let node: HTMLElement | null = el.parentElement;
+  while (node && node !== document.body) {
+    const cs = getComputedStyle(node);
+    const needs = props.some(p => {
+      const v = cs.getPropertyValue(p);
+      return v && v !== 'none' && v !== 'auto' && v !== 'normal';
+    }) || cs.overflow !== 'visible';
+    if (needs) {
+      const target = node;
+      const prev = target.getAttribute('style') || '';
+      props.forEach(p => target.style.setProperty(p, 'none', 'important'));
+      target.style.setProperty('overflow', 'visible', 'important');
+      undo.push(() => {
+        if (prev) target.setAttribute('style', prev);
+        else target.removeAttribute('style');
+      });
+    }
+    node = node.parentElement;
+  }
+  return () => undo.forEach(fn => { try { fn(); } catch { /* ignore */ } });
+}
+
 export function onFullscreenChange(handler: () => void): () => void {
   const events = ['fullscreenchange', 'webkitfullscreenchange', 'mozfullscreenchange', 'MSFullscreenChange', 'webkitbeginfullscreen', 'webkitendfullscreen'];
   events.forEach(ev => document.addEventListener(ev, handler, true));
