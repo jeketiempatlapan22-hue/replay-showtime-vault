@@ -123,6 +123,14 @@ export default function TvConnectDialog({ open, onOpenChange, initialTab = 'code
     if (open && tab === 'code' && !code && !loading && !error) void createCode();
   }, [open, tab, code, loading, error, createCode]);
 
+  // Replay source may finish loading just after the dialog opens. Retry
+  // automatically instead of leaving a stale "access not open" message.
+  useEffect(() => {
+    if (open && tab === 'code' && replayPayload && error.startsWith('Akses belum terbuka')) {
+      setError('');
+    }
+  }, [error, open, replayPayload, tab]);
+
   const remaining = expiresAt ? Math.max(0, Math.floor((expiresAt - now) / 1000)) : 0;
   const mm = String(Math.floor(remaining / 60)).padStart(2, '0');
   const ss = String(remaining % 60).padStart(2, '0');
