@@ -190,16 +190,19 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
   );
 
   const replayTvPayload = useMemo<Record<string, unknown> | null>(() => {
-    if (!activeSource) return null;
+    const selected = activeSource
+      || sources.find(item => item.is_default)
+      || sources[0];
+    if (!selected) return null;
     return {
       kind: 'replay',
       replay_id: replay.id,
       title: replay.title,
-      source_type: activeSource.type,
-      source: activeSource.url,
+      source_type: selected.type,
+      source: selected.url,
       youtube_alt_id: source?.youtube_alt_id || '',
     };
-  }, [activeSource, replay.id, replay.title, source?.youtube_alt_id]);
+  }, [activeSource, replay.id, replay.title, source?.youtube_alt_id, sources]);
 
   // Prefetch all non-active sources in background so switching is instant
   useEffect(() => {
