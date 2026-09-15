@@ -489,7 +489,66 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
           </div>
         </div>
       </div>
+      {showTvMenu && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 p-3" onClick={() => setShowTvMenu(false)}>
+          <div className="w-full max-w-sm rounded-xl border border-border bg-card p-2 shadow-2xl text-sm" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-2 px-2.5 py-2 text-sm font-semibold">
+              <Cast className="w-4 h-4 text-primary" /> Hubungkan ke TV / Proyektor
+            </div>
+            <button
+              type="button"
+              className="w-full text-left px-2.5 py-2.5 rounded hover:bg-muted"
+              onClick={() => { setTvConnectTab('code'); setShowTvMenu(false); setShowTvConnect(true); }}
+            >
+              Kode untuk browser TV (6 angka)
+            </button>
+            {isGoogleCastCapable() && (
+              <button
+                type="button"
+                disabled={castBusy}
+                className="w-full text-left px-2.5 py-2.5 rounded hover:bg-muted disabled:opacity-60"
+                onClick={async () => {
+                  if (!activeSource) return;
+                  if (activeSource.type === 'youtube') {
+                    setCastMsg('Replay YouTube tidak bisa dikirim langsung ke Chromecast. Pakai kode 6 angka atau siarkan layar.');
+                    return;
+                  }
+                  setCastBusy(true);
+                  setCastMsg('Menyiapkan Chromecast…');
+                  const ok = await castMedia({ url: activeSource.url, title: replay.title });
+                  setCastBusy(false);
+                  setCastMsg(ok ? 'Terkirim ke TV.' : 'Gagal menyambung ke Chromecast. Coba kode 6 angka.');
+                }}
+              >
+                {castBusy ? 'Menyiapkan Chromecast…' : 'Chromecast (kirim video ke TV)'}
+              </button>
+            )}
+            <button
+              type="button"
+              className="w-full text-left px-2.5 py-2.5 rounded hover:bg-muted"
+              onClick={() => { setTvConnectTab('mirror'); setShowTvMenu(false); setShowTvConnect(true); }}
+            >
+              Panduan siarkan layar ke TV
+            </button>
+            <button
+              type="button"
+              className="w-full text-left px-2.5 py-2.5 rounded hover:bg-muted"
+              onClick={async () => {
+                try { await navigator.clipboard.writeText(window.location.href); } catch { /* ignore */ }
+                setShowTvMenu(false);
+              }}
+            >
+              Salin link replay
+            </button>
+            {castMsg && <p className="px-2.5 py-1.5 text-[11px] text-primary">{castMsg}</p>}
+            <p className="px-2.5 py-1.5 text-[10px] text-muted-foreground leading-relaxed">
+              Kode TV memakai akses yang sama dan tidak memerlukan reset perangkat.
+            </p>
+          </div>
+        </div>
+      )}
       <Suspense fallback={null}>
+
         <TvConnectDialog
           open={showTvConnect}
           onOpenChange={setShowTvConnect}
