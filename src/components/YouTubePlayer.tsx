@@ -52,6 +52,7 @@ function buildSources(source: ReplaySource | null, replay: ReplayRow): PlaylistS
 export default function YouTubePlayer({ replay, onBack }: Props) {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showTvMenu, setShowTvMenu] = useState(false);
+  const [showTvConnect, setShowTvConnect] = useState(false);
   const [tvConnectTab, setTvConnectTab] = useState<'code' | 'mirror'>('code');
 
   const [viewCount, setViewCount] = useState(replay.view_count ?? 0);
@@ -314,6 +315,7 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
                 onClick={() => {
                   setTvConnectTab('code');
                   setShowTvMenu(false);
+                  setShowTvConnect(true);
                 }}
               >
                 Kode untuk browser TV (6 angka)
@@ -324,6 +326,7 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
                 onClick={() => {
                   setTvConnectTab('mirror');
                   setShowTvMenu(false);
+                  setShowTvConnect(true);
                 }}
               >
                 Panduan siarkan layar ke TV
@@ -520,8 +523,8 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
       </div>
       <Suspense fallback={null}>
         <TvConnectDialog
-          open={tvConnectTab === 'code' ? showTvMenu : showTvMenu}
-          onOpenChange={setShowTvMenu}
+          open={showTvConnect}
+          onOpenChange={setShowTvConnect}
           initialTab={tvConnectTab}
           replayPayload={replayTvPayload}
         />
