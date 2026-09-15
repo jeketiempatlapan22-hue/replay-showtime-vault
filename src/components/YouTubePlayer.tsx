@@ -396,7 +396,12 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
             source={activeSource.url}
             title={replay.title}
             altYoutubeId={source?.youtube_alt_id || ''}
-            onTvClick={() => { setCastMsg(''); setShowTvMenu(true); }}
+            onTvClick={() => {
+              setCastMsg('');
+              setTvConnectTab('code');
+              setShowTvMenu(false);
+              setShowTvConnect(true);
+            }}
 
           />
         )}

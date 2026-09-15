@@ -39,6 +39,16 @@ Deno.serve(async (req) => {
     if (action === 'create') {
       const payload = body?.payload;
       if (!payload || typeof payload !== 'object') return json({ error: 'payload_required' }, 400);
+      const replayPayload = payload as Record<string, unknown>;
+      const isReplay = replayPayload.kind === 'replay';
+      if (isReplay && (
+        typeof replayPayload.replay_id !== 'string' || !replayPayload.replay_id ||
+        typeof replayPayload.source !== 'string' || !replayPayload.source ||
+        !['youtube', 'cloudflare', 'm3u8'].includes(String(replayPayload.source_type || ''))
+      )) return json({ error: 'replay_payload_invalid' }, 400);
+      if (!isReplay && (typeof replayPayload.grant !== 'string' || !replayPayload.grant)) {
+        return json({ error: 'live_grant_required' }, 400);
+      }
       const raw = JSON.stringify(payload);
       if (raw.length > 20000) return json({ error: 'payload_too_large' }, 400);
 
