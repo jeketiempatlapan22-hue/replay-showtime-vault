@@ -10,7 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import RatingStars from '@/components/RatingStars';
 // CommentSection lazy-loaded — chunk komentar baru dimuat saat user scroll/buka.
 const CommentSection = lazy(() => import('@/components/CommentSection'));
-const TvConnectDialog = lazy(() => import('@/components/TvConnectDialog'));
+import TvConnectDialog from '@/components/TvConnectDialog';
 import HlsPlayer, { type HlsPlayerHandle } from '@/components/HlsPlayer';
 import EmbedPlayer from '@/components/EmbedPlayer';
 import DeviceResetButton from '@/components/DeviceResetButton';
@@ -575,15 +575,12 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
           </div>
         </div>
       )}
-      <Suspense fallback={null}>
-
-        <TvConnectDialog
-          open={showTvConnect}
-          onOpenChange={setShowTvConnect}
-          initialTab={tvConnectTab}
-          replayPayload={replayTvPayload}
-        />
-      </Suspense>
+      <TvConnectDialog
+        open={showTvConnect}
+        onOpenChange={setShowTvConnect}
+        initialTab={tvConnectTab}
+        replayPayload={replayTvPayload}
+      />
     </div>
   );
 }

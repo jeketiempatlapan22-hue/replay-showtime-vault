@@ -4,4 +4,4 @@
 - [x] Standardize non-admin live-chat username and comment colors.
 - [x] Improve pinned-message prominence without obscuring chat.
 - [x] Increase live-chat column height and verify mobile/desktop.
-- [ ] Make replay six-digit TV pairing and Chromecast reliable across Android, iPhone, and desktop.
+- [x] Make replay six-digit TV pairing and Chromecast reliable across Android, iPhone, and desktop.

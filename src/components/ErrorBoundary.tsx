@@ -17,6 +17,13 @@ function isDomReconciliationError(error: Error | string): boolean {
   return DOM_ERROR_PATTERNS.some(p => msg.includes(p));
 }
 
+function isStaleChunkError(error: Error | string): boolean {
+  const msg = typeof error === 'string' ? error : error?.message || '';
+  return msg.includes('Failed to fetch dynamically imported module') ||
+    msg.includes('Importing a module script failed') ||
+    msg.includes('ChunkLoadError');
+}
+
 interface State { hasError: boolean; error?: Error }
 
 export default class ErrorBoundary extends React.Component<{ children: React.ReactNode }, State> {
@@ -25,13 +32,36 @@ export default class ErrorBoundary extends React.Component<{ children: React.Rea
 
   static getDerivedStateFromError(error: Error): State | null {
     // For DOM reconciliation errors, don't show error UI - we'll auto-recover
-    if (isDomReconciliationError(error)) {
+    if (isDomReconciliationError(error) || isStaleChunkError(error)) {
       return null; // Don't update state, let componentDidCatch handle it
     }
     return { hasError: true, error };
   }
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
+    if (isStaleChunkError(error) && !this.recovering) {
+      this.recovering = true;
+      const recoveryKey = 'replaytime-chunk-recovery';
+      try {
+        if (sessionStorage.getItem(recoveryKey) === '1') {
+          this.setState({ hasError: true, error });
+          return;
+        }
+        sessionStorage.setItem(recoveryKey, '1');
+      } catch { /* continue with one recovery attempt */ }
+      void (async () => {
+        try {
+          if ('caches' in window) {
+            const keys = await caches.keys();
+            await Promise.all(keys.filter((key) => key.startsWith('app-code-') || key.startsWith('html-nav-')).map((key) => caches.delete(key)));
+          }
+        } finally {
+          window.location.reload();
+        }
+      })();
+      return;
+    }
+
     console.error('ErrorBoundary caught:', error, info);
     
     if (isDomReconciliationError(error) && !this.recovering) {
