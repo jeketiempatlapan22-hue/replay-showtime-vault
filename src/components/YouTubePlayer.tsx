@@ -302,6 +302,15 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
     window.setTimeout(() => setLinkCopied(false), 1800);
   }, []);
 
+  const openTvDialog = useCallback((tab: 'code' | 'mirror') => {
+    // Jangan membuka Radix Dialog pada pointer event yang sama dengan penutupan
+    // menu. Safari/iOS dapat menganggap event tersebut sebagai klik di luar lalu
+    // langsung menutup dialog yang baru dibuat.
+    setShowTvMenu(false);
+    setTvConnectTab(tab);
+    window.setTimeout(() => setShowTvConnect(true), 80);
+  }, []);
+
 
   const handleHlsFatalError = useCallback(() => {
     // Try to switch to next source automatically
@@ -522,7 +531,7 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
             <Button
               variant="ghost"
               className="h-auto w-full justify-start gap-3 px-2.5 py-3 text-left"
-              onClick={() => { setTvConnectTab('code'); setShowTvMenu(false); setShowTvConnect(true); }}
+              onClick={() => openTvDialog('code')}
             >
               <Tv className="h-5 w-5 shrink-0 text-primary" />
               <span><span className="block font-semibold">Kode 6 angka</span><span className="block text-xs font-normal text-muted-foreground">Masukkan kode di browser Android TV</span></span>
@@ -537,9 +546,7 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
                   return;
                 }
                 if (activeSource.type === 'youtube' || !isGoogleCastCapable()) {
-                  setTvConnectTab('mirror');
-                  setShowTvMenu(false);
-                  setShowTvConnect(true);
+                  openTvDialog('mirror');
                   return;
                 }
                 setCastBusy(true);
