@@ -17,6 +17,13 @@ function isDomReconciliationError(error: Error | string): boolean {
   return DOM_ERROR_PATTERNS.some(p => msg.includes(p));
 }
 
+function isStaleChunkError(error: Error | string): boolean {
+  const msg = typeof error === 'string' ? error : error?.message || '';
+  return msg.includes('Failed to fetch dynamically imported module') ||
+    msg.includes('Importing a module script failed') ||
+    msg.includes('ChunkLoadError');
+}
+
 interface State { hasError: boolean; error?: Error }
 
 export default class ErrorBoundary extends React.Component<{ children: React.ReactNode }, State> {
@@ -25,13 +32,36 @@ export default class ErrorBoundary extends React.Component<{ children: React.Rea
 
   static getDerivedStateFromError(error: Error): State | null {
     // For DOM reconciliation errors, don't show error UI - we'll auto-recover
-    if (isDomReconciliationError(error)) {
+    if (isDomReconciliationError(error) || isStaleChunkError(error)) {
       return null; // Don't update state, let componentDidCatch handle it
     }
     return { hasError: true, error };
   }
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
+    if (isStaleChunkError(error) && !this.recovering) {
+      this.recovering = true;
+      const recoveryKey = 'replaytime-chunk-recovery';
+      try {
+        if (sessionStorage.getItem(recoveryKey) === '1') {
+          this.setState({ hasError: true, error });
+          return;
+        }
+        sessionStorage.setItem(recoveryKey, '1');
+      } catch { /* continue with one recovery attempt */ }
+      void (async () => {
+        try {
+          if ('caches' in window) {
+            const keys = await caches.keys();
+            await Promise.all(keys.filter((key) => key.startsWith('app-code-') || key.startsWith('html-nav-')).map((key) => caches.delete(key)));
+          }
+        } finally {
+          window.location.reload();
+        }
+      })();
+      return;
+    }
+
     console.error('ErrorBoundary caught:', error, info);
     
     if (isDomReconciliationError(error) && !this.recovering) {
@@ -48,18 +78,31 @@ export default class ErrorBoundary extends React.Component<{ children: React.Rea
   componentDidMount() {
     // Global handler to suppress DOM reconciliation errors from crashing Chrome
     window.addEventListener('error', this.handleGlobalError);
+    window.addEventListener('unhandledrejection', this.handleUnhandledRejection);
   }
 
   componentWillUnmount() {
     window.removeEventListener('error', this.handleGlobalError);
+    window.removeEventListener('unhandledrejection', this.handleUnhandledRejection);
   }
 
   private handleGlobalError = (event: ErrorEvent) => {
+    if (isStaleChunkError(event.error || event.message)) {
+      event.preventDefault();
+      window.location.reload();
+      return;
+    }
     if (isDomReconciliationError(event.error || event.message)) {
       console.warn('Suppressed DOM reconciliation error:', event.message);
       event.preventDefault();
       event.stopPropagation();
     }
+  };
+
+  private handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+    if (!isStaleChunkError(event.reason)) return;
+    event.preventDefault();
+    window.location.reload();
   };
 
   render() {

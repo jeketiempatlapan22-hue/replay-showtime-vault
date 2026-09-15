@@ -9,6 +9,9 @@ type CastWindow = Window & {
   __onGCastApiAvailable?: (available: boolean) => void;
 };
 
+export type CastFailure = 'unsupported' | 'sdk_unavailable' | 'cancelled' | 'no_session' | 'load_failed';
+export interface CastResult { ok: boolean; reason?: CastFailure }
+
 const CAST_SDK_URL = 'https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1';
 const DEFAULT_RECEIVER = 'CC1AD845'; // Default Media Receiver
 
@@ -31,6 +34,7 @@ export function loadCastSdk(): Promise<boolean> {
 
   w.__gcastLoading = new Promise<boolean>((resolve) => {
     let settled = false;
+    const previous = w.__onGCastApiAvailable;
     const done = (ok: boolean) => {
       if (settled) return;
       settled = true;
@@ -38,6 +42,7 @@ export function loadCastSdk(): Promise<boolean> {
     };
     // SDK memanggil global ini saat siap.
     (window as any).__onGCastApiAvailable = (available: boolean) => {
+      try { previous?.(available); } catch { /* ignore another sender callback */ }
       if (!available) return done(false);
       try {
         w.cast.framework.CastContext.getInstance().setOptions({
@@ -60,7 +65,13 @@ export function loadCastSdk(): Promise<boolean> {
       script.onerror = () => done(false);
       document.head.appendChild(script);
     }
-    setTimeout(() => done(!!w.cast?.framework), 6000);
+    // Beberapa Android/TV browser lambat memuat discovery service. Jangan
+    // mengunci hasil false terlalu cepat karena promise ini dipakai seterusnya.
+    setTimeout(() => {
+      const available = !!w.cast?.framework;
+      if (!available) w.__gcastLoading = undefined;
+      done(available);
+    }, 12000);
   });
 
   return w.__gcastLoading;
@@ -75,15 +86,20 @@ export interface CastMediaOptions {
 }
 
 /** Mulai sesi Google Cast dan mainkan media. Return false kalau gagal. */
-export async function castMedia(opts: CastMediaOptions): Promise<boolean> {
+export async function castMediaDetailed(opts: CastMediaOptions): Promise<CastResult> {
+  if (!isGoogleCastCapable()) return { ok: false, reason: 'unsupported' };
   const ok = await loadCastSdk();
-  if (!ok) return false;
+  if (!ok) return { ok: false, reason: 'sdk_unavailable' };
   const w = window as CastWindow;
   try {
     const context = w.cast.framework.CastContext.getInstance();
-    await context.requestSession().catch(() => undefined);
+    try {
+      await context.requestSession();
+    } catch {
+      return { ok: false, reason: 'cancelled' };
+    }
     const session = context.getCurrentSession();
-    if (!session) return false;
+    if (!session) return { ok: false, reason: 'no_session' };
 
     const contentType = opts.contentType
       || (/\.m3u8(\?|$)/i.test(opts.url) ? 'application/x-mpegURL' : 'video/mp4');
@@ -99,10 +115,15 @@ export async function castMedia(opts: CastMediaOptions): Promise<boolean> {
     const request = new w.chrome.cast.media.LoadRequest(mediaInfo);
     request.autoplay = true;
     await session.loadMedia(request);
-    return true;
+    return { ok: true };
   } catch {
-    return false;
+    return { ok: false, reason: 'load_failed' };
   }
+}
+
+/** Kompatibilitas pemanggil lama yang hanya memerlukan sukses/gagal. */
+export async function castMedia(opts: CastMediaOptions): Promise<boolean> {
+  return (await castMediaDetailed(opts)).ok;
 }
 
 export function stopCastSession() {

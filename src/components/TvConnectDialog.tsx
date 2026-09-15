@@ -136,28 +136,48 @@ export default function TvConnectDialog({ open, onOpenChange, initialTab = 'code
   useEffect(() => {
     if (open && tab === 'code' && replayPayload && error.startsWith('Akses belum terbuka')) {
       setError('');
+      void createCode();
     }
-  }, [error, open, replayPayload, tab]);
+  }, [createCode, error, open, replayPayload, tab]);
 
   const remaining = expiresAt ? Math.max(0, Math.floor((expiresAt - now) / 1000)) : 0;
   const mm = String(Math.floor(remaining / 60)).padStart(2, '0');
   const ss = String(remaining % 60).padStart(2, '0');
 
   const copyUrl = async () => {
+    const value = siteLink('/tv');
     try {
-      await navigator.clipboard.writeText(siteLink('/tv'));
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1800);
-    } catch { /* ignore */ }
+      await navigator.clipboard.writeText(value);
+    } catch {
+      const input = document.createElement('textarea');
+      input.value = value;
+      input.style.position = 'fixed';
+      input.style.opacity = '0';
+      document.body.appendChild(input);
+      input.select();
+      try { document.execCommand('copy'); } catch { /* ignore */ }
+      input.remove();
+    }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1800);
   };
 
   const copyCode = async () => {
     if (!code) return;
     try {
       await navigator.clipboard.writeText(code);
-      setCopiedCode(true);
-      setTimeout(() => setCopiedCode(false), 1800);
-    } catch { /* ignore */ }
+    } catch {
+      const input = document.createElement('textarea');
+      input.value = code;
+      input.style.position = 'fixed';
+      input.style.opacity = '0';
+      document.body.appendChild(input);
+      input.select();
+      try { document.execCommand('copy'); } catch { /* ignore */ }
+      input.remove();
+    }
+    setCopiedCode(true);
+    setTimeout(() => setCopiedCode(false), 1800);
   };
 
   const guide = MIRROR_STEPS[platform];

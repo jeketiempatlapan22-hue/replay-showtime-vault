@@ -35,8 +35,11 @@ async function purgeLegacyCaches() {
   if (!('caches' in window)) return;
   try {
     const keys = await caches.keys();
-    const obsolete = new Set(['static-assets', 'html-nav', 'app-code-v2']);
-    await Promise.all(keys.filter((k) => obsolete.has(k)).map((k) => caches.delete(k)));
+    await Promise.all(
+      keys
+        .filter((k) => k === 'static-assets' || k === 'html-nav' || k.startsWith('html-nav-v') || k.startsWith('app-code-v'))
+        .map((k) => caches.delete(k))
+    );
   } catch { /* ignore */ }
 }
 

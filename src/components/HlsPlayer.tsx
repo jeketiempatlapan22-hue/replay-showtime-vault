@@ -1,11 +1,11 @@
-import { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHandle, Suspense, lazy } from 'react';
+import { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHandle } from 'react';
 import Hls from 'hls.js';
 import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, RotateCcw, RotateCw, Loader2, Settings, Check, Cast } from 'lucide-react';
 import { isFullscreenActive, isVideoFullscreen, onFullscreenChange, requestFs, exitFs, lockLandscape } from '@/lib/fullscreen';
 import LiveWatermark from '@/components/LiveWatermark';
 import { castMedia, isGoogleCastCapable, requestWakeLock, showNativePicker, stopCastSession } from '@/lib/cast';
 import { readUnlockPayload, requestCastUrl } from '@/lib/tvSession';
-const TvConnectDialog = lazy(() => import('@/components/TvConnectDialog'));
+import TvConnectDialog from '@/components/TvConnectDialog';
 
 
 interface Props {
@@ -1362,11 +1362,9 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
       </div>
     )}
 
-    <Suspense fallback={null}>
-      {showTvConnect && (
-        <TvConnectDialog open={showTvConnect} onOpenChange={setShowTvConnect} initialTab={tvConnectTab} showId={showId} replayPayload={replayTvPayload} />
-      )}
-    </Suspense>
+    {showTvConnect && (
+      <TvConnectDialog open={showTvConnect} onOpenChange={setShowTvConnect} initialTab={tvConnectTab} showId={showId} replayPayload={replayTvPayload} />
+    )}
     </>
   );
 });
