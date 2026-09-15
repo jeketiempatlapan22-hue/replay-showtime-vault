@@ -56,6 +56,9 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
   const [showTvMenu, setShowTvMenu] = useState(false);
   const [showTvConnect, setShowTvConnect] = useState(false);
   const [tvConnectTab, setTvConnectTab] = useState<'code' | 'mirror'>('code');
+  const [castMsg, setCastMsg] = useState('');
+  const [castBusy, setCastBusy] = useState(false);
+
 
   const [viewCount, setViewCount] = useState(replay.view_count ?? 0);
   const [hlsFailed, setHlsFailed] = useState(false);
