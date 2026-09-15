@@ -311,50 +311,8 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
           <h1 className="text-base sm:text-lg font-semibold truncate font-sans">{replay.title}</h1>
           <p className="text-xs sm:text-sm text-muted-foreground">{replay.criteria}</p>
         </div>
-        <div className="relative shrink-0">
-          <Button variant="ghost" size="icon" onClick={() => setShowTvMenu(v => !v)} className={showTvMenu ? 'text-primary' : ''} aria-label="Hubungkan ke TV / Proyektor">
-            <Cast className="w-5 h-5" />
-          </Button>
-          {showTvMenu && (
-            <div className="absolute right-0 top-full mt-1 z-30 w-60 rounded-lg border border-border bg-card p-1.5 shadow-xl text-xs">
-              <button
-                type="button"
-                className="w-full text-left px-2.5 py-2 rounded hover:bg-muted"
-                onClick={() => {
-                  setTvConnectTab('code');
-                  setShowTvMenu(false);
-                  setShowTvConnect(true);
-                }}
-              >
-                Kode untuk browser TV (6 angka)
-              </button>
-              <button
-                type="button"
-                className="w-full text-left px-2.5 py-2 rounded hover:bg-muted"
-                onClick={() => {
-                  setTvConnectTab('mirror');
-                  setShowTvMenu(false);
-                  setShowTvConnect(true);
-                }}
-              >
-                Panduan siarkan layar ke TV
-              </button>
-              <button
-                type="button"
-                className="w-full text-left px-2.5 py-2 rounded hover:bg-muted"
-                onClick={async () => {
-                  try { await navigator.clipboard.writeText(window.location.href); } catch { /* ignore */ }
-                  setShowTvMenu(false);
-                }}
-              >
-                Salin link replay
-              </button>
-              <p className="px-2.5 py-1.5 text-[10px] text-muted-foreground leading-relaxed">
-                Kode TV memakai akses yang sama dan tidak memerlukan reset perangkat.
-              </p>
-            </div>
-          )}
-        </div>
+
+
         {activeSource && activeSource.type !== 'm3u8' && (
           <Button variant="ghost" size="icon" onClick={toggleFullscreen} className="shrink-0">
             {isFullscreen ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
