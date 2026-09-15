@@ -136,8 +136,9 @@ export default function TvConnectDialog({ open, onOpenChange, initialTab = 'code
   useEffect(() => {
     if (open && tab === 'code' && replayPayload && error.startsWith('Akses belum terbuka')) {
       setError('');
+      void createCode();
     }
-  }, [error, open, replayPayload, tab]);
+  }, [createCode, error, open, replayPayload, tab]);
 
   const remaining = expiresAt ? Math.max(0, Math.floor((expiresAt - now) / 1000)) : 0;
   const mm = String(Math.floor(remaining / 60)).padStart(2, '0');

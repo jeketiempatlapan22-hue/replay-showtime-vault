@@ -78,18 +78,31 @@ export default class ErrorBoundary extends React.Component<{ children: React.Rea
   componentDidMount() {
     // Global handler to suppress DOM reconciliation errors from crashing Chrome
     window.addEventListener('error', this.handleGlobalError);
+    window.addEventListener('unhandledrejection', this.handleUnhandledRejection);
   }
 
   componentWillUnmount() {
     window.removeEventListener('error', this.handleGlobalError);
+    window.removeEventListener('unhandledrejection', this.handleUnhandledRejection);
   }
 
   private handleGlobalError = (event: ErrorEvent) => {
+    if (isStaleChunkError(event.error || event.message)) {
+      event.preventDefault();
+      window.location.reload();
+      return;
+    }
     if (isDomReconciliationError(event.error || event.message)) {
       console.warn('Suppressed DOM reconciliation error:', event.message);
       event.preventDefault();
       event.stopPropagation();
     }
+  };
+
+  private handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+    if (!isStaleChunkError(event.reason)) return;
+    event.preventDefault();
+    window.location.reload();
   };
 
   render() {

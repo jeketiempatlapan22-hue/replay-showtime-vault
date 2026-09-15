@@ -17,7 +17,7 @@ import DeviceResetButton from '@/components/DeviceResetButton';
 import { prefetchM3U8, prefetchYouTube, prefetchCloudflare } from '@/lib/prefetch';
 import { useAutoHideOnInteraction } from '@/hooks/useAutoHideOnInteraction';
 import { getReplayPurchase, getAllShowPurchases } from '@/lib/purchases';
-import { castMedia, isGoogleCastCapable } from '@/lib/cast';
+import { castMediaDetailed, isGoogleCastCapable } from '@/lib/cast';
 
 
 interface Props {
@@ -302,6 +302,13 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
     window.setTimeout(() => setLinkCopied(false), 1800);
   }, []);
 
+  const cloudflareCastUrl = useCallback((raw: string) => {
+    const value = raw.trim();
+    if (/^https?:\/\//i.test(value) && /\/manifest\/video\.m3u8(?:\?|$)/i.test(value)) return value;
+    const uid = value.match(/([a-f0-9]{32})/i)?.[1];
+    return uid ? `https://videodelivery.net/${uid}/manifest/video.m3u8` : '';
+  }, []);
+
   const openTvDialog = useCallback((tab: 'code' | 'mirror') => {
     // Jangan membuka Radix Dialog pada pointer event yang sama dengan penutupan
     // menu. Safari/iOS dapat menganggap event tersebut sebagai klik di luar lalu
@@ -546,14 +553,31 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
                   return;
                 }
                 if (activeSource.type === 'youtube' || !isGoogleCastCapable()) {
+                  setCastMsg(activeSource.type === 'youtube'
+                    ? 'Replay YouTube disambungkan melalui kode TV atau siarkan layar.'
+                    : 'Chromecast langsung tidak tersedia di browser ini. Gunakan kode TV atau siarkan layar.');
                   openTvDialog('mirror');
+                  return;
+                }
+                const castUrl = activeSource.type === 'cloudflare'
+                  ? cloudflareCastUrl(activeSource.url)
+                  : activeSource.url;
+                if (!castUrl) {
+                  setCastMsg('Alamat video untuk Chromecast tidak tersedia. Gunakan kode 6 angka.');
                   return;
                 }
                 setCastBusy(true);
                 setCastMsg('Menyiapkan Chromecast…');
-                const ok = await castMedia({ url: activeSource.url, title: replay.title });
+                const result = await castMediaDetailed({
+                  url: castUrl,
+                  title: replay.title,
+                  contentType: activeSource.type === 'cloudflare' ? 'application/x-mpegURL' : undefined,
+                });
                 setCastBusy(false);
-                setCastMsg(ok ? 'Terkirim ke TV.' : 'Chromecast tidak ditemukan. Coba kode 6 angka.');
+                if (result.ok) setCastMsg('Replay berhasil dikirim ke TV.');
+                else if (result.reason === 'cancelled') setCastMsg('Pemilihan Chromecast dibatalkan.');
+                else if (result.reason === 'load_failed') setCastMsg('TV ditemukan, tetapi video tidak dapat dimuat. Gunakan kode 6 angka.');
+                else setCastMsg('Chromecast tidak ditemukan. Pastikan HP dan TV memakai WiFi yang sama.');
               }}
             >
               {castBusy ? <Loader2 className="h-5 w-5 shrink-0 animate-spin text-primary" /> : <MonitorSmartphone className="h-5 w-5 shrink-0 text-primary" />}
