@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { isFullscreenActive, onFullscreenChange, requestFs, exitFs, lockLandscape, neutralizeFsAncestors } from '@/lib/fullscreen';
-import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, SkipBack, SkipForward } from 'lucide-react';
+import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, SkipBack, SkipForward, Cast } from 'lucide-react';
 import LiveWatermark from '@/components/LiveWatermark';
 
 interface Props {
@@ -12,7 +12,10 @@ interface Props {
   isLive?: boolean;
   /** ID/link YouTube alternatif; dipakai hanya bila player tersendat saat suara diaktifkan. */
   altYoutubeId?: string;
+  /** Bila diisi, tombol "Hubungkan ke TV" tampil di samping tombol layar penuh. */
+  onTvClick?: () => void;
 }
+
 
 interface YoutubePlayerApi {
   getIframe?: () => HTMLIFrameElement;
