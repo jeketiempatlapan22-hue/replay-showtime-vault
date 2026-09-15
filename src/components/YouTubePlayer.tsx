@@ -1,5 +1,4 @@
 import { ArrowLeft, Maximize, Minimize, Eye, Loader2, Lock, PictureInPicture2, ListVideo, Cast } from 'lucide-react';
-import { showNativePicker } from '@/lib/cast';
 import { isFullscreenActive, isVideoFullscreen, onFullscreenChange, requestFs, exitFs, lockLandscape } from '@/lib/fullscreen';
 
 
@@ -11,6 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import RatingStars from '@/components/RatingStars';
 // CommentSection lazy-loaded — chunk komentar baru dimuat saat user scroll/buka.
 const CommentSection = lazy(() => import('@/components/CommentSection'));
+const TvConnectDialog = lazy(() => import('@/components/TvConnectDialog'));
 import HlsPlayer, { type HlsPlayerHandle } from '@/components/HlsPlayer';
 import EmbedPlayer from '@/components/EmbedPlayer';
 import DeviceResetButton from '@/components/DeviceResetButton';
@@ -52,6 +52,7 @@ function buildSources(source: ReplaySource | null, replay: ReplayRow): PlaylistS
 export default function YouTubePlayer({ replay, onBack }: Props) {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showTvMenu, setShowTvMenu] = useState(false);
+  const [tvConnectTab, setTvConnectTab] = useState<'code' | 'mirror'>('code');
 
   const [viewCount, setViewCount] = useState(replay.view_count ?? 0);
   const [hlsFailed, setHlsFailed] = useState(false);
@@ -187,6 +188,18 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
     [sources, activeSourceId],
   );
 
+  const replayTvPayload = useMemo<Record<string, unknown> | null>(() => {
+    if (!activeSource) return null;
+    return {
+      kind: 'replay',
+      replay_id: replay.id,
+      title: replay.title,
+      source_type: activeSource.type,
+      source: activeSource.url,
+      youtube_alt_id: source?.youtube_alt_id || '',
+    };
+  }, [activeSource, replay.id, replay.title, source?.youtube_alt_id]);
+
   // Prefetch all non-active sources in background so switching is instant
   useEffect(() => {
     if (!sources.length) return;
@@ -299,22 +312,21 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
                 type="button"
                 className="w-full text-left px-2.5 py-2 rounded hover:bg-muted"
                 onClick={() => {
-                  showNativePicker(document.querySelector('video'));
+                  setTvConnectTab('code');
                   setShowTvMenu(false);
                 }}
               >
-                AirPlay / Remote Playback (via HP)
+                Kode untuk browser TV (6 angka)
               </button>
               <button
                 type="button"
                 className="w-full text-left px-2.5 py-2 rounded hover:bg-muted"
                 onClick={() => {
-                  const v = document.querySelector('video') as HTMLVideoElement & { webkitShowPlaybackTargetPicker?: () => void };
-                  if (typeof v?.webkitShowPlaybackTargetPicker === 'function') v.webkitShowPlaybackTargetPicker();
+                  setTvConnectTab('mirror');
                   setShowTvMenu(false);
                 }}
               >
-                Hubungkan ke TV (Cast / AirPlay)
+                Panduan siarkan layar ke TV
               </button>
               <button
                 type="button"
@@ -324,10 +336,10 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
                   setShowTvMenu(false);
                 }}
               >
-                Salin link untuk browser TV
+                Salin link replay
               </button>
               <p className="px-2.5 py-1.5 text-[10px] text-muted-foreground leading-relaxed">
-                AirPlay/Cast dari HP ini memakai sesi yang sama — token tidak perlu reset. Salin link hanya untuk token multi-perangkat.
+                Kode TV memakai akses yang sama dan tidak memerlukan reset perangkat.
               </p>
             </div>
           )}
@@ -406,6 +418,7 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
             title={replay.title}
             onFatalError={handleHlsFatalError}
             onPipChange={setPipActive}
+            replayTvPayload={replayTvPayload}
           />
         ) : (
           <EmbedPlayer
@@ -505,6 +518,14 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
           </div>
         </div>
       </div>
+      <Suspense fallback={null}>
+        <TvConnectDialog
+          open={tvConnectTab === 'code' ? showTvMenu : showTvMenu}
+          onOpenChange={setShowTvMenu}
+          initialTab={tvConnectTab}
+          replayPayload={replayTvPayload}
+        />
+      </Suspense>
     </div>
   );
 }

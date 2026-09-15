@@ -58,9 +58,11 @@ interface Props {
   onOpenChange: (open: boolean) => void;
   initialTab?: 'code' | 'mirror';
   showId?: string;
+  /** Payload replay yang sudah lolos validasi akses di perangkat pengirim. */
+  replayPayload?: Record<string, unknown> | null;
 }
 
-export default function TvConnectDialog({ open, onOpenChange, initialTab = 'code', showId = '' }: Props) {
+export default function TvConnectDialog({ open, onOpenChange, initialTab = 'code', showId = '', replayPayload = null }: Props) {
   const [tab, setTab] = useState<'code' | 'mirror'>(initialTab);
   useEffect(() => { if (open) setTab(initialTab); }, [open, initialTab]);
   const [platform, setPlatform] = useState<Platform>('desktop');
@@ -88,14 +90,21 @@ export default function TvConnectDialog({ open, onOpenChange, initialTab = 'code
   const createCode = useCallback(async () => {
     setLoading(true); setError(''); setCode('');
     try {
-      const payload = readUnlockPayload(showId);
-      if (!payload || typeof payload.grant !== 'string' || !payload.grant) {
-        setError('Akses belum terbuka di perangkat ini. Buka siarannya dulu, lalu coba lagi.');
+      const payload = replayPayload || readUnlockPayload(showId);
+      const isReplay = payload?.kind === 'replay' && typeof payload?.replay_id === 'string';
+      const isLive = typeof payload?.grant === 'string' && !!payload.grant;
+      if (!payload || (!isReplay && !isLive)) {
+        setError('Akses belum terbuka di perangkat ini. Buka videonya dulu, lalu coba lagi.');
         setLoading(false);
         return;
       }
       const { data, error: fnErr } = await supabase.functions.invoke('tv-pair', {
-        body: { action: 'create', payload, show_id: showId, browser_id: getBrowserId() },
+        body: {
+          action: 'create',
+          payload,
+          show_id: isReplay ? '' : showId,
+          browser_id: getBrowserId(),
+        },
       });
       if (fnErr || !data?.ok || !data?.code) {
         setError('Gagal membuat kode. Coba lagi sebentar.');
@@ -108,7 +117,7 @@ export default function TvConnectDialog({ open, onOpenChange, initialTab = 'code
       setError('Gagal membuat kode. Coba lagi sebentar.');
     }
     setLoading(false);
-  }, [showId]);
+  }, [replayPayload, showId]);
 
   useEffect(() => {
     if (open && tab === 'code' && !code && !loading && !error) void createCode();
