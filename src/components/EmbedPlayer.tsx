@@ -139,7 +139,7 @@ function loadYouTubeApi(): Promise<void> {
   return ytApiLoadingPromise;
 }
 
-export default function EmbedPlayer({ type, source, title, watermark, hideSeekButtons = false, isLive = false, altYoutubeId = '' }: Props) {
+export default function EmbedPlayer({ type, source, title, watermark, hideSeekButtons = false, isLive = false, altYoutubeId = '', onTvClick }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const ytPlayerRef = useRef<YoutubePlayerApi | null>(null);
