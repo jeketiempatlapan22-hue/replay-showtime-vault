@@ -17,6 +17,8 @@ import DeviceResetButton from '@/components/DeviceResetButton';
 import { prefetchM3U8, prefetchYouTube, prefetchCloudflare } from '@/lib/prefetch';
 import { useAutoHideOnInteraction } from '@/hooks/useAutoHideOnInteraction';
 import { getReplayPurchase, getAllShowPurchases } from '@/lib/purchases';
+import { castMedia, isGoogleCastCapable } from '@/lib/cast';
+
 
 interface Props {
   replay: ReplayRow;
