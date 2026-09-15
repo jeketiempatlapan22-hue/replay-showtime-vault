@@ -1324,7 +1324,22 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
           )}
           {onTvClick && (
             <button
-              onClick={(e) => { e.stopPropagation(); onTvClick(); resetHideTimer(); }}
+              type="button"
+              onClick={async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                // Dialog/menu yang dirender di portal tidak dapat muncul di atas
+                // native fullscreen. Keluar dulu agar pilihan TV selalu terlihat
+                // pada Android, iPhone, dan desktop.
+                if (isFullscreenActive() || pseudoFs) {
+                  await exitFs(containerRef.current?.querySelector('video') || null);
+                  setPseudoFs(false);
+                  setIsFullscreen(false);
+                  await lockLandscape(false);
+                }
+                onTvClick();
+                resetHideTimer();
+              }}
               aria-label="Hubungkan ke TV / Proyektor"
               className="p-2.5 landscape:p-3 text-white hover:text-primary active:scale-95 transition-all shrink-0"
             >

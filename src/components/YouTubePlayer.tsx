@@ -1,4 +1,4 @@
-import { ArrowLeft, Maximize, Minimize, Eye, Loader2, Lock, PictureInPicture2, ListVideo, Cast } from 'lucide-react';
+import { ArrowLeft, Maximize, Minimize, Eye, Loader2, Lock, PictureInPicture2, ListVideo, Cast, Copy, MonitorSmartphone, Tv } from 'lucide-react';
 import { isFullscreenActive, isVideoFullscreen, onFullscreenChange, requestFs, exitFs, lockLandscape } from '@/lib/fullscreen';
 
 
@@ -58,6 +58,7 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
   const [tvConnectTab, setTvConnectTab] = useState<'code' | 'mirror'>('code');
   const [castMsg, setCastMsg] = useState('');
   const [castBusy, setCastBusy] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
 
 
   const [viewCount, setViewCount] = useState(replay.view_count ?? 0);
@@ -283,6 +284,33 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
     await lockLandscape(true);
   }, []);
 
+  const copyReplayLink = useCallback(async () => {
+    const value = window.location.href;
+    try {
+      await navigator.clipboard.writeText(value);
+    } catch {
+      const input = document.createElement('textarea');
+      input.value = value;
+      input.style.position = 'fixed';
+      input.style.opacity = '0';
+      document.body.appendChild(input);
+      input.select();
+      try { document.execCommand('copy'); } catch { /* ignore */ }
+      input.remove();
+    }
+    setLinkCopied(true);
+    window.setTimeout(() => setLinkCopied(false), 1800);
+  }, []);
+
+  const openTvDialog = useCallback((tab: 'code' | 'mirror') => {
+    // Jangan membuka Radix Dialog pada pointer event yang sama dengan penutupan
+    // menu. Safari/iOS dapat menganggap event tersebut sebagai klik di luar lalu
+    // langsung menutup dialog yang baru dibuat.
+    setShowTvMenu(false);
+    setTvConnectTab(tab);
+    window.setTimeout(() => setShowTvConnect(true), 80);
+  }, []);
+
 
   const handleHlsFatalError = useCallback(() => {
     // Try to switch to next source automatically
@@ -398,9 +426,8 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
             altYoutubeId={source?.youtube_alt_id || ''}
             onTvClick={() => {
               setCastMsg('');
-              setTvConnectTab('code');
-              setShowTvMenu(false);
-              setShowTvConnect(true);
+              setShowTvConnect(false);
+              setShowTvMenu(true);
             }}
 
           />
@@ -495,60 +522,56 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
         </div>
       </div>
       {showTvMenu && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 p-3" onClick={() => setShowTvMenu(false)}>
-          <div className="w-full max-w-sm rounded-xl border border-border bg-card p-2 shadow-2xl text-sm" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center gap-2 px-2.5 py-2 text-sm font-semibold">
+        <div className="fixed inset-0 z-[10000] flex items-end sm:items-center justify-center bg-background/80 p-3 backdrop-blur-sm" onClick={() => setShowTvMenu(false)}>
+          <div role="dialog" aria-modal="true" aria-label="Pilihan sambungan TV" className="w-full max-w-sm rounded-lg border border-border bg-card p-3 shadow-2xl text-sm" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-2 px-2 py-2 text-sm font-semibold text-foreground">
               <Cast className="w-4 h-4 text-primary" /> Hubungkan ke TV / Proyektor
             </div>
-            <button
-              type="button"
-              className="w-full text-left px-2.5 py-2.5 rounded hover:bg-muted"
-              onClick={() => { setTvConnectTab('code'); setShowTvMenu(false); setShowTvConnect(true); }}
+            <p className="px-2 pb-2 text-xs text-muted-foreground">Pilih salah satu cara berikut.</p>
+            <Button
+              variant="ghost"
+              className="h-auto w-full justify-start gap-3 px-2.5 py-3 text-left"
+              onClick={() => openTvDialog('code')}
             >
-              Kode untuk browser TV (6 angka)
-            </button>
-            {isGoogleCastCapable() && (
-              <button
-                type="button"
-                disabled={castBusy}
-                className="w-full text-left px-2.5 py-2.5 rounded hover:bg-muted disabled:opacity-60"
-                onClick={async () => {
-                  if (!activeSource) return;
-                  if (activeSource.type === 'youtube') {
-                    setCastMsg('Replay YouTube tidak bisa dikirim langsung ke Chromecast. Pakai kode 6 angka atau siarkan layar.');
-                    return;
-                  }
-                  setCastBusy(true);
-                  setCastMsg('Menyiapkan Chromecast…');
-                  const ok = await castMedia({ url: activeSource.url, title: replay.title });
-                  setCastBusy(false);
-                  setCastMsg(ok ? 'Terkirim ke TV.' : 'Gagal menyambung ke Chromecast. Coba kode 6 angka.');
-                }}
-              >
-                {castBusy ? 'Menyiapkan Chromecast…' : 'Chromecast (kirim video ke TV)'}
-              </button>
-            )}
-            <button
-              type="button"
-              className="w-full text-left px-2.5 py-2.5 rounded hover:bg-muted"
-              onClick={() => { setTvConnectTab('mirror'); setShowTvMenu(false); setShowTvConnect(true); }}
-            >
-              Panduan siarkan layar ke TV
-            </button>
-            <button
-              type="button"
-              className="w-full text-left px-2.5 py-2.5 rounded hover:bg-muted"
+              <Tv className="h-5 w-5 shrink-0 text-primary" />
+              <span><span className="block font-semibold">Kode 6 angka</span><span className="block text-xs font-normal text-muted-foreground">Masukkan kode di browser Android TV</span></span>
+            </Button>
+            <Button
+              variant="ghost"
+              className="h-auto w-full justify-start gap-3 px-2.5 py-3 text-left"
+              disabled={castBusy}
               onClick={async () => {
-                try { await navigator.clipboard.writeText(window.location.href); } catch { /* ignore */ }
-                setShowTvMenu(false);
+                if (!activeSource) {
+                  setCastMsg('Video belum siap. Tunggu sebentar lalu coba lagi.');
+                  return;
+                }
+                if (activeSource.type === 'youtube' || !isGoogleCastCapable()) {
+                  openTvDialog('mirror');
+                  return;
+                }
+                setCastBusy(true);
+                setCastMsg('Menyiapkan Chromecast…');
+                const ok = await castMedia({ url: activeSource.url, title: replay.title });
+                setCastBusy(false);
+                setCastMsg(ok ? 'Terkirim ke TV.' : 'Chromecast tidak ditemukan. Coba kode 6 angka.');
               }}
             >
-              Salin link replay
-            </button>
+              {castBusy ? <Loader2 className="h-5 w-5 shrink-0 animate-spin text-primary" /> : <MonitorSmartphone className="h-5 w-5 shrink-0 text-primary" />}
+              <span><span className="block font-semibold">Chromecast / siarkan layar</span><span className="block text-xs font-normal text-muted-foreground">Pilih TV atau ikuti panduan perangkat</span></span>
+            </Button>
+            <Button
+              variant="ghost"
+              className="h-auto w-full justify-start gap-3 px-2.5 py-3 text-left"
+              onClick={() => { void copyReplayLink(); }}
+            >
+              <Copy className="h-5 w-5 shrink-0 text-primary" />
+              <span><span className="block font-semibold">{linkCopied ? 'Link berhasil disalin' : 'Salin link replay'}</span><span className="block text-xs font-normal text-muted-foreground">Buka alamat yang sama di perangkat lain</span></span>
+            </Button>
             {castMsg && <p className="px-2.5 py-1.5 text-[11px] text-primary">{castMsg}</p>}
             <p className="px-2.5 py-1.5 text-[10px] text-muted-foreground leading-relaxed">
               Kode TV memakai akses yang sama dan tidak memerlukan reset perangkat.
             </p>
+            <Button variant="outline" className="mt-1 w-full" onClick={() => setShowTvMenu(false)}>Tutup</Button>
           </div>
         </div>
       )}
