@@ -127,13 +127,9 @@ export default function TvConnectDialog({ open, onOpenChange, initialTab = 'code
     setCode('');
     setError('');
     setExpiresAt(0);
-    if (initialTab === 'code') void createCode();
+    if (tab === 'code') void createCode();
     return () => { requestRef.current += 1; };
-  }, [open, initialTab, createCode]);
-
-  useEffect(() => {
-    if (open && tab === 'code' && !code && !loading && !error) void createCode();
-  }, [open, tab, code, loading, error, createCode]);
+  }, [open, tab, createCode]);
 
   // Replay source may finish loading just after the dialog opens. Retry
   // automatically instead of leaving a stale "access not open" message.
