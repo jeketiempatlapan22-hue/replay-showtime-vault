@@ -25,12 +25,12 @@ const PlayerFallback = () => (
   </div>
 );
 const ChatFallback = () => (
-  <div className="rounded-2xl bg-card/80 border border-border h-[60vh] min-h-[380px] flex items-center justify-center">
+  <div className="rounded-2xl bg-card/80 border border-border h-[70vh] min-h-[460px] max-h-[760px] flex items-center justify-center">
     <Loader2 className="w-6 h-6 text-primary animate-spin" />
   </div>
 );
 const ChatIdle = () => (
-  <div className="rounded-2xl bg-card/60 border border-border h-[42vh] min-h-[260px] flex items-center justify-center">
+  <div className="rounded-2xl bg-card/60 border border-border h-[70vh] min-h-[460px] max-h-[760px] flex items-center justify-center">
     <span className="text-xs text-muted-foreground">Live Chat</span>
   </div>
 );

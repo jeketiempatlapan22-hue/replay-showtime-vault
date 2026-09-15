@@ -1,10 +1,22 @@
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Tv, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { supabase } from '@/integrations/supabase/client';
 import { saveTvSession } from '@/lib/tvSession';
+
+const HlsPlayer = lazy(() => import('@/components/HlsPlayer'));
+const EmbedPlayer = lazy(() => import('@/components/EmbedPlayer'));
+
+interface ReplayTvPayload {
+  kind: 'replay';
+  replay_id: string;
+  title: string;
+  source_type: 'youtube' | 'cloudflare' | 'm3u8';
+  source: string;
+  youtube_alt_id?: string;
+}
 
 const SS_KEY_BASE = 'replaytime-live-unlocked';
 
@@ -23,6 +35,7 @@ export default function TvPage() {
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [replay, setReplay] = useState<ReplayTvPayload | null>(null);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,6 +47,12 @@ export default function TvPage() {
         body: { action: 'claim', code: clean },
       });
       if (data?.ok && data?.payload) {
+        const payload = data.payload as Record<string, unknown>;
+        if (payload.kind === 'replay' && typeof payload.replay_id === 'string' && typeof payload.source === 'string') {
+          setReplay(payload as unknown as ReplayTvPayload);
+          setLoading(false);
+          return;
+        }
         const showId = String(data.show_id || '');
         const key = `${SS_KEY_BASE}${showId ? '-' + showId : ''}`;
         try { sessionStorage.setItem(key, JSON.stringify(data.payload)); } catch { /* ignore */ }
@@ -47,6 +66,34 @@ export default function TvPage() {
     }
     setLoading(false);
   };
+
+  if (replay) {
+    return (
+      <div className="min-h-screen bg-background px-2 py-3 sm:px-4 sm:py-6">
+        <div className="mx-auto w-full max-w-screen-2xl space-y-3">
+          <div className="flex items-center gap-3 px-1">
+            <Tv className="h-5 w-5 text-primary" />
+            <div className="min-w-0">
+              <p className="text-xs text-muted-foreground">Replay di TV</p>
+              <h1 className="truncate text-base font-bold text-foreground sm:text-lg">{replay.title || 'ReplayTime'}</h1>
+            </div>
+          </div>
+          <Suspense fallback={<div className="aspect-video w-full rounded-xl bg-card flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>}>
+            {replay.source_type === 'm3u8' ? (
+              <HlsPlayer src={replay.source} title={replay.title || 'ReplayTime'} />
+            ) : (
+              <EmbedPlayer
+                type={replay.source_type === 'cloudflare' ? 'cloudflare' : 'youtube'}
+                source={replay.source}
+                title={replay.title || 'ReplayTime'}
+                altYoutubeId={replay.youtube_alt_id || ''}
+              />
+            )}
+          </Suspense>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background relative z-10 flex items-center justify-center px-4 py-10">

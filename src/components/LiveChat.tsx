@@ -25,23 +25,6 @@ interface LiveChatProps {
 }
 
 
-// Palet warna nama (gaya YouTube/TikTok). Pakai token semantik.
-const NAME_COLORS = [
-  'text-sky-400',
-  'text-emerald-400',
-  'text-fuchsia-400',
-  'text-amber-400',
-  'text-rose-400',
-  'text-violet-400',
-  'text-teal-400',
-  'text-orange-400',
-];
-const colorForName = (name: string) => {
-  let h = 0;
-  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
-  return NAME_COLORS[h % NAME_COLORS.length];
-};
-
 export default function LiveChat({ lite = false, showId = '' }: LiveChatProps) {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [pinned, setPinned] = useState<Msg[]>([]);
@@ -291,7 +274,7 @@ export default function LiveChat({ lite = false, showId = '' }: LiveChatProps) {
   const canChat = (isAdmin || !!name.trim()) && !iAmBlocked;
 
   return (
-    <div className="rounded-2xl bg-card/80 border border-border overflow-hidden flex flex-col h-[60vh] min-h-[380px]">
+    <div className="rounded-2xl bg-card/80 border border-border overflow-hidden flex flex-col h-[70vh] min-h-[460px] max-h-[760px]">
       <div className="flex items-center gap-2 px-3 py-2 border-b border-border bg-secondary/40">
         <MessageCircle className="w-4 h-4 text-primary" />
         <span className="text-sm font-semibold">Live Chat</span>
@@ -304,14 +287,14 @@ export default function LiveChat({ lite = false, showId = '' }: LiveChatProps) {
 
       {/* Pinned banner */}
       {pinned.length > 0 && (
-        <div className="px-3 py-2 bg-primary/10 border-b border-primary/30 space-y-1.5 max-h-32 overflow-y-auto">
+        <div className="px-3 py-2.5 bg-primary/15 border-b-2 border-primary/50 space-y-2 max-h-36 overflow-y-auto shadow-sm">
           {pinned.map(m => (
-            <div key={m.id} className="flex items-start gap-2 text-xs">
-              <Pin className="w-3 h-3 text-primary mt-0.5 shrink-0" />
+            <div key={m.id} className="flex items-start gap-2 text-sm leading-snug">
+              <Pin className="w-4 h-4 text-primary mt-0.5 shrink-0" />
               <div className="flex-1 min-w-0">
                 <span className="font-semibold text-primary">{m.name}</span>
                 {m.is_admin && <span className="ml-1 text-[9px] uppercase bg-primary text-primary-foreground px-1 rounded">Admin</span>}
-                <span className="ml-1 text-foreground/90 break-words">{m.message}</span>
+                <span className="ml-1 font-medium text-foreground break-words">{m.message}</span>
               </div>
               {isAdmin && (
                 <div className="flex gap-1 shrink-0">
@@ -330,7 +313,7 @@ export default function LiveChat({ lite = false, showId = '' }: LiveChatProps) {
         {messages.map(m => {
           const isUserBlocked = !!m.browser_id && blockedSet.has(m.browser_id);
           const replied = m.reply_to_id ? messageMap.get(m.reply_to_id) : null;
-          const nameColor = m.is_admin ? 'text-yellow-400' : colorForName(m.name);
+          const nameColor = m.is_admin ? 'text-yellow-400' : 'chat-user-name';
           return (
             <div
               id={`chatmsg-${m.id}`}
@@ -358,7 +341,7 @@ export default function LiveChat({ lite = false, showId = '' }: LiveChatProps) {
                 {isUserBlocked && !m.is_admin && (
                   <span className="text-[9px] uppercase bg-destructive/80 text-destructive-foreground px-1 py-0.5 rounded">Diblokir</span>
                 )}
-                <span className="text-foreground/95 break-words">{m.message}</span>
+                <span className={m.is_admin ? 'text-foreground/95 break-words' : 'text-muted-foreground break-words'}>{m.message}</span>
                 <span className="text-[10px] text-muted-foreground/60 ml-1">{time(m.created_at)}</span>
                 <span className="ml-auto opacity-0 group-hover:opacity-100 flex gap-1.5 items-center">
                   {!m.is_admin && !iAmBlocked && (

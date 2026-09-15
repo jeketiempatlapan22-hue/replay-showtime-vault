@@ -21,6 +21,8 @@ interface Props {
   overlay?: React.ReactNode;
   /** Show aktif yang dipakai untuk pairing TV dan pemilihan payload akses. */
   showId?: string;
+  /** Payload replay tervalidasi untuk pairing browser TV. */
+  replayTvPayload?: Record<string, unknown> | null;
 }
 
 export interface HlsPlayerHandle {
@@ -46,7 +48,7 @@ interface QualityLevel {
   bitrate?: number;
 }
 
-const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, onFatalError, onPipChange, hideSeekButtons = false, headers, overlay, showId = '' }, ref) => {
+const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, onFatalError, onPipChange, hideSeekButtons = false, headers, overlay, showId = '', replayTvPayload = null }, ref) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const hideControlsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1362,7 +1364,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
 
     <Suspense fallback={null}>
       {showTvConnect && (
-        <TvConnectDialog open={showTvConnect} onOpenChange={setShowTvConnect} initialTab={tvConnectTab} showId={showId} />
+        <TvConnectDialog open={showTvConnect} onOpenChange={setShowTvConnect} initialTab={tvConnectTab} showId={showId} replayPayload={replayTvPayload} />
       )}
     </Suspense>
     </>

@@ -51,6 +51,19 @@
     --sidebar-accent-foreground: 210 40% 92%;
     --sidebar-border: 220 25% 20%;
     --sidebar-ring: 45 80% 55%;
+    --chat-user-name: 0 0% 100%;
+    --chat-user-name-outline: 0 0% 0%;
+  }
+}
+
+@layer utilities {
+  .chat-user-name {
+    color: hsl(var(--chat-user-name));
+    text-shadow:
+      -1px -1px 0 hsl(var(--chat-user-name-outline)),
+      1px -1px 0 hsl(var(--chat-user-name-outline)),
+      -1px 1px 0 hsl(var(--chat-user-name-outline)),
+      1px 1px 0 hsl(var(--chat-user-name-outline));
   }
 }
 
