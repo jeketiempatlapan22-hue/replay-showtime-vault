@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Loader2, Tv, MonitorSmartphone, Copy, Check, RefreshCw } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -73,6 +73,7 @@ export default function TvConnectDialog({ open, onOpenChange, initialTab = 'code
   const [now, setNow] = useState(Date.now());
   const [copied, setCopied] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
+  const requestRef = useRef(0);
 
   const tvUrl = useMemo(() => {
     if (typeof window === 'undefined') return '';
@@ -88,6 +89,7 @@ export default function TvConnectDialog({ open, onOpenChange, initialTab = 'code
   }, [open, expiresAt]);
 
   const createCode = useCallback(async () => {
+    const requestId = ++requestRef.current;
     setLoading(true); setError(''); setCode('');
     try {
       const payload = replayPayload || readUnlockPayload(showId);
@@ -95,7 +97,7 @@ export default function TvConnectDialog({ open, onOpenChange, initialTab = 'code
       const isLive = typeof payload?.grant === 'string' && !!payload.grant;
       if (!payload || (!isReplay && !isLive)) {
         setError('Akses belum terbuka di perangkat ini. Buka videonya dulu, lalu coba lagi.');
-        setLoading(false);
+        if (requestId === requestRef.current) setLoading(false);
         return;
       }
       const { data, error: fnErr } = await supabase.functions.invoke('tv-pair', {
@@ -106,6 +108,7 @@ export default function TvConnectDialog({ open, onOpenChange, initialTab = 'code
           browser_id: getBrowserId(),
         },
       });
+      if (requestId !== requestRef.current) return;
       if (fnErr || !data?.ok || !data?.code) {
         setError('Gagal membuat kode. Coba lagi sebentar.');
       } else {
@@ -114,10 +117,19 @@ export default function TvConnectDialog({ open, onOpenChange, initialTab = 'code
         setNow(Date.now());
       }
     } catch {
-      setError('Gagal membuat kode. Coba lagi sebentar.');
+      if (requestId === requestRef.current) setError('Gagal membuat kode. Periksa koneksi lalu coba lagi.');
     }
-    setLoading(false);
+    if (requestId === requestRef.current) setLoading(false);
   }, [replayPayload, showId]);
+
+  useEffect(() => {
+    if (!open) return;
+    setCode('');
+    setError('');
+    setExpiresAt(0);
+    if (initialTab === 'code') void createCode();
+    return () => { requestRef.current += 1; };
+  }, [open, initialTab, createCode]);
 
   useEffect(() => {
     if (open && tab === 'code' && !code && !loading && !error) void createCode();
