@@ -408,6 +408,20 @@ export default function MembershipUsersAdmin() {
                   <p className="text-[10px] text-muted-foreground mt-1">Belum ada paket. Buat dulu di menu “Paket Membership”.</p>
                 )}
               </div>
+              <div>
+                <Label>Tipe Durasi</Label>
+                <div className="flex flex-wrap gap-1.5 mt-1">
+                  <Button type="button" size="sm" variant={createForm.days === 31 ? 'default' : 'outline'} onClick={() => setCreateForm(f => ({ ...f, days: 31 }))}>Otomatis 1 Bulan (31 hari)</Button>
+                  <Button type="button" size="sm" variant={createForm.days === 62 ? 'default' : 'outline'} onClick={() => setCreateForm(f => ({ ...f, days: 62 }))}>Otomatis 2 Bulan (62 hari)</Button>
+                  <Button
+                    type="button" size="sm"
+                    variant={createForm.days !== 31 && createForm.days !== 62 ? 'default' : 'outline'}
+                    onClick={() => setCreateForm(f => ({ ...f, days: pkgs.find(p => p.id === f.package_id)?.duration_days || f.days }))}
+                  >
+                    Durasi Admin (paket/manual)
+                  </Button>
+                </div>
+              </div>
               <div className="grid grid-cols-2 gap-2">
                 <div><Label>Durasi (hari)</Label><Input type="number" min={1} value={createForm.days} onChange={e => setCreateForm(f => ({ ...f, days: parseInt(e.target.value)||1 }))} /></div>
                 <div><Label>Max Device</Label><Input type="number" min={1} value={createForm.max_devices} onChange={e => setCreateForm(f => ({ ...f, max_devices: parseInt(e.target.value)||1 }))} /></div>
