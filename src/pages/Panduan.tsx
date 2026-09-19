@@ -121,33 +121,35 @@ const GUIDES: Guide[] = [
     note: 'Pakai email yang benar-benar aktif — link token & notifikasi pembayaran dikirim ke email/WhatsApp tersebut.',
   },
   {
+    id: 'buy-show',
+    title: 'Cara Beli Show / Replay (Langsung di Website)',
+    icon: Ticket,
+    image: imgBuyShow,
+    summary: 'Semua pembelian selesai sendiri di website — tidak perlu chat admin.',
+    steps: [
+      { title: '1 menit: pilih show/replay', desc: 'Di halaman depan pilih kartu show atau replay yang ingin ditonton, lalu tekan tombol harga (mis. "Beli Show" / "Beli Replay").' },
+      { title: 'Isi nomor WhatsApp & email', desc: 'Nomor dipakai sebagai tanda kepemilikan pembelian. Cukup isi sekali; tidak dikirim ke siapa pun selain sistem.' },
+      { title: 'Pilih cara bayar: QRIS atau Koin', desc: 'QRIS: nominal sudah otomatis sesuai harga. Koin: saldo langsung dipotong dan akses aktif seketika.' },
+      { title: 'Scan QRIS lalu tunggu di halaman yang sama', desc: 'Bayar dari e-wallet atau m-banking apa pun. Jangan tutup halaman — status berubah otomatis begitu pembayaran masuk (biasanya di bawah 1 menit).' },
+      { title: 'Tekan "Tonton Sekarang"', desc: 'Begitu lunas, tombol tonton langsung muncul di kotak pembayaran dan di kartu show. Klik dan langsung diputar — tanpa menyalin link atau meminta token ke admin.' },
+      { title: 'Buka lagi kapan saja lewat Profil', desc: 'Semua pembelian tersimpan di halaman Profil → Riwayat Pembelian. Klik salah satu baris untuk membukanya kembali di perangkat mana pun.' },
+    ],
+    note: 'Jika status masih "menunggu" lebih dari 5 menit, tekan tombol "Cek Status Pembayaran" di kotak yang sama — sistem akan memeriksa ulang ke penyedia pembayaran.',
+  },
+  {
     id: 'coin',
     title: 'Cara Beli Koin',
     icon: Coins,
     image: imgCoin,
-    summary: 'Top up koin untuk menukar show atau membership tanpa QRIS berulang.',
+    summary: 'Isi koin sekali, lalu beli show/replay/membership tanpa scan QRIS berulang.',
     steps: [
-      { title: 'Buka menu Koin', desc: 'Pilih menu "Koin" dari navigasi bawah atau hamburger menu.' },
-      { title: 'Pilih paket koin', desc: 'Tersedia beberapa paket. Semakin besar paket biasanya semakin hemat.' },
-      { title: 'Bayar via QRIS', desc: 'Scan QRIS yang muncul lewat aplikasi e-wallet (DANA, OVO, GoPay, ShopeePay) atau m-banking.' },
-      { title: 'Tunggu konfirmasi otomatis', desc: 'Koin masuk otomatis setelah pembayaran tervalidasi. Refresh halaman jika belum muncul.' },
-      { title: 'Kirim bukti jika lama', desc: 'Jika koin belum masuk setelah 5 menit, kirim bukti pembayaran ke admin lewat tombol "Kirim Bukti".' },
+      { title: 'Buka menu Koin', desc: 'Lewat navigasi bawah atau hamburger menu → "Koin".' },
+      { title: 'Pilih paket koin', desc: 'Paket lebih besar biasanya lebih hemat per koinnya.' },
+      { title: 'Bayar QRIS', desc: 'Scan dengan DANA, OVO, GoPay, ShopeePay, atau m-banking. Nominal sudah pas, tidak perlu diubah.' },
+      { title: 'Saldo masuk otomatis', desc: 'Saldo koin bertambah sendiri setelah pembayaran tervalidasi. Tidak perlu konfirmasi ke admin.' },
+      { title: 'Pakai koin', desc: 'Di kartu show/replay/membership pilih tombol bayar dengan Koin — akses aktif saat itu juga.' },
     ],
-  },
-  {
-    id: 'buy-show',
-    title: 'Cara Beli Show / Replay',
-    icon: Ticket,
-    image: imgBuyShow,
-    summary: 'Beli tiket show live atau replay untuk ditonton kapan saja.',
-    steps: [
-      { title: 'Buka halaman Show', desc: 'Pilih show yang ingin ditonton dari daftar show aktif.' },
-      { title: 'Klik Beli Show / Beli Replay', desc: 'Pilih metode bayar: QRIS atau tukar Koin (jika koin cukup).' },
-      { title: 'Selesaikan pembayaran', desc: 'Untuk QRIS — scan kode dan bayar. Untuk Koin — konfirmasi penukaran.' },
-      { title: 'Link token dikirim otomatis', desc: 'Setelah pembayaran sukses, link token + sandi dikirim via WhatsApp dan muncul di kartu show.' },
-      { title: 'Salin link & buka', desc: 'Klik tombol "Salin Link Token", tempel di browser perangkat yang akan dipakai menonton.' },
-    ],
-    note: 'Jika notifikasi WhatsApp belum sampai, link tetap muncul di kartu show pada akun yang sama (asal login).',
+    note: 'Saldo koin bisa dilihat kapan saja di halaman Profil.',
   },
   {
     id: 'token',
@@ -160,7 +162,7 @@ const GUIDES: Guide[] = [
       { title: 'Tempel di browser perangkat tujuan', desc: 'Buka browser di HP/TV/Laptop yang akan dipakai menonton, paste link ke address bar, tekan Enter.' },
       { title: 'Token mengunci ke 1 perangkat', desc: 'Link token (1 perangkat) otomatis terkunci ke perangkat pertama yang membukanya.' },
       { title: 'Ingin pindah perangkat? Reset!', desc: 'Buka link di perangkat baru, masuk ke halaman akses, klik "Reset Perangkat". Perangkat lama otomatis keluar.' },
-      { title: 'Kuota reset maksimum 3×', desc: 'Reset manual dibatasi 3 kali per token agar tidak disalahgunakan. Hubungi admin jika sudah habis.' },
+      { title: 'Kuota reset maksimum 3×', desc: 'Reset mandiri dibatasi 3 kali per token agar tidak disalahgunakan.' },
     ],
     note: 'Token MULTI-PERANGKAT (untuk paket khusus) bisa dipakai di banyak perangkat sekaligus dan tidak perlu (tidak bisa) direset manual.',
   },
@@ -169,13 +171,15 @@ const GUIDES: Guide[] = [
     title: 'Membership: Akses Tanpa Beli Per Show',
     icon: Crown,
     image: imgBuyShow,
-    summary: 'Member aktif bisa langsung nonton semua live tanpa beli tiket per show.',
+    summary: 'Beli membership sendiri di website; akses aktif otomatis setelah bayar.',
     steps: [
-      { title: 'Pilih paket di halaman Membership', desc: 'Buka menu "Membership", pilih paket sesuai durasi.' },
-      { title: 'Bayar via QRIS atau Koin', desc: 'Setelah bayar, token membership + sandi dikirim ke WhatsApp.' },
-      { title: 'Aktifkan di profil', desc: 'Buka halaman Profil, masukkan token + sandi membership. Status akan berubah jadi "Member Aktif".' },
-      { title: 'Tonton live langsung', desc: 'Selama membership aktif, tombol "Tonton Live (Member)" muncul otomatis di kartu show.' },
+      { title: 'Buka menu Membership', desc: 'Pilih paket sesuai durasi (1 bulan = 31 hari, 2 bulan = 62 hari).' },
+      { title: 'Isi nomor WhatsApp & email', desc: 'Dipakai sebagai penanda kepemilikan membership kamu.' },
+      { title: 'Bayar QRIS atau tukar Koin', desc: 'Nominal QRIS sudah otomatis sesuai harga paket. Dengan koin, akses aktif seketika.' },
+      { title: 'Akses aktif otomatis', desc: 'Setelah lunas, status berubah jadi "Member Aktif" dan tombol "Tonton Live (Member)" muncul sendiri di kartu show — tanpa memasukkan token manual.' },
+      { title: 'Cek masa aktif di Profil', desc: 'Halaman Profil menampilkan sisa masa aktif dan tombol reset perangkat bila ganti HP/TV.' },
     ],
+    note: 'Jika paket sedang dijeda admin, tombol beli membership tidak muncul — coba lagi nanti.',
   },
   {
     id: 'watch-live',
@@ -208,15 +212,16 @@ const GUIDES: Guide[] = [
   },
   {
     id: 'tips',
-    title: 'Tips: Fonnte Pause / Token Belum Diterima',
+    title: 'Pembayaran Lama Terkonfirmasi? Ini Solusinya',
     icon: KeyRound,
     image: imgRegister,
-    summary: 'Apa yang harus dilakukan jika notifikasi WhatsApp belum sampai.',
+    summary: 'Langkah mandiri jika status pembayaran belum berubah.',
     steps: [
-      { title: 'Tunggu 1–3 menit', desc: 'Kadang notifikasi WA delay karena antrean gateway.' },
-      { title: 'Cek kartu show di akun', desc: 'Token juga muncul otomatis di kartu show pada akun yang sama (login dulu).' },
-      { title: 'Kirim bukti pembayaran ke admin', desc: 'Klik tombol "Kirim Bukti" — kamu langsung diarahkan ke WhatsApp admin. Admin akan kirim link manual.' },
-      { title: 'Pastikan nomor WA benar', desc: 'Cek nomor di profil. Salah angka 1 saja, notifikasi tidak akan sampai.' },
+      { title: 'Tunggu 1–3 menit', desc: 'Konfirmasi QRIS biasanya masuk di bawah 1 menit, kadang sampai 3 menit saat ramai.' },
+      { title: 'Tekan "Cek Status Pembayaran"', desc: 'Tombol ada di kotak pembayaran yang sama. Sistem akan menanyakan ulang statusnya ke penyedia pembayaran.' },
+      { title: 'Buka Profil → Riwayat Pembelian', desc: 'Pembelian yang sudah lunas selalu tampil di sini beserta tombol tonton.' },
+      { title: 'Pastikan nomor WhatsApp benar', desc: 'Pembelian tanpa login dikenali dari nomor WhatsApp. Gunakan nomor yang sama saat membuka kembali di perangkat lain.' },
+      { title: 'QRIS kedaluwarsa? Ulangi saja', desc: 'Jika kode QRIS habis masa berlaku, tutup lalu tekan tombol beli lagi — kode baru dibuat otomatis dan uang tidak terpotong dua kali.' },
     ],
   },
 ];
@@ -281,9 +286,9 @@ export default function Panduan() {
         <div className="rounded-xl border-2 border-primary/40 bg-primary/5 p-3 sm:p-4 mb-6 flex items-start gap-3">
           <Copy className="w-5 h-5 text-primary shrink-0 mt-0.5" />
           <div className="text-xs sm:text-sm">
-            <div className="font-semibold text-foreground mb-0.5">Sudah beli show?</div>
+            <div className="font-semibold text-foreground mb-0.5">Semua pembelian selesai di website ini</div>
             <div className="text-muted-foreground">
-              Klik tombol <b>"Salin Link Token"</b> di kartu show, lalu tempel di browser perangkat tujuan. Token otomatis aktif di perangkat itu.
+              Pilih show → bayar QRIS atau Koin → tombol <b>"Tonton Sekarang"</b> muncul otomatis. Tidak perlu chat admin untuk minta link atau token.
             </div>
           </div>
         </div>
@@ -353,7 +358,7 @@ export default function Panduan() {
         </div>
 
         <div className="mt-8 text-center text-xs text-muted-foreground">
-          Masih bingung? Hubungi admin lewat menu <b>Hubungi Admin</b> di hamburger menu.
+          Semua langkah pembelian di atas bisa diselesaikan sendiri langsung di website ini.
         </div>
       </main>
     </div>

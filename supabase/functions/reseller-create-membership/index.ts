@@ -64,8 +64,12 @@ Deno.serve(async (req) => {
   if (!pkg) return json({ error: 'package_not_found' }, 404);
   if (pkg.paused === true) return json({ error: 'package_paused' }, 400);
 
-  // Durasi SELALU mengikuti pengaturan admin pada paket (reseller tidak bisa mengubah).
-  const days = Math.max(1, Math.floor(Number(pkg.duration_days) || 30));
+  // Token reseller SELALU fixed: 31 hari (1 bulan) atau 62 hari (2 bulan) sejak pembuatan.
+  // Tidak terpengaruh durasi/periode tetap yang diatur admin.
+  const pkgName = String(pkg.name || '').toLowerCase();
+  const adminDays = Math.floor(Number(pkg.duration_days) || 30);
+  const isTwoMonths = /\b2\s*bulan|dua\s*bulan|60\s*hari|62\s*hari/.test(pkgName) || adminDays >= 45;
+  const days = isTwoMonths ? 62 : 31;
 
   const { data: settings } = await admin.from('site_settings').select('key,value')
     .in('key', ['site_origin', 'wa_membership_template']);
@@ -77,12 +81,10 @@ Deno.serve(async (req) => {
 
   const token = await freshToken(admin, 12);
   const password = await freshToken(admin, 8);
-  // Periode SELALU mengikuti pengaturan admin: pakai tanggal tetap bila diisi.
-  const startsAt = pkg.fixed_starts_at ? new Date(pkg.fixed_starts_at) : new Date();
-  const expiresAt = pkg.fixed_expires_at
-    ? new Date(pkg.fixed_expires_at)
-    : new Date(startsAt.getTime() + days * 24 * 60 * 60 * 1000);
-  const effectiveDays = Math.max(1, Math.round((expiresAt.getTime() - startsAt.getTime()) / 86400000));
+  // Periode dihitung dari waktu pembuatan token reseller (31/62 hari).
+  const startsAt = new Date();
+  const expiresAt = new Date(startsAt.getTime() + days * 24 * 60 * 60 * 1000);
+  const effectiveDays = days;
 
   const { data: ba } = await admin.from('bot_admins').select('label').eq('phone', phone).maybeSingle();
   const resellerLabel = (ba?.label || '').trim();
