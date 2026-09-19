@@ -356,7 +356,16 @@ export default function MembershipUsersAdmin() {
             <div><Label>Email</Label><Input value={editForm.email} onChange={e => setEditForm(f => ({ ...f, email: e.target.value }))} /></div>
             <div><Label>Phone (628xxx)</Label><Input value={editForm.phone} onChange={e => setEditForm(f => ({ ...f, phone: e.target.value }))} /></div>
             <div><Label>Berakhir</Label><Input type="datetime-local" value={editForm.expires_at} onChange={e => setEditForm(f => ({ ...f, expires_at: e.target.value }))} /></div>
-            <div><Label>Perpanjang (+hari)</Label><Input type="number" min={0} value={editForm.extend} onChange={e => setEditForm(f => ({ ...f, extend: parseInt(e.target.value)||0 }))} /><p className="text-[10px] text-muted-foreground mt-1">Akan menambah N hari dari tanggal berakhir saat ini (atau dari sekarang bila sudah lewat).</p></div>
+            <div>
+              <Label>Perpanjang (+hari)</Label>
+              <div className="flex flex-wrap gap-1.5 my-1.5">
+                <Button type="button" size="sm" variant={editForm.extend === 31 ? 'default' : 'outline'} onClick={() => setEditForm(f => ({ ...f, extend: 31 }))}>+31 hari (1 bulan)</Button>
+                <Button type="button" size="sm" variant={editForm.extend === 62 ? 'default' : 'outline'} onClick={() => setEditForm(f => ({ ...f, extend: 62 }))}>+62 hari (2 bulan)</Button>
+                <Button type="button" size="sm" variant="ghost" onClick={() => setEditForm(f => ({ ...f, extend: 0 }))}>Reset</Button>
+              </div>
+              <Input type="number" min={0} value={editForm.extend} onChange={e => setEditForm(f => ({ ...f, extend: parseInt(e.target.value)||0 }))} />
+              <p className="text-[10px] text-muted-foreground mt-1">Durasi bebas per user — boleh berbeda dari durasi paket. Menambah N hari dari tanggal berakhir saat ini (atau dari sekarang bila sudah lewat).</p>
+            </div>
             <div><Label>Max Device</Label><Input type="number" min={1} value={editForm.max_devices} onChange={e => setEditForm(f => ({ ...f, max_devices: parseInt(e.target.value)||1 }))} /></div>
             <div className="flex items-center justify-between"><Label>Termasuk replay</Label><Switch checked={editForm.includes_replays} onCheckedChange={(v) => setEditForm(f => ({ ...f, includes_replays: v }))} /></div>
             <div className="flex items-center justify-between"><Label>Dicabut (revoked)</Label><Switch checked={editForm.revoked} onCheckedChange={(v) => setEditForm(f => ({ ...f, revoked: v }))} /></div>
@@ -398,6 +407,20 @@ export default function MembershipUsersAdmin() {
                 {!pkgError && !pkgLoading && pkgs.length === 0 && (
                   <p className="text-[10px] text-muted-foreground mt-1">Belum ada paket. Buat dulu di menu “Paket Membership”.</p>
                 )}
+              </div>
+              <div>
+                <Label>Tipe Durasi</Label>
+                <div className="flex flex-wrap gap-1.5 mt-1">
+                  <Button type="button" size="sm" variant={createForm.days === 31 ? 'default' : 'outline'} onClick={() => setCreateForm(f => ({ ...f, days: 31 }))}>Otomatis 1 Bulan (31 hari)</Button>
+                  <Button type="button" size="sm" variant={createForm.days === 62 ? 'default' : 'outline'} onClick={() => setCreateForm(f => ({ ...f, days: 62 }))}>Otomatis 2 Bulan (62 hari)</Button>
+                  <Button
+                    type="button" size="sm"
+                    variant={createForm.days !== 31 && createForm.days !== 62 ? 'default' : 'outline'}
+                    onClick={() => setCreateForm(f => ({ ...f, days: pkgs.find(p => p.id === f.package_id)?.duration_days || f.days }))}
+                  >
+                    Durasi Admin (paket/manual)
+                  </Button>
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div><Label>Durasi (hari)</Label><Input type="number" min={1} value={createForm.days} onChange={e => setCreateForm(f => ({ ...f, days: parseInt(e.target.value)||1 }))} /></div>
