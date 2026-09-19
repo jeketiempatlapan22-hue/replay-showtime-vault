@@ -223,7 +223,13 @@ export default function MembershipPackagesAdmin() {
             <Label className="text-xs">Nama Paket</Label>
             <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="cth: Premium 30 Hari" />
           </div>
-          <div>
+          <div className="sm:col-span-2">
+            <Label className="text-xs">Tipe Durasi</Label>
+            <div className="flex flex-wrap gap-1.5 mt-1 mb-2">
+              <Button type="button" size="sm" variant={form.duration_days === 31 ? 'default' : 'outline'} onClick={() => setForm({ ...form, duration_days: 31 })}>Otomatis 1 Bulan (31 hari)</Button>
+              <Button type="button" size="sm" variant={form.duration_days === 62 ? 'default' : 'outline'} onClick={() => setForm({ ...form, duration_days: 62 })}>Otomatis 2 Bulan (62 hari)</Button>
+              <Button type="button" size="sm" variant={form.duration_days !== 31 && form.duration_days !== 62 ? 'default' : 'outline'} onClick={() => setForm({ ...form, duration_days: form.duration_days === 31 || form.duration_days === 62 ? 30 : form.duration_days })}>Durasi Admin (manual)</Button>
+            </div>
             <Label className="text-xs">Durasi (hari)</Label>
             <Input type="number" min={1} value={form.duration_days} onChange={(e) => setForm({ ...form, duration_days: Number(e.target.value) || 0 })} />
           </div>
