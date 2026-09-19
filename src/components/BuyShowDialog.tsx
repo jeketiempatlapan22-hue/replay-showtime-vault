@@ -507,40 +507,24 @@ export default function BuyShowDialog({ open, onOpenChange, showId = '', showTit
                   fallbackLink={accessLink}
                   compact
                 />
-                <div className="rounded-lg border-2 border-primary/40 bg-primary/10 p-3 space-y-2 animate-pulse-slow">
-                  <div className="flex items-center gap-1.5 text-[11px] font-semibold text-primary">
-                    <Copy className="w-3.5 h-3.5" /> SALIN LINK TOKEN & TEMPEL DI BROWSER
-                  </div>
-                  <p className="text-[10px] text-muted-foreground">Tekan tombol di bawah untuk menyalin link, lalu tempel (paste) di browser untuk langsung menonton.</p>
-                  <Button size="sm" className="w-full gap-1.5" onClick={copyLink}>
-                    <Copy className="w-3.5 h-3.5" /> Salin Link Token
-                  </Button>
-                </div>
-                <div className="rounded-md border border-border bg-card p-3 space-y-2">
-                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Link akses</div>
-                  <div className="flex items-center gap-2">
-                    <code className="flex-1 text-xs font-mono break-all">{accessLink}</code>
-                    <Button size="sm" variant="outline" onClick={copyLink}><Copy className="w-3.5 h-3.5" /></Button>
-                  </div>
-                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground pt-1">Token</div>
-                  <div className="flex items-center gap-2">
-                    <code className="flex-1 text-xs font-mono break-all">{accessToken}</code>
-                    <Button size="sm" variant="outline" onClick={copyToken}><Copy className="w-3.5 h-3.5" /></Button>
-                  </div>
-                </div>
+                <Button
+                  size="lg"
+                  className="w-full gap-2 bg-red-600 hover:bg-red-700 text-white"
+                  onClick={() => {
+                    onOpenChange(false);
+                    const path = accessLink.replace(window.location.origin, '');
+                    navigate(path);
+                  }}
+                >
+                  <Play className="w-4 h-4" />
+                  {kind === 'bundle'
+                    ? 'Tonton Sekarang (Bundle)'
+                    : kind === 'show'
+                      ? 'Tonton Live Sekarang'
+                      : 'Tonton Replay Sekarang'}
+                </Button>
               </>
             )}
-            <div className="rounded-md border border-green-500/30 bg-green-500/10 p-2.5 space-y-1.5">
-              <div className="text-[11px] font-semibold text-foreground flex items-center gap-1.5">
-                <MessageCircle className="w-3.5 h-3.5 text-green-500" /> Token belum masuk? Kirim bukti pembayaran
-              </div>
-              <p className="text-[10px] text-muted-foreground">Bila bot WA sedang gangguan, kirim bukti pembayaran ke admin agar token dibuat manual.</p>
-              <Button asChild size="sm" className="w-full bg-green-600 hover:bg-green-700 text-white">
-                <a href={adminWaUrl} target="_blank" rel="noopener noreferrer">
-                  <MessageCircle className="w-3.5 h-3.5 mr-1.5" /> Kirim Bukti Pembayaran ke Admin
-                </a>
-              </Button>
-            </div>
             <Button variant="outline" className="w-full" onClick={() => onOpenChange(false)}>Tutup</Button>
           </div>
         )}
