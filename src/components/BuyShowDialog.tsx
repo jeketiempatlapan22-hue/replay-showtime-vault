@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
-import { Loader2, CheckCircle2, Copy, Smartphone, ExternalLink, MessageCircle, AlertTriangle, Coins, Lock, Upload } from 'lucide-react';
+import { Loader2, CheckCircle2, Copy, Smartphone, ExternalLink, MessageCircle, AlertTriangle, Coins, Lock, Upload, Play } from 'lucide-react';
 import { setShowPurchase, setReplayPurchase } from '@/lib/purchases';
 import MembershipProofUpload from '@/components/MembershipProofUpload';
 import { adminWaNumber } from '@/lib/adminWa';
