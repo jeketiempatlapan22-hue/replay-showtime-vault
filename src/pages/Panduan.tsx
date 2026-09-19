@@ -286,9 +286,9 @@ export default function Panduan() {
         <div className="rounded-xl border-2 border-primary/40 bg-primary/5 p-3 sm:p-4 mb-6 flex items-start gap-3">
           <Copy className="w-5 h-5 text-primary shrink-0 mt-0.5" />
           <div className="text-xs sm:text-sm">
-            <div className="font-semibold text-foreground mb-0.5">Sudah beli show?</div>
+            <div className="font-semibold text-foreground mb-0.5">Semua pembelian selesai di website ini</div>
             <div className="text-muted-foreground">
-              Klik tombol <b>"Salin Link Token"</b> di kartu show, lalu tempel di browser perangkat tujuan. Token otomatis aktif di perangkat itu.
+              Pilih show → bayar QRIS atau Koin → tombol <b>"Tonton Sekarang"</b> muncul otomatis. Tidak perlu chat admin untuk minta link atau token.
             </div>
           </div>
         </div>
@@ -358,7 +358,7 @@ export default function Panduan() {
         </div>
 
         <div className="mt-8 text-center text-xs text-muted-foreground">
-          Masih bingung? Hubungi admin lewat menu <b>Hubungi Admin</b> di hamburger menu.
+          Semua langkah pembelian di atas bisa diselesaikan sendiri langsung di website ini.
         </div>
       </main>
     </div>
