@@ -132,6 +132,12 @@ export default function BulkShowImport({ onImported }: Props) {
           replay_id: null,
           replay_enabled: false,
           idn_show_id: s.idn_show_id || '',
+          live_auto_schedule: !!s.live_auto_schedule,
+          live_url: s.player_url || '',
+          live_type: s.player_url ? s.player_type : 'm3u8',
+          live_sources: s.player_url
+            ? [{ label: 'Player Utama', type: s.player_type, url: s.player_url }]
+            : [],
         } as any);
         ok++;
       } catch {
