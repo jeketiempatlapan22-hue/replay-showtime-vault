@@ -194,6 +194,8 @@ export default function BulkShowImport({ onImported }: Props) {
               defCoinsReplay={defCoinsReplay} setDefCoinsReplay={setDefCoinsReplay}
               defPassword={defPassword} setDefPassword={setDefPassword}
               aliasPrefix={aliasPrefix} setAliasPrefix={setAliasPrefix}
+              defLiveAuto={defLiveAuto} setDefLiveAuto={setDefLiveAuto}
+              defPlayerUrl={defPlayerUrl} setDefPlayerUrl={setDefPlayerUrl}
             />
 
             {warnings.length > 0 && (
