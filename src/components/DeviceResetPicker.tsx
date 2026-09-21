@@ -38,12 +38,12 @@ export default function DeviceResetPicker({ targets }: { targets: ResetTarget[] 
       <CardContent className="space-y-2">
         {list.length === 0 ? (
           <p className="text-xs text-muted-foreground">
-            Belum ada akses yang bisa direset. Setelah membeli show, replay, atau membership, tombol reset akan muncul di sini.
+            Belum ada akses live yang perlu direset. Replay bisa ditonton di perangkat mana pun tanpa reset.
           </p>
         ) : (
           <>
             <p className="text-[11px] text-muted-foreground">
-              Pilih akses yang mau dipindahkan ke perangkat ini.
+              Khusus akses Live & Membership. Pilih akses yang mau dipindahkan ke perangkat ini.
             </p>
             <Select value={selected} onValueChange={setSelected}>
               <SelectTrigger className="h-9 text-xs">

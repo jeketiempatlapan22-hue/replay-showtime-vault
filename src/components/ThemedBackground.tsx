@@ -277,7 +277,141 @@ function AuroraBackground() {
   );
 }
 
-export type ThemeType = 'ramadhan' | 'space' | 'ocean' | 'sunset' | 'forest' | 'sunrise' | 'winter' | 'spring' | 'aurora';
+// RAIN — tetesan hujan + kilat halus
+function RainBackground() {
+  const drops = useMemo(() =>
+    Array.from({ length: 70 }, (_, i) => ({
+      id: i,
+      left: `${Math.random() * 100}%`,
+      delay: `${Math.random() * 2}s`,
+      duration: `${Math.random() * 0.6 + 0.7}s`,
+      height: Math.random() * 40 + 30,
+      opacity: Math.random() * 0.4 + 0.25,
+    })), []
+  );
+  return (
+    <div className="fixed inset-0 overflow-hidden pointer-events-none z-0"
+      style={{ background: 'linear-gradient(180deg, hsl(215,35%,12%) 0%, hsl(212,30%,18%) 60%, hsl(210,25%,24%) 100%)' }}>
+      <div className="absolute inset-0 animate-lightning-flash bg-foreground/5" />
+      {drops.map(d => (
+        <div key={d.id} className="absolute w-px animate-rain-fall"
+          style={{
+            left: d.left, top: '-10%', height: d.height, opacity: d.opacity,
+            background: 'linear-gradient(180deg, transparent, hsl(200,60%,85%))',
+            animationDelay: d.delay, animationDuration: d.duration,
+          }} />
+      ))}
+      <div className="absolute bottom-0 left-0 w-full h-1/4 opacity-30"
+        style={{ background: 'linear-gradient(0deg, hsla(210,40%,60%,0.35), transparent)' }} />
+    </div>
+  );
+}
+
+// RAINBOW — pita pelangi bergerak
+function RainbowBackground() {
+  return (
+    <div className="fixed inset-0 overflow-hidden pointer-events-none z-0"
+      style={{ background: 'linear-gradient(180deg, hsl(200,70%,80%) 0%, hsl(200,60%,90%) 55%, hsl(140,35%,82%) 100%)' }}>
+      <div className="absolute -top-1/3 left-1/2 -translate-x-1/2 w-[160vw] h-[160vw] rounded-full opacity-50 animate-rainbow-drift"
+        style={{
+          background: 'conic-gradient(from 180deg, transparent 0deg, transparent 150deg, hsla(0,80%,60%,0.55) 165deg, hsla(35,90%,60%,0.55) 172deg, hsla(55,90%,60%,0.55) 179deg, hsla(120,60%,50%,0.55) 186deg, hsla(200,80%,55%,0.55) 193deg, hsla(270,60%,60%,0.55) 200deg, transparent 215deg, transparent 360deg)',
+          maskImage: 'radial-gradient(circle, transparent 58%, black 60%, black 68%, transparent 70%)',
+          WebkitMaskImage: 'radial-gradient(circle, transparent 58%, black 60%, black 68%, transparent 70%)',
+        }} />
+      <div className="absolute top-10 left-10 w-40 h-16 rounded-full bg-background/60 blur-xl animate-cloud-drift" />
+      <div className="absolute top-32 right-10 w-56 h-20 rounded-full bg-background/50 blur-xl animate-cloud-drift-slow" />
+      <Particles color="hsl(55,90%,65%)" />
+    </div>
+  );
+}
+
+// METEOR — hujan meteor di langit malam
+function MeteorBackground() {
+  const meteors = useMemo(() =>
+    Array.from({ length: 14 }, (_, i) => ({
+      id: i,
+      left: `${Math.random() * 100}%`,
+      top: `${Math.random() * 50}%`,
+      delay: `${Math.random() * 6}s`,
+      duration: `${Math.random() * 1.5 + 1.2}s`,
+      width: Math.random() * 90 + 60,
+    })), []
+  );
+  return (
+    <div className="fixed inset-0 overflow-hidden pointer-events-none z-0"
+      style={{ background: 'linear-gradient(180deg, hsl(240,45%,5%) 0%, hsl(235,40%,9%) 60%, hsl(230,35%,14%) 100%)' }}>
+      <Stars count={80} />
+      {meteors.map(m => (
+        <div key={m.id} className="absolute h-px animate-meteor-streak"
+          style={{
+            left: m.left, top: m.top, width: m.width,
+            background: 'linear-gradient(90deg, hsla(45,90%,80%,0.9), transparent)',
+            animationDelay: m.delay, animationDuration: m.duration,
+          }} />
+      ))}
+    </div>
+  );
+}
+
+// SAKURA MALAM — kelopak beterbangan di langit gelap
+function SakuraNightBackground() {
+  const petals = useMemo(() =>
+    Array.from({ length: 22 }, (_, i) => ({
+      id: i,
+      left: `${Math.random() * 100}%`,
+      delay: `${Math.random() * 8}s`,
+      duration: `${Math.random() * 5 + 7}s`,
+      size: Math.random() * 8 + 6,
+    })), []
+  );
+  return (
+    <div className="fixed inset-0 overflow-hidden pointer-events-none z-0"
+      style={{ background: 'linear-gradient(180deg, hsl(300,30%,8%) 0%, hsl(330,28%,13%) 55%, hsl(340,25%,18%) 100%)' }}>
+      <Stars count={40} />
+      <CrescentMoon />
+      {petals.map(p => (
+        <div key={p.id} className="absolute animate-petal-fall"
+          style={{
+            left: p.left, top: '-5%', width: p.size, height: p.size * 0.8,
+            borderRadius: '50% 0 50% 50%',
+            background: 'radial-gradient(circle at 30% 30%, hsla(340,80%,80%,0.95), hsla(330,70%,60%,0.6))',
+            animationDelay: p.delay, animationDuration: p.duration,
+          }} />
+      ))}
+    </div>
+  );
+}
+
+// AWAN — awan bergerak perlahan
+function CloudsBackground() {
+  const clouds = useMemo(() =>
+    Array.from({ length: 8 }, (_, i) => ({
+      id: i,
+      top: `${Math.random() * 70}%`,
+      delay: `${Math.random() * 30}s`,
+      duration: `${Math.random() * 40 + 50}s`,
+      width: Math.random() * 180 + 120,
+      opacity: Math.random() * 0.35 + 0.25,
+    })), []
+  );
+  return (
+    <div className="fixed inset-0 overflow-hidden pointer-events-none z-0"
+      style={{ background: 'linear-gradient(180deg, hsl(205,65%,70%) 0%, hsl(200,55%,82%) 60%, hsl(195,45%,90%) 100%)' }}>
+      {clouds.map(c => (
+        <div key={c.id} className="absolute rounded-full blur-2xl animate-cloud-cross"
+          style={{
+            top: c.top, left: '-30%', width: c.width, height: c.width * 0.35,
+            background: 'hsla(0,0%,100%,0.9)', opacity: c.opacity,
+            animationDelay: c.delay, animationDuration: c.duration,
+          }} />
+      ))}
+    </div>
+  );
+}
+
+export type ThemeType =
+  | 'ramadhan' | 'space' | 'ocean' | 'sunset' | 'forest' | 'sunrise' | 'winter' | 'spring' | 'aurora'
+  | 'rain' | 'rainbow' | 'meteor' | 'sakura' | 'clouds';
 
 export const THEME_OPTIONS: { value: ThemeType; label: string; emoji: string }[] = [
   { value: 'ramadhan', label: 'Ramadhan', emoji: '🌙' },
@@ -289,6 +423,11 @@ export const THEME_OPTIONS: { value: ThemeType; label: string; emoji: string }[]
   { value: 'winter', label: 'Musim Salju', emoji: '❄️' },
   { value: 'spring', label: 'Musim Semi', emoji: '🌸' },
   { value: 'aurora', label: 'Aurora', emoji: '🌌' },
+  { value: 'rain', label: 'Hujan', emoji: '🌧️' },
+  { value: 'rainbow', label: 'Pelangi', emoji: '🌈' },
+  { value: 'meteor', label: 'Badai Meteor', emoji: '☄️' },
+  { value: 'sakura', label: 'Sakura Malam', emoji: '🌸' },
+  { value: 'clouds', label: 'Awan', emoji: '☁️' },
 ];
 
 export default function ThemedBackground({ theme = 'ramadhan' }: { theme?: ThemeType }) {
@@ -301,6 +440,11 @@ export default function ThemedBackground({ theme = 'ramadhan' }: { theme?: Theme
     case 'winter': return <WinterBackground />;
     case 'spring': return <SpringBackground />;
     case 'aurora': return <AuroraBackground />;
+    case 'rain': return <RainBackground />;
+    case 'rainbow': return <RainbowBackground />;
+    case 'meteor': return <MeteorBackground />;
+    case 'sakura': return <SakuraNightBackground />;
+    case 'clouds': return <CloudsBackground />;
     default: return <RamadhanBackground />;
   }
 }

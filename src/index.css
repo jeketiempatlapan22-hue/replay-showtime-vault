@@ -163,6 +163,60 @@
   animation: petal-fall 8s ease-in-out infinite;
 }
 
+@keyframes rain-fall {
+  0% { transform: translateY(-10vh); }
+  100% { transform: translateY(115vh); }
+}
+
+@keyframes lightning-flash {
+  0%, 92%, 100% { opacity: 0; }
+  93% { opacity: 0.55; }
+  94% { opacity: 0.05; }
+  95% { opacity: 0.4; }
+  97% { opacity: 0; }
+}
+
+@keyframes rainbow-drift {
+  0%, 100% { transform: translateX(-50%) rotate(-2deg); opacity: 0.45; }
+  50% { transform: translateX(-50%) rotate(2deg); opacity: 0.65; }
+}
+
+@keyframes cloud-drift {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(40px); }
+}
+
+@keyframes cloud-cross {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(160vw); }
+}
+
+@keyframes meteor-streak {
+  0% { transform: translate(0, 0) rotate(28deg); opacity: 0; }
+  10% { opacity: 1; }
+  100% { transform: translate(60vw, 60vh) rotate(28deg); opacity: 0; }
+}
+
+.animate-rain-fall { animation: rain-fall 1s linear infinite; }
+.animate-lightning-flash { animation: lightning-flash 12s linear infinite; }
+.animate-rainbow-drift { animation: rainbow-drift 14s ease-in-out infinite; }
+.animate-cloud-drift { animation: cloud-drift 18s ease-in-out infinite; }
+.animate-cloud-drift-slow { animation: cloud-drift 26s ease-in-out infinite; }
+.animate-cloud-cross { animation: cloud-cross 60s linear infinite; }
+.animate-meteor-streak { animation: meteor-streak 2s ease-in infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-rain-fall,
+  .animate-lightning-flash,
+  .animate-rainbow-drift,
+  .animate-cloud-drift,
+  .animate-cloud-drift-slow,
+  .animate-cloud-cross,
+  .animate-meteor-streak {
+    animation: none;
+  }
+}
+
 @keyframes fade-up {
   0% { opacity: 0; transform: translateY(20px); }
   100% { opacity: 1; transform: translateY(0); }
@@ -359,4 +413,74 @@
 .scrollbar-thin:hover::-webkit-scrollbar-thumb,
 .scrollbar-thin:focus-visible::-webkit-scrollbar-thumb {
   background-color: hsl(var(--primary) / 0.6);
+}
+
+.light.theme-rain {
+  --background: 210 25% 93%;
+  --card: 210 20% 97%;
+  --primary: 205 55% 40%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 210 18% 88%;
+  --muted: 210 15% 91%;
+  --muted-foreground: 210 12% 42%;
+  --border: 210 15% 82%;
+  --input: 210 15% 82%;
+  --ring: 205 55% 40%;
+  --accent: 195 45% 45%;
+}
+
+.light.theme-rainbow {
+  --background: 200 40% 95%;
+  --card: 200 25% 98%;
+  --primary: 280 55% 50%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 200 22% 90%;
+  --muted: 200 18% 92%;
+  --muted-foreground: 210 12% 42%;
+  --border: 200 18% 84%;
+  --input: 200 18% 84%;
+  --ring: 280 55% 50%;
+  --accent: 20 75% 52%;
+}
+
+.light.theme-meteor {
+  --background: 240 22% 94%;
+  --card: 240 18% 97%;
+  --primary: 245 55% 52%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 240 16% 89%;
+  --muted: 240 14% 91%;
+  --muted-foreground: 240 12% 42%;
+  --border: 240 14% 83%;
+  --input: 240 14% 83%;
+  --ring: 245 55% 52%;
+  --accent: 45 80% 48%;
+}
+
+.light.theme-sakura {
+  --background: 335 28% 95%;
+  --card: 335 20% 98%;
+  --primary: 335 60% 52%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 335 18% 90%;
+  --muted: 335 15% 92%;
+  --muted-foreground: 335 12% 42%;
+  --border: 335 15% 84%;
+  --input: 335 15% 84%;
+  --ring: 335 60% 52%;
+  --accent: 275 45% 55%;
+}
+
+.light.theme-clouds {
+  --background: 200 35% 95%;
+  --card: 200 22% 98%;
+  --primary: 205 60% 45%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 200 20% 90%;
+  --muted: 200 16% 92%;
+  --muted-foreground: 205 12% 42%;
+  --border: 200 16% 84%;
+  --input: 200 16% 84%;
+  --ring: 205 60% 45%;
+  --accent: 190 50% 48%;
 }

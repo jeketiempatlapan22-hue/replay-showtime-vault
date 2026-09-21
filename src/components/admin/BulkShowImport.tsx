@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
 import { Upload, Trash2, Sparkles, ImageOff, ImageIcon } from 'lucide-react';
 import { upsertActiveShow } from '@/lib/activeShows';
 import { toast } from '@/hooks/use-toast';
@@ -18,6 +19,14 @@ import { parseBulkText, type ParsedShow } from '@/lib/bulkShowParser';
 
 interface Props {
   onImported: () => void;
+}
+
+/** Tebak jenis sumber player dari URL yang ditempel admin. */
+function detectSourceType(url: string): 'm3u8' | 'youtube' | 'cloudflare' {
+  const u = (url || '').toLowerCase();
+  if (u.includes('youtube.com') || u.includes('youtu.be')) return 'youtube';
+  if (u.includes('videodelivery.net') || u.includes('cloudflarestream.com')) return 'cloudflare';
+  return 'm3u8';
 }
 
 export default function BulkShowImport({ onImported }: Props) {
@@ -41,10 +50,15 @@ export default function BulkShowImport({ onImported }: Props) {
   const [defCoinsReplay, setDefCoinsReplay] = useState<number>(0);
   const [defPassword, setDefPassword] = useState<string>('');
   const [aliasPrefix, setAliasPrefix] = useState<string>('');
+  const [defLiveAuto, setDefLiveAuto] = useState<boolean>(true);
+  const [defPlayerUrl, setDefPlayerUrl] = useState<string>('');
+  const [autoOverride, setAutoOverride] = useState<Record<number, boolean>>({});
+  const [urlOverride, setUrlOverride] = useState<Record<number, string>>({});
 
   const preview = useMemo(() => parsed.map((s, idx) => {
     const hit = matchGalleryImage(s.title, gallery);
     const override = imgOverride[idx];
+    const playerUrl = (urlOverride[idx] ?? defPlayerUrl).trim();
     return {
       ...s,
       admin_alias: aliasPrefix ? `${aliasPrefix}${idx + 1}` : s.admin_alias,
@@ -55,8 +69,11 @@ export default function BulkShowImport({ onImported }: Props) {
       price_replay_coins: s.price_replay_coins || defCoinsReplay,
       image_url: override ?? (hit?.url || ''),
       image_name: override ? (gallery.find(g => g.url === override)?.name || 'manual') : (hit?.name || ''),
+      live_auto_schedule: autoOverride[idx] ?? defLiveAuto,
+      player_url: playerUrl,
+      player_type: detectSourceType(playerUrl),
     };
-  }), [parsed, gallery, imgOverride, aliasPrefix, defPassword, defPriceShow, defPriceReplay, defCoinsShow, defCoinsReplay]);
+  }), [parsed, gallery, imgOverride, aliasPrefix, defPassword, defPriceShow, defPriceReplay, defCoinsShow, defCoinsReplay, defLiveAuto, defPlayerUrl, autoOverride, urlOverride]);
 
   const unmatched = preview.filter(s => !s.image_url).length;
 
@@ -116,6 +133,12 @@ export default function BulkShowImport({ onImported }: Props) {
           replay_id: null,
           replay_enabled: false,
           idn_show_id: s.idn_show_id || '',
+          live_auto_schedule: !!s.live_auto_schedule,
+          live_url: s.player_url || '',
+          live_type: s.player_url ? s.player_type : 'm3u8',
+          live_sources: s.player_url
+            ? [{ label: 'Player Utama', type: s.player_type, url: s.player_url }]
+            : [],
         } as any);
         ok++;
       } catch {
@@ -172,6 +195,8 @@ export default function BulkShowImport({ onImported }: Props) {
               defCoinsReplay={defCoinsReplay} setDefCoinsReplay={setDefCoinsReplay}
               defPassword={defPassword} setDefPassword={setDefPassword}
               aliasPrefix={aliasPrefix} setAliasPrefix={setAliasPrefix}
+              defLiveAuto={defLiveAuto} setDefLiveAuto={setDefLiveAuto}
+              defPlayerUrl={defPlayerUrl} setDefPlayerUrl={setDefPlayerUrl}
             />
 
             {warnings.length > 0 && (
@@ -272,6 +297,21 @@ export default function BulkShowImport({ onImported }: Props) {
                       <Input className="h-8 text-xs" value={s.description}
                         onChange={e => updateRow(idx, { description: e.target.value })} />
                     </div>
+                    <div className="col-span-2 flex flex-wrap items-center gap-3">
+                      <label className="flex items-center gap-2 text-[11px] cursor-pointer">
+                        <Switch
+                          checked={s.live_auto_schedule}
+                          onCheckedChange={(v) => setAutoOverride(prev => ({ ...prev, [idx]: v }))}
+                        />
+                        Live Otomatis
+                      </label>
+                      <div className="flex-1 min-w-[200px]">
+                        <Label className="text-[10px]">Player Utama (opsional) — {s.player_url ? s.player_type : 'kosong'}</Label>
+                        <Input className="h-8 text-xs" placeholder="https://.../index.m3u8"
+                          value={s.player_url}
+                          onChange={e => setUrlOverride(prev => ({ ...prev, [idx]: e.target.value.trim() }))} />
+                      </div>
+                    </div>
                   </div>
                   {s.lineup.length > 0 && (
                     <div className="flex flex-wrap gap-1 pt-1">
@@ -302,10 +342,23 @@ function Card_Defaults(props: {
   defCoinsReplay: number; setDefCoinsReplay: (n: number) => void;
   defPassword: string; setDefPassword: (s: string) => void;
   aliasPrefix: string; setAliasPrefix: (s: string) => void;
+  defLiveAuto: boolean; setDefLiveAuto: (v: boolean) => void;
+  defPlayerUrl: string; setDefPlayerUrl: (s: string) => void;
 }) {
   return (
     <div className="p-3 rounded-lg border border-primary/30 bg-primary/5 space-y-2">
       <p className="text-xs font-semibold">Default untuk semua show (kosongkan jika ingin per-show)</p>
+      <div className="flex flex-wrap items-center gap-3">
+        <label className="flex items-center gap-2 text-xs font-medium cursor-pointer">
+          <Switch checked={props.defLiveAuto} onCheckedChange={props.setDefLiveAuto} />
+          Live Otomatis Aktif
+        </label>
+        <div className="flex-1 min-w-[220px]">
+          <Label className="text-[10px]">Player Utama (opsional) — m3u8 / YouTube / Cloudflare</Label>
+          <Input className="h-8 text-xs" placeholder="https://.../index.m3u8" value={props.defPlayerUrl}
+            onChange={e => props.setDefPlayerUrl(e.target.value.trim())} />
+        </div>
+      </div>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
         <div>
           <Label className="text-[10px]">Prefix Alias</Label>
