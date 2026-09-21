@@ -163,6 +163,60 @@
   animation: petal-fall 8s ease-in-out infinite;
 }
 
+@keyframes rain-fall {
+  0% { transform: translateY(-10vh); }
+  100% { transform: translateY(115vh); }
+}
+
+@keyframes lightning-flash {
+  0%, 92%, 100% { opacity: 0; }
+  93% { opacity: 0.55; }
+  94% { opacity: 0.05; }
+  95% { opacity: 0.4; }
+  97% { opacity: 0; }
+}
+
+@keyframes rainbow-drift {
+  0%, 100% { transform: translateX(-50%) rotate(-2deg); opacity: 0.45; }
+  50% { transform: translateX(-50%) rotate(2deg); opacity: 0.65; }
+}
+
+@keyframes cloud-drift {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(40px); }
+}
+
+@keyframes cloud-cross {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(160vw); }
+}
+
+@keyframes meteor-streak {
+  0% { transform: translate(0, 0) rotate(28deg); opacity: 0; }
+  10% { opacity: 1; }
+  100% { transform: translate(60vw, 60vh) rotate(28deg); opacity: 0; }
+}
+
+.animate-rain-fall { animation: rain-fall 1s linear infinite; }
+.animate-lightning-flash { animation: lightning-flash 12s linear infinite; }
+.animate-rainbow-drift { animation: rainbow-drift 14s ease-in-out infinite; }
+.animate-cloud-drift { animation: cloud-drift 18s ease-in-out infinite; }
+.animate-cloud-drift-slow { animation: cloud-drift 26s ease-in-out infinite; }
+.animate-cloud-cross { animation: cloud-cross 60s linear infinite; }
+.animate-meteor-streak { animation: meteor-streak 2s ease-in infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-rain-fall,
+  .animate-lightning-flash,
+  .animate-rainbow-drift,
+  .animate-cloud-drift,
+  .animate-cloud-drift-slow,
+  .animate-cloud-cross,
+  .animate-meteor-streak {
+    animation: none;
+  }
+}
+
 @keyframes fade-up {
   0% { opacity: 0; transform: translateY(20px); }
   100% { opacity: 1; transform: translateY(0); }
