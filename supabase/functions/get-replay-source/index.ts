@@ -47,35 +47,17 @@ Deno.serve(async (req) => {
       if (replay.access_token && replay.access_token === access_token) {
         valid = true;
       } else {
-        // 2) personal device-locked token
+        // 2) personal token — replay tidak lagi dikunci per perangkat
         const { data: pt } = await supabase
           .from("replay_personal_tokens")
-          .select("id, replay_id, max_devices, revoked, expires_at")
+          .select("id, replay_id, revoked, expires_at")
           .eq("token", access_token)
           .maybeSingle();
         if (pt && pt.expires_at && new Date(pt.expires_at).getTime() < Date.now()) {
           return json({ valid: false, reason: "expired" }, 403);
         }
         if (pt && !pt.revoked && pt.replay_id === replay_id) {
-          if (!browser_id) return json({ valid: false, reason: "no_device" }, 403);
-          const { data: existing } = await supabase
-            .from("replay_token_devices")
-            .select("id").eq("token_id", pt.id).eq("browser_id", browser_id).maybeSingle();
-          if (existing) {
-            valid = true;
-          } else {
-            const { count } = await supabase
-              .from("replay_token_devices").select("id", { count: "exact", head: true }).eq("token_id", pt.id);
-            if ((count ?? 0) >= pt.max_devices) return json({ valid: false, reason: "device_limit" }, 403);
-            const { error: insErr } = await supabase
-              .from("replay_token_devices").insert({ token_id: pt.id, browser_id });
-            if (insErr) {
-              const { data: re } = await supabase.from("replay_token_devices")
-                .select("id").eq("token_id", pt.id).eq("browser_id", browser_id).maybeSingle();
-              if (!re) return json({ valid: false, reason: "device_limit" }, 403);
-            }
-            valid = true;
-          }
+          valid = true;
         }
 
         // 3) membership token — berlaku untuk replay yang tanggalnya berada
@@ -100,28 +82,18 @@ Deno.serve(async (req) => {
               && replayTime <= (Number.isFinite(expiresAt) ? expiresAt : replayTime);
             if (!inPeriod) return json({ valid: false, reason: "outside_membership_period" }, 403);
 
-            if (!browser_id) return json({ valid: false, reason: "no_device" }, 403);
-            const maxDevices = Math.max(1, Number(mt.max_devices || 1));
-            const { data: existingDev } = await supabase
-              .from("membership_token_devices")
-              .select("id").eq("token_id", mt.id).eq("browser_id", browser_id).maybeSingle();
-            if (existingDev) {
-              await supabase.from("membership_token_devices")
-                .update({ last_seen: new Date().toISOString() }).eq("id", existingDev.id);
-              valid = true;
-            } else {
-              const { count } = await supabase
-                .from("membership_token_devices").select("id", { count: "exact", head: true }).eq("token_id", mt.id);
-              if ((count ?? 0) >= maxDevices) return json({ valid: false, reason: "device_limit" }, 403);
-              const { error: insErr } = await supabase
-                .from("membership_token_devices").insert({ token_id: mt.id, browser_id });
-              if (insErr) {
-                const { data: re } = await supabase.from("membership_token_devices")
-                  .select("id").eq("token_id", mt.id).eq("browser_id", browser_id).maybeSingle();
-                if (!re) return json({ valid: false, reason: "device_limit" }, 403);
+            // Replay bebas perangkat: cukup catat perangkat aktif bila sudah ada
+            // (tanpa membatasi jumlah). Batas perangkat hanya berlaku di Live.
+            if (browser_id) {
+              const { data: existingDev } = await supabase
+                .from("membership_token_devices")
+                .select("id").eq("token_id", mt.id).eq("browser_id", browser_id).maybeSingle();
+              if (existingDev) {
+                await supabase.from("membership_token_devices")
+                  .update({ last_seen: new Date().toISOString() }).eq("id", existingDev.id);
               }
-              valid = true;
             }
+            valid = true;
           }
         }
 
@@ -136,25 +108,8 @@ Deno.serve(async (req) => {
             .eq("replay_id", replay_id)
             .maybeSingle();
           if (ordRep) {
-            if (!browser_id) return json({ valid: false, reason: "no_device" }, 403);
-            const { data: odev } = await supabase
-              .from("order_token_devices")
-              .select("id").eq("order_id", ordRep.id).eq("browser_id", browser_id).maybeSingle();
-            if (odev) {
-              valid = true;
-            } else {
-              const { count } = await supabase
-                .from("order_token_devices").select("id", { count: "exact", head: true }).eq("order_id", ordRep.id);
-              if ((count ?? 0) >= 1) return json({ valid: false, reason: "device_limit" }, 403);
-              const { error: insErr } = await supabase
-                .from("order_token_devices").insert({ order_id: ordRep.id, browser_id });
-              if (insErr) {
-                const { data: re } = await supabase.from("order_token_devices")
-                  .select("id").eq("order_id", ordRep.id).eq("browser_id", browser_id).maybeSingle();
-                if (!re) return json({ valid: false, reason: "device_limit" }, 403);
-              }
-              valid = true;
-            }
+            // Pembelian replay bebas perangkat.
+            valid = true;
           }
         }
 
@@ -178,26 +133,8 @@ Deno.serve(async (req) => {
               .in("show_id", showIds)
               .maybeSingle();
             if (ord) {
-              // Satu link pembelian = satu perangkat.
-              if (!browser_id) return json({ valid: false, reason: "no_device" }, 403);
-              const { data: odev } = await supabase
-                .from("order_token_devices")
-                .select("id").eq("order_id", ord.id).eq("browser_id", browser_id).maybeSingle();
-              if (odev) {
-                valid = true;
-              } else {
-                const { count } = await supabase
-                  .from("order_token_devices").select("id", { count: "exact", head: true }).eq("order_id", ord.id);
-                if ((count ?? 0) >= 1) return json({ valid: false, reason: "device_limit" }, 403);
-                const { error: insErr } = await supabase
-                  .from("order_token_devices").insert({ order_id: ord.id, browser_id });
-                if (insErr) {
-                  const { data: re } = await supabase.from("order_token_devices")
-                    .select("id").eq("order_id", ord.id).eq("browser_id", browser_id).maybeSingle();
-                  if (!re) return json({ valid: false, reason: "device_limit" }, 403);
-                }
-                valid = true;
-              }
+              // Replay hasil konversi show: bebas perangkat.
+              valid = true;
             }
 
 
@@ -205,7 +142,7 @@ Deno.serve(async (req) => {
             if (!valid) {
               const { data: st } = await supabase
                 .from("active_show_tokens")
-                .select("id, revoked, expires_at, max_devices, show_id")
+                .select("id, revoked, expires_at, show_id")
                 .eq("token", access_token)
                 .in("show_id", showIds)
                 .maybeSingle();
@@ -213,26 +150,8 @@ Deno.serve(async (req) => {
                 if (st.expires_at && new Date(st.expires_at).getTime() < Date.now()) {
                   return json({ valid: false, reason: "expired" }, 403);
                 }
-                if (!browser_id) return json({ valid: false, reason: "no_device" }, 403);
-                const maxDev = Math.max(1, Number(st.max_devices || 1));
-                const { data: dev } = await supabase
-                  .from("active_show_token_devices")
-                  .select("id").eq("token_id", st.id).eq("browser_id", browser_id).maybeSingle();
-                if (dev) {
-                  valid = true;
-                } else {
-                  const { count } = await supabase
-                    .from("active_show_token_devices").select("id", { count: "exact", head: true }).eq("token_id", st.id);
-                  if ((count ?? 0) >= maxDev) return json({ valid: false, reason: "device_limit" }, 403);
-                  const { error: insErr } = await supabase
-                    .from("active_show_token_devices").insert({ token_id: st.id, browser_id });
-                  if (insErr) {
-                    const { data: re } = await supabase.from("active_show_token_devices")
-                      .select("id").eq("token_id", st.id).eq("browser_id", browser_id).maybeSingle();
-                    if (!re) return json({ valid: false, reason: "device_limit" }, 403);
-                  }
-                  valid = true;
-                }
+                // Replay bebas perangkat (batas perangkat tetap di halaman Live).
+                valid = true;
               }
             }
           }
