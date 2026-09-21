@@ -30,9 +30,19 @@ const CRITERIA_FILTERS = [
   { value: 'reguler', label: 'Reguler' },
   { value: 'sts', label: 'STS' },
   { value: 'last_show', label: 'Last Show' },
+  { value: 'shonichi', label: 'Shonichi' },
+  { value: 'senshuuraku', label: 'Senshuuraku' },
   { value: 'aniv', label: 'Anniversary' },
   { value: 'special', label: 'Spesial' },
 ];
+
+// Urutan tampil untuk kelompok replay spesial.
+const SPECIAL_ORDER = ['sts', 'last_show', 'shonichi', 'senshuuraku', 'aniv', 'special'];
+const specialRank = (c: string) => {
+  const i = SPECIAL_ORDER.indexOf((c || '').toLowerCase());
+  return i === -1 ? SPECIAL_ORDER.length : i;
+};
+const isSpecialReplay = (r: { criteria: string }) => SPECIAL_ORDER.includes((r.criteria || '').toLowerCase());
 
 type SortMode = 'newest' | 'oldest' | 'title';
 
