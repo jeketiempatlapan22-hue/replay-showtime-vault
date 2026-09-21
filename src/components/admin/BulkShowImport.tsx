@@ -41,10 +41,15 @@ export default function BulkShowImport({ onImported }: Props) {
   const [defCoinsReplay, setDefCoinsReplay] = useState<number>(0);
   const [defPassword, setDefPassword] = useState<string>('');
   const [aliasPrefix, setAliasPrefix] = useState<string>('');
+  const [defLiveAuto, setDefLiveAuto] = useState<boolean>(true);
+  const [defPlayerUrl, setDefPlayerUrl] = useState<string>('');
+  const [autoOverride, setAutoOverride] = useState<Record<number, boolean>>({});
+  const [urlOverride, setUrlOverride] = useState<Record<number, string>>({});
 
   const preview = useMemo(() => parsed.map((s, idx) => {
     const hit = matchGalleryImage(s.title, gallery);
     const override = imgOverride[idx];
+    const playerUrl = (urlOverride[idx] ?? defPlayerUrl).trim();
     return {
       ...s,
       admin_alias: aliasPrefix ? `${aliasPrefix}${idx + 1}` : s.admin_alias,
@@ -55,8 +60,11 @@ export default function BulkShowImport({ onImported }: Props) {
       price_replay_coins: s.price_replay_coins || defCoinsReplay,
       image_url: override ?? (hit?.url || ''),
       image_name: override ? (gallery.find(g => g.url === override)?.name || 'manual') : (hit?.name || ''),
+      live_auto_schedule: autoOverride[idx] ?? defLiveAuto,
+      player_url: playerUrl,
+      player_type: detectSourceType(playerUrl),
     };
-  }), [parsed, gallery, imgOverride, aliasPrefix, defPassword, defPriceShow, defPriceReplay, defCoinsShow, defCoinsReplay]);
+  }), [parsed, gallery, imgOverride, aliasPrefix, defPassword, defPriceShow, defPriceReplay, defCoinsShow, defCoinsReplay, defLiveAuto, defPlayerUrl, autoOverride, urlOverride]);
 
   const unmatched = preview.filter(s => !s.image_url).length;
 
