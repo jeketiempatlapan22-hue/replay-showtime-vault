@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
 import { Upload, Trash2, Sparkles, ImageOff, ImageIcon } from 'lucide-react';
 import { upsertActiveShow } from '@/lib/activeShows';
 import { toast } from '@/hooks/use-toast';
@@ -296,6 +297,21 @@ export default function BulkShowImport({ onImported }: Props) {
                       <Input className="h-8 text-xs" value={s.description}
                         onChange={e => updateRow(idx, { description: e.target.value })} />
                     </div>
+                    <div className="col-span-2 flex flex-wrap items-center gap-3">
+                      <label className="flex items-center gap-2 text-[11px] cursor-pointer">
+                        <Switch
+                          checked={s.live_auto_schedule}
+                          onCheckedChange={(v) => setAutoOverride(prev => ({ ...prev, [idx]: v }))}
+                        />
+                        Live Otomatis
+                      </label>
+                      <div className="flex-1 min-w-[200px]">
+                        <Label className="text-[10px]">Player Utama (opsional) — {s.player_url ? s.player_type : 'kosong'}</Label>
+                        <Input className="h-8 text-xs" placeholder="https://.../index.m3u8"
+                          value={s.player_url}
+                          onChange={e => setUrlOverride(prev => ({ ...prev, [idx]: e.target.value.trim() }))} />
+                      </div>
+                    </div>
                   </div>
                   {s.lineup.length > 0 && (
                     <div className="flex flex-wrap gap-1 pt-1">
@@ -326,10 +342,23 @@ function Card_Defaults(props: {
   defCoinsReplay: number; setDefCoinsReplay: (n: number) => void;
   defPassword: string; setDefPassword: (s: string) => void;
   aliasPrefix: string; setAliasPrefix: (s: string) => void;
+  defLiveAuto: boolean; setDefLiveAuto: (v: boolean) => void;
+  defPlayerUrl: string; setDefPlayerUrl: (s: string) => void;
 }) {
   return (
     <div className="p-3 rounded-lg border border-primary/30 bg-primary/5 space-y-2">
       <p className="text-xs font-semibold">Default untuk semua show (kosongkan jika ingin per-show)</p>
+      <div className="flex flex-wrap items-center gap-3">
+        <label className="flex items-center gap-2 text-xs font-medium cursor-pointer">
+          <Switch checked={props.defLiveAuto} onCheckedChange={props.setDefLiveAuto} />
+          Live Otomatis Aktif
+        </label>
+        <div className="flex-1 min-w-[220px]">
+          <Label className="text-[10px]">Player Utama (opsional) — m3u8 / YouTube / Cloudflare</Label>
+          <Input className="h-8 text-xs" placeholder="https://.../index.m3u8" value={props.defPlayerUrl}
+            onChange={e => props.setDefPlayerUrl(e.target.value.trim())} />
+        </div>
+      </div>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
         <div>
           <Label className="text-[10px]">Prefix Alias</Label>
