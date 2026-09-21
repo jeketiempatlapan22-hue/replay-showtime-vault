@@ -275,62 +275,59 @@ export default function Index() {
   const grouped = useMemo(() => {
     let result = { ...allGrouped };
 
-    // Text search
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
+    const keep = (fn: (r: ReplayRow) => boolean) => {
       const filtered: Record<string, ReplayRow[]> = {};
       for (const [month, replays] of Object.entries(result)) {
-        const matched = replays.filter(r =>
-          r.title.toLowerCase().includes(q) ||
-          r.lineup.some(m => m.toLowerCase().includes(q)) ||
-          r.criteria.toLowerCase().includes(q) ||
-          (r.show_name && r.show_name.toLowerCase().includes(q)) ||
-          (r.featured_member && r.featured_member.toLowerCase().includes(q))
-        );
+        const matched = replays.filter(fn);
         if (matched.length > 0) filtered[month] = matched;
       }
       result = filtered;
+    };
+
+    // Text search — semua kata kunci harus cocok (mis. "sts jessi")
+    if (searchQuery.trim()) {
+      const terms = searchQuery.toLowerCase().split(/\s+/).filter(Boolean);
+      keep((r) => {
+        const haystack = [
+          r.title, r.criteria, r.show_name || '', r.featured_member || '',
+          r.date || '', ...(r.lineup || []),
+        ].join(' ').toLowerCase();
+        return terms.every(t => haystack.includes(t));
+      });
     }
+
+    // Kelompok spesial / reguler
+    if (groupMode === 'special') keep(isSpecialReplay);
+    else if (groupMode === 'regular') keep(r => !isSpecialReplay(r));
+
+    // Filter kalender (rentang tanggal)
+    if (dateFrom) keep(r => (r.date || '') >= dateFrom);
+    if (dateTo) keep(r => (r.date || '') <= dateTo);
 
     // Criteria filter
-    if (criteriaFilter) {
-      const filtered: Record<string, ReplayRow[]> = {};
-      for (const [month, replays] of Object.entries(result)) {
-        const matched = replays.filter(r => r.criteria === criteriaFilter);
-        if (matched.length > 0) filtered[month] = matched;
-      }
-      result = filtered;
-    }
+    if (criteriaFilter) keep(r => r.criteria === criteriaFilter);
 
     // Bookmarks only
-    if (showBookmarksOnly) {
-      const filtered: Record<string, ReplayRow[]> = {};
-      for (const [month, replays] of Object.entries(result)) {
-        const matched = replays.filter(r => bookmarks.has(r.id));
-        if (matched.length > 0) filtered[month] = matched;
-      }
-      result = filtered;
-    }
+    if (showBookmarksOnly) keep(r => bookmarks.has(r.id));
 
     // Sort within each month (default: newest first by date+time)
     const getDateTime = (r: ReplayRow) => `${r.date}T${r.show_time || '19:00:00'}`;
-    if (sortMode === 'oldest') {
-      for (const key of Object.keys(result)) {
-        result[key] = [...result[key]].sort((a, b) => getDateTime(a).localeCompare(getDateTime(b)));
+    const byNewest = (a: ReplayRow, b: ReplayRow) => getDateTime(b).localeCompare(getDateTime(a));
+    for (const key of Object.keys(result)) {
+      let arr = [...result[key]];
+      if (sortMode === 'oldest') arr.sort((a, b) => getDateTime(a).localeCompare(getDateTime(b)));
+      else if (sortMode === 'title') arr.sort((a, b) => a.title.localeCompare(b.title));
+      else arr.sort(byNewest);
+      // Dalam mode spesial, urutkan kategori: STS → Last Show → Shonichi →
+      // Senshuuraku → Anniversary → Spesial.
+      if (groupMode === 'special') {
+        arr = arr.sort((a, b) => specialRank(a.criteria) - specialRank(b.criteria));
       }
-    } else if (sortMode === 'title') {
-      for (const key of Object.keys(result)) {
-        result[key] = [...result[key]].sort((a, b) => a.title.localeCompare(b.title));
-      }
-    } else {
-      // newest first
-      for (const key of Object.keys(result)) {
-        result[key] = [...result[key]].sort((a, b) => getDateTime(b).localeCompare(getDateTime(a)));
-      }
+      result[key] = arr;
     }
 
     return result;
-  }, [allGrouped, searchQuery, criteriaFilter, sortMode, showBookmarksOnly, bookmarks]);
+  }, [allGrouped, searchQuery, criteriaFilter, sortMode, showBookmarksOnly, bookmarks, groupMode, dateFrom, dateTo]);
 
   const sortedMonths = Object.keys(grouped).sort((a, b) =>
     sortMode === 'oldest' ? a.localeCompare(b) : b.localeCompare(a)
