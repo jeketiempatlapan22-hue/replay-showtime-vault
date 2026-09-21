@@ -532,6 +532,48 @@ export default function Index() {
                 ))}
               </div>
 
+              {/* Kelompok spesial / reguler */}
+              <div className="flex flex-wrap justify-center gap-2">
+                {([
+                  { value: 'all', label: 'Semua Replay' },
+                  { value: 'special', label: '✦ Replay Spesial' },
+                  { value: 'regular', label: 'Replay Reguler' },
+                ] as const).map(g => (
+                  <button key={g.value}
+                    onClick={() => setGroupMode(g.value)}
+                    className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all duration-200 ${
+                      groupMode === g.value
+                        ? 'bg-accent text-accent-foreground border-accent'
+                        : 'bg-card/60 border-border text-muted-foreground hover:border-accent/50 hover:text-foreground'
+                    }`}
+                  >
+                    {g.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Filter kalender */}
+              <div className="flex flex-wrap items-end justify-center gap-2">
+                <div className="text-left">
+                  <label className="block text-[10px] text-muted-foreground mb-1">Dari tanggal</label>
+                  <Input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
+                    className="h-8 text-xs bg-card/60 backdrop-blur" />
+                </div>
+                <div className="text-left">
+                  <label className="block text-[10px] text-muted-foreground mb-1">Sampai tanggal</label>
+                  <Input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
+                    className="h-8 text-xs bg-card/60 backdrop-blur" />
+                </div>
+                {(dateFrom || dateTo) && (
+                  <Button variant="ghost" size="sm" className="h-8 text-xs"
+                    onClick={() => { setDateFrom(''); setDateTo(''); }}>
+                    <X className="w-3.5 h-3.5 mr-1" /> Hapus tanggal
+                  </Button>
+                )}
+              </div>
+
+
+
               {/* Sort + Bookmark row */}
               <div className="flex justify-center gap-2">
                 <Button
