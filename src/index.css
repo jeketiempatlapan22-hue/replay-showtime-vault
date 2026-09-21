@@ -414,3 +414,73 @@
 .scrollbar-thin:focus-visible::-webkit-scrollbar-thumb {
   background-color: hsl(var(--primary) / 0.6);
 }
+
+.light.theme-rain {
+  --background: 210 25% 93%;
+  --card: 210 20% 97%;
+  --primary: 205 55% 40%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 210 18% 88%;
+  --muted: 210 15% 91%;
+  --muted-foreground: 210 12% 42%;
+  --border: 210 15% 82%;
+  --input: 210 15% 82%;
+  --ring: 205 55% 40%;
+  --accent: 195 45% 45%;
+}
+
+.light.theme-rainbow {
+  --background: 200 40% 95%;
+  --card: 200 25% 98%;
+  --primary: 280 55% 50%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 200 22% 90%;
+  --muted: 200 18% 92%;
+  --muted-foreground: 210 12% 42%;
+  --border: 200 18% 84%;
+  --input: 200 18% 84%;
+  --ring: 280 55% 50%;
+  --accent: 20 75% 52%;
+}
+
+.light.theme-meteor {
+  --background: 240 22% 94%;
+  --card: 240 18% 97%;
+  --primary: 245 55% 52%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 240 16% 89%;
+  --muted: 240 14% 91%;
+  --muted-foreground: 240 12% 42%;
+  --border: 240 14% 83%;
+  --input: 240 14% 83%;
+  --ring: 245 55% 52%;
+  --accent: 45 80% 48%;
+}
+
+.light.theme-sakura {
+  --background: 335 28% 95%;
+  --card: 335 20% 98%;
+  --primary: 335 60% 52%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 335 18% 90%;
+  --muted: 335 15% 92%;
+  --muted-foreground: 335 12% 42%;
+  --border: 335 15% 84%;
+  --input: 335 15% 84%;
+  --ring: 335 60% 52%;
+  --accent: 275 45% 55%;
+}
+
+.light.theme-clouds {
+  --background: 200 35% 95%;
+  --card: 200 22% 98%;
+  --primary: 205 60% 45%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 200 20% 90%;
+  --muted: 200 16% 92%;
+  --muted-foreground: 205 12% 42%;
+  --border: 200 16% 84%;
+  --input: 200 16% 84%;
+  --ring: 205 60% 45%;
+  --accent: 190 50% 48%;
+}
