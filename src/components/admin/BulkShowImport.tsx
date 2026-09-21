@@ -20,6 +20,14 @@ interface Props {
   onImported: () => void;
 }
 
+/** Tebak jenis sumber player dari URL yang ditempel admin. */
+function detectSourceType(url: string): 'm3u8' | 'youtube' | 'cloudflare' {
+  const u = (url || '').toLowerCase();
+  if (u.includes('youtube.com') || u.includes('youtu.be')) return 'youtube';
+  if (u.includes('videodelivery.net') || u.includes('cloudflarestream.com')) return 'cloudflare';
+  return 'm3u8';
+}
+
 export default function BulkShowImport({ onImported }: Props) {
   const [open, setOpen] = useState(false);
   const [text, setText] = useState('');
