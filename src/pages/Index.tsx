@@ -85,6 +85,9 @@ export default function Index() {
   const [sortMode, setSortMode] = useState<SortMode>('newest');
   const [showFilters, setShowFilters] = useState(false);
   const [showBookmarksOnly, setShowBookmarksOnly] = useState(false);
+  const [groupMode, setGroupMode] = useState<'all' | 'special' | 'regular'>('all');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [showScrollTop, setShowScrollTop] = useState(false);
 
   // Bookmarks
