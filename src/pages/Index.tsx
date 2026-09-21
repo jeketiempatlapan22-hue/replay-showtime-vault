@@ -355,7 +355,7 @@ export default function Index() {
     loadLockRef.current = false;
     setLoadingMore(false);
     if (loadTimerRef.current) { clearTimeout(loadTimerRef.current); loadTimerRef.current = null; }
-  }, [searchQuery, criteriaFilter, sortMode, showBookmarksOnly]);
+  }, [searchQuery, criteriaFilter, sortMode, showBookmarksOnly, groupMode, dateFrom, dateTo]);
 
   useEffect(() => {
     const el = sentinelRef.current;
