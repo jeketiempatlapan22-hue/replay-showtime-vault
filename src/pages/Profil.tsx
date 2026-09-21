@@ -186,7 +186,8 @@ export default function Profil() {
 
 
 
-  // Semua akses yang bisa direset perangkatnya, dikumpulkan di satu tempat.
+  // Hanya akses LIVE (show aktif) & membership yang terkunci perangkat.
+  // Replay bebas dibuka di perangkat mana pun, jadi tidak perlu direset.
   const resetTargets: ResetTarget[] = [
     ...memberships
       .filter((m) => m.status === 'paid' && !m.revoked && m.token && m.password
@@ -199,10 +200,10 @@ export default function Profil() {
         password: m.password!,
       })),
     ...myOrders
-      .filter((o) => !!o.access_token)
+      .filter((o) => !!o.access_token && !!o.show_id && !o.replay_id)
       .map((o) => ({
         id: `o-${o.id}`,
-        label: o.item_title || 'Pembelian',
+        label: o.item_title || 'Akses Live',
         kind: 'show' as const,
         token: o.access_token!,
       })),
