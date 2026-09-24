@@ -37,8 +37,8 @@ export default function MembershipDashboard({ membership, onShopMore }: { member
     const load = async () => {
       const { data } = await supabase
         .from('membership_packages')
-        .eq('show_to_user' as any, true)
         .select('id,name,duration_days,price_idr,price_coins,quota_total,quota_reserved,status,sort_order')
+        .eq('show_to_user' as any, true)
         .eq('status', 'open')
         .order('sort_order');
       const list = ((data || []) as OpenPkg[]).filter((p) => (p.quota_total - p.quota_reserved) > 0);

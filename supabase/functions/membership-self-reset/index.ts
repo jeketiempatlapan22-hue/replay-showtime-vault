@@ -28,7 +28,10 @@ Deno.serve(async (req) => {
     if (!t) return json({ ok: false, reason: "token_not_found" });
     if (t.password !== mpassword) return json({ ok: false, reason: "bad_password" });
 
-    const used = t.manual_resets_used || 0;
+    // Kuota reset terisi ulang tiap hari (00:00 WIB).
+    const todayWib = new Date(Date.now() + 7 * 3600_000).toISOString().slice(0, 10);
+    const sameDay = String(t.manual_resets_day || '') === todayWib;
+    const used = sameDay ? (t.manual_resets_used || 0) : 0;
     const max = t.manual_resets_max || 3;
     const remaining = Math.max(0, max - used);
 
@@ -49,7 +52,7 @@ Deno.serve(async (req) => {
 
     await supabase.from("membership_token_devices").delete().eq("token_id", t.id);
     await supabase.from("membership_token_devices").insert({ token_id: t.id, browser_id });
-    await supabase.from("membership_tokens").update({ manual_resets_used: used + 1, updated_at: new Date().toISOString() }).eq("id", t.id);
+    await supabase.from("membership_tokens").update({ manual_resets_used: used + 1, manual_resets_day: todayWib, updated_at: new Date().toISOString() }).eq("id", t.id);
 
     return json({ ok: true, used: used + 1, max, remaining: max - (used + 1) });
   } catch {
