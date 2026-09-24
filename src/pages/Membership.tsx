@@ -86,9 +86,10 @@ export default function Membership() {
   useEffect(() => {
     const load = async () => {
       setPkgsLoading(true);
-      const { data } = await supabase
+      const { data } = await (supabase as any)
         .from('membership_packages')
         .select('id,name,description,duration_days,price_idr,price_coins,pakasir_amount,quota_total,quota_reserved,max_devices,status,sort_order,fixed_starts_at,fixed_expires_at')
+        .eq('show_to_user', true)
         .order('sort_order')
         .order('created_at');
       setPkgs((data || []) as Pkg[]);

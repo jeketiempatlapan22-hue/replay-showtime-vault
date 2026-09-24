@@ -69,6 +69,8 @@ export default function Profil() {
   const [memberships, setMemberships] = useState<MyMembership[]>([]);
   const [memLoading, setMemLoading] = useState(true);
   const [myOrders, setMyOrders] = useState<MyOrder[]>([]);
+  // Jadwal show per show_id: link token satuan kedaluwarsa 24 jam setelah jadwal show.
+  const [showSched, setShowSched] = useState<Record<string, { endMs: number; converted: boolean }>>({});
   const [guest, setGuest] = useState<GuestAccount | null>(() => getGuestAccount());
   const [openMem, setOpenMem] = useState<string | null>(null);
 
@@ -179,7 +181,17 @@ export default function Profil() {
         .not('access_token', 'is', null)
         .order('paid_at', { ascending: false })
         .limit(20);
-      if (!cancelled) setMyOrders((data || []) as MyOrder[]);
+      const rows = (data || []) as MyOrder[];
+      const ids = [...new Set(rows.map((r) => r.show_id).filter(Boolean))] as string[];
+      const sched: Record<string, { endMs: number; converted: boolean }> = {};
+      if (ids.length) {
+        const { data: shows } = await supabase.from('active_shows').select('id,show_date,show_time,replay_id').in('id', ids);
+        for (const sh of (shows || []) as any[]) {
+          const start = new Date(`${sh.show_date}T${String(sh.show_time || '00:00').slice(0, 5)}:00+07:00`).getTime();
+          sched[sh.id] = { endMs: start + 24 * 3600_000, converted: !!sh.replay_id };
+        }
+      }
+      if (!cancelled) { setShowSched(sched); setMyOrders(rows); }
     })();
     return () => { cancelled = true; };
   }, [user]);
@@ -200,7 +212,9 @@ export default function Profil() {
         password: m.password!,
       })),
     ...myOrders
-      .filter((o) => !!o.access_token && !!o.show_id && !o.replay_id)
+      .filter((o) => !!o.access_token && !!o.show_id && !o.replay_id
+        && !!showSched[o.show_id] && !showSched[o.show_id].converted
+        && showSched[o.show_id].endMs > Date.now())
       .map((o) => ({
         id: `o-${o.id}`,
         label: o.item_title || 'Akses Live',
@@ -472,7 +486,13 @@ export default function Profil() {
           <CardContent className="space-y-3">
             <PurchaseHistoryList
               emptyText="Belum ada pembelian show atau replay."
-              items={myOrders.map((o) => ({
+              items={myOrders.filter((o) => {
+                // Link show satuan hilang 24 jam setelah jadwal (kecuali sudah jadi replay).
+                if (!o.show_id || o.replay_id) return true;
+                const sc = showSched[o.show_id];
+                if (!sc) return false;
+                return sc.converted || sc.endMs > Date.now();
+              }).map((o) => ({
                 key: o.id,
                 title: o.item_title || 'Pembelian',
                 dateLabel: o.paid_at

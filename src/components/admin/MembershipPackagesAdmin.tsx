@@ -31,6 +31,8 @@ interface Pkg {
   pause_message: string;
   fixed_starts_at: string | null;
   fixed_expires_at: string | null;
+  show_to_user?: boolean;
+  show_to_reseller?: boolean;
 }
 
 
@@ -50,6 +52,8 @@ const emptyForm = {
   sort_order: 0,
   fixed_starts_at: '',
   fixed_expires_at: '',
+  show_to_user: true,
+  show_to_reseller: true,
 };
 
 // Convert ISO timestamp <-> <input type="date"> value (YYYY-MM-DD) in local time.
@@ -126,6 +130,8 @@ export default function MembershipPackagesAdmin() {
       sort_order: Number(form.sort_order) || 0,
       fixed_starts_at: dateInputToIso(form.fixed_starts_at, false),
       fixed_expires_at: dateInputToIso(form.fixed_expires_at, true),
+      show_to_user: form.show_to_user,
+      show_to_reseller: form.show_to_reseller,
     };
     const editingId = form.id;
     const { error } = editingId
@@ -176,6 +182,8 @@ export default function MembershipPackagesAdmin() {
       sort_order: p.sort_order,
       fixed_starts_at: isoToDateInput(p.fixed_starts_at),
       fixed_expires_at: isoToDateInput(p.fixed_expires_at),
+      show_to_user: p.show_to_user !== false,
+      show_to_reseller: p.show_to_reseller !== false,
     });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -265,6 +273,15 @@ export default function MembershipPackagesAdmin() {
               <Switch checked={form.status === 'open'} onCheckedChange={(v) => setForm({ ...form, status: v ? 'open' : 'closed' })} />
               {form.status === 'open' ? 'Dibuka' : 'Ditutup'}
             </label>
+          </div>
+          <div className="sm:col-span-2 flex flex-wrap gap-4">
+            <label className="flex items-center gap-2 text-xs">
+              <Switch checked={form.show_to_user} onCheckedChange={(v) => setForm({ ...form, show_to_user: !!v })} /> Tampilkan ke user
+            </label>
+            <label className="flex items-center gap-2 text-xs">
+              <Switch checked={form.show_to_reseller} onCheckedChange={(v) => setForm({ ...form, show_to_reseller: !!v })} /> Tampilkan ke reseller
+            </label>
+            <p className="w-full text-[11px] text-muted-foreground">Disembunyikan tidak mematikan token yang sudah dibuat — tetap berlaku sampai masa membership habis.</p>
           </div>
           <div className="sm:col-span-2 grid sm:grid-cols-2 gap-3 border-2 border-primary/30 bg-primary/5 rounded-lg p-3">
             <div className="sm:col-span-2 text-xs">

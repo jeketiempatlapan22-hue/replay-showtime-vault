@@ -974,6 +974,8 @@ export type Database = {
           quota_reserved: number
           quota_total: number
           replay_info: string
+          show_to_reseller: boolean
+          show_to_user: boolean
           sort_order: number
           status: string
           updated_at: string
@@ -996,6 +998,8 @@ export type Database = {
           quota_reserved?: number
           quota_total?: number
           replay_info?: string
+          show_to_reseller?: boolean
+          show_to_user?: boolean
           sort_order?: number
           status?: string
           updated_at?: string
@@ -1018,6 +1022,8 @@ export type Database = {
           quota_reserved?: number
           quota_total?: number
           replay_info?: string
+          show_to_reseller?: boolean
+          show_to_user?: boolean
           sort_order?: number
           status?: string
           updated_at?: string
@@ -1128,6 +1134,7 @@ export type Database = {
           id: string
           includes_replays: boolean
           label: string
+          manual_resets_day: string | null
           manual_resets_max: number
           manual_resets_used: number
           max_devices: number
@@ -1148,6 +1155,7 @@ export type Database = {
           id?: string
           includes_replays?: boolean
           label?: string
+          manual_resets_day?: string | null
           manual_resets_max?: number
           manual_resets_used?: number
           max_devices?: number
@@ -1168,6 +1176,7 @@ export type Database = {
           id?: string
           includes_replays?: boolean
           label?: string
+          manual_resets_day?: string | null
           manual_resets_max?: number
           manual_resets_used?: number
           max_devices?: number
@@ -2253,6 +2262,8 @@ export type Database = {
           quota_reserved: number
           quota_total: number
           replay_info: string
+          show_to_reseller: boolean
+          show_to_user: boolean
           sort_order: number
           status: string
           updated_at: string
