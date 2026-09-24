@@ -1,0 +1,1 @@
+GRANT SELECT (show_to_user, show_to_reseller) ON public.membership_packages TO anon, authenticated;
