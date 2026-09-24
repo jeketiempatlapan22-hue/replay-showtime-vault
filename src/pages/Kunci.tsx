@@ -5,11 +5,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { supabase } from '@/integrations/supabase/client';
 import { getBrowserId } from '@/lib/browserId';
-import { DEFAULT_ADMIN_WA } from '@/lib/adminWa';
+import { normalizeWa } from '@/lib/adminWa';
 
 const SS_KEY_BASE = 'replaytime-live-unlocked';
-const WA_NUMBER = DEFAULT_ADMIN_WA;
-const WA_LINK = `https://wa.me/${WA_NUMBER}?text=${encodeURIComponent('Halo admin, saya ingin beli akses show live.')}`;
 
 const reasonMessage = (reason?: string): string => {
   switch (reason) {
@@ -39,6 +37,15 @@ export default function Kunci() {
   const [pwError, setPwError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [notice, setNotice] = useState('');
+  const [waNumber, setWaNumber] = useState('');
+  useEffect(() => {
+    supabase.from('site_settings').select('key,value').in('key', ['owner_wa_number', 'admin_wa_phone'])
+      .then(({ data }) => {
+        const m = new Map(((data || []) as any[]).map((r) => [r.key, String(r.value || '')]));
+        setWaNumber(normalizeWa(m.get('owner_wa_number') || m.get('admin_wa_phone') || ''));
+      });
+  }, []);
+  const waLink = `https://wa.me/${waNumber}?text=${encodeURIComponent('Halo admin, saya ingin beli akses show live.')}`;
 
   // If already unlocked (cached), bounce straight to /live
   useEffect(() => {
@@ -121,7 +128,7 @@ export default function Kunci() {
             </div>
             <h2 className="text-2xl font-bold text-foreground">Akses Live Terkunci</h2>
             <p className="text-sm text-muted-foreground">
-              Masukkan <span className="font-semibold text-foreground">sandi satuan show</span> atau <span className="font-semibold text-foreground">sandi master bulanan</span>, atau hubungi admin untuk membeli show.
+              Masukkan <span className="font-semibold text-foreground">sandi satuan show</span> atau <span className="font-semibold text-foreground">sandi master bulanan</span>.
             </p>
           </div>
 
@@ -152,6 +159,7 @@ export default function Kunci() {
           </form>
 
           <div className="pt-4 border-t border-border space-y-3">
+            {waNumber && (<>
             <div className="text-center space-y-1">
               <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-foreground">
                 <ShoppingBag className="w-3.5 h-3.5" />
@@ -159,20 +167,21 @@ export default function Kunci() {
               </div>
               <p className="text-xs text-muted-foreground">Hubungi admin untuk pembelian show.</p>
             </div>
-            <a href={WA_LINK} target="_blank" rel="noopener noreferrer" className="block">
+            <a href={waLink} target="_blank" rel="noopener noreferrer" className="block">
               <Button className="w-full bg-green-600 hover:bg-green-700 text-white gap-2">
                 <MessageCircle className="w-4 h-4" />
                 Beli Show via WhatsApp
               </Button>
             </a>
-            <p className="text-center text-[11px] text-muted-foreground">+62 838-9908-7711</p>
+            <p className="text-center text-[11px] text-muted-foreground">+{waNumber}</p>
+            </>)}
 
             <div className="pt-3 border-t border-border">
               <Button type="button" variant="ghost" size="sm" className="w-full text-xs" onClick={handleSelfReset}>
                 Reset perangkat membership saya
               </Button>
               <p className="text-[10px] text-muted-foreground text-center mt-1">
-                Gunakan jika ingin pindah browser/device. Maks. 3x reset manual; otomatis reset tiap 00:00 WIB.
+                Gunakan jika ingin pindah browser/device. Kuota 3x reset manual per hari, terisi ulang tiap 00:00 WIB.
               </p>
             </div>
           </div>

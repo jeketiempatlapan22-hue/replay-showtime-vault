@@ -88,6 +88,7 @@ export default function Membership() {
       setPkgsLoading(true);
       const { data } = await supabase
         .from('membership_packages')
+        .eq('show_to_user' as any, true)
         .select('id,name,description,duration_days,price_idr,price_coins,pakasir_amount,quota_total,quota_reserved,max_devices,status,sort_order,fixed_starts_at,fixed_expires_at')
         .order('sort_order')
         .order('created_at');
