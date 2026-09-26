@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { membershipPasswordOk, currentMembershipPassword } from "../_shared/membership-password.ts";
 import { bundleShowTokens } from "../_shared/bundle.ts";
 
 const corsHeaders = {
@@ -49,15 +50,16 @@ Deno.serve(async (req) => {
     if (mtoken) {
       const { data: t } = await admin
         .from("membership_tokens")
-        .select("token,password,label,expires_at,revoked,replay_info,includes_replays")
+        .select("id,token,password,password_rotating,label,expires_at,revoked,replay_info,includes_replays")
         .eq("token", mtoken).maybeSingle();
       if (!t || t.revoked) return json({ ok: false, reason: "invalid" });
-      if (t.password && mpassword && t.password !== mpassword) return json({ ok: false, reason: "invalid" });
-      const link = `${origin}/live?mtoken=${encodeURIComponent(t.token)}&mp=${encodeURIComponent(String(t.password || ""))}`;
+      if (t.password && mpassword && !(await membershipPasswordOk(admin, t, mpassword))) return json({ ok: false, reason: "invalid" });
+      const curPw = await currentMembershipPassword(admin, t);
+      const link = `${origin}/live?mtoken=${encodeURIComponent(t.token)}&mp=${encodeURIComponent(curPw)}`;
       const date = t.expires_at
         ? `Berlaku hingga ${new Date(t.expires_at).toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" })}`
         : "";
-      const password = String(t.password || "");
+      const password = curPw;
       const replayInfo = String(t.replay_info || "");
       return json({
         ok: true,
