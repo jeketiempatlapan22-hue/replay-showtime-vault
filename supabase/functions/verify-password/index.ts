@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { bundlePasswordValidForReplay } from "../_shared/bundle.ts";
+import { membershipPasswordOk } from "../_shared/membership-password.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -57,7 +58,7 @@ Deno.serve(async (req) => {
       const { data: t } = await supabase
         .from("membership_tokens").select("*").eq("token", mtoken).maybeSingle();
       if (!t || t.revoked) return json({ valid: false, reason: "revoked" });
-      if (t.password && t.password !== (mpassword || "")) return json({ valid: false, reason: "bad_membership_password" });
+      if (!(await membershipPasswordOk(supabase, t, mpassword || ""))) return json({ valid: false, reason: "bad_membership_password" });
       if (!t.includes_replays) return json({ valid: false, reason: "scope" });
       const now = Date.now();
       if (t.expires_at && new Date(t.expires_at).getTime() < now) return json({ valid: false, reason: "expired" });

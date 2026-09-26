@@ -159,6 +159,7 @@ export default function Live() {
 
 
   const showId = search.get('show') || '';
+  const adminMonitor = search.get('admin_monitor') === '1';
   // Show yang di-resolve server (untuk membership yang membuka /live tanpa ?show).
   const [resolvedShowId, setResolvedShowId] = useState('');
   const resolvedShowIdRef = useRef('');
@@ -231,7 +232,8 @@ export default function Live() {
             const t = search.get('t');
             const mt = search.get('mtoken');
             const mp = search.get('mp') || search.get('mpassword') || '';
-            if (t) void doUnlock({ token: t }, true);
+            if (adminMonitor) void doUnlock({ admin_monitor: true }, true);
+            else if (t) void doUnlock({ token: t }, true);
             else if (mt) void doUnlock({ mtoken: mt, mpassword: mp }, true);
             // For password-cached users, URL/sources were fetched at initial unlock.
           }
@@ -282,7 +284,7 @@ export default function Live() {
   };
 
 
-  const doUnlock = async (opts: { token?: string; password?: string; mtoken?: string; mpassword?: string }, silent = false) => {
+  const doUnlock = async (opts: { token?: string; password?: string; mtoken?: string; mpassword?: string; admin_monitor?: boolean }, silent = false) => {
     if (!silent) { setSubmitting(true); setPwError(''); }
     try {
       const { data } = await supabase.functions.invoke('unlock-live', {
@@ -476,6 +478,7 @@ export default function Live() {
     fetchStatus();
     const tParam = search.get('t');
     const mtParam = search.get('mtoken');
+    if (adminMonitor && showId) { void doUnlock({ admin_monitor: true }, true); return; }
     let cached: string | null = null;
     try {
       cached = sessionStorage.getItem(`${SS_KEY_BASE}${showId?'-'+showId:''}`);

@@ -1,3 +1,4 @@
+import { genShortPassword } from '../_shared/membership-password.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
@@ -59,8 +60,17 @@ Deno.serve(async (req) => {
   const { data: verified } = await admin.rpc('reseller_verify', { _phone: phone, _pin: pin });
   if (verified !== true) return json({ error: 'unauthorized' }, 401);
 
-  const { data: pkg } = await admin.from('membership_packages')
-    .select('id,name,status,paused,max_devices,includes_replays,replay_info,duration_days,fixed_starts_at,fixed_expires_at').eq('id', packageId).maybeSingle();
+  const preset = packageId === 'preset_1m' ? 31 : packageId === 'preset_2m' ? 62 : 0;
+  let pkg: any = null;
+  if (preset) {
+    pkg = { id: null, name: preset === 62 ? 'Membership 2 Bulan' : 'Membership 1 Bulan', paused: false, max_devices: 1, includes_replays: true, replay_info: '', duration_days: preset, fixed_expires_at: null };
+    const { data: ri } = await admin.from('site_settings').select('value').eq('key', 'reseller_membership_replay_info').maybeSingle();
+    pkg.replay_info = String(ri?.value || '');
+  } else {
+    const { data } = await admin.from('membership_packages')
+      .select('id,name,status,paused,max_devices,includes_replays,replay_info,duration_days,fixed_starts_at,fixed_expires_at').eq('id', packageId).maybeSingle();
+    pkg = data;
+  }
   if (!pkg) return json({ error: 'package_not_found' }, 404);
   if (pkg.paused === true) return json({ error: 'package_paused' }, 400);
 
@@ -69,7 +79,7 @@ Deno.serve(async (req) => {
   const pkgName = String(pkg.name || '').toLowerCase();
   const adminDays = Math.floor(Number(pkg.duration_days) || 30);
   const isTwoMonths = /\b2\s*bulan|dua\s*bulan|60\s*hari|62\s*hari/.test(pkgName) || adminDays >= 45;
-  const days = isTwoMonths ? 62 : 31;
+  const days = preset || (isTwoMonths ? 62 : 31);
 
   const { data: settings } = await admin.from('site_settings').select('key,value')
     .in('key', ['site_origin', 'wa_membership_template']);
@@ -80,7 +90,7 @@ Deno.serve(async (req) => {
   const replayInfo = String(pkg.replay_info || '');
 
   const token = await freshToken(admin, 12);
-  const password = await freshToken(admin, 8);
+  const password = genShortPassword();
   // Periode dihitung dari waktu pembuatan token reseller (31/62 hari).
   const startsAt = new Date();
   const expiresAt = new Date(startsAt.getTime() + days * 24 * 60 * 60 * 1000);
@@ -100,8 +110,11 @@ Deno.serve(async (req) => {
     replay_info: replayInfo,
     package_id: pkg.id,
     created_by: `reseller:${phone}`,
+    password_rotating: true,
   }).select('id').maybeSingle();
   if (error || !tk) return json({ error: 'create_failed', detail: error?.message }, 500);
+
+  await admin.from('membership_token_passwords').insert({ token_id: tk.id, password });
 
   const link = `${origin}/live?mtoken=${encodeURIComponent(token)}&mp=${encodeURIComponent(password)}`;
   const expStr = expiresAt.toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
@@ -121,7 +134,7 @@ Deno.serve(async (req) => {
   });
   await admin.from('reseller_audit_log').insert({
     reseller_phone: phone, reseller_label: resellerLabel,
-    kind: 'membership', target_id: pkg.id, target_title: pkg.name,
+    kind: 'membership', target_id: pkg.id || null, target_title: pkg.name,
     token, expires_at: expiresAt.toISOString(), duration_days: effectiveDays,
     meta: { max_devices: pkg.max_devices || 1, includes_replays: pkg.includes_replays !== false, replay_info_source: 'package', fixed_period: !!pkg.fixed_expires_at },
   });

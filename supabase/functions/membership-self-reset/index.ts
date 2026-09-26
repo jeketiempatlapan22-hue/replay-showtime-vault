@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { membershipPasswordOk } from "../_shared/membership-password.ts";
 import { ipGuard } from "../_shared/ip-guard.ts";
 
 const corsHeaders = {
@@ -26,7 +27,7 @@ Deno.serve(async (req) => {
     const { data: t } = await supabase
       .from("membership_tokens").select("*").eq("token", mtoken).maybeSingle();
     if (!t) return json({ ok: false, reason: "token_not_found" });
-    if (t.password !== mpassword) return json({ ok: false, reason: "bad_password" });
+    if (!(await membershipPasswordOk(supabase, t, mpassword))) return json({ ok: false, reason: "bad_password" });
 
     // Kuota reset terisi ulang tiap hari (00:00 WIB).
     const todayWib = new Date(Date.now() + 7 * 3600_000).toISOString().slice(0, 10);

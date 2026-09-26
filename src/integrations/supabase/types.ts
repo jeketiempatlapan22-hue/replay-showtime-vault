@@ -1125,6 +1125,35 @@ export type Database = {
           },
         ]
       }
+      membership_token_passwords: {
+        Row: {
+          created_at: string
+          id: string
+          password: string
+          token_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          password: string
+          token_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          password?: string
+          token_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "membership_token_passwords_token_id_fkey"
+            columns: ["token_id"]
+            isOneToOne: false
+            referencedRelation: "membership_tokens"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       membership_tokens: {
         Row: {
           created_at: string
@@ -1140,6 +1169,7 @@ export type Database = {
           max_devices: number
           package_id: string | null
           password: string
+          password_rotating: boolean
           phone: string
           replay_info: string
           revoked: boolean
@@ -1161,6 +1191,7 @@ export type Database = {
           max_devices?: number
           package_id?: string | null
           password?: string
+          password_rotating?: boolean
           phone?: string
           replay_info?: string
           revoked?: boolean
@@ -1182,6 +1213,7 @@ export type Database = {
           max_devices?: number
           package_id?: string | null
           password?: string
+          password_rotating?: boolean
           phone?: string
           replay_info?: string
           revoked?: boolean
@@ -2629,6 +2661,7 @@ export type Database = {
         }[]
       }
       gen_bundle_password: { Args: never; Returns: string }
+      gen_short_password: { Args: never; Returns: string }
       get_active_live: {
         Args: never
         Returns: {
@@ -2731,6 +2764,7 @@ export type Database = {
       phone_exists: { Args: { _phone: string }; Returns: boolean }
       prune_old_logs: { Args: never; Returns: undefined }
       prune_proofs_and_storage: { Args: never; Returns: number }
+      purge_expired_membership_tokens: { Args: never; Returns: number }
       rate_replay: {
         Args: { _browser_id: string; _rating: number; _replay_id: string }
         Returns: undefined
@@ -2920,6 +2954,7 @@ export type Database = {
           reserved_until: string
         }[]
       }
+      rotate_membership_passwords: { Args: never; Returns: number }
       sync_show_bundle: { Args: never; Returns: undefined }
     }
     Enums: {
