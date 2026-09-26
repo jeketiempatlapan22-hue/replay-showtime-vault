@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { GRANT_TTL_FREE, signGrant } from "../_shared/stream-grant.ts";
+import { membershipPasswordOk } from "../_shared/membership-password.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -53,7 +54,7 @@ async function verifyMembership(supabase: any, mtoken: string, mpassword: string
   const { data: t } = await supabase
     .from("membership_tokens").select("*").eq("token", mtoken).maybeSingle();
   if (!t || t.revoked) return { ok: false, reason: "revoked" };
-  if (t.password && t.password !== mpassword) return { ok: false, reason: "bad_membership_password" };
+  if (!(await membershipPasswordOk(supabase, t, mpassword))) return { ok: false, reason: "bad_membership_password" };
   const now = Date.now();
   if (t.expires_at && new Date(t.expires_at).getTime() < now) return { ok: false, reason: "expired" };
   if (t.starts_at && new Date(t.starts_at).getTime() > now) return { ok: false, reason: "not_started" };
