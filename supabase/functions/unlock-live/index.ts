@@ -74,7 +74,7 @@ async function verifyMembership(supabase: any, mtoken: string, mpassword: string
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   try {
-    const { token, password, browser_id, show_id, mtoken, mpassword, silent } = await req.json().catch(() => ({} as any));
+    const { token, password, browser_id, show_id, mtoken, mpassword, silent, admin_monitor } = await req.json().catch(() => ({} as any));
     const isSilent = silent === true;
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -212,6 +212,23 @@ Deno.serve(async (req) => {
         grant: "",
         watermark: `RT-${String(show.id).slice(0, 4).toUpperCase()}`,
       };
+
+      // Monitor Live admin: verifikasi peran admin dari JWT, tanpa ikatan perangkat.
+      if (admin_monitor === true) {
+        const auth = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
+        let isAdm = false;
+        if (auth) {
+          const { data: u } = await supabase.auth.getUser(auth);
+          if (u?.user?.id) {
+            const { data: r } = await supabase.from("user_roles").select("role").eq("user_id", u.user.id).eq("role", "admin").maybeSingle();
+            isAdm = !!r;
+          }
+        }
+        if (!isAdm) return json({ valid: false, reason: "unauthorized" });
+        const aGrant = await signGrant({ sid: String(show.id), idn: String(show.idn_show_id || ""), bid: String(browser_id || "admin"), kind: "password" });
+        return json({ ...okPayload, show_id: show.id, grant: aGrant, watermark: "ADMIN" });
+      }
+
 
       // Membership bypass
       if (mtoken) {
