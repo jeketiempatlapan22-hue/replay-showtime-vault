@@ -228,8 +228,12 @@ function MembershipPanel({
       _phone: session.phone,
       _pin: session.pin,
     });
+    const presets: PackageRow[] = [
+      { id: 'preset_1m', name: 'Membership 1 Bulan', description: 'Berlaku 31 hari sejak link dibuat. Sandi berganti tiap 24 jam, sandi lama tetap berlaku.', replay_info: '', duration_days: 31, max_devices: 1, includes_replays: true, status: 'active', paused: false },
+      { id: 'preset_2m', name: 'Membership 2 Bulan', description: 'Berlaku 62 hari sejak link dibuat. Sandi berganti tiap 24 jam, sandi lama tetap berlaku.', replay_info: '', duration_days: 62, max_devices: 1, includes_replays: true, status: 'active', paused: false },
+    ];
     if (error) toast({ title: 'Gagal memuat paket', description: error.message, variant: 'destructive' });
-    else setPkgs((data ?? []) as PackageRow[]);
+    setPkgs([...presets, ...((data ?? []) as PackageRow[])]);
     setLoading(false);
   };
   useEffect(() => { load(); }, []);
