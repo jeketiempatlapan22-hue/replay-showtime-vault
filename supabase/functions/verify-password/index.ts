@@ -89,6 +89,21 @@ Deno.serve(async (req) => {
       return json({ valid: true, via: 'bundle' });
     }
 
+    // Sandi membership per user: tetap berlaku 1 tahun untuk replay dalam periode membership,
+    // walau link token sudah terhapus karena kadaluarsa.
+    if (replay.date) {
+      const rd = new Date(`${replay.date}T12:00:00+07:00`);
+      const { data: mp } = await supabase.from("membership_replay_passwords")
+        .select("id").eq("password", String(password).trim())
+        .gt("valid_until", new Date().toISOString())
+        .lte("starts_at", new Date(rd.getTime() + 86400000).toISOString())
+        .gte("membership_expires_at", rd.toISOString()).limit(1).maybeSingle();
+      if (mp) {
+        await supabase.rpc('record_login_attempt', { _identifier: lockId, _success: true });
+        return json({ valid: true, via: 'membership_password' });
+      }
+    }
+
     const d = new Date(replay.date);
     const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
     const { data: masters } = await supabase
