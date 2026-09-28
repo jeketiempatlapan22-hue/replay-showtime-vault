@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Tv, Coins, User } from 'lucide-react';
+import { Clapperboard, Tv, Coins, User } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
@@ -35,7 +35,7 @@ function BottomNavContent({ locationPath }: { locationPath: string }) {
   }, [user]);
 
   const items = [
-    { to: '/', label: 'Beranda', Icon: Home, match: (p: string) => p === '/' },
+    { to: '/', label: 'Replay', Icon: Clapperboard, match: (p: string) => p === '/' },
     { to: '/shows', label: 'Shows', Icon: Tv, match: (p: string) => p.startsWith('/shows') || p.startsWith('/show') },
     { to: '/koin', label: 'Koin', Icon: Coins, match: (p: string) => p.startsWith('/koin') },
     { to: user ? '/profil' : '/auth', label: user ? 'Akun' : 'Masuk', Icon: User, match: (p: string) => p.startsWith('/profil') || p.startsWith('/auth') },

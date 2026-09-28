@@ -420,11 +420,11 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
               clearTimeout(ytFallbackTimerRef.current);
               ytFallbackTimerRef.current = null;
             }
-            // Force injected iframe to fill container & block native clicks
+            // Biarkan iframe memenuhi container dan menerima interaksi langsung.
             try {
               const ifr = ytPlayerRef.current?.getIframe?.();
               if (ifr) {
-                ifr.setAttribute('style', 'position:absolute;inset:0;width:100%;height:100%;border:0;pointer-events:none;');
+                ifr.setAttribute('style', 'position:absolute;inset:0;width:100%;height:100%;border:0;');
                 ifr.setAttribute('allow', 'autoplay; encrypted-media; picture-in-picture; fullscreen');
                 ifr.setAttribute('allowfullscreen', 'true');
               }
@@ -1121,7 +1121,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
             />
           ) : (
             // YT API akan mengganti div ini dengan iframe-nya sendiri.
-            <div key="api" className="absolute inset-0 w-full h-full pointer-events-none">
+            <div key="api" className="absolute inset-0 w-full h-full">
               <div ref={ytHostRef} className="w-full h-full" />
             </div>
           )
@@ -1153,27 +1153,6 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
         )
       )}
 
-
-      {/* Click-shield over iframe — tap memulai pemutaran (gesture asli) atau menampilkan kontrol. */}
-      {!plainMode && (
-        <div
-          className="absolute inset-0 z-[5]"
-          onClick={(e) => {
-            e.preventDefault();
-            const s = type === 'youtube' ? ytState() : undefined;
-            const reallyPlaying = s === undefined ? isPlaying : (s === 1 || s === 3);
-            // Selagi masih bisu, tap di mana pun pada area video langsung menyalakan
-            // suara dalam gesture yang sama (tanpa reload player, tanpa pause).
-            if (type === 'youtube' && !userUnmutedRef.current) {
-              activateSound();
-              toggleControls();
-              return;
-            }
-            if (!reallyPlaying) playFromGesture();
-            toggleControls();
-          }}
-        />
-      )}
 
       {/* Tombol putar besar di tengah saat video belum berjalan. */}
       {!plainMode && ready && !isPlaying && (
@@ -1223,7 +1202,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
       {/* Controls */}
       <div
         className={`absolute inset-x-0 bottom-0 z-10 px-2 sm:px-3 pb-2 sm:pb-3 pt-8 bg-gradient-to-t from-black/80 to-transparent transition-opacity duration-300 ${
-          plainMode ? 'hidden' : showControls || !isPlaying ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+          plainMode ? 'hidden' : type === 'youtube' || showControls || !isPlaying ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
         }`}
 
         style={{ touchAction: 'manipulation' }}

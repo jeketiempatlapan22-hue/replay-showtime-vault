@@ -332,7 +332,7 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
     }
   }, [activeSource, sources]);
 
-  // YouTube/Cloudflare are now rendered by EmbedPlayer (overlay-protected)
+  // YouTube/Cloudflare dirender oleh EmbedPlayer dengan kontrol replay yang terlihat.
 
   const lineup = replay.lineup || [];
 
@@ -360,7 +360,6 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
         ref={containerRef}
         className="w-full max-w-screen-2xl mx-auto px-2 sm:px-4 lg:px-6 py-3 sm:py-4 select-none"
         style={{ WebkitUserSelect: 'none', userSelect: 'none' }}
-        onContextMenu={(e) => e.preventDefault()}
       >
         {sourceLoading ? (
           <div className="relative w-full overflow-hidden rounded-xl bg-black flex items-center justify-center" style={{ paddingBottom: '56.25%' }}>
