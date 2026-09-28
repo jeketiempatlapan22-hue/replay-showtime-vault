@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Menu, X, Home, MessageCircle, Phone, Sun, Moon, Radio, LogIn, LogOut, User as UserIcon, Crown, BookOpen, Clapperboard, Tv, ChevronDown } from 'lucide-react';
+import { Menu, X, MessageCircle, Phone, Sun, Moon, Radio, LogIn, LogOut, User as UserIcon, Crown, BookOpen, Clapperboard, Tv, ChevronDown } from 'lucide-react';
 
 const GUIDE_LINKS = [
   { id: 'buy-show', label: 'Panduan Pembelian' },
@@ -115,8 +115,8 @@ export default function HamburgerMenu({ whatsappNumber, whatsappLink, lightMode,
             onClick={() => setOpen(false)}
             className="flex items-center gap-3 px-4 py-3 rounded-lg text-foreground hover:bg-secondary transition-colors"
           >
-            <Home className="w-5 h-5 text-primary" />
-            <span className="font-medium">Beranda</span>
+            <Clapperboard className="w-5 h-5 text-primary" />
+            <span className="font-medium">Replay</span>
           </Link>
 
           <Link

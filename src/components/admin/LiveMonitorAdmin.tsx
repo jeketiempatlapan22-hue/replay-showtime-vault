@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { RefreshCw } from 'lucide-react';
+import AdminLinkMaker from '@/components/admin/AdminLinkMaker';
 
 type S = { id: string; title: string; is_live: boolean; show_date: string; show_time: string };
 
@@ -22,7 +23,8 @@ export default function LiveMonitorAdmin() {
   }, []);
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-6">
+      <section className="space-y-3">
       <div className="flex gap-2 items-center">
         <select className="flex-1 h-10 rounded-md border border-input bg-background px-2 text-sm" value={sel} onChange={(e) => setSel(e.target.value)}>
           {shows.map((s) => <option key={s.id} value={s.id}>{s.is_live ? '🔴 LIVE • ' : ''}{s.title} ({s.show_date} {String(s.show_time).slice(0, 5)})</option>)}
@@ -40,6 +42,14 @@ export default function LiveMonitorAdmin() {
           allowFullScreen
         />
       ) : <p className="text-sm text-muted-foreground">Belum ada show aktif.</p>}
+      </section>
+      <section className="space-y-3 border-t border-border pt-5">
+        <div>
+          <h2 className="font-semibold text-base">Buat Link</h2>
+          <p className="text-xs text-muted-foreground">Buat link baru setelah memantau player, jumlah penonton, dan live chat.</p>
+        </div>
+        <AdminLinkMaker />
+      </section>
     </div>
   );
 }
