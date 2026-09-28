@@ -270,10 +270,6 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
   useEffect(() => { isPlayingRef.current = isPlaying; }, [isPlaying]);
   const userUnmutedRef = useRef(false);
 
-  const toggleControls = useCallback(() => {
-    resetHideTimer();
-  }, [resetHideTimer]);
-
   const handleFrameLoaded = useCallback(() => {
     markReady(true);
     setIsPlaying(true);
