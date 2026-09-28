@@ -57,13 +57,13 @@ Deno.serve(async (req) => {
     const { data: tk, error } = await admin.from('membership_tokens').insert({
       token, password, phone: '', label: `admin:${label} / ${name}`, duration_days: days,
       starts_at: startsAt.toISOString(), expires_at: expiresAt.toISOString(), max_devices: 1,
-      includes_replays: true, replay_info: '', package_id: null, created_by: 'admin', password_rotating: true,
+      includes_replays: true, replay_info: '', package_id: null, created_by: 'admin', password_rotating: false,
     }).select('id').maybeSingle();
     if (error || !tk) return json({ error: 'create_failed', detail: error?.message }, 500);
     await admin.from('membership_token_passwords').insert({ token_id: tk.id, password });
     const link = `${origin}/live?mtoken=${encodeURIComponent(token)}&mp=${encodeURIComponent(password)}`;
     const message = [`👑 *MEMBERSHIP AKTIF*`, '', `📦 *${name}*`, `📅 Berlaku hingga: ${fmtId(expiresAt)}`, '',
-      '🔗 *Link Akses:*', link, '', `🔐 Sandi: *${password}*`, '(Sandi berganti tiap 24 jam, sandi lama tetap berlaku)', '', '— *ReplayTime* 💖'].join('\n');
+      '🔗 *Link Akses:*', link, '', `🔐 Sandi: *${password}*`, '(Sandi khusus kamu, berlaku untuk live selama membership & replay 1 tahun)', '', '— *ReplayTime* 💖'].join('\n');
     await admin.from('token_deliveries').insert({ phone: '', replay_id: null, replay_title: `Membership • ${name}`, access_token: token, link, source: 'admin', requested_by: 'admin' });
     return json({ ok: true, token, password, link, message, title: name, expires_at: expiresAt.toISOString() });
   }
