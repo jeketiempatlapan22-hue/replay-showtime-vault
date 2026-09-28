@@ -110,7 +110,7 @@ Deno.serve(async (req) => {
     replay_info: replayInfo,
     package_id: pkg.id,
     created_by: `reseller:${phone}`,
-    password_rotating: true,
+    password_rotating: false,
   }).select('id').maybeSingle();
   if (error || !tk) return json({ error: 'create_failed', detail: error?.message }, 500);
 

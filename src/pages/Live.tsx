@@ -321,7 +321,7 @@ export default function Live() {
           type: isSrcType(data.type) ? data.type : 'm3u8',
           url: data.url || '',
           sources: toPrivateSources(data.sources),
-          watermark: data.watermark || '',
+          watermark: adminMonitor ? '' : (data.watermark || ''),
           enabled: !!data.enabled,
           idn_show_id: data.idn_show_id || '',
           grant: data.grant || '',

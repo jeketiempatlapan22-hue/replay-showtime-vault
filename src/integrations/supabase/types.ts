@@ -1093,6 +1093,36 @@ export type Database = {
           },
         ]
       }
+      membership_replay_passwords: {
+        Row: {
+          created_at: string
+          id: string
+          membership_expires_at: string
+          password: string
+          starts_at: string
+          token: string
+          valid_until: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          membership_expires_at: string
+          password: string
+          starts_at: string
+          token?: string
+          valid_until: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          membership_expires_at?: string
+          password?: string
+          starts_at?: string
+          token?: string
+          valid_until?: string
+        }
+        Relationships: []
+      }
       membership_token_devices: {
         Row: {
           browser_id: string
