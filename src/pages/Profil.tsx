@@ -14,6 +14,7 @@ import { saveMembershipCredentials } from '@/lib/membershipAccess';
 import DeviceResetPicker, { type ResetTarget } from '@/components/DeviceResetPicker';
 import AccessInfoCard from '@/components/AccessInfoCard';
 import PurchaseHistoryList from '@/components/PurchaseHistoryList';
+import GameWinsHistory from '@/components/GameWinsHistory';
 import GuestChoice from '@/components/GuestChoice';
 import GuestProfile from '@/components/GuestProfile';
 import { getGuestAccount, type GuestAccount } from '@/lib/guest';
@@ -478,6 +479,8 @@ export default function Profil() {
             )}
           </CardContent>
         </Card>
+
+        {user && <GameWinsHistory userId={user.id} />}
 
         <Card>
           <CardHeader>
