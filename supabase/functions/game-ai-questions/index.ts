@@ -22,6 +22,10 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const count = Math.min(10, Math.max(1, Number(body.count) || 5));
     const topic = String(body.topic || 'JKT48 umum').slice(0, 200);
+    const lyrics = body.game_type === 'lyrics';
+    const userMsg = lyrics
+      ? `Buat ${count} soal "Tebak Lagu" JKT48 dengan topik: ${topic}. prompt = potongan lirik pendek (1-2 baris, maksimal 15 kata, boleh parafrase) dari lagu JKT48 yang benar-benar ada; answer = judul lagu resmi; choices = 3 judul lagu JKT48 (salah satunya jawaban).`
+      : `Buat ${count} soal tebak-tebakan dengan topik: ${topic}.`;
 
     const res = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -30,7 +34,7 @@ Deno.serve(async (req) => {
         model: 'google/gemini-3-flash-preview',
         messages: [
           { role: 'system', content: 'Kamu pembuat kuis penggemar JKT48 berbahasa Indonesia. Buat soal faktual yang jawabannya singkat (1-3 kata) dan pasti benar. Jika tidak yakin sebuah fakta, jangan dipakai.' },
-          { role: 'user', content: `Buat ${count} soal tebak-tebakan dengan topik: ${topic}.` },
+          { role: 'user', content: userMsg },
         ],
         tools: [{ type: 'function', function: { name: 'soal', parameters: { type: 'object', properties: { questions: { type: 'array', items: { type: 'object', properties: { prompt: { type: 'string' }, answer: { type: 'string' }, alt_answers: { type: 'array', items: { type: 'string' } }, choices: { type: 'array', items: { type: 'string' }, description: '3 pilihan jawaban (A/B/C), salah satunya persis sama dengan answer' } }, required: ['prompt', 'answer', 'alt_answers', 'choices'] } } }, required: ['questions'] } } }],
         tool_choice: { type: 'function', function: { name: 'soal' } },
