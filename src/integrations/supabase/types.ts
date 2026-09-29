@@ -647,35 +647,38 @@ export type Database = {
       game_entries: {
         Row: {
           answers: Json
+          browser_id: string | null
           correct_count: number
           created_at: string
           id: string
           prize: Json | null
           round_id: string
           total: number
-          user_id: string
+          user_id: string | null
           won: boolean
         }
         Insert: {
           answers?: Json
+          browser_id?: string | null
           correct_count?: number
           created_at?: string
           id?: string
           prize?: Json | null
           round_id: string
           total?: number
-          user_id: string
+          user_id?: string | null
           won?: boolean
         }
         Update: {
           answers?: Json
+          browser_id?: string | null
           correct_count?: number
           created_at?: string
           id?: string
           prize?: Json | null
           round_id?: string
           total?: number
-          user_id?: string
+          user_id?: string | null
           won?: boolean
         }
         Relationships: [
@@ -739,6 +742,7 @@ export type Database = {
           ends_at: string
           game_type: string
           id: string
+          images_cleaned: boolean
           is_published: boolean
           prizes: Json
           starts_at: string
@@ -751,6 +755,7 @@ export type Database = {
           ends_at?: string
           game_type?: string
           id?: string
+          images_cleaned?: boolean
           is_published?: boolean
           prizes?: Json
           starts_at?: string
@@ -763,6 +768,7 @@ export type Database = {
           ends_at?: string
           game_type?: string
           id?: string
+          images_cleaned?: boolean
           is_published?: boolean
           prizes?: Json
           starts_at?: string
