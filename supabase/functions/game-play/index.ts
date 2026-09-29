@@ -64,7 +64,10 @@ Deno.serve(async (req) => {
       const late = at.getTime() - new Date(v.started_at).getTime() > BLUR_LIMIT_S * 1000 + 800;
       return json({ ok: true, late });
     }
-    const identOr = (): string => [userId && `user_id.eq.${userId}`, browserId && `browser_id.eq.${browserId}`, deviceFp && `device_fp.eq.${deviceFp}`].filter(Boolean).join(',');
+    // Akun login: dicek per akun. Tamu: per browser + perangkat (hanya terhadap entri tamu lain).
+    const identOr = (): string => userId
+      ? `user_id.eq.${userId}`
+      : [browserId && `browser_id.eq.${browserId}`, deviceFp && `and(device_fp.eq.${deviceFp},user_id.is.null)`].filter(Boolean).join(',');
 
     // Bersihkan gambar upload dari ronde yang sudah selesai (hemat ruang).
     const { data: doneRounds } = await admin.from('game_rounds').select('id').eq('images_cleaned', false).lt('ends_at', new Date().toISOString()).limit(20);
@@ -86,18 +89,24 @@ Deno.serve(async (req) => {
         .order('starts_at', { ascending: false }).limit(10);
       const ids = (rounds || []).map((r) => r.id);
       const { data: qs } = ids.length ? await admin.from('game_questions').select('id,round_id,prompt,image_url,answer,reveal_image_url,sort_order,choices').in('round_id', ids).order('sort_order') : { data: [] as any[] };
-      const { data: entries } = identOr() && ids.length
-        ? await admin.from('game_entries').select('id,round_id,answers,correct_count,total,won,prize,created_at').in('round_id', ids).or(identOr())
+      // Hanya tampilkan hasil milik sendiri (akun / browser ini). Cocok perangkat saja = diblokir, tanpa hasil orang lain.
+      const ownOr = userId ? `user_id.eq.${userId}` : (browserId ? `browser_id.eq.${browserId}` : '');
+      const { data: entries } = ownOr && ids.length
+        ? await admin.from('game_entries').select('id,round_id,answers,correct_count,total,won,prize,created_at').in('round_id', ids).or(ownOr)
+        : { data: [] as any[] };
+      const { data: fpEntries } = !userId && deviceFp && ids.length
+        ? await admin.from('game_entries').select('round_id').in('round_id', ids).eq('device_fp', deviceFp).is('user_id', null)
         : { data: [] as any[] };
       const out = (rounds || []).map((r) => {
         const entry = (entries || []).find((e: any) => e.round_id === r.id) || null;
+        const device_blocked = !entry && (fpEntries || []).some((e: any) => e.round_id === r.id);
         const ended = r.ends_at < nowIso;
         const reveal = !!entry || ended;
         return {
           ...r,
           prizes: (r.prizes as Prize[] || []).map((p) => ({ kind: p.kind, coins: p.coins })),
           status: r.starts_at > nowIso ? 'upcoming' : ended ? 'ended' : 'active',
-          entry,
+          entry, device_blocked,
           questions: (qs || []).filter((q: any) => q.round_id === r.id).map((q: any) => ({
             id: q.id, prompt: q.prompt, image_url: q.image_url, choices: q.choices || [],
             ...(reveal ? { answer: q.answer, reveal_image_url: q.reveal_image_url } : {}),
@@ -137,15 +146,18 @@ Deno.serve(async (req) => {
           if (new Date(v.answered_at).getTime() - new Date(v.started_at).getTime() > BLUR_LIMIT_S * 1000 + 800) tooSlow = true;
         }
       }
+      // Semua soal wajib benar-benar dijawab.
+      if (round.game_type !== 'blur' && qs.some((q: any) => !norm(String(answers[q.id] ?? '')))) return json({ error: 'incomplete' }, 400);
       let correct = 0;
       const clean: Record<string, string> = {};
       for (const q of qs) {
         const a = String(answers[q.id] ?? '').slice(0, 200);
         clean[q.id] = a;
-        const ok = [q.answer, ...(q.alt_answers || [])].map(norm).filter(Boolean).includes(norm(a));
-        if (ok && norm(a)) correct++;
+        const na = norm(a);
+        const ok = !!na && [q.answer, ...(q.alt_answers || [])].map(norm).filter(Boolean).includes(na);
+        if (ok) correct++;
       }
-      const won = correct === qs.length && !tooSlow;
+      const won = correct === qs.length && qs.length > 0 && !tooSlow;
       // Klaim slot dulu (unique round_id+user_id) agar tidak bisa main 2x.
       const { data: entry, error: insErr } = await admin.from('game_entries').insert({
         round_id: roundId, user_id: userId, browser_id: browserId, device_fp: deviceFp, ip_hash: ipHash, answers: clean, correct_count: correct, total: qs.length, won,
