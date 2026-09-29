@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -12,7 +12,7 @@ import { Gamepad2, Gift, Copy, Radio, Coins, Clock, CheckCircle2, XCircle, Arrow
 
 type Q = { id: string; prompt: string; image_url: string; choices?: string[]; answer?: string; reveal_image_url?: string };
 type Entry = { correct_count: number; total: number; won: boolean; prize: any; answers: Record<string, string> };
-type Round = { id: string; title: string; description: string; game_type?: string; starts_at: string; ends_at: string; status: 'upcoming' | 'active' | 'ended'; prizes: { kind: string; coins?: number }[]; questions: Q[]; entry: Entry | null; device_blocked?: boolean };
+type Round = { id: string; title: string; description: string; game_type?: string; starts_at: string; ends_at: string; status: 'upcoming' | 'active' | 'ended'; prizes: { kind: string; coins?: number }[]; questions: Q[]; entry: Entry | null; device_blocked?: boolean; prize_seconds?: number };
 
 const fmt = (iso: string) => new Date(iso).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' });
 const prizeLabel = (p: { kind: string; coins?: number }) => p.kind === 'coins' ? `${p.coins} Koin` : p.kind === 'show' ? 'Show Gratis' : 'Bundel Show';
@@ -20,10 +20,10 @@ const isAudio = (u: string) => /\.(mp3|m4a|ogg|wav|aac)(\?|$)/i.test(u);
 const typeLabel: Record<string, string> = { quiz: 'Kuis', lyrics: 'Tebak Lagu', blur: 'Tebak Foto Blur' };
 
 // Foto mulai sangat buram lalu makin jelas dalam 30 detik setelah user menekan "Mulai".
-// Waktu mulai & waktu jawab dicatat di server; hanya jawaban dalam 7 detik yang dapat hadiah.
+// Waktu mulai & waktu jawab dicatat di server; batas detik hadiah diatur admin per game.
 const BLUR_MS = 30000;
-const PRIZE_MS = 7000;
-function BlurImage({ src, start, onStart, locked }: { src: string; start: number | null; onStart: () => void; locked: boolean }) {
+function BlurImage({ src, start, onStart, locked, limit }: { src: string; start: number | null; onStart: () => void; locked: boolean; limit: number }) {
+  const PRIZE_MS = limit * 1000;
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
     if (!start || locked) return;
@@ -38,10 +38,10 @@ function BlurImage({ src, start, onStart, locked }: { src: string; start: number
     <div className="relative w-fit max-w-full overflow-hidden rounded-lg border border-border">
       <img src={src} alt="" draggable={false} onContextMenu={(e) => e.preventDefault()} className="max-h-64 object-contain select-none transition-[filter] duration-200" style={{ filter: `blur(${start ? blur : 28}px)` }} />
       {!start ? (
-        <button type="button" onClick={onStart} className="absolute inset-0 flex items-center justify-center bg-background/40 text-sm font-semibold text-center leading-snug px-2"><Eye className="w-4 h-4 mr-1 shrink-0" />Mulai (jawab dalam 7 detik)</button>
+        <button type="button" onClick={onStart} className="absolute inset-0 flex items-center justify-center bg-background/40 text-sm font-semibold text-center leading-snug px-2"><Eye className="w-4 h-4 mr-1 shrink-0" />Mulai (jawab dalam {limit} detik)</button>
       ) : !locked && (elapsed <= PRIZE_MS
         ? <span className="absolute bottom-1 right-1 text-[10px] px-2 py-0.5 rounded-full bg-background/80">{prizeLeft} dtk untuk hadiah</span>
-        : <span className="absolute bottom-1 right-1 text-[10px] px-2 py-0.5 rounded-full bg-destructive text-destructive-foreground">Lebih dari 7 dtk</span>)}
+        : <span className="absolute bottom-1 right-1 text-[10px] px-2 py-0.5 rounded-full bg-destructive text-destructive-foreground">Lebih dari {limit} dtk</span>)}
     </div>
   );
 }
@@ -81,26 +81,48 @@ function RoundCard({ r, signedIn, onDone }: { r: Round; signedIn: boolean; onDon
   const isBlur = r.game_type === 'blur';
   const [starts, setStarts] = useState<Record<string, number>>({});
   const [locked, setLocked] = useState<Record<string, boolean>>({});
-  const ident = async () => ({ browser_id: getBrowserId(), device_fp: await getDeviceFp() });
-  const startQ = async (qid: string) => {
+  const limit = r.prize_seconds || 20;
+  const ident = async () => ({ browser_id: getBrowserId(), device_fp: await getDeviceFp().catch(() => '') });
+  const views = useRef<Record<string, Promise<unknown>>>({});
+  const call = async (body: Record<string, unknown>) => {
+    for (let i = 0; i < 3; i++) {
+      const { data, error } = await supabase.functions.invoke('game-play', { body: { ...body, ...(await ident()) } });
+      if (!error || data?.error) return { data, error };
+      await new Promise((res) => setTimeout(res, 800));
+    }
+    return { data: null, error: new Error('network') };
+  };
+  const startQ = (qid: string) => {
     setStarts((s) => ({ ...s, [qid]: Date.now() }));
-    await supabase.functions.invoke('game-play', { body: { action: 'view', round_id: r.id, question_id: qid, ...(await ident()) } });
+    views.current[qid] = call({ action: 'view', round_id: r.id, question_id: qid });
   };
   const lockQ = async (qid: string, ans: string) => {
     if (!ans.trim() || locked[qid]) return;
     setAnswers((a) => ({ ...a, [qid]: ans })); setLocked((l) => ({ ...l, [qid]: true }));
-    const { data } = await supabase.functions.invoke('game-play', { body: { action: 'answer', round_id: r.id, question_id: qid, answer: ans, ...(await ident()) } });
-    if (data?.late) toast({ title: 'Lebih dari 7 detik — jawaban ini tidak dapat hadiah', variant: 'destructive' });
+    await views.current[qid];
+    let { data } = await call({ action: 'answer', round_id: r.id, question_id: qid, answer: ans });
+    if (data?.error === 'not_viewed') {
+      await call({ action: 'view', round_id: r.id, question_id: qid });
+      ({ data } = await call({ action: 'answer', round_id: r.id, question_id: qid, answer: ans }));
+    }
+    if (data?.late) toast({ title: `Lebih dari ${limit} detik — jawaban ini tidak dapat hadiah`, variant: 'destructive' });
+  };
+  const errText: Record<string, string> = {
+    already_played: 'Kamu sudah bermain di ronde ini', ended: 'Game sudah berakhir', not_started: 'Game belum dimulai',
+    incomplete: 'Masih ada soal yang belum dijawab', missing_identity: 'Browser tidak dikenali, muat ulang halaman lalu coba lagi',
+    round_not_found: 'Game tidak ditemukan', network: 'Koneksi bermasalah, coba kirim lagi',
   };
   const submit = async () => {
     if (r.questions.some((q) => !answers[q.id]?.trim())) { toast({ title: 'Isi semua jawaban dulu', variant: 'destructive' }); return; }
     if (!confirm('Kamu hanya punya 1 kesempatan. Kirim jawaban sekarang?')) return;
     setBusy(true);
-    const { data, error } = await supabase.functions.invoke('game-play', { body: { action: 'submit', round_id: r.id, answers, ...(await ident()) } });
+    await Promise.all(Object.values(views.current));
+    const { data, error } = await call({ action: 'submit', round_id: r.id, answers });
     setBusy(false);
     if (error || data?.error) {
-      const e = data?.error || error?.message;
-      toast({ title: e === 'already_played' ? 'Kamu sudah bermain di ronde ini' : e === 'ended' ? 'Game sudah berakhir' : 'Gagal mengirim', variant: 'destructive' });
+      const e = data?.error || 'network';
+      toast({ title: 'Gagal mengirim', description: errText[e] || 'Coba lagi sebentar', variant: 'destructive' });
+      if (e === 'network') return;
     } else {
       const p = data.entry?.prize;
       if (p?.kind === 'show' && p.show_id) setShowPurchase(p.show_id, { token: p.token, kind: 'show', paidAt: Date.now() });
@@ -143,7 +165,7 @@ function RoundCard({ r, signedIn, onDone }: { r: Round; signedIn: boolean; onDon
                 </div>
               ) : <p className="font-medium text-sm">{i + 1}. {q.prompt}</p>}
               {q.image_url && (isAudio(q.image_url) ? <audio controls preload="none" src={q.image_url} className="w-full" />
-                : isBlur && !reveal ? <BlurImage src={q.image_url} start={starts[q.id] ?? null} locked={!!locked[q.id]} onStart={() => startQ(q.id)} />
+                : isBlur && !reveal ? <BlurImage src={q.image_url} start={starts[q.id] ?? null} locked={!!locked[q.id]} limit={limit} onStart={() => startQ(q.id)} />
                 : <img src={q.image_url} alt="" className="max-h-64 rounded-lg border border-border object-contain" />)}
               {reveal ? (
                 <div className="text-sm space-y-1">
@@ -152,7 +174,7 @@ function RoundCard({ r, signedIn, onDone }: { r: Round; signedIn: boolean; onDon
                   {q.reveal_image_url && <img src={q.reveal_image_url} alt={q.answer} className="max-h-64 rounded-lg border border-border object-contain" />}
                 </div>
               ) : isBlur && !starts[q.id] ? (
-                <p className="text-xs text-muted-foreground">Tekan Mulai, lalu jawab dalam 7 detik untuk dapat hadiah. Foto perlahan jelas dalam 30 detik. Jawaban langsung terkunci.</p>
+                <p className="text-xs text-muted-foreground">Tekan Mulai, lalu jawab dalam {limit} detik untuk dapat hadiah. Foto perlahan jelas dalam 30 detik. Jawaban langsung terkunci.</p>
               ) : (
                 q.choices && q.choices.length > 0 ? (
                   <div className="grid gap-2">
