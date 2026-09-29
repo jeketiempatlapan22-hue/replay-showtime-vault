@@ -32,14 +32,15 @@ function ImageField({ value, onChange, placeholder }: { value: string; onChange:
 }
 
 type Prize = { kind: 'coins' | 'show' | 'bundle'; coins?: number; weight: number };
-type Q = { id?: string; prompt: string; image_url: string; answer: string; alt_answers: string; reveal_image_url: string };
+type Q = { id?: string; prompt: string; image_url: string; answer: string; alt_answers: string; choices: string; reveal_image_url: string };
 type Round = { id?: string; title: string; description: string; game_type: string; starts_at: string; ends_at: string; is_published: boolean; prizes: Prize[] };
 
 const db = supabase as any;
 const toLocal = (iso: string) => { const d = new Date(iso); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 16); };
 const blank = (): Round => ({ title: '', description: '', game_type: 'quiz', starts_at: new Date().toISOString(), ends_at: new Date(Date.now() + 86400000).toISOString(), is_published: false,
   prizes: [{ kind: 'coins', coins: 3, weight: 5 }, { kind: 'show', weight: 2 }, { kind: 'bundle', weight: 1 }] });
-const blankQ = (): Q => ({ prompt: '', image_url: '', answer: '', alt_answers: '', reveal_image_url: '' });
+const parseChoices = (q: Q) => q.choices.split('|').map((s) => s.trim()).filter(Boolean).slice(0, 6);
+const blankQ = (): Q => ({ prompt: '', image_url: '', answer: '', alt_answers: '', choices: '', reveal_image_url: '' });
 
 export default function GameAdmin() {
   const [rounds, setRounds] = useState<any[]>([]);
@@ -60,12 +61,13 @@ export default function GameAdmin() {
     if (!r) { setEdit(blank()); setQs([blankQ()]); return; }
     setEdit({ ...r, prizes: r.prizes || [] });
     const { data } = await db.from('game_questions').select('*').eq('round_id', r.id).order('sort_order');
-    setQs((data || []).map((q: any) => ({ ...q, alt_answers: (q.alt_answers || []).join(', ') })));
+    setQs((data || []).map((q: any) => ({ ...q, alt_answers: (q.alt_answers || []).join(', '), choices: (q.choices || []).join(' | ') })));
   };
 
   const save = async () => {
     if (!edit) return;
     if (!edit.title.trim() || !qs.length || qs.some((q) => !q.prompt.trim() || !q.answer.trim())) { toast({ title: 'Isi judul, soal dan jawaban', variant: 'destructive' }); return; }
+    if (qs.some((q) => { const c = parseChoices(q); return c.length > 0 && (c.length < 2 || !c.includes(q.answer.trim())); })) { toast({ title: 'Pilihan A/B/C minimal 2 dan harus memuat jawaban benar', variant: 'destructive' }); return; }
     setBusy(true);
     const { id, ...rest } = edit as any;
     const payload = { images_cleaned: false, title: rest.title, description: rest.description, game_type: rest.game_type, starts_at: rest.starts_at, ends_at: rest.ends_at, is_published: rest.is_published, prizes: rest.prizes };
@@ -74,7 +76,7 @@ export default function GameAdmin() {
     const rid = res.data.id;
     await db.from('game_questions').delete().eq('round_id', rid);
     const { error } = await db.from('game_questions').insert(qs.map((q, i) => ({ round_id: rid, prompt: q.prompt, image_url: q.image_url, answer: q.answer, reveal_image_url: q.reveal_image_url, sort_order: i,
-      alt_answers: q.alt_answers.split(',').map((s) => s.trim()).filter(Boolean) })));
+      alt_answers: q.alt_answers.split(',').map((s) => s.trim()).filter(Boolean), choices: parseChoices(q) })));
     setBusy(false);
     if (error) { toast({ title: 'Gagal simpan soal', description: error.message, variant: 'destructive' }); return; }
     toast({ title: 'Game disimpan' });
@@ -95,7 +97,7 @@ export default function GameAdmin() {
     const { data, error } = await supabase.functions.invoke('game-ai-questions', { body: { topic: aiTopic, count: 5 } });
     setBusy(false);
     if (error || data?.error) { toast({ title: 'AI gagal', description: data?.error || error?.message, variant: 'destructive' }); return; }
-    const add = (data.questions || []).map((q: any) => ({ ...blankQ(), prompt: q.prompt, answer: q.answer, alt_answers: (q.alt_answers || []).join(', ') }));
+    const add = (data.questions || []).map((q: any) => ({ ...blankQ(), prompt: q.prompt, answer: q.answer, alt_answers: (q.alt_answers || []).join(', '), choices: (q.choices || []).join(' | ') }));
     setQs((cur) => [...cur.filter((q) => q.prompt.trim()), ...add]);
     toast({ title: `${add.length} soal AI ditambahkan — periksa kebenarannya dulu` });
   };
@@ -164,6 +166,7 @@ export default function GameAdmin() {
                   <Button size="icon" variant="ghost" onClick={() => setQs(qs.filter((_, j) => j !== i))}><Trash2 className="w-4 h-4" /></Button></div>
                 <ImageField placeholder="Gambar soal / potongan foto (opsional)" value={q.image_url} onChange={(v) => setQ(i, { image_url: v })} />
                 <Input placeholder="Jawaban" value={q.answer} onChange={(e) => setQ(i, { answer: e.target.value })} />
+                <Input placeholder="Pilihan A | B | C (opsional, pisahkan dengan |, harus memuat jawaban)" value={q.choices} onChange={(e) => setQ(i, { choices: e.target.value })} />
                 <Input placeholder="Jawaban lain yang diterima, pisahkan koma" value={q.alt_answers} onChange={(e) => setQ(i, { alt_answers: e.target.value })} />
                 <ImageField placeholder="Foto asli jawaban (opsional)" value={q.reveal_image_url} onChange={(v) => setQ(i, { reveal_image_url: v })} />
               </div>
