@@ -19,9 +19,10 @@ const prizeLabel = (p: { kind: string; coins?: number }) => p.kind === 'coins' ?
 const isAudio = (u: string) => /\.(mp3|m4a|ogg|wav|aac)(\?|$)/i.test(u);
 const typeLabel: Record<string, string> = { quiz: 'Kuis', lyrics: 'Tebak Lagu', blur: 'Tebak Foto Blur' };
 
-// Foto mulai sangat buram lalu makin jelas dalam 5 detik setelah user menekan "Mulai".
-// Waktu mulai & waktu jawab dicatat di server; lewat 5 detik = tidak dapat hadiah.
-const BLUR_MS = 5000;
+// Foto mulai sangat buram lalu makin jelas dalam 30 detik setelah user menekan "Mulai".
+// Waktu mulai & waktu jawab dicatat di server; hanya jawaban dalam 7 detik yang dapat hadiah.
+const BLUR_MS = 30000;
+const PRIZE_MS = 7000;
 function BlurImage({ src, start, onStart, locked }: { src: string; start: number | null; onStart: () => void; locked: boolean }) {
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
@@ -31,12 +32,16 @@ function BlurImage({ src, start, onStart, locked }: { src: string; start: number
   }, [start, locked]);
   const p = start ? Math.min(1, (now - start) / BLUR_MS) : 0;
   const blur = Math.round(28 * (1 - p));
+  const elapsed = start ? now - start : 0;
+  const prizeLeft = Math.ceil((PRIZE_MS - elapsed) / 1000);
   return (
     <div className="relative w-fit max-w-full overflow-hidden rounded-lg border border-border">
       <img src={src} alt="" draggable={false} onContextMenu={(e) => e.preventDefault()} className="max-h-64 object-contain select-none transition-[filter] duration-200" style={{ filter: `blur(${start ? blur : 28}px)` }} />
       {!start ? (
-        <button type="button" onClick={onStart} className="absolute inset-0 flex items-center justify-center bg-background/40 text-sm font-semibold"><Eye className="w-4 h-4 mr-1" />Mulai (waktu 5 detik)</button>
-      ) : !locked && <span className={`absolute bottom-1 right-1 text-[10px] px-2 py-0.5 rounded-full ${p < 1 ? 'bg-background/80' : 'bg-destructive text-destructive-foreground'}`}>{p < 1 ? `${Math.ceil((BLUR_MS - (now - start)) / 1000)} dtk` : 'Waktu habis'}</span>}
+        <button type="button" onClick={onStart} className="absolute inset-0 flex items-center justify-center bg-background/40 text-sm font-semibold text-center leading-snug px-2"><Eye className="w-4 h-4 mr-1 shrink-0" />Mulai (jawab dalam 7 detik)</button>
+      ) : !locked && (elapsed <= PRIZE_MS
+        ? <span className="absolute bottom-1 right-1 text-[10px] px-2 py-0.5 rounded-full bg-background/80">{prizeLeft} dtk untuk hadiah</span>
+        : <span className="absolute bottom-1 right-1 text-[10px] px-2 py-0.5 rounded-full bg-destructive text-destructive-foreground">Lebih dari 7 dtk</span>)}
     </div>
   );
 }
@@ -85,7 +90,7 @@ function RoundCard({ r, signedIn, onDone }: { r: Round; signedIn: boolean; onDon
     if (!ans.trim() || locked[qid]) return;
     setAnswers((a) => ({ ...a, [qid]: ans })); setLocked((l) => ({ ...l, [qid]: true }));
     const { data } = await supabase.functions.invoke('game-play', { body: { action: 'answer', round_id: r.id, question_id: qid, answer: ans, ...(await ident()) } });
-    if (data?.late) toast({ title: 'Lebih dari 5 detik — jawaban ini tidak dapat hadiah', variant: 'destructive' });
+    if (data?.late) toast({ title: 'Lebih dari 7 detik — jawaban ini tidak dapat hadiah', variant: 'destructive' });
   };
   const submit = async () => {
     if (r.questions.some((q) => !answers[q.id]?.trim())) { toast({ title: 'Isi semua jawaban dulu', variant: 'destructive' }); return; }
@@ -144,7 +149,7 @@ function RoundCard({ r, signedIn, onDone }: { r: Round; signedIn: boolean; onDon
                   {q.reveal_image_url && <img src={q.reveal_image_url} alt={q.answer} className="max-h-64 rounded-lg border border-border object-contain" />}
                 </div>
               ) : isBlur && !starts[q.id] ? (
-                <p className="text-xs text-muted-foreground">Tekan Mulai, lalu jawab dalam 5 detik. Jawaban langsung terkunci.</p>
+                <p className="text-xs text-muted-foreground">Tekan Mulai, lalu jawab dalam 7 detik untuk dapat hadiah. Foto perlahan jelas dalam 30 detik. Jawaban langsung terkunci.</p>
               ) : (
                 q.choices && q.choices.length > 0 ? (
                   <div className="grid gap-2">

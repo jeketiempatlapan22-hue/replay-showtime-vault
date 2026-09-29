@@ -43,7 +43,7 @@ Deno.serve(async (req) => {
     const ipRaw = (req.headers.get('x-forwarded-for') || req.headers.get('cf-connecting-ip') || '').split(',')[0].trim();
     const ipHash = ipRaw ? Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode('game:' + ipRaw)))).map((b) => b.toString(16).padStart(2, '0')).join('').slice(0, 32) : null;
     const MAX_WINS = 3; // per hari
-    const BLUR_LIMIT_S = 5;
+    const BLUR_LIMIT_S = 7;
     const ident = userId || browserId || '';
 
     // Tebak Foto Blur: catat waktu mulai lihat foto & waktu jawab di server.
