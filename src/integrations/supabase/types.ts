@@ -786,6 +786,92 @@ export type Database = {
         }
         Relationships: []
       }
+      game_views: {
+        Row: {
+          answer: string | null
+          answered_at: string | null
+          id: string
+          ident: string
+          question_id: string
+          round_id: string
+          started_at: string
+        }
+        Insert: {
+          answer?: string | null
+          answered_at?: string | null
+          id?: string
+          ident: string
+          question_id: string
+          round_id: string
+          started_at?: string
+        }
+        Update: {
+          answer?: string | null
+          answered_at?: string | null
+          id?: string
+          ident?: string
+          question_id?: string
+          round_id?: string
+          started_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "game_views_round_id_fkey"
+            columns: ["round_id"]
+            isOneToOne: false
+            referencedRelation: "game_rounds"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      game_wins: {
+        Row: {
+          bundle_id: string | null
+          created_at: string
+          id: string
+          kind: string
+          prize: Json
+          round_title: string
+          show_id: string | null
+          user_id: string
+        }
+        Insert: {
+          bundle_id?: string | null
+          created_at?: string
+          id?: string
+          kind: string
+          prize?: Json
+          round_title?: string
+          show_id?: string | null
+          user_id: string
+        }
+        Update: {
+          bundle_id?: string | null
+          created_at?: string
+          id?: string
+          kind?: string
+          prize?: Json
+          round_title?: string
+          show_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "game_wins_bundle_id_fkey"
+            columns: ["bundle_id"]
+            isOneToOne: false
+            referencedRelation: "show_bundles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "game_wins_show_id_fkey"
+            columns: ["show_id"]
+            isOneToOne: false
+            referencedRelation: "active_shows"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ip_visit_log: {
         Row: {
           endpoint: string
