@@ -650,7 +650,9 @@ export type Database = {
           browser_id: string | null
           correct_count: number
           created_at: string
+          device_fp: string | null
           id: string
+          ip_hash: string | null
           prize: Json | null
           round_id: string
           total: number
@@ -662,7 +664,9 @@ export type Database = {
           browser_id?: string | null
           correct_count?: number
           created_at?: string
+          device_fp?: string | null
           id?: string
+          ip_hash?: string | null
           prize?: Json | null
           round_id: string
           total?: number
@@ -674,7 +678,9 @@ export type Database = {
           browser_id?: string | null
           correct_count?: number
           created_at?: string
+          device_fp?: string | null
           id?: string
+          ip_hash?: string | null
           prize?: Json | null
           round_id?: string
           total?: number
