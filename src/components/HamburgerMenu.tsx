@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Menu, X, MessageCircle, Phone, Sun, Moon, Radio, LogIn, LogOut, User as UserIcon, Crown, BookOpen, Clapperboard, Tv, ChevronDown } from 'lucide-react';
+import { Menu, X, MessageCircle, Phone, Sun, Moon, Radio, LogIn, LogOut, User as UserIcon, Crown, BookOpen, Clapperboard, Tv, ChevronDown, Gamepad2 } from 'lucide-react';
 
 const GUIDE_LINKS = [
   { id: 'buy-show', label: 'Panduan Pembelian' },
@@ -177,6 +177,11 @@ export default function HamburgerMenu({ whatsappNumber, whatsappLink, lightMode,
               <span className="font-medium block">Hubungkan TV/Proyektor</span>
               <span className="text-xs text-muted-foreground">Masukkan 6 kode dari halaman live</span>
             </div>
+          </Link>
+
+          <Link to="/game" onClick={() => setOpen(false)} className="flex items-center gap-3 px-4 py-3 rounded-lg text-foreground hover:bg-secondary transition-colors">
+            <Gamepad2 className="w-5 h-5 text-primary" />
+            <span className="font-medium">Game & Hadiah</span>
           </Link>
 
           <div className="rounded-lg overflow-hidden">

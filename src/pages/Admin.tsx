@@ -1,4 +1,5 @@
 import LiveMonitorAdmin from '@/components/admin/LiveMonitorAdmin';
+import GameAdmin from '@/components/admin/GameAdmin';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Plus, Trash2, Edit2, Key, Save, Palette, MessageCircle, LogOut, Eye, Send, List, Settings, ShieldCheck, Unlock as UnlockIcon, Link2, Copy, X, Radio, RefreshCw, Users, Upload, Search, ArrowUpDown, Sparkles, Calendar, Bot, History, Menu, Lock, ClipboardList } from 'lucide-react';
@@ -722,6 +723,7 @@ export default function Admin() {
                 { v: 'replay_off', label: 'Replay Off', Icon: Eye },
                 { v: 'pakasir', label: 'Pakasir Webhook', Icon: Settings },
                 { v: 'coins', label: 'Koin', Icon: Sparkles },
+                { v: 'game', label: 'Game & Hadiah', Icon: Sparkles },
                 { v: 'users', label: 'Manajemen User', Icon: Users },
                 { v: 'preview', label: 'Preview', Icon: Eye },
                 { v: 'comments', label: 'Komentar', Icon: MessageCircle },
@@ -746,7 +748,7 @@ export default function Admin() {
           </SheetContent>
         </Sheet>
         <Button variant="ghost" size="icon" onClick={() => navigate('/')} className="shrink-0" title="Beranda"><ArrowLeft className="w-5 h-5" /></Button>
-        <h1 className="text-base sm:text-xl font-bold font-sans text-foreground flex-1 min-w-0 truncate">Admin · {(['reseller_audit', 'reseller_billing', 'reseller_pricing'].includes(activeTab) ? 'Reseller' : ['membership', 'mb_users', 'mb_packages'].includes(activeTab) ? 'Membership' : ['security', 'ip_manager'].includes(activeTab) ? 'Keamanan' : ({ replays: 'Replay', shows: 'Streaming Show', members: 'Member', bot: 'Bot WA', history: 'Riwayat', live_monitor: 'Live & Buat Link', token_factory: 'Token Factory', bundle: 'Bundel Show', mb_proofs: 'Bukti Transaksi', replay_off: 'Replay Off', pakasir: 'Pakasir Webhook', coins: 'Koin', users: 'Manajemen User', preview: 'Preview', comments: 'Komentar', settings: 'Setelan' } as Record<string, string>)[activeTab])}</h1>
+        <h1 className="text-base sm:text-xl font-bold font-sans text-foreground flex-1 min-w-0 truncate">Admin · {(['reseller_audit', 'reseller_billing', 'reseller_pricing'].includes(activeTab) ? 'Reseller' : ['membership', 'mb_users', 'mb_packages'].includes(activeTab) ? 'Membership' : ['security', 'ip_manager'].includes(activeTab) ? 'Keamanan' : ({ replays: 'Replay', shows: 'Streaming Show', members: 'Member', bot: 'Bot WA', history: 'Riwayat', live_monitor: 'Live & Buat Link', token_factory: 'Token Factory', bundle: 'Bundel Show', mb_proofs: 'Bukti Transaksi', replay_off: 'Replay Off', pakasir: 'Pakasir Webhook', coins: 'Koin', game: 'Game & Hadiah', users: 'Manajemen User', preview: 'Preview', comments: 'Komentar', settings: 'Setelan' } as Record<string, string>)[activeTab])}</h1>
         <div className="flex items-center gap-1 sm:gap-2 shrink-0">
           <Button size="sm" onClick={() => { resetForm(); setShowAddDialog(true); }} className="text-xs sm:text-sm">
             <Plus className="w-4 h-4 sm:mr-1" /> <span className="hidden sm:inline">Tambah</span>
@@ -758,7 +760,7 @@ export default function Admin() {
       <div className="w-full max-w-6xl mx-auto px-2 sm:px-4 py-4 overflow-x-hidden">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="hidden">
-            <TabsTrigger value="replays" /><TabsTrigger value="shows" /><TabsTrigger value="members" /><TabsTrigger value="bot" /><TabsTrigger value="history" /><TabsTrigger value="reseller_audit" /><TabsTrigger value="reseller_billing" /><TabsTrigger value="reseller_pricing" /><TabsTrigger value="membership" /><TabsTrigger value="mb_users" /><TabsTrigger value="token_factory" /><TabsTrigger value="live_monitor" /><TabsTrigger value="mb_packages" /><TabsTrigger value="mb_proofs" /><TabsTrigger value="replay_off" /><TabsTrigger value="pakasir" /><TabsTrigger value="coins" /><TabsTrigger value="users" /><TabsTrigger value="preview" /><TabsTrigger value="comments" /><TabsTrigger value="security" /><TabsTrigger value="ip_manager" /><TabsTrigger value="settings" />
+            <TabsTrigger value="replays" /><TabsTrigger value="shows" /><TabsTrigger value="members" /><TabsTrigger value="bot" /><TabsTrigger value="history" /><TabsTrigger value="reseller_audit" /><TabsTrigger value="reseller_billing" /><TabsTrigger value="reseller_pricing" /><TabsTrigger value="membership" /><TabsTrigger value="mb_users" /><TabsTrigger value="token_factory" /><TabsTrigger value="live_monitor" /><TabsTrigger value="mb_packages" /><TabsTrigger value="mb_proofs" /><TabsTrigger value="replay_off" /><TabsTrigger value="pakasir" /><TabsTrigger value="coins" /><TabsTrigger value="game" /><TabsTrigger value="users" /><TabsTrigger value="preview" /><TabsTrigger value="comments" /><TabsTrigger value="security" /><TabsTrigger value="ip_manager" /><TabsTrigger value="settings" />
           </TabsList>
 
           {(['reseller_audit', 'reseller_billing', 'reseller_pricing'].includes(activeTab) || ['membership', 'mb_users', 'mb_packages'].includes(activeTab) || ['security', 'ip_manager'].includes(activeTab)) && (
@@ -790,6 +792,7 @@ export default function Admin() {
           <TabsContent value="replay_off"><ReplayOffAdmin /></TabsContent>
           <TabsContent value="pakasir"><PakasirAdmin /></TabsContent>
           <TabsContent value="coins"><CoinAdmin /></TabsContent>
+          <TabsContent value="game"><GameAdmin /></TabsContent>
           <TabsContent value="users"><UserManagement /></TabsContent>
           <TabsContent value="ip_manager"><IpManager /></TabsContent>
 
