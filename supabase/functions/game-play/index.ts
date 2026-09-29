@@ -88,6 +88,13 @@ Deno.serve(async (req) => {
 
     if (action === 'submit') {
       if (!userId && (!browserId || !deviceFp)) return json({ error: 'missing_identity' }, 400);
+      const roundId = String(body.round_id || '');
+      const answers = (body.answers && typeof body.answers === 'object') ? body.answers as Record<string, string> : {};
+      const { data: round } = await admin.from('game_rounds').select('*').eq('id', roundId).eq('is_published', true).maybeSingle();
+      if (!round) return json({ error: 'round_not_found' }, 404);
+      const now = Date.now();
+      if (new Date(round.starts_at).getTime() > now) return json({ error: 'not_started' }, 400);
+      if (new Date(round.ends_at).getTime() < now) return json({ error: 'ended' }, 400);
       // Cek server: akun, browser, perangkat (lintas browser) sudah pernah main di ronde ini?
       const { count: prior } = await admin.from('game_entries').select('id', { count: 'exact', head: true }).eq('round_id', roundId).or(identOr());
       if ((prior || 0) > 0) return json({ error: 'already_played' }, 409);
@@ -96,13 +103,6 @@ Deno.serve(async (req) => {
         const { count: ipPrior } = await admin.from('game_entries').select('id', { count: 'exact', head: true }).eq('round_id', roundId).eq('ip_hash', ipHash).is('user_id', null);
         if ((ipPrior || 0) > 0) return json({ error: 'already_played' }, 409);
       }
-      const roundId = String(body.round_id || '');
-      const answers = (body.answers && typeof body.answers === 'object') ? body.answers as Record<string, string> : {};
-      const { data: round } = await admin.from('game_rounds').select('*').eq('id', roundId).eq('is_published', true).maybeSingle();
-      if (!round) return json({ error: 'round_not_found' }, 404);
-      const now = Date.now();
-      if (new Date(round.starts_at).getTime() > now) return json({ error: 'not_started' }, 400);
-      if (new Date(round.ends_at).getTime() < now) return json({ error: 'ended' }, 400);
       const { data: qs } = await admin.from('game_questions').select('id,answer,alt_answers').eq('round_id', roundId);
       if (!qs?.length) return json({ error: 'no_questions' }, 400);
       let correct = 0;
