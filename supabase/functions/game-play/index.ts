@@ -38,6 +38,21 @@ Deno.serve(async (req) => {
     const { data: st } = await admin.from('site_settings').select('value').eq('key', 'site_origin').maybeSingle();
     const origin = String(st?.value || 'https://realtime48stream.my.id').replace(/\/+$/, '');
 
+    const browserId = String(body.browser_id || '').slice(0, 100).trim() || null;
+
+    // Bersihkan gambar upload dari ronde yang sudah selesai (hemat ruang).
+    const { data: doneRounds } = await admin.from('game_rounds').select('id').eq('images_cleaned', false).lt('ends_at', new Date().toISOString()).limit(20);
+    for (const dr of doneRounds || []) {
+      const { data: dq } = await admin.from('game_questions').select('id,image_url,reveal_image_url').eq('round_id', dr.id);
+      const paths: string[] = [];
+      for (const q of dq || []) for (const u of [q.image_url, q.reveal_image_url]) {
+        const m = String(u || '').match(/\/card-images\/(game\/[^?]+)/); if (m) paths.push(decodeURIComponent(m[1]));
+      }
+      if (paths.length) await admin.storage.from('card-images').remove(paths);
+      await admin.from('game_questions').update({ image_url: '', reveal_image_url: '' }).eq('round_id', dr.id).or('image_url.like.%/card-images/game/%,reveal_image_url.like.%/card-images/game/%');
+      await admin.from('game_rounds').update({ images_cleaned: true }).eq('id', dr.id);
+    }
+
     if (action === 'list') {
       const nowIso = new Date().toISOString();
       const { data: rounds } = await admin.from('game_rounds').select('id,title,description,game_type,starts_at,ends_at,prizes')
@@ -45,7 +60,9 @@ Deno.serve(async (req) => {
         .order('starts_at', { ascending: false }).limit(10);
       const ids = (rounds || []).map((r) => r.id);
       const { data: qs } = ids.length ? await admin.from('game_questions').select('id,round_id,prompt,image_url,answer,reveal_image_url,sort_order').in('round_id', ids).order('sort_order') : { data: [] as any[] };
-      const { data: entries } = userId && ids.length ? await admin.from('game_entries').select('*').eq('user_id', userId).in('round_id', ids) : { data: [] as any[] };
+      const { data: entries } = (userId || browserId) && ids.length
+        ? await admin.from('game_entries').select('*').in('round_id', ids).or(userId ? `user_id.eq.${userId}${browserId ? `,browser_id.eq.${browserId}` : ''}` : `browser_id.eq.${browserId}`)
+        : { data: [] as any[] };
       const out = (rounds || []).map((r) => {
         const entry = (entries || []).find((e: any) => e.round_id === r.id) || null;
         const ended = r.ends_at < nowIso;
@@ -65,7 +82,7 @@ Deno.serve(async (req) => {
     }
 
     if (action === 'submit') {
-      if (!userId) return json({ error: 'login_required' }, 401);
+      if (!userId && !browserId) return json({ error: 'missing_identity' }, 400);
       const roundId = String(body.round_id || '');
       const answers = (body.answers && typeof body.answers === 'object') ? body.answers as Record<string, string> : {};
       const { data: round } = await admin.from('game_rounds').select('*').eq('id', roundId).eq('is_published', true).maybeSingle();
@@ -86,18 +103,23 @@ Deno.serve(async (req) => {
       const won = correct === qs.length;
       // Klaim slot dulu (unique round_id+user_id) agar tidak bisa main 2x.
       const { data: entry, error: insErr } = await admin.from('game_entries').insert({
-        round_id: roundId, user_id: userId, answers: clean, correct_count: correct, total: qs.length, won,
+        round_id: roundId, user_id: userId, browser_id: browserId, answers: clean, correct_count: correct, total: qs.length, won,
       }).select('*').single();
       if (insErr) return json({ error: 'already_played' }, 409);
+      if (userId && browserId) {
+        // Cegah main dua kali: login di browser yang sama dengan entri anon lain.
+        const { count } = await admin.from('game_entries').select('id', { count: 'exact', head: true }).eq('round_id', roundId).or(`user_id.eq.${userId},browser_id.eq.${browserId}`);
+        if ((count || 0) > 1) { await admin.from('game_entries').delete().eq('id', entry.id); return json({ error: 'already_played' }, 409); }
+      }
       if (!won) return json({ ok: true, entry });
 
-      const prizes = [...((round.prizes as Prize[]) || [])];
+      const prizes = [...((round.prizes as Prize[]) || [])].filter((p) => userId || p.kind !== 'coins');
       let prize: any = null;
       for (let attempt = 0; attempt < 4 && !prize && prizes.length; attempt++) {
         const p = pickWeighted(prizes);
         if (!p) break;
         prizes.splice(prizes.indexOf(p), 1);
-        if (p.kind === 'coins' && Number(p.coins) > 0) {
+        if (p.kind === 'coins' && Number(p.coins) > 0 && userId) {
           await admin.rpc('grant_coins', { _user_id: userId, _delta: Number(p.coins), _reason: 'game_prize', _meta: { round_id: roundId } });
           prize = { kind: 'coins', coins: Number(p.coins) };
         } else if (p.kind === 'show') {
@@ -107,23 +129,24 @@ Deno.serve(async (req) => {
           if (!upcoming.length) continue;
           const s: any = upcoming[Math.floor(Math.random() * upcoming.length)];
           const token = genToken();
-          await admin.from('active_show_tokens').insert({ show_id: s.id, token, label: `game:${userId}`, kind: 'personal', max_devices: 1, revoked: false });
+          await admin.from('active_show_tokens').insert({ show_id: s.id, token, label: `game:${userId || browserId}`, kind: 'personal', max_devices: 1, revoked: false });
           await admin.from('orders').insert({ user_id: userId, user_phone: '', show_id: s.id, item_title: `Show • ${s.title} (Hadiah Game)`, amount: 0, kind: 'show', status: 'paid', paid_at: new Date().toISOString(), access_token: token });
           prize = { kind: 'show', show_id: s.id, title: s.title, show_date: s.show_date, show_time: s.show_time, token,
             link: `${origin}/live?show=${s.id}&t=${token}`, password: String(s.live_password || ''), replay_info: String(s.replay_info || '') };
         } else if (p.kind === 'bundle') {
           const bundle = await getBundle(admin);
           if (!bundle || !bundle.is_active || !bundle.show_ids.length) continue;
-          const existing = await findBundleToken(admin, { bundleId: bundle.id, userId, phone: '' });
-          if (existing) continue;
-          const issued = await issueBundleToken(admin, { userId, phone: '', label: `game:${userId}` });
+          if (userId) { const existing = await findBundleToken(admin, { bundleId: bundle.id, userId, phone: '' }); if (existing) continue; }
+          const issued = await issueBundleToken(admin, { userId, phone: '', label: `game:${userId || browserId}` });
           if (!issued) continue;
           await admin.from('orders').insert({ user_id: userId, user_phone: '', item_title: `Bundel • ${bundle.name} (Hadiah Game)`, amount: 0, kind: 'bundle', status: 'paid', paid_at: new Date().toISOString(), access_token: issued.token });
           prize = { kind: 'bundle', title: bundle.name, count: bundle.show_ids.length, token: issued.token,
             link: `${origin}/shows?bt=${issued.token}`, password: issued.password };
         }
       }
-      if (!prize) {
+      if (!prize && !userId) {
+        prize = { kind: 'none', message: 'Hadiah show sedang habis. Masuk/daftar akun di game berikutnya untuk peluang hadiah koin.' };
+      } else if (!prize) {
         await admin.rpc('grant_coins', { _user_id: userId, _delta: 3, _reason: 'game_prize', _meta: { round_id: roundId, fallback: true } });
         prize = { kind: 'coins', coins: 3 };
       }
