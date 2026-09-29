@@ -644,6 +644,133 @@ export type Database = {
         }
         Relationships: []
       }
+      game_entries: {
+        Row: {
+          answers: Json
+          correct_count: number
+          created_at: string
+          id: string
+          prize: Json | null
+          round_id: string
+          total: number
+          user_id: string
+          won: boolean
+        }
+        Insert: {
+          answers?: Json
+          correct_count?: number
+          created_at?: string
+          id?: string
+          prize?: Json | null
+          round_id: string
+          total?: number
+          user_id: string
+          won?: boolean
+        }
+        Update: {
+          answers?: Json
+          correct_count?: number
+          created_at?: string
+          id?: string
+          prize?: Json | null
+          round_id?: string
+          total?: number
+          user_id?: string
+          won?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "game_entries_round_id_fkey"
+            columns: ["round_id"]
+            isOneToOne: false
+            referencedRelation: "game_rounds"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      game_questions: {
+        Row: {
+          alt_answers: string[]
+          answer: string
+          created_at: string
+          id: string
+          image_url: string
+          prompt: string
+          reveal_image_url: string
+          round_id: string
+          sort_order: number
+        }
+        Insert: {
+          alt_answers?: string[]
+          answer?: string
+          created_at?: string
+          id?: string
+          image_url?: string
+          prompt?: string
+          reveal_image_url?: string
+          round_id: string
+          sort_order?: number
+        }
+        Update: {
+          alt_answers?: string[]
+          answer?: string
+          created_at?: string
+          id?: string
+          image_url?: string
+          prompt?: string
+          reveal_image_url?: string
+          round_id?: string
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "game_questions_round_id_fkey"
+            columns: ["round_id"]
+            isOneToOne: false
+            referencedRelation: "game_rounds"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      game_rounds: {
+        Row: {
+          created_at: string
+          description: string
+          ends_at: string
+          game_type: string
+          id: string
+          is_published: boolean
+          prizes: Json
+          starts_at: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string
+          ends_at?: string
+          game_type?: string
+          id?: string
+          is_published?: boolean
+          prizes?: Json
+          starts_at?: string
+          title?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          ends_at?: string
+          game_type?: string
+          id?: string
+          is_published?: boolean
+          prizes?: Json
+          starts_at?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       ip_visit_log: {
         Row: {
           endpoint: string

@@ -30,6 +30,7 @@ const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const Reseller = lazy(() => import("./pages/Reseller"));
 const Panduan = lazy(() => import("./pages/Panduan"));
 const TvPage = lazy(() => import("./pages/Tv"));
+const Game = lazy(() => import("./pages/Game"));
 
 const queryClient = new QueryClient();
 
@@ -120,6 +121,7 @@ const App = () => (
               <Route path="/reseller" element={<Reseller />} />
               <Route path="/panduan" element={<Panduan />} />
               <Route path="/tv" element={<TvPage />} />
+              <Route path="/game" element={<Game />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
             </Suspense>
