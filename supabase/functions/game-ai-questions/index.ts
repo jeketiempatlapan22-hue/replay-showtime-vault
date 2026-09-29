@@ -32,7 +32,7 @@ Deno.serve(async (req) => {
           { role: 'system', content: 'Kamu pembuat kuis penggemar JKT48 berbahasa Indonesia. Buat soal faktual yang jawabannya singkat (1-3 kata) dan pasti benar. Jika tidak yakin sebuah fakta, jangan dipakai.' },
           { role: 'user', content: `Buat ${count} soal tebak-tebakan dengan topik: ${topic}.` },
         ],
-        tools: [{ type: 'function', function: { name: 'soal', parameters: { type: 'object', properties: { questions: { type: 'array', items: { type: 'object', properties: { prompt: { type: 'string' }, answer: { type: 'string' }, alt_answers: { type: 'array', items: { type: 'string' } } }, required: ['prompt', 'answer', 'alt_answers'] } } }, required: ['questions'] } } }],
+        tools: [{ type: 'function', function: { name: 'soal', parameters: { type: 'object', properties: { questions: { type: 'array', items: { type: 'object', properties: { prompt: { type: 'string' }, answer: { type: 'string' }, alt_answers: { type: 'array', items: { type: 'string' } }, choices: { type: 'array', items: { type: 'string' }, description: '3 pilihan jawaban (A/B/C), salah satunya persis sama dengan answer' } }, required: ['prompt', 'answer', 'alt_answers', 'choices'] } } }, required: ['questions'] } } }],
         tool_choice: { type: 'function', function: { name: 'soal' } },
       }),
     });
