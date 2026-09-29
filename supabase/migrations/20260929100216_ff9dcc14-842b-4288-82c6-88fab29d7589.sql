@@ -1,0 +1,1 @@
+ALTER TABLE public.game_questions ADD COLUMN IF NOT EXISTS choices text[] NOT NULL DEFAULT '{}';
