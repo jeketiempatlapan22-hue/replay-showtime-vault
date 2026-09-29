@@ -229,8 +229,8 @@ function MembershipPanel({
       _pin: session.pin,
     });
     const presets: PackageRow[] = [
-      { id: 'preset_1m', name: 'Membership 1 Bulan', description: 'Berlaku 31 hari sejak link dibuat. Sandi unik per user: live selama membership, replay 1 tahun.', replay_info: '', duration_days: 31, max_devices: 1, includes_replays: true, status: 'active', paused: false },
-      { id: 'preset_2m', name: 'Membership 2 Bulan', description: 'Berlaku 62 hari sejak link dibuat. Sandi unik per user: live selama membership, replay 1 tahun.', replay_info: '', duration_days: 62, max_devices: 1, includes_replays: true, status: 'active', paused: false },
+      { id: 'preset_1m', name: 'Membership 1 Bulan', description: 'Berlaku 31 hari sejak link dibuat. Sandi unik per user.', replay_info: '', duration_days: 31, max_devices: 1, includes_replays: true, status: 'active', paused: false },
+      { id: 'preset_2m', name: 'Membership 2 Bulan', description: 'Berlaku 62 hari sejak link dibuat. Sandi unik per user.', replay_info: '', duration_days: 62, max_devices: 1, includes_replays: true, status: 'active', paused: false },
     ];
     if (error) toast({ title: 'Gagal memuat paket', description: error.message, variant: 'destructive' });
     setPkgs([...presets, ...((data ?? []) as PackageRow[])]);
@@ -811,7 +811,7 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
               <Button size="sm" onClick={() => { setPage(0); loadReplays(); }} disabled={loadingR}>Cari</Button>
             </div>
             <p className="text-[11px] text-muted-foreground italic">
-              ⏳ Token replay berlaku 1 tahun · 1 device.
+              👤 1 device.
             </p>
             {loadingR ? (
               <p className="text-sm text-muted-foreground">Memuat…</p>
