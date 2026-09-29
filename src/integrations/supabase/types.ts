@@ -701,6 +701,7 @@ export type Database = {
         Row: {
           alt_answers: string[]
           answer: string
+          choices: string[]
           created_at: string
           id: string
           image_url: string
@@ -712,6 +713,7 @@ export type Database = {
         Insert: {
           alt_answers?: string[]
           answer?: string
+          choices?: string[]
           created_at?: string
           id?: string
           image_url?: string
@@ -723,6 +725,7 @@ export type Database = {
         Update: {
           alt_answers?: string[]
           answer?: string
+          choices?: string[]
           created_at?: string
           id?: string
           image_url?: string

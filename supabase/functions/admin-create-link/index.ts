@@ -63,7 +63,7 @@ Deno.serve(async (req) => {
     await admin.from('membership_token_passwords').insert({ token_id: tk.id, password });
     const link = `${origin}/live?mtoken=${encodeURIComponent(token)}&mp=${encodeURIComponent(password)}`;
     const message = [`👑 *MEMBERSHIP AKTIF*`, '', `📦 *${name}*`, `📅 Berlaku hingga: ${fmtId(expiresAt)}`, '',
-      '🔗 *Link Akses:*', link, '', `🔐 Sandi: *${password}*`, '(Sandi khusus kamu, berlaku untuk live selama membership & replay 1 tahun)', '', '— *ReplayTime* 💖'].join('\n');
+      '🔗 *Link Akses:*', link, '', '🎬 *Link Replay:* ' + siteOnly, '', `🔐 Sandi: *${password}*`, '', '— *ReplayTime* 💖'].join('\n');
     await admin.from('token_deliveries').insert({ phone: '', replay_id: null, replay_title: `Membership • ${name}`, access_token: token, link, source: 'admin', requested_by: 'admin' });
     return json({ ok: true, token, password, link, message, title: name, expires_at: expiresAt.toISOString() });
   }

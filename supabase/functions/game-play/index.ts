@@ -64,7 +64,7 @@ Deno.serve(async (req) => {
         .eq('is_published', true).gte('ends_at', new Date(Date.now() - 3 * 86400000).toISOString())
         .order('starts_at', { ascending: false }).limit(10);
       const ids = (rounds || []).map((r) => r.id);
-      const { data: qs } = ids.length ? await admin.from('game_questions').select('id,round_id,prompt,image_url,answer,reveal_image_url,sort_order').in('round_id', ids).order('sort_order') : { data: [] as any[] };
+      const { data: qs } = ids.length ? await admin.from('game_questions').select('id,round_id,prompt,image_url,answer,reveal_image_url,sort_order,choices').in('round_id', ids).order('sort_order') : { data: [] as any[] };
       const { data: entries } = identOr() && ids.length
         ? await admin.from('game_entries').select('id,round_id,answers,correct_count,total,won,prize,created_at').in('round_id', ids).or(identOr())
         : { data: [] as any[] };
@@ -78,7 +78,7 @@ Deno.serve(async (req) => {
           status: r.starts_at > nowIso ? 'upcoming' : ended ? 'ended' : 'active',
           entry,
           questions: (qs || []).filter((q: any) => q.round_id === r.id).map((q: any) => ({
-            id: q.id, prompt: q.prompt, image_url: q.image_url,
+            id: q.id, prompt: q.prompt, image_url: q.image_url, choices: q.choices || [],
             ...(reveal ? { answer: q.answer, reveal_image_url: q.reveal_image_url } : {}),
           })),
         };
