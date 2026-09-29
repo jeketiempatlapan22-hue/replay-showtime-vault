@@ -8,14 +8,38 @@ import { getDeviceFp } from '@/lib/deviceFp';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from '@/hooks/use-toast';
-import { Gamepad2, Gift, Copy, Radio, Coins, Clock, CheckCircle2, XCircle, ArrowLeft } from 'lucide-react';
+import { Gamepad2, Gift, Copy, Radio, Coins, Clock, CheckCircle2, XCircle, ArrowLeft, Music, Eye } from 'lucide-react';
 
 type Q = { id: string; prompt: string; image_url: string; choices?: string[]; answer?: string; reveal_image_url?: string };
 type Entry = { correct_count: number; total: number; won: boolean; prize: any; answers: Record<string, string> };
-type Round = { id: string; title: string; description: string; starts_at: string; ends_at: string; status: 'upcoming' | 'active' | 'ended'; prizes: { kind: string; coins?: number }[]; questions: Q[]; entry: Entry | null };
+type Round = { id: string; title: string; description: string; game_type?: string; starts_at: string; ends_at: string; status: 'upcoming' | 'active' | 'ended'; prizes: { kind: string; coins?: number }[]; questions: Q[]; entry: Entry | null };
 
 const fmt = (iso: string) => new Date(iso).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' });
 const prizeLabel = (p: { kind: string; coins?: number }) => p.kind === 'coins' ? `${p.coins} Koin` : p.kind === 'show' ? 'Show Gratis' : 'Bundel Show';
+const isAudio = (u: string) => /\.(mp3|m4a|ogg|wav|aac)(\?|$)/i.test(u);
+const typeLabel: Record<string, string> = { quiz: 'Kuis', lyrics: 'Tebak Lagu', blur: 'Tebak Foto Blur' };
+
+// Foto mulai sangat buram lalu makin jelas dalam 30 detik setelah user menekan "Mulai".
+function BlurImage({ src }: { src: string }) {
+  const [start, setStart] = useState<number | null>(null);
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    if (!start) return;
+    const t = setInterval(() => setNow(Date.now()), 250);
+    return () => clearInterval(t);
+  }, [start]);
+  const DUR = 30000;
+  const p = start ? Math.min(1, (now - start) / DUR) : 0;
+  const blur = Math.round(28 * (1 - p));
+  return (
+    <div className="relative w-fit max-w-full overflow-hidden rounded-lg border border-border">
+      <img src={src} alt="" draggable={false} onContextMenu={(e) => e.preventDefault()} className="max-h-64 object-contain select-none transition-[filter] duration-300" style={{ filter: `blur(${start ? blur : 28}px)` }} />
+      {!start ? (
+        <button type="button" onClick={() => { setStart(Date.now()); setNow(Date.now()); }} className="absolute inset-0 flex items-center justify-center bg-background/40 text-sm font-semibold"><Eye className="w-4 h-4 mr-1" />Mulai perjelas foto</button>
+      ) : p < 1 && <span className="absolute bottom-1 right-1 text-[10px] px-2 py-0.5 rounded-full bg-background/80">{Math.ceil((DUR - (now - start)) / 1000)} dtk</span>}
+    </div>
+  );
+}
 
 function PrizeCard({ prize }: { prize: any }) {
   const copy = async (text: string) => { try { await navigator.clipboard.writeText(text); toast({ title: 'Disalin' }); } catch { /* ignore */ } };
@@ -72,6 +96,7 @@ function RoundCard({ r, signedIn, onDone }: { r: Round; signedIn: boolean; onDon
         <div className="flex items-center gap-2 flex-wrap">
           <h2 className="font-bold text-lg">{r.title}</h2>
           <span className={`text-[10px] px-2 py-0.5 rounded-full ${r.status === 'active' ? 'bg-primary text-primary-foreground' : 'bg-secondary text-muted-foreground'}`}>{r.status === 'active' ? 'Berlangsung' : r.status === 'upcoming' ? 'Segera' : 'Selesai'}</span>
+          <span className="text-[10px] px-2 py-0.5 rounded-full border border-border text-muted-foreground">{typeLabel[r.game_type || 'quiz'] || 'Kuis'}</span>
         </div>
         {r.description && <p className="text-sm text-muted-foreground mt-1">{r.description}</p>}
         <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1"><Clock className="w-3 h-3" />{fmt(r.starts_at)} – {fmt(r.ends_at)}</p>
@@ -89,8 +114,15 @@ function RoundCard({ r, signedIn, onDone }: { r: Round; signedIn: boolean; onDon
         <div className="space-y-4">
           {r.questions.map((q, i) => (
             <div key={q.id} className="space-y-2">
-              <p className="font-medium text-sm">{i + 1}. {q.prompt}</p>
-              {q.image_url && <img src={q.image_url} alt="" className="max-h-64 rounded-lg border border-border object-contain" />}
+              {r.game_type === 'lyrics' ? (
+                <div className="space-y-1">
+                  <p className="font-medium text-sm flex items-center gap-1"><Music className="w-4 h-4 text-primary" />{i + 1}. Tebak judul lagunya</p>
+                  <blockquote className="border-l-4 border-primary bg-primary/5 rounded-r-lg px-3 py-2 text-sm italic whitespace-pre-line">{q.prompt}</blockquote>
+                </div>
+              ) : <p className="font-medium text-sm">{i + 1}. {q.prompt}</p>}
+              {q.image_url && (isAudio(q.image_url) ? <audio controls preload="none" src={q.image_url} className="w-full" />
+                : r.game_type === 'blur' && !reveal ? <BlurImage src={q.image_url} />
+                : <img src={q.image_url} alt="" className="max-h-64 rounded-lg border border-border object-contain" />)}
               {reveal ? (
                 <div className="text-sm space-y-1">
                   {r.entry && <p className="text-muted-foreground">Jawabanmu: {r.entry.answers?.[q.id] || '-'}</p>}
