@@ -208,6 +208,11 @@ Deno.serve(async (req) => {
         await admin.rpc('grant_coins', { _user_id: userId, _delta: 3, _reason: 'game_prize', _meta: { round_id: roundId, fallback: true } });
         prize = { kind: 'coins', coins: 3 };
       }
+      if (prize && userId && (prize.kind === 'show' || prize.kind === 'bundle')) {
+        // Riwayat permanen: tetap ada walau game/soal dihapus; hilang otomatis bila show/bundel dihapus.
+        const bundleId = prize.kind === 'bundle' ? (await getBundle(admin))?.id ?? null : null;
+        await admin.from('game_wins').insert({ user_id: userId, round_title: String(round.title || ''), kind: prize.kind, show_id: prize.show_id ?? null, bundle_id: bundleId, prize });
+      }
       const { data: updated } = await admin.from('game_entries').update({ prize }).eq('id', entry.id).select('*').single();
       return json({ ok: true, entry: updated });
     }
