@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { toast } from '@/hooks/use-toast';
 import { Gamepad2, Gift, Copy, Radio, Coins, Clock, CheckCircle2, XCircle, ArrowLeft } from 'lucide-react';
 
-type Q = { id: string; prompt: string; image_url: string; answer?: string; reveal_image_url?: string };
+type Q = { id: string; prompt: string; image_url: string; choices?: string[]; answer?: string; reveal_image_url?: string };
 type Entry = { correct_count: number; total: number; won: boolean; prize: any; answers: Record<string, string> };
 type Round = { id: string; title: string; description: string; starts_at: string; ends_at: string; status: 'upcoming' | 'active' | 'ended'; prizes: { kind: string; coins?: number }[]; questions: Q[]; entry: Entry | null };
 
@@ -98,7 +98,18 @@ function RoundCard({ r, signedIn, onDone }: { r: Round; signedIn: boolean; onDon
                   {q.reveal_image_url && <img src={q.reveal_image_url} alt={q.answer} className="max-h-64 rounded-lg border border-border object-contain" />}
                 </div>
               ) : (
-                <Input value={answers[q.id] || ''} maxLength={200} placeholder="Jawabanmu" onChange={(e) => setAnswers((a) => ({ ...a, [q.id]: e.target.value }))} />
+                q.choices && q.choices.length > 0 ? (
+                  <div className="grid gap-2">
+                    {q.choices.map((c, ci) => (
+                      <Button key={ci} type="button" variant={answers[q.id] === c ? 'default' : 'outline'} className="justify-start h-auto py-2 whitespace-normal text-left"
+                        onClick={() => setAnswers((a) => ({ ...a, [q.id]: c }))}>
+                        <b className="mr-2">{String.fromCharCode(65 + ci)}.</b>{c}
+                      </Button>
+                    ))}
+                  </div>
+                ) : (
+                  <Input value={answers[q.id] || ''} maxLength={200} placeholder="Jawabanmu" onChange={(e) => setAnswers((a) => ({ ...a, [q.id]: e.target.value }))} />
+                )
               )}
             </div>
           ))}
