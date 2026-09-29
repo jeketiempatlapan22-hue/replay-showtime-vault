@@ -12,7 +12,7 @@ import { Gamepad2, Gift, Copy, Radio, Coins, Clock, CheckCircle2, XCircle, Arrow
 
 type Q = { id: string; prompt: string; image_url: string; choices?: string[]; answer?: string; reveal_image_url?: string };
 type Entry = { correct_count: number; total: number; won: boolean; prize: any; answers: Record<string, string> };
-type Round = { id: string; title: string; description: string; game_type?: string; starts_at: string; ends_at: string; status: 'upcoming' | 'active' | 'ended'; prizes: { kind: string; coins?: number }[]; questions: Q[]; entry: Entry | null };
+type Round = { id: string; title: string; description: string; game_type?: string; starts_at: string; ends_at: string; status: 'upcoming' | 'active' | 'ended'; prizes: { kind: string; coins?: number }[]; questions: Q[]; entry: Entry | null; device_blocked?: boolean };
 
 const fmt = (iso: string) => new Date(iso).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' });
 const prizeLabel = (p: { kind: string; coins?: number }) => p.kind === 'coins' ? `${p.coins} Koin` : p.kind === 'show' ? 'Show Gratis' : 'Bundel Show';
@@ -122,6 +122,9 @@ function RoundCard({ r, signedIn, onDone }: { r: Round; signedIn: boolean; onDon
         <div className="flex flex-wrap gap-1 mt-2">{r.prizes.map((p, i) => <span key={i} className="text-[11px] px-2 py-0.5 rounded-full border border-primary/40 text-primary">{prizeLabel(p)}</span>)}</div>
       </div>
 
+      {!r.entry && r.device_blocked && (
+        <p className="text-sm text-muted-foreground">Perangkat ini sudah dipakai bermain di game ini. Masuk ke akunmu untuk bermain.</p>
+      )}
       {r.entry && (
         <div className="space-y-2">
           <p className="font-semibold flex items-center gap-2">{r.entry.won ? <CheckCircle2 className="w-5 h-5 text-primary" /> : <XCircle className="w-5 h-5 text-destructive" />}Benar {r.entry.correct_count}/{r.entry.total}{r.entry.won ? ' — kamu menang!' : ' — belum beruntung'}</p>
