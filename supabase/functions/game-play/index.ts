@@ -42,7 +42,28 @@ Deno.serve(async (req) => {
     const deviceFp = String(body.device_fp || '').replace(/[^a-z0-9|./ -]/gi, '').slice(0, 100) || null;
     const ipRaw = (req.headers.get('x-forwarded-for') || req.headers.get('cf-connecting-ip') || '').split(',')[0].trim();
     const ipHash = ipRaw ? Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode('game:' + ipRaw)))).map((b) => b.toString(16).padStart(2, '0')).join('').slice(0, 32) : null;
-    const MAX_WINS = 2;
+    const MAX_WINS = 3; // per hari
+    const BLUR_LIMIT_S = 5;
+    const ident = userId || browserId || '';
+
+    // Tebak Foto Blur: catat waktu mulai lihat foto & waktu jawab di server.
+    if (action === 'view' || action === 'answer') {
+      if (!ident) return json({ error: 'missing_identity' }, 400);
+      const roundId = String(body.round_id || ''); const qid = String(body.question_id || '');
+      const { data: q } = await admin.from('game_questions').select('id,round_id').eq('id', qid).eq('round_id', roundId).maybeSingle();
+      if (!q) return json({ error: 'not_found' }, 404);
+      if (action === 'view') {
+        await admin.from('game_views').upsert({ round_id: roundId, question_id: qid, ident }, { onConflict: 'question_id,ident', ignoreDuplicates: true });
+        return json({ ok: true, limit: BLUR_LIMIT_S });
+      }
+      const { data: v } = await admin.from('game_views').select('id,started_at,answered_at').eq('question_id', qid).eq('ident', ident).maybeSingle();
+      if (!v) return json({ error: 'not_viewed' }, 400);
+      if (v.answered_at) return json({ error: 'locked' }, 409);
+      const at = new Date();
+      await admin.from('game_views').update({ answered_at: at.toISOString(), answer: String(body.answer || '').slice(0, 200) }).eq('id', v.id);
+      const late = at.getTime() - new Date(v.started_at).getTime() > BLUR_LIMIT_S * 1000 + 800;
+      return json({ ok: true, late });
+    }
     const identOr = (): string => [userId && `user_id.eq.${userId}`, browserId && `browser_id.eq.${browserId}`, deviceFp && `device_fp.eq.${deviceFp}`].filter(Boolean).join(',');
 
     // Bersihkan gambar upload dari ronde yang sudah selesai (hemat ruang).
@@ -105,6 +126,17 @@ Deno.serve(async (req) => {
       }
       const { data: qs } = await admin.from('game_questions').select('id,answer,alt_answers').eq('round_id', roundId);
       if (!qs?.length) return json({ error: 'no_questions' }, 400);
+      // Tebak Foto Blur: jawaban diambil dari catatan server (waktu lihat → waktu jawab).
+      let tooSlow = false;
+      if (round.game_type === 'blur') {
+        const { data: views } = await admin.from('game_views').select('question_id,started_at,answered_at,answer').eq('round_id', roundId).eq('ident', ident);
+        for (const q of qs) {
+          const v = (views || []).find((x: any) => x.question_id === q.id);
+          if (!v?.answered_at) { tooSlow = true; continue; }
+          answers[q.id] = String(v.answer || '');
+          if (new Date(v.answered_at).getTime() - new Date(v.started_at).getTime() > BLUR_LIMIT_S * 1000 + 800) tooSlow = true;
+        }
+      }
       let correct = 0;
       const clean: Record<string, string> = {};
       for (const q of qs) {
@@ -113,7 +145,7 @@ Deno.serve(async (req) => {
         const ok = [q.answer, ...(q.alt_answers || [])].map(norm).filter(Boolean).includes(norm(a));
         if (ok && norm(a)) correct++;
       }
-      const won = correct === qs.length;
+      const won = correct === qs.length && !tooSlow;
       // Klaim slot dulu (unique round_id+user_id) agar tidak bisa main 2x.
       const { data: entry, error: insErr } = await admin.from('game_entries').insert({
         round_id: roundId, user_id: userId, browser_id: browserId, device_fp: deviceFp, ip_hash: ipHash, answers: clean, correct_count: correct, total: qs.length, won,
@@ -125,10 +157,16 @@ Deno.serve(async (req) => {
         if ((count || 0) > 1) { await admin.from('game_entries').delete().eq('id', entry.id); return json({ error: 'already_played' }, 409); }
       }
       if (!won) return json({ ok: true, entry });
-      // Batas kemenangan: 1 user/perangkat maksimal menang di 2 game.
-      const { count: wins } = await admin.from('game_entries').select('id', { count: 'exact', head: true }).eq('won', true).neq('id', entry.id).not('prize', 'is', null).or(identOr());
+      if (tooSlow) {
+        const prize = { kind: 'none', message: `Jawabanmu benar semua, tapi ada foto yang kamu tebak lebih dari ${BLUR_LIMIT_S} detik, jadi tidak dapat hadiah.` };
+        const { data: upd } = await admin.from('game_entries').update({ prize }).eq('id', entry.id).select('*').single();
+        return json({ ok: true, entry: upd });
+      }
+      // Batas kemenangan: maksimal 3 game per hari (WIB) per akun/browser/perangkat.
+      const dayStart = new Date(Math.floor((now + 7 * 3600000) / 86400000) * 86400000 - 7 * 3600000).toISOString();
+      const { count: wins } = await admin.from('game_entries').select('id', { count: 'exact', head: true }).eq('won', true).neq('id', entry.id).not('prize', 'is', null).not('prize->>kind', 'eq', 'none').gte('created_at', dayStart).or(identOr());
       if ((wins || 0) >= MAX_WINS) {
-        const prize = { kind: 'none', message: `Jawabanmu benar semua! Tapi kamu sudah menang di ${MAX_WINS} game, jadi tidak ada hadiah tambahan.` };
+        const prize = { kind: 'none', message: `Hadiah habis untuk hari ini 🎁 Jawabanmu benar semua, tapi kamu sudah menang di ${MAX_WINS} game hari ini. Coba lagi besok ya!` };
         const { data: upd } = await admin.from('game_entries').update({ prize }).eq('id', entry.id).select('*').single();
         return json({ ok: true, entry: upd });
       }
@@ -169,6 +207,11 @@ Deno.serve(async (req) => {
       } else if (!prize) {
         await admin.rpc('grant_coins', { _user_id: userId, _delta: 3, _reason: 'game_prize', _meta: { round_id: roundId, fallback: true } });
         prize = { kind: 'coins', coins: 3 };
+      }
+      if (prize && userId && (prize.kind === 'show' || prize.kind === 'bundle')) {
+        // Riwayat permanen: tetap ada walau game/soal dihapus; hilang otomatis bila show/bundel dihapus.
+        const bundleId = prize.kind === 'bundle' ? (await getBundle(admin))?.id ?? null : null;
+        await admin.from('game_wins').insert({ user_id: userId, round_title: String(round.title || ''), kind: prize.kind, show_id: prize.show_id ?? null, bundle_id: bundleId, prize });
       }
       const { data: updated } = await admin.from('game_entries').update({ prize }).eq('id', entry.id).select('*').single();
       return json({ ok: true, entry: updated });
