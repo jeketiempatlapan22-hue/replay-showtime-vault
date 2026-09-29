@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { getBrowserId } from '@/lib/browserId';
 import { setShowPurchase } from '@/lib/purchases';
+import { getDeviceFp } from '@/lib/deviceFp';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from '@/hooks/use-toast';
@@ -52,7 +53,7 @@ function RoundCard({ r, signedIn, onDone }: { r: Round; signedIn: boolean; onDon
     if (r.questions.some((q) => !answers[q.id]?.trim())) { toast({ title: 'Isi semua jawaban dulu', variant: 'destructive' }); return; }
     if (!confirm('Kamu hanya punya 1 kesempatan. Kirim jawaban sekarang?')) return;
     setBusy(true);
-    const { data, error } = await supabase.functions.invoke('game-play', { body: { action: 'submit', round_id: r.id, answers, browser_id: getBrowserId() } });
+    const { data, error } = await supabase.functions.invoke('game-play', { body: { action: 'submit', round_id: r.id, answers, browser_id: getBrowserId(), device_fp: await getDeviceFp() } });
     setBusy(false);
     if (error || data?.error) {
       const e = data?.error || error?.message;
@@ -115,7 +116,7 @@ export default function Game() {
   const { user } = useAuth();
   const [rounds, setRounds] = useState<Round[] | null>(null);
   const load = useCallback(async () => {
-    const { data } = await supabase.functions.invoke('game-play', { body: { action: 'list', browser_id: getBrowserId() } });
+    const { data } = await supabase.functions.invoke('game-play', { body: { action: 'list', browser_id: getBrowserId(), device_fp: await getDeviceFp() } });
     setRounds(data?.rounds || []);
   }, []);
   useEffect(() => { void load(); }, [load, user?.id]);
@@ -125,7 +126,7 @@ export default function Game() {
       <div className="max-w-2xl mx-auto px-4 py-6 space-y-4">
         <Link to="/" className="text-sm text-muted-foreground flex items-center gap-1"><ArrowLeft className="w-4 h-4" />Kembali</Link>
         <h1 className="text-2xl font-bold flex items-center gap-2"><Gamepad2 className="w-6 h-6 text-primary" />Game & Hadiah</h1>
-        <p className="text-sm text-muted-foreground">Jawab semua soal dengan benar untuk dapat hadiah acak: koin, show gratis, atau bundel show. Setiap akun hanya punya 1 kesempatan per game.</p>
+        <p className="text-sm text-muted-foreground">Jawab semua soal dengan benar untuk dapat hadiah acak: koin, show gratis, atau bundel show. Setiap akun/perangkat hanya punya 1 kesempatan per game, dan maksimal menang di 2 game.</p>
         {rounds === null ? <p className="text-sm text-muted-foreground">Memuat...</p>
           : rounds.length === 0 ? <p className="text-sm text-muted-foreground">Belum ada game. Tunggu game berikutnya dari admin ya!</p>
           : rounds.map((r) => <RoundCard key={r.id} r={r} signedIn={!!user} onDone={load} />)}

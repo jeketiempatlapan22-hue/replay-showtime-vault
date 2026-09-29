@@ -39,6 +39,11 @@ Deno.serve(async (req) => {
     const origin = String(st?.value || 'https://realtime48stream.my.id').replace(/\/+$/, '');
 
     const browserId = String(body.browser_id || '').slice(0, 100).trim() || null;
+    const deviceFp = String(body.device_fp || '').replace(/[^a-z0-9|./ -]/gi, '').slice(0, 100) || null;
+    const ipRaw = (req.headers.get('x-forwarded-for') || req.headers.get('cf-connecting-ip') || '').split(',')[0].trim();
+    const ipHash = ipRaw ? Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode('game:' + ipRaw)))).map((b) => b.toString(16).padStart(2, '0')).join('').slice(0, 32) : null;
+    const MAX_WINS = 2;
+    const identOr = (): string => [userId && `user_id.eq.${userId}`, browserId && `browser_id.eq.${browserId}`, deviceFp && `device_fp.eq.${deviceFp}`].filter(Boolean).join(',');
 
     // Bersihkan gambar upload dari ronde yang sudah selesai (hemat ruang).
     const { data: doneRounds } = await admin.from('game_rounds').select('id').eq('images_cleaned', false).lt('ends_at', new Date().toISOString()).limit(20);
@@ -60,8 +65,8 @@ Deno.serve(async (req) => {
         .order('starts_at', { ascending: false }).limit(10);
       const ids = (rounds || []).map((r) => r.id);
       const { data: qs } = ids.length ? await admin.from('game_questions').select('id,round_id,prompt,image_url,answer,reveal_image_url,sort_order').in('round_id', ids).order('sort_order') : { data: [] as any[] };
-      const { data: entries } = (userId || browserId) && ids.length
-        ? await admin.from('game_entries').select('*').in('round_id', ids).or(userId ? `user_id.eq.${userId}${browserId ? `,browser_id.eq.${browserId}` : ''}` : `browser_id.eq.${browserId}`)
+      const { data: entries } = identOr() && ids.length
+        ? await admin.from('game_entries').select('id,round_id,answers,correct_count,total,won,prize,created_at').in('round_id', ids).or(identOr())
         : { data: [] as any[] };
       const out = (rounds || []).map((r) => {
         const entry = (entries || []).find((e: any) => e.round_id === r.id) || null;
@@ -82,7 +87,7 @@ Deno.serve(async (req) => {
     }
 
     if (action === 'submit') {
-      if (!userId && !browserId) return json({ error: 'missing_identity' }, 400);
+      if (!userId && (!browserId || !deviceFp)) return json({ error: 'missing_identity' }, 400);
       const roundId = String(body.round_id || '');
       const answers = (body.answers && typeof body.answers === 'object') ? body.answers as Record<string, string> : {};
       const { data: round } = await admin.from('game_rounds').select('*').eq('id', roundId).eq('is_published', true).maybeSingle();
@@ -90,6 +95,14 @@ Deno.serve(async (req) => {
       const now = Date.now();
       if (new Date(round.starts_at).getTime() > now) return json({ error: 'not_started' }, 400);
       if (new Date(round.ends_at).getTime() < now) return json({ error: 'ended' }, 400);
+      // Cek server: akun, browser, perangkat (lintas browser) sudah pernah main di ronde ini?
+      const { count: prior } = await admin.from('game_entries').select('id', { count: 'exact', head: true }).eq('round_id', roundId).or(identOr());
+      if ((prior || 0) > 0) return json({ error: 'already_played' }, 409);
+      // Tamu: satu jaringan (IP) hanya 1 kesempatan tamu per ronde.
+      if (!userId && ipHash) {
+        const { count: ipPrior } = await admin.from('game_entries').select('id', { count: 'exact', head: true }).eq('round_id', roundId).eq('ip_hash', ipHash).is('user_id', null);
+        if ((ipPrior || 0) > 0) return json({ error: 'already_played' }, 409);
+      }
       const { data: qs } = await admin.from('game_questions').select('id,answer,alt_answers').eq('round_id', roundId);
       if (!qs?.length) return json({ error: 'no_questions' }, 400);
       let correct = 0;
@@ -103,15 +116,22 @@ Deno.serve(async (req) => {
       const won = correct === qs.length;
       // Klaim slot dulu (unique round_id+user_id) agar tidak bisa main 2x.
       const { data: entry, error: insErr } = await admin.from('game_entries').insert({
-        round_id: roundId, user_id: userId, browser_id: browserId, answers: clean, correct_count: correct, total: qs.length, won,
+        round_id: roundId, user_id: userId, browser_id: browserId, device_fp: deviceFp, ip_hash: ipHash, answers: clean, correct_count: correct, total: qs.length, won,
       }).select('*').single();
       if (insErr) return json({ error: 'already_played' }, 409);
-      if (userId && browserId) {
-        // Cegah main dua kali: login di browser yang sama dengan entri anon lain.
-        const { count } = await admin.from('game_entries').select('id', { count: 'exact', head: true }).eq('round_id', roundId).or(`user_id.eq.${userId},browser_id.eq.${browserId}`);
+      {
+        // Cegah balapan permintaan paralel dari identitas yang sama.
+        const { count } = await admin.from('game_entries').select('id', { count: 'exact', head: true }).eq('round_id', roundId).or(identOr());
         if ((count || 0) > 1) { await admin.from('game_entries').delete().eq('id', entry.id); return json({ error: 'already_played' }, 409); }
       }
       if (!won) return json({ ok: true, entry });
+      // Batas kemenangan: 1 user/perangkat maksimal menang di 2 game.
+      const { count: wins } = await admin.from('game_entries').select('id', { count: 'exact', head: true }).eq('won', true).neq('id', entry.id).not('prize', 'is', null).or(identOr());
+      if ((wins || 0) >= MAX_WINS) {
+        const prize = { kind: 'none', message: `Jawabanmu benar semua! Tapi kamu sudah menang di ${MAX_WINS} game, jadi tidak ada hadiah tambahan.` };
+        const { data: upd } = await admin.from('game_entries').update({ prize }).eq('id', entry.id).select('*').single();
+        return json({ ok: true, entry: upd });
+      }
 
       const prizes = [...((round.prizes as Prize[]) || [])].filter((p) => userId || p.kind !== 'coins');
       let prize: any = null;
