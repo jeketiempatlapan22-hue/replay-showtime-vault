@@ -19,24 +19,24 @@ const prizeLabel = (p: { kind: string; coins?: number }) => p.kind === 'coins' ?
 const isAudio = (u: string) => /\.(mp3|m4a|ogg|wav|aac)(\?|$)/i.test(u);
 const typeLabel: Record<string, string> = { quiz: 'Kuis', lyrics: 'Tebak Lagu', blur: 'Tebak Foto Blur' };
 
-// Foto mulai sangat buram lalu makin jelas dalam 30 detik setelah user menekan "Mulai".
-function BlurImage({ src }: { src: string }) {
-  const [start, setStart] = useState<number | null>(null);
+// Foto mulai sangat buram lalu makin jelas dalam 5 detik setelah user menekan "Mulai".
+// Waktu mulai & waktu jawab dicatat di server; lewat 5 detik = tidak dapat hadiah.
+const BLUR_MS = 5000;
+function BlurImage({ src, start, onStart, locked }: { src: string; start: number | null; onStart: () => void; locked: boolean }) {
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
-    if (!start) return;
-    const t = setInterval(() => setNow(Date.now()), 250);
+    if (!start || locked) return;
+    const t = setInterval(() => setNow(Date.now()), 200);
     return () => clearInterval(t);
-  }, [start]);
-  const DUR = 30000;
-  const p = start ? Math.min(1, (now - start) / DUR) : 0;
+  }, [start, locked]);
+  const p = start ? Math.min(1, (now - start) / BLUR_MS) : 0;
   const blur = Math.round(28 * (1 - p));
   return (
     <div className="relative w-fit max-w-full overflow-hidden rounded-lg border border-border">
-      <img src={src} alt="" draggable={false} onContextMenu={(e) => e.preventDefault()} className="max-h-64 object-contain select-none transition-[filter] duration-300" style={{ filter: `blur(${start ? blur : 28}px)` }} />
+      <img src={src} alt="" draggable={false} onContextMenu={(e) => e.preventDefault()} className="max-h-64 object-contain select-none transition-[filter] duration-200" style={{ filter: `blur(${start ? blur : 28}px)` }} />
       {!start ? (
-        <button type="button" onClick={() => { setStart(Date.now()); setNow(Date.now()); }} className="absolute inset-0 flex items-center justify-center bg-background/40 text-sm font-semibold"><Eye className="w-4 h-4 mr-1" />Mulai perjelas foto</button>
-      ) : p < 1 && <span className="absolute bottom-1 right-1 text-[10px] px-2 py-0.5 rounded-full bg-background/80">{Math.ceil((DUR - (now - start)) / 1000)} dtk</span>}
+        <button type="button" onClick={onStart} className="absolute inset-0 flex items-center justify-center bg-background/40 text-sm font-semibold"><Eye className="w-4 h-4 mr-1" />Mulai (waktu 5 detik)</button>
+      ) : !locked && <span className={`absolute bottom-1 right-1 text-[10px] px-2 py-0.5 rounded-full ${p < 1 ? 'bg-background/80' : 'bg-destructive text-destructive-foreground'}`}>{p < 1 ? `${Math.ceil((BLUR_MS - (now - start)) / 1000)} dtk` : 'Waktu habis'}</span>}
     </div>
   );
 }
@@ -73,11 +73,25 @@ function PrizeCard({ prize }: { prize: any }) {
 function RoundCard({ r, signedIn, onDone }: { r: Round; signedIn: boolean; onDone: () => void }) {
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
+  const isBlur = r.game_type === 'blur';
+  const [starts, setStarts] = useState<Record<string, number>>({});
+  const [locked, setLocked] = useState<Record<string, boolean>>({});
+  const ident = async () => ({ browser_id: getBrowserId(), device_fp: await getDeviceFp() });
+  const startQ = async (qid: string) => {
+    setStarts((s) => ({ ...s, [qid]: Date.now() }));
+    await supabase.functions.invoke('game-play', { body: { action: 'view', round_id: r.id, question_id: qid, ...(await ident()) } });
+  };
+  const lockQ = async (qid: string, ans: string) => {
+    if (!ans.trim() || locked[qid]) return;
+    setAnswers((a) => ({ ...a, [qid]: ans })); setLocked((l) => ({ ...l, [qid]: true }));
+    const { data } = await supabase.functions.invoke('game-play', { body: { action: 'answer', round_id: r.id, question_id: qid, answer: ans, ...(await ident()) } });
+    if (data?.late) toast({ title: 'Lebih dari 5 detik — jawaban ini tidak dapat hadiah', variant: 'destructive' });
+  };
   const submit = async () => {
     if (r.questions.some((q) => !answers[q.id]?.trim())) { toast({ title: 'Isi semua jawaban dulu', variant: 'destructive' }); return; }
     if (!confirm('Kamu hanya punya 1 kesempatan. Kirim jawaban sekarang?')) return;
     setBusy(true);
-    const { data, error } = await supabase.functions.invoke('game-play', { body: { action: 'submit', round_id: r.id, answers, browser_id: getBrowserId(), device_fp: await getDeviceFp() } });
+    const { data, error } = await supabase.functions.invoke('game-play', { body: { action: 'submit', round_id: r.id, answers, ...(await ident()) } });
     setBusy(false);
     if (error || data?.error) {
       const e = data?.error || error?.message;
@@ -85,7 +99,7 @@ function RoundCard({ r, signedIn, onDone }: { r: Round; signedIn: boolean; onDon
     } else {
       const p = data.entry?.prize;
       if (p?.kind === 'show' && p.show_id) setShowPurchase(p.show_id, { token: p.token, kind: 'show', paidAt: Date.now() });
-      toast({ title: data.entry?.won ? 'Selamat, kamu menang! 🎉' : 'Jawaban terkirim' });
+      toast({ title: data.entry?.won && p?.kind !== 'none' ? 'Selamat, kamu menang! 🎉' : p?.kind === 'none' ? 'Tidak dapat hadiah' : 'Jawaban terkirim', description: p?.kind === 'none' ? p.message : undefined });
     }
     onDone();
   };
@@ -121,7 +135,7 @@ function RoundCard({ r, signedIn, onDone }: { r: Round; signedIn: boolean; onDon
                 </div>
               ) : <p className="font-medium text-sm">{i + 1}. {q.prompt}</p>}
               {q.image_url && (isAudio(q.image_url) ? <audio controls preload="none" src={q.image_url} className="w-full" />
-                : r.game_type === 'blur' && !reveal ? <BlurImage src={q.image_url} />
+                : isBlur && !reveal ? <BlurImage src={q.image_url} start={starts[q.id] ?? null} locked={!!locked[q.id]} onStart={() => startQ(q.id)} />
                 : <img src={q.image_url} alt="" className="max-h-64 rounded-lg border border-border object-contain" />)}
               {reveal ? (
                 <div className="text-sm space-y-1">
@@ -129,18 +143,25 @@ function RoundCard({ r, signedIn, onDone }: { r: Round; signedIn: boolean; onDon
                   <p>Jawaban: <b className="text-primary">{q.answer}</b></p>
                   {q.reveal_image_url && <img src={q.reveal_image_url} alt={q.answer} className="max-h-64 rounded-lg border border-border object-contain" />}
                 </div>
+              ) : isBlur && !starts[q.id] ? (
+                <p className="text-xs text-muted-foreground">Tekan Mulai, lalu jawab dalam 5 detik. Jawaban langsung terkunci.</p>
               ) : (
                 q.choices && q.choices.length > 0 ? (
                   <div className="grid gap-2">
                     {q.choices.map((c, ci) => (
-                      <Button key={ci} type="button" variant={answers[q.id] === c ? 'default' : 'outline'} className="justify-start h-auto py-2 whitespace-normal text-left"
-                        onClick={() => setAnswers((a) => ({ ...a, [q.id]: c }))}>
+                      <Button key={ci} type="button" disabled={isBlur && locked[q.id] && answers[q.id] !== c} variant={answers[q.id] === c ? 'default' : 'outline'} className="justify-start h-auto py-2 whitespace-normal text-left"
+                        onClick={() => isBlur ? lockQ(q.id, c) : setAnswers((a) => ({ ...a, [q.id]: c }))}>
                         <b className="mr-2">{String.fromCharCode(65 + ci)}.</b>{c}
                       </Button>
                     ))}
                   </div>
                 ) : (
-                  <Input value={answers[q.id] || ''} maxLength={200} placeholder="Jawabanmu" onChange={(e) => setAnswers((a) => ({ ...a, [q.id]: e.target.value }))} />
+                  <div className="flex gap-2">
+                    <Input value={answers[q.id] || ''} disabled={isBlur && locked[q.id]} maxLength={200} placeholder="Jawabanmu"
+                      onChange={(e) => setAnswers((a) => ({ ...a, [q.id]: e.target.value }))}
+                      onKeyDown={(e) => { if (isBlur && e.key === 'Enter') void lockQ(q.id, answers[q.id] || ''); }} />
+                    {isBlur && <Button type="button" disabled={locked[q.id]} onClick={() => lockQ(q.id, answers[q.id] || '')}>Kunci</Button>}
+                  </div>
                 )
               )}
             </div>

@@ -138,11 +138,11 @@ export default function GameAdmin() {
             <select className="mt-1 h-9 w-full rounded-md border border-input bg-background px-2 text-sm" value={edit.game_type} onChange={(e) => setEdit({ ...edit, game_type: e.target.value })}>
               <option value="quiz">Kuis tebak-tebakan</option>
               <option value="lyrics">Tebak Lagu (potongan lirik / audio)</option>
-              <option value="blur">Tebak Foto Blur (foto makin jelas 30 detik)</option>
+              <option value="blur">Tebak Foto Blur (batas 5 detik)</option>
             </select>
           </label>
           {edit.game_type === 'lyrics' && <p className="text-xs text-muted-foreground">Isi kolom soal dengan potongan lirik, jawaban = judul lagu. Kolom gambar boleh diisi link audio (.mp3/.m4a) untuk potongan lagu.</p>}
-          {edit.game_type === 'blur' && <p className="text-xs text-muted-foreground">Wajib isi gambar soal (foto member). Foto tampil buram lalu makin jelas; jawaban = nama member.</p>}
+          {edit.game_type === 'blur' && <p className="text-xs text-muted-foreground">Wajib isi gambar soal (foto member). Foto tampil buram lalu jelas dalam 5 detik; user yang menjawab lebih dari 5 detik tidak dapat hadiah. Jawaban = nama member.</p>}
           <Textarea placeholder="Deskripsi (opsional)" value={edit.description} onChange={(e) => setEdit({ ...edit, description: e.target.value })} />
           <div className="grid sm:grid-cols-2 gap-2">
             <label className="text-xs">Mulai<Input type="datetime-local" value={toLocal(edit.starts_at)} onChange={(e) => setEdit({ ...edit, starts_at: new Date(e.target.value).toISOString() })} /></label>
