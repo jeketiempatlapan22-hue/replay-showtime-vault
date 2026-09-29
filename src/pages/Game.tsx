@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { getBrowserId } from '@/lib/browserId';
+import { setShowPurchase } from '@/lib/purchases';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from '@/hooks/use-toast';
@@ -17,6 +19,7 @@ const prizeLabel = (p: { kind: string; coins?: number }) => p.kind === 'coins' ?
 function PrizeCard({ prize }: { prize: any }) {
   const copy = async (text: string) => { try { await navigator.clipboard.writeText(text); toast({ title: 'Disalin' }); } catch { /* ignore */ } };
   if (!prize) return null;
+  if (prize.kind === 'none') return <p className="text-sm text-muted-foreground">{prize.message}</p>;
   if (prize.kind === 'coins') return (
     <div className="rounded-lg border border-primary/40 bg-primary/10 p-3 flex items-center gap-2"><Coins className="w-5 h-5 text-primary" /><span className="font-semibold">+{prize.coins} koin masuk ke saldo kamu</span></div>
   );
@@ -49,12 +52,16 @@ function RoundCard({ r, signedIn, onDone }: { r: Round; signedIn: boolean; onDon
     if (r.questions.some((q) => !answers[q.id]?.trim())) { toast({ title: 'Isi semua jawaban dulu', variant: 'destructive' }); return; }
     if (!confirm('Kamu hanya punya 1 kesempatan. Kirim jawaban sekarang?')) return;
     setBusy(true);
-    const { data, error } = await supabase.functions.invoke('game-play', { body: { action: 'submit', round_id: r.id, answers } });
+    const { data, error } = await supabase.functions.invoke('game-play', { body: { action: 'submit', round_id: r.id, answers, browser_id: getBrowserId() } });
     setBusy(false);
     if (error || data?.error) {
       const e = data?.error || error?.message;
       toast({ title: e === 'already_played' ? 'Kamu sudah bermain di ronde ini' : e === 'ended' ? 'Game sudah berakhir' : 'Gagal mengirim', variant: 'destructive' });
-    } else toast({ title: data.entry?.won ? 'Selamat, kamu menang! 🎉' : 'Jawaban terkirim' });
+    } else {
+      const p = data.entry?.prize;
+      if (p?.kind === 'show' && p.show_id) setShowPurchase(p.show_id, { token: p.token, kind: 'show', paidAt: Date.now() });
+      toast({ title: data.entry?.won ? 'Selamat, kamu menang! 🎉' : 'Jawaban terkirim' });
+    }
     onDone();
   };
   const reveal = !!r.entry || r.status === 'ended';
@@ -94,9 +101,10 @@ function RoundCard({ r, signedIn, onDone }: { r: Round; signedIn: boolean; onDon
               )}
             </div>
           ))}
-          {!reveal && r.status === 'active' && (signedIn
-            ? <Button onClick={submit} disabled={busy} className="w-full">{busy ? 'Mengirim...' : 'Kirim Jawaban (1x kesempatan)'}</Button>
-            : <Button asChild className="w-full"><Link to="/auth">Masuk untuk bermain</Link></Button>)}
+          {!reveal && r.status === 'active' && (<>
+            {!signedIn && <p className="text-xs text-muted-foreground">Main tanpa akun: hadiah berupa show/bundel. Masuk akun agar juga bisa dapat hadiah koin.</p>}
+            <Button onClick={submit} disabled={busy} className="w-full">{busy ? 'Mengirim...' : 'Kirim Jawaban (1x kesempatan)'}</Button>
+          </>)}
         </div>
       )}
     </div>
@@ -107,7 +115,7 @@ export default function Game() {
   const { user } = useAuth();
   const [rounds, setRounds] = useState<Round[] | null>(null);
   const load = useCallback(async () => {
-    const { data } = await supabase.functions.invoke('game-play', { body: { action: 'list' } });
+    const { data } = await supabase.functions.invoke('game-play', { body: { action: 'list', browser_id: getBrowserId() } });
     setRounds(data?.rounds || []);
   }, []);
   useEffect(() => { void load(); }, [load, user?.id]);

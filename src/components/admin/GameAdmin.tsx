@@ -5,7 +5,31 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { toast } from '@/hooks/use-toast';
-import { Plus, Trash2, Sparkles, Save, Users, Square } from 'lucide-react';
+import { Plus, Trash2, Sparkles, Save, Users, Square, Upload } from 'lucide-react';
+
+function ImageField({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder: string }) {
+  const [up, setUp] = useState(false);
+  const upload = async (f?: File) => {
+    if (!f) return;
+    if (!f.type.startsWith('image/') || f.size > 5 * 1024 * 1024) { toast({ title: 'Gambar maks 5MB', variant: 'destructive' }); return; }
+    setUp(true);
+    const path = `game/${crypto.randomUUID()}.${(f.name.split('.').pop() || 'jpg').toLowerCase()}`;
+    const { error } = await supabase.storage.from('card-images').upload(path, f, { contentType: f.type });
+    setUp(false);
+    if (error) { toast({ title: 'Upload gagal', description: error.message, variant: 'destructive' }); return; }
+    onChange(supabase.storage.from('card-images').getPublicUrl(path).data.publicUrl);
+  };
+  return (
+    <div className="flex gap-2 items-center">
+      <Input placeholder={placeholder} value={value} onChange={(e) => onChange(e.target.value)} />
+      <label className="shrink-0 inline-flex items-center gap-1 h-9 px-3 rounded-md border border-input text-sm cursor-pointer hover:bg-secondary">
+        <Upload className="w-4 h-4" />{up ? '...' : 'Upload'}
+        <input type="file" accept="image/*" className="hidden" onChange={(e) => { void upload(e.target.files?.[0]); e.target.value = ''; }} />
+      </label>
+      {value && <img src={value} alt="" className="w-9 h-9 rounded object-cover border border-border" />}
+    </div>
+  );
+}
 
 type Prize = { kind: 'coins' | 'show' | 'bundle'; coins?: number; weight: number };
 type Q = { id?: string; prompt: string; image_url: string; answer: string; alt_answers: string; reveal_image_url: string };
@@ -44,7 +68,7 @@ export default function GameAdmin() {
     if (!edit.title.trim() || !qs.length || qs.some((q) => !q.prompt.trim() || !q.answer.trim())) { toast({ title: 'Isi judul, soal dan jawaban', variant: 'destructive' }); return; }
     setBusy(true);
     const { id, ...rest } = edit as any;
-    const payload = { title: rest.title, description: rest.description, game_type: rest.game_type, starts_at: rest.starts_at, ends_at: rest.ends_at, is_published: rest.is_published, prizes: rest.prizes };
+    const payload = { images_cleaned: false, title: rest.title, description: rest.description, game_type: rest.game_type, starts_at: rest.starts_at, ends_at: rest.ends_at, is_published: rest.is_published, prizes: rest.prizes };
     const res = id ? await db.from('game_rounds').update(payload).eq('id', id).select('id').single() : await db.from('game_rounds').insert(payload).select('id').single();
     if (res.error) { setBusy(false); toast({ title: 'Gagal', description: res.error.message, variant: 'destructive' }); return; }
     const rid = res.data.id;
@@ -57,7 +81,7 @@ export default function GameAdmin() {
     setEdit({ ...edit, id: rid }); void load();
   };
 
-  const stopNow = async (r: any) => { await db.from('game_rounds').update({ ends_at: new Date().toISOString() }).eq('id', r.id); toast({ title: 'Game dihentikan' }); void load(); };
+  const stopNow = async (r: any) => { await db.from('game_rounds').update({ ends_at: new Date().toISOString() }).eq('id', r.id); toast({ title: 'Game dihentikan, gambar dibersihkan' }); await supabase.functions.invoke('game-play', { body: { action: 'list' } }); void load(); };
   const del = async (r: any) => { if (!confirm('Hapus game ini?')) return; await db.from('game_rounds').delete().eq('id', r.id); setEdit(null); void load(); };
   const showEntries = async (r: any) => {
     const { data } = await db.from('game_entries').select('*').eq('round_id', r.id).order('created_at');
@@ -100,7 +124,7 @@ export default function GameAdmin() {
         <div className="border border-border rounded-md p-3 space-y-1">
           <p className="font-semibold text-sm">Peserta ({entries.length}) • Menang {entries.filter((e) => e.won).length}</p>
           {entries.map((e) => (
-            <p key={e.id} className="text-xs">{e.who?.username || e.who?.email || e.user_id.slice(0, 8)} — {e.correct_count}/{e.total} {e.won ? `🏆 ${e.prize?.kind === 'coins' ? `${e.prize.coins} koin` : e.prize?.title || e.prize?.kind || ''}` : ''}</p>
+            <p key={e.id} className="text-xs">{e.who?.username || e.who?.email || (e.user_id ? e.user_id.slice(0, 8) : `Tamu ${String(e.browser_id || '').slice(0, 6)}`)} — {e.correct_count}/{e.total} {e.won ? `🏆 ${e.prize?.kind === 'coins' ? `${e.prize.coins} koin` : e.prize?.title || e.prize?.kind || ''}` : ''}</p>
           ))}
         </div>
       )}
@@ -138,10 +162,10 @@ export default function GameAdmin() {
               <div key={i} className="border border-border rounded-md p-2 space-y-2">
                 <div className="flex gap-2"><Textarea placeholder={`Soal ${i + 1} (mis. Tebak member dari potongan foto ini)`} value={q.prompt} onChange={(e) => setQ(i, { prompt: e.target.value })} />
                   <Button size="icon" variant="ghost" onClick={() => setQs(qs.filter((_, j) => j !== i))}><Trash2 className="w-4 h-4" /></Button></div>
-                <Input placeholder="URL gambar soal / potongan foto (opsional)" value={q.image_url} onChange={(e) => setQ(i, { image_url: e.target.value })} />
+                <ImageField placeholder="Gambar soal / potongan foto (opsional)" value={q.image_url} onChange={(v) => setQ(i, { image_url: v })} />
                 <Input placeholder="Jawaban" value={q.answer} onChange={(e) => setQ(i, { answer: e.target.value })} />
                 <Input placeholder="Jawaban lain yang diterima, pisahkan koma" value={q.alt_answers} onChange={(e) => setQ(i, { alt_answers: e.target.value })} />
-                <Input placeholder="URL foto asli jawaban (opsional)" value={q.reveal_image_url} onChange={(e) => setQ(i, { reveal_image_url: e.target.value })} />
+                <ImageField placeholder="Foto asli jawaban (opsional)" value={q.reveal_image_url} onChange={(v) => setQ(i, { reveal_image_url: v })} />
               </div>
             ))}
             <Button size="sm" variant="outline" onClick={() => setQs([...qs, blankQ()])}><Plus className="w-4 h-4 mr-1" />Soal</Button>
