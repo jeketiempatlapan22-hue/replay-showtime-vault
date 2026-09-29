@@ -753,6 +753,7 @@ export type Database = {
           id: string
           images_cleaned: boolean
           is_published: boolean
+          prize_seconds: number
           prizes: Json
           starts_at: string
           title: string
@@ -766,6 +767,7 @@ export type Database = {
           id?: string
           images_cleaned?: boolean
           is_published?: boolean
+          prize_seconds?: number
           prizes?: Json
           starts_at?: string
           title?: string
@@ -779,6 +781,7 @@ export type Database = {
           id?: string
           images_cleaned?: boolean
           is_published?: boolean
+          prize_seconds?: number
           prizes?: Json
           starts_at?: string
           title?: string

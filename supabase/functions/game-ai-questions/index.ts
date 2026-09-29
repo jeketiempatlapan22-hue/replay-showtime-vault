@@ -20,12 +20,12 @@ Deno.serve(async (req) => {
     if (!isAdmin) return json({ error: 'forbidden' }, 403);
 
     const body = await req.json().catch(() => ({}));
-    const count = Math.min(10, Math.max(1, Number(body.count) || 5));
+    const count = Math.min(30, Math.max(1, Number(body.count) || 25));
     const topic = String(body.topic || 'JKT48 umum').slice(0, 200);
     const lyrics = body.game_type === 'lyrics';
     const userMsg = lyrics
       ? `Buat ${count} soal "Tebak Lagu" JKT48 dengan topik: ${topic}. prompt = potongan lirik pendek (1-2 baris, maksimal 15 kata, boleh parafrase) dari lagu JKT48 yang benar-benar ada; answer = judul lagu resmi; choices = 3 judul lagu JKT48 (salah satunya jawaban).`
-      : `Buat ${count} soal tebak-tebakan dengan topik: ${topic}.`;
+      : `Buat ${count} soal tebak-tebakan JKT48 yang beragam dan acak. Topik utama: ${topic}. Campur juga topik luas: member aktif & alumni, generasi, tim (Love/Dream/Passion), kapten, center single, judul single & album, setlist teater, lagu, sister group AKB48 dan grup 48 lain, sejarah JKT48 (tahun berdiri, teater fX Sudirman), event (handshake, Pemilihan Member Single/senbatsu), julukan & jikoshoukai, tanggal lahir, asal kota, fakta unik. Campur tingkat mudah, sedang, dan susah. Jangan ada soal yang mirip satu sama lain. Acak seed: ${crypto.randomUUID().slice(0, 8)}.`;
 
     const res = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',

@@ -33,11 +33,11 @@ function ImageField({ value, onChange, placeholder }: { value: string; onChange:
 
 type Prize = { kind: 'coins' | 'show' | 'bundle'; coins?: number; weight: number };
 type Q = { id?: string; prompt: string; image_url: string; answer: string; alt_answers: string; choices: string; reveal_image_url: string };
-type Round = { id?: string; title: string; description: string; game_type: string; starts_at: string; ends_at: string; is_published: boolean; prizes: Prize[] };
+type Round = { id?: string; title: string; description: string; game_type: string; prize_seconds: number; starts_at: string; ends_at: string; is_published: boolean; prizes: Prize[] };
 
 const db = supabase as any;
 const toLocal = (iso: string) => { const d = new Date(iso); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 16); };
-const blank = (): Round => ({ title: '', description: '', game_type: 'quiz', starts_at: new Date().toISOString(), ends_at: new Date(Date.now() + 86400000).toISOString(), is_published: false,
+const blank = (): Round => ({ title: '', description: '', game_type: 'quiz', prize_seconds: 20, starts_at: new Date().toISOString(), ends_at: new Date(Date.now() + 86400000).toISOString(), is_published: false,
   prizes: [{ kind: 'coins', coins: 3, weight: 5 }, { kind: 'show', weight: 2 }, { kind: 'bundle', weight: 1 }] });
 const parseChoices = (q: Q) => q.choices.split('|').map((s) => s.trim()).filter(Boolean).slice(0, 6);
 const blankQ = (): Q => ({ prompt: '', image_url: '', answer: '', alt_answers: '', choices: '', reveal_image_url: '' });
@@ -49,6 +49,7 @@ export default function GameAdmin() {
   const [entries, setEntries] = useState<any[] | null>(null);
   const [aiTopic, setAiTopic] = useState('member JKT48 generasi terbaru');
   const [busy, setBusy] = useState(false);
+  const [sugg, setSugg] = useState<Q[]>([]);
 
   const load = async () => {
     const { data } = await db.from('game_rounds').select('*').order('starts_at', { ascending: false });
@@ -70,7 +71,7 @@ export default function GameAdmin() {
     if (qs.some((q) => { const c = parseChoices(q); return c.length > 0 && (c.length < 2 || !c.includes(q.answer.trim())); })) { toast({ title: 'Pilihan A/B/C minimal 2 dan harus memuat jawaban benar', variant: 'destructive' }); return; }
     setBusy(true);
     const { id, ...rest } = edit as any;
-    const payload = { images_cleaned: false, title: rest.title, description: rest.description, game_type: rest.game_type, starts_at: rest.starts_at, ends_at: rest.ends_at, is_published: rest.is_published, prizes: rest.prizes };
+    const payload = { images_cleaned: false, title: rest.title, description: rest.description, game_type: rest.game_type, prize_seconds: Math.max(1, Math.min(300, Number(rest.prize_seconds) || 20)), starts_at: rest.starts_at, ends_at: rest.ends_at, is_published: rest.is_published, prizes: rest.prizes };
     const res = id ? await db.from('game_rounds').update(payload).eq('id', id).select('id').single() : await db.from('game_rounds').insert(payload).select('id').single();
     if (res.error) { setBusy(false); toast({ title: 'Gagal', description: res.error.message, variant: 'destructive' }); return; }
     const rid = res.data.id;
@@ -94,12 +95,12 @@ export default function GameAdmin() {
 
   const genAi = async () => {
     setBusy(true);
-    const { data, error } = await supabase.functions.invoke('game-ai-questions', { body: { topic: aiTopic, count: 5, game_type: edit?.game_type || 'quiz' } });
+    const { data, error } = await supabase.functions.invoke('game-ai-questions', { body: { topic: aiTopic, count: 25, game_type: edit?.game_type || 'quiz' } });
     setBusy(false);
     if (error || data?.error) { toast({ title: 'AI gagal', description: data?.error || error?.message, variant: 'destructive' }); return; }
     const add = (data.questions || []).map((q: any) => ({ ...blankQ(), prompt: q.prompt, answer: q.answer, alt_answers: (q.alt_answers || []).join(', '), choices: (q.choices || []).join(' | ') }));
-    setQs((cur) => [...cur.filter((q) => q.prompt.trim()), ...add]);
-    toast({ title: `${add.length} soal AI ditambahkan — periksa kebenarannya dulu` });
+    setSugg((cur) => [...add, ...cur]);
+    toast({ title: `${add.length} soal AI siap dipilih — periksa kebenarannya dulu` });
   };
 
   const setP = (i: number, patch: Partial<Prize>) => edit && setEdit({ ...edit, prizes: edit.prizes.map((p, j) => j === i ? { ...p, ...patch } : p) });
@@ -138,11 +139,17 @@ export default function GameAdmin() {
             <select className="mt-1 h-9 w-full rounded-md border border-input bg-background px-2 text-sm" value={edit.game_type} onChange={(e) => setEdit({ ...edit, game_type: e.target.value })}>
               <option value="quiz">Kuis tebak-tebakan</option>
               <option value="lyrics">Tebak Lagu (potongan lirik / audio)</option>
-              <option value="blur">Tebak Foto Blur (hadiah hanya jika dijawab ≤ 7 detik)</option>
+              <option value="blur">Tebak Foto Blur (batas detik hadiah diatur di bawah)</option>
             </select>
           </label>
           {edit.game_type === 'lyrics' && <p className="text-xs text-muted-foreground">Isi kolom soal dengan potongan lirik, jawaban = judul lagu. Kolom gambar boleh diisi link audio (.mp3/.m4a) untuk potongan lagu.</p>}
-          {edit.game_type === 'blur' && <p className="text-xs text-muted-foreground">Wajib isi gambar soal (foto member). Foto tampil buram lalu jelas dalam 30 detik; hanya jawaban dalam 7 detik yang dapat hadiah. Jawaban = nama member.</p>}
+          {edit.game_type === 'blur' && <div className="space-y-2">
+            <p className="text-xs text-muted-foreground">Wajib isi gambar soal (foto member). Foto tampil buram lalu jelas dalam 30 detik; hanya jawaban dalam batas detik di bawah yang dapat hadiah. Jawaban = nama member.</p>
+            <label className="text-xs block">Batas detik untuk dapat hadiah
+              <div className="flex gap-2 items-center mt-1"><Input type="number" min={1} max={300} className="w-24" value={edit.prize_seconds ?? 20} onChange={(e) => setEdit({ ...edit, prize_seconds: Number(e.target.value) })} />
+                {[7, 10, 15, 20, 30].map((n) => <Button key={n} size="sm" variant={edit.prize_seconds === n ? 'default' : 'outline'} onClick={() => setEdit({ ...edit, prize_seconds: n })}>{n}d</Button>)}</div>
+            </label>
+          </div>}
           <Textarea placeholder="Deskripsi (opsional)" value={edit.description} onChange={(e) => setEdit({ ...edit, description: e.target.value })} />
           <div className="grid sm:grid-cols-2 gap-2">
             <label className="text-xs">Mulai<Input type="datetime-local" value={toLocal(edit.starts_at)} onChange={(e) => setEdit({ ...edit, starts_at: new Date(e.target.value).toISOString() })} /></label>
@@ -169,6 +176,18 @@ export default function GameAdmin() {
           <div className="space-y-2">
             <p className="font-semibold text-sm">Soal ({qs.length}) — user harus benar semua untuk menang</p>
             <div className="flex gap-2"><Input value={aiTopic} onChange={(e) => setAiTopic(e.target.value)} placeholder="Topik soal AI" /><Button size="sm" disabled={busy} onClick={genAi}><Sparkles className="w-4 h-4 mr-1" />Soal AI</Button></div>
+            {sugg.length > 0 && (
+              <div className="border border-dashed border-primary/50 rounded-md p-2 space-y-1 max-h-96 overflow-y-auto">
+                <div className="flex items-center justify-between gap-2"><p className="text-xs font-semibold">Pilihan soal AI ({sugg.length}) — klik Tambah untuk memakai</p>
+                  <Button size="sm" variant="ghost" onClick={() => setSugg([])}>Bersihkan</Button></div>
+                {sugg.map((q, i) => (
+                  <div key={i} className="flex gap-2 items-start border-t border-border pt-1">
+                    <div className="flex-1 min-w-0 text-xs"><p className="font-medium whitespace-pre-line">{q.prompt}</p><p className="text-primary">✓ {q.answer}</p>{q.choices && <p className="text-muted-foreground">{q.choices}</p>}</div>
+                    <Button size="sm" variant="outline" onClick={() => { setQs((cur) => [...cur.filter((x) => x.prompt.trim()), q]); setSugg((cur) => cur.filter((_, j) => j !== i)); }}><Plus className="w-3 h-3 mr-1" />Tambah</Button>
+                  </div>
+                ))}
+              </div>
+            )}
             {qs.map((q, i) => (
               <div key={i} className="border border-border rounded-md p-2 space-y-2">
                 <div className="flex gap-2"><Textarea placeholder={`Soal ${i + 1} (mis. Tebak member dari potongan foto ini)`} value={q.prompt} onChange={(e) => setQ(i, { prompt: e.target.value })} />
