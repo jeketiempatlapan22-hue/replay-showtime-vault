@@ -43,7 +43,7 @@ Deno.serve(async (req) => {
     const ipRaw = (req.headers.get('x-forwarded-for') || req.headers.get('cf-connecting-ip') || '').split(',')[0].trim();
     const ipHash = ipRaw ? Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode('game:' + ipRaw)))).map((b) => b.toString(16).padStart(2, '0')).join('').slice(0, 32) : null;
     const MAX_WINS = 3; // per hari
-    const BLUR_LIMIT_S = 7;
+    const BLUR_LIMIT_S = 20;
     const ident = userId || browserId || '';
 
     // Tebak Foto Blur: catat waktu mulai lihat foto & waktu jawab di server.
@@ -52,22 +52,24 @@ Deno.serve(async (req) => {
       const roundId = String(body.round_id || ''); const qid = String(body.question_id || '');
       const { data: q } = await admin.from('game_questions').select('id,round_id').eq('id', qid).eq('round_id', roundId).maybeSingle();
       if (!q) return json({ error: 'not_found' }, 404);
+      const { data: rr } = await admin.from('game_rounds').select('prize_seconds').eq('id', roundId).maybeSingle();
+      const limitS = Math.max(1, Number(rr?.prize_seconds) || BLUR_LIMIT_S);
       if (action === 'view') {
         await admin.from('game_views').upsert({ round_id: roundId, question_id: qid, ident }, { onConflict: 'question_id,ident', ignoreDuplicates: true });
-        return json({ ok: true, limit: BLUR_LIMIT_S });
+        return json({ ok: true, limit: limitS });
       }
       const { data: v } = await admin.from('game_views').select('id,started_at,answered_at').eq('question_id', qid).eq('ident', ident).maybeSingle();
       if (!v) return json({ error: 'not_viewed' }, 400);
       if (v.answered_at) return json({ error: 'locked' }, 409);
       const at = new Date();
       await admin.from('game_views').update({ answered_at: at.toISOString(), answer: String(body.answer || '').slice(0, 200) }).eq('id', v.id);
-      const late = at.getTime() - new Date(v.started_at).getTime() > BLUR_LIMIT_S * 1000 + 800;
+      const late = at.getTime() - new Date(v.started_at).getTime() > limitS * 1000 + 1500;
       return json({ ok: true, late });
     }
     // Akun login: dicek per akun. Tamu: per browser + perangkat (hanya terhadap entri tamu lain).
     const identOr = (): string => userId
       ? `user_id.eq.${userId}`
-      : [browserId && `browser_id.eq.${browserId}`, deviceFp && `and(device_fp.eq.${deviceFp},user_id.is.null)`].filter(Boolean).join(',');
+      : [browserId && `browser_id.eq.${browserId}`, deviceFp && ipHash && `and(device_fp.eq.${deviceFp},ip_hash.eq.${ipHash},user_id.is.null)`].filter(Boolean).join(',');
 
     // Bersihkan gambar upload dari ronde yang sudah selesai (hemat ruang).
     const { data: doneRounds } = await admin.from('game_rounds').select('id').eq('images_cleaned', false).lt('ends_at', new Date().toISOString()).limit(20);
@@ -84,7 +86,7 @@ Deno.serve(async (req) => {
 
     if (action === 'list') {
       const nowIso = new Date().toISOString();
-      const { data: rounds } = await admin.from('game_rounds').select('id,title,description,game_type,starts_at,ends_at,prizes')
+      const { data: rounds } = await admin.from('game_rounds').select('id,title,description,game_type,starts_at,ends_at,prizes,prize_seconds')
         .eq('is_published', true).gte('ends_at', new Date(Date.now() - 3 * 86400000).toISOString())
         .order('starts_at', { ascending: false }).limit(10);
       const ids = (rounds || []).map((r) => r.id);
@@ -94,8 +96,8 @@ Deno.serve(async (req) => {
       const { data: entries } = ownOr && ids.length
         ? await admin.from('game_entries').select('id,round_id,answers,correct_count,total,won,prize,created_at').in('round_id', ids).or(ownOr)
         : { data: [] as any[] };
-      const { data: fpEntries } = !userId && deviceFp && ids.length
-        ? await admin.from('game_entries').select('round_id').in('round_id', ids).eq('device_fp', deviceFp).is('user_id', null)
+      const { data: fpEntries } = !userId && deviceFp && ipHash && ids.length
+        ? await admin.from('game_entries').select('round_id').in('round_id', ids).eq('device_fp', deviceFp).eq('ip_hash', ipHash || '-').is('user_id', null)
         : { data: [] as any[] };
       const out = (rounds || []).map((r) => {
         const entry = (entries || []).find((e: any) => e.round_id === r.id) || null;
@@ -117,7 +119,7 @@ Deno.serve(async (req) => {
     }
 
     if (action === 'submit') {
-      if (!userId && (!browserId || !deviceFp)) return json({ error: 'missing_identity' }, 400);
+      if (!userId && !browserId) return json({ error: 'missing_identity' }, 400);
       const roundId = String(body.round_id || '');
       const answers = (body.answers && typeof body.answers === 'object') ? body.answers as Record<string, string> : {};
       const { data: round } = await admin.from('game_rounds').select('*').eq('id', roundId).eq('is_published', true).maybeSingle();
@@ -128,22 +130,18 @@ Deno.serve(async (req) => {
       // Cek server: akun, browser, perangkat (lintas browser) sudah pernah main di ronde ini?
       const { count: prior } = await admin.from('game_entries').select('id', { count: 'exact', head: true }).eq('round_id', roundId).or(identOr());
       if ((prior || 0) > 0) return json({ error: 'already_played' }, 409);
-      // Tamu: satu jaringan (IP) hanya 1 kesempatan tamu per ronde.
-      if (!userId && ipHash) {
-        const { count: ipPrior } = await admin.from('game_entries').select('id', { count: 'exact', head: true }).eq('round_id', roundId).eq('ip_hash', ipHash).is('user_id', null);
-        if ((ipPrior || 0) > 0) return json({ error: 'already_played' }, 409);
-      }
       const { data: qs } = await admin.from('game_questions').select('id,answer,alt_answers').eq('round_id', roundId);
       if (!qs?.length) return json({ error: 'no_questions' }, 400);
       // Tebak Foto Blur: jawaban diambil dari catatan server (waktu lihat → waktu jawab).
       let tooSlow = false;
+      const limitS = Math.max(1, Number(round.prize_seconds) || BLUR_LIMIT_S);
       if (round.game_type === 'blur') {
         const { data: views } = await admin.from('game_views').select('question_id,started_at,answered_at,answer').eq('round_id', roundId).eq('ident', ident);
         for (const q of qs) {
           const v = (views || []).find((x: any) => x.question_id === q.id);
           if (!v?.answered_at) { tooSlow = true; continue; }
           answers[q.id] = String(v.answer || '');
-          if (new Date(v.answered_at).getTime() - new Date(v.started_at).getTime() > BLUR_LIMIT_S * 1000 + 800) tooSlow = true;
+          if (new Date(v.answered_at).getTime() - new Date(v.started_at).getTime() > limitS * 1000 + 1500) tooSlow = true;
         }
       }
       // Semua soal wajib benar-benar dijawab.
@@ -170,7 +168,7 @@ Deno.serve(async (req) => {
       }
       if (!won) return json({ ok: true, entry });
       if (tooSlow) {
-        const prize = { kind: 'none', message: `Jawabanmu benar semua, tapi ada foto yang kamu tebak lebih dari ${BLUR_LIMIT_S} detik, jadi tidak dapat hadiah.` };
+        const prize = { kind: 'none', message: `Jawabanmu benar semua, tapi ada foto yang kamu tebak lebih dari ${limitS} detik, jadi tidak dapat hadiah.` };
         const { data: upd } = await admin.from('game_entries').update({ prize }).eq('id', entry.id).select('*').single();
         return json({ ok: true, entry: upd });
       }
