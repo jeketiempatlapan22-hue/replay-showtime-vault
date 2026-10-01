@@ -11,7 +11,7 @@ const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: 
 const norm = (s: string) => String(s || '').toLowerCase().normalize('NFKD').replace(/[^a-z0-9]/g, '');
 const genToken = () => crypto.randomUUID().replace(/-/g, '').slice(0, 24);
 
-type Prize = { kind: 'coins' | 'show' | 'bundle'; coins?: number; weight?: number };
+type Prize = { kind: 'coins' | 'show' | 'bundle'; coins?: number; weight?: number; quota?: number | null; _i?: number };
 
 function pickWeighted(list: Prize[]): Prize | null {
   const valid = list.filter((p) => Number(p.weight ?? 1) > 0);
@@ -69,7 +69,7 @@ Deno.serve(async (req) => {
     // Akun login: dicek per akun. Tamu: per browser + perangkat (hanya terhadap entri tamu lain).
     const identOr = (): string => userId
       ? `user_id.eq.${userId}`
-      : [browserId && `browser_id.eq.${browserId}`, deviceFp && ipHash && `and(device_fp.eq.${deviceFp},ip_hash.eq.${ipHash},user_id.is.null)`].filter(Boolean).join(',');
+      : `browser_id.eq.${browserId}`;
 
     // Bersihkan gambar upload dari ronde yang sudah selesai (hemat ruang).
     const { data: doneRounds } = await admin.from('game_rounds').select('id').eq('images_cleaned', false).lt('ends_at', new Date().toISOString()).limit(20);
@@ -96,12 +96,9 @@ Deno.serve(async (req) => {
       const { data: entries } = ownOr && ids.length
         ? await admin.from('game_entries').select('id,round_id,answers,correct_count,total,won,prize,created_at').in('round_id', ids).or(ownOr)
         : { data: [] as any[] };
-      const { data: fpEntries } = !userId && deviceFp && ipHash && ids.length
-        ? await admin.from('game_entries').select('round_id').in('round_id', ids).eq('device_fp', deviceFp).eq('ip_hash', ipHash || '-').is('user_id', null)
-        : { data: [] as any[] };
       const out = (rounds || []).map((r) => {
         const entry = (entries || []).find((e: any) => e.round_id === r.id) || null;
-        const device_blocked = !entry && (fpEntries || []).some((e: any) => e.round_id === r.id);
+        const device_blocked = false;
         const ended = r.ends_at < nowIso;
         const reveal = !!entry || ended;
         return {
@@ -181,7 +178,17 @@ Deno.serve(async (req) => {
         return json({ ok: true, entry: upd });
       }
 
-      const prizes = [...((round.prizes as Prize[]) || [])].filter((p) => userId || p.kind !== 'coins');
+      // Kuota per item: hitung hadiah yang sudah keluar di ronde ini.
+      const allPrizes = ((round.prizes as Prize[]) || []).map((p, i) => ({ ...p, _i: i }));
+      const { data: given } = await admin.from('game_entries').select('prize').eq('round_id', roundId).not('prize', 'is', null);
+      const usedBy = (i: number) => (given || []).filter((g: any) => g.prize && g.prize.kind !== 'none' && Number(g.prize.idx) === i).length;
+      const available = allPrizes.filter((p) => p.quota === undefined || p.quota === null || String(p.quota) === '' || usedBy(p._i!) < Number(p.quota));
+      if (!available.length) {
+        const prize = { kind: 'none', message: allPrizes.length ? 'Hadiah habis 🎁 Jawabanmu benar semua, tapi kuota hadiah game ini sudah habis. Ikuti game berikutnya ya!' : 'Hadiah habis 🎁 Jawabanmu benar semua, tapi game ini tidak menyediakan hadiah. Ikuti game berikutnya ya!' };
+        const { data: upd } = await admin.from('game_entries').update({ prize }).eq('id', entry.id).select('*').single();
+        return json({ ok: true, entry: upd });
+      }
+      const prizes = available.filter((p) => userId || p.kind !== 'coins');
       let prize: any = null;
       for (let attempt = 0; attempt < 4 && !prize && prizes.length; attempt++) {
         const p = pickWeighted(prizes);
@@ -189,7 +196,7 @@ Deno.serve(async (req) => {
         prizes.splice(prizes.indexOf(p), 1);
         if (p.kind === 'coins' && Number(p.coins) > 0 && userId) {
           await admin.rpc('grant_coins', { _user_id: userId, _delta: Number(p.coins), _reason: 'game_prize', _meta: { round_id: roundId } });
-          prize = { kind: 'coins', coins: Number(p.coins) };
+          prize = { kind: 'coins', coins: Number(p.coins), idx: p._i };
         } else if (p.kind === 'show') {
           const { data: shows } = await admin.from('active_shows').select('id,title,show_date,show_time,live_password,replay_info')
             .eq('is_active', true).is('replay_id', null);
@@ -199,7 +206,7 @@ Deno.serve(async (req) => {
           const token = genToken();
           await admin.from('active_show_tokens').insert({ show_id: s.id, token, label: `game:${userId || browserId}`, kind: 'personal', max_devices: 1, revoked: false });
           await admin.from('orders').insert({ user_id: userId, user_phone: '', show_id: s.id, item_title: `Show • ${s.title} (Hadiah Game)`, amount: 0, kind: 'show', status: 'paid', paid_at: new Date().toISOString(), access_token: token });
-          prize = { kind: 'show', show_id: s.id, title: s.title, show_date: s.show_date, show_time: s.show_time, token,
+          prize = { kind: 'show', idx: p._i, show_id: s.id, title: s.title, show_date: s.show_date, show_time: s.show_time, token,
             link: `${origin}/live?show=${s.id}&t=${token}`, password: String(s.live_password || ''), replay_info: String(s.replay_info || '') };
         } else if (p.kind === 'bundle') {
           const bundle = await getBundle(admin);
@@ -208,15 +215,12 @@ Deno.serve(async (req) => {
           const issued = await issueBundleToken(admin, { userId, phone: '', label: `game:${userId || browserId}` });
           if (!issued) continue;
           await admin.from('orders').insert({ user_id: userId, user_phone: '', item_title: `Bundel • ${bundle.name} (Hadiah Game)`, amount: 0, kind: 'bundle', status: 'paid', paid_at: new Date().toISOString(), access_token: issued.token });
-          prize = { kind: 'bundle', title: bundle.name, count: bundle.show_ids.length, token: issued.token,
+          prize = { kind: 'bundle', idx: p._i, title: bundle.name, count: bundle.show_ids.length, token: issued.token,
             link: `${origin}/shows?bt=${issued.token}`, password: issued.password };
         }
       }
-      if (!prize && !userId) {
-        prize = { kind: 'none', message: 'Hadiah show sedang habis. Masuk/daftar akun di game berikutnya untuk peluang hadiah koin.' };
-      } else if (!prize) {
-        await admin.rpc('grant_coins', { _user_id: userId, _delta: 3, _reason: 'game_prize', _meta: { round_id: roundId, fallback: true } });
-        prize = { kind: 'coins', coins: 3 };
+      if (!prize) {
+        prize = { kind: 'none', message: userId ? 'Hadiah habis 🎁 Jawabanmu benar semua, tapi hadiah yang tersedia sudah habis. Ikuti game berikutnya ya!' : 'Hadiah habis 🎁 Hadiah show/bundel sudah habis. Masuk/daftar akun untuk peluang hadiah koin di game berikutnya.' };
       }
       if (prize && userId && (prize.kind === 'show' || prize.kind === 'bundle')) {
         // Riwayat permanen: tetap ada walau game/soal dihapus; hilang otomatis bila show/bundel dihapus.
