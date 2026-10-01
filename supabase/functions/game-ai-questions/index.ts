@@ -20,8 +20,37 @@ Deno.serve(async (req) => {
     if (!isAdmin) return json({ error: 'forbidden' }, 403);
 
     const body = await req.json().catch(() => ({}));
-    const count = Math.min(30, Math.max(1, Number(body.count) || 25));
-    const topic = String(body.topic || 'JKT48 umum').slice(0, 200);
+    if (body.game_type === 'blur') {
+      const { data: mem } = await admin.from('members').select('name,photo_url').neq('photo_url', '');
+      const list = (mem || []).filter((m: any) => m.photo_url && m.name);
+      if (list.length < 3) return json({ error: 'Foto member belum cukup (minimal 3 member berfoto di menu Member).' }, 400);
+      const shuf = <T,>(a: T[]) => a.map((v) => [Math.random(), v] as const).sort((x, y) => x[0] - y[0]).map((x) => x[1]);
+      const n = Math.min(Number(body.count) || 100, list.length);
+      const questions = shuf(list).slice(0, n).map((m: any) => {
+        const others = shuf(list.filter((o: any) => o.name !== m.name)).slice(0, 2).map((o: any) => o.name);
+        return { prompt: 'Siapa member JKT48 di foto ini?', answer: m.name, alt_answers: [], choices: shuf([m.name, ...others]), image_url: m.photo_url };
+      });
+      return json({ ok: true, questions });
+    }
+    const total = Math.min(150, Math.max(1, Number(body.count) || 100));
+    const batches = Math.ceil(total / 25);
+    const results = await Promise.all(Array.from({ length: batches }, (_, b) => gen(body, Math.min(25, total - b * 25), b)));
+    const err = results.find((r) => r.error);
+    const all = results.flatMap((r) => r.questions || []);
+    if (!all.length && err) return json({ error: err.error }, err.status || 500);
+    const seen = new Set<string>();
+    const questions = all.filter((q: any) => { const k = String(q.prompt).toLowerCase().trim(); if (!q.prompt || !q.answer || seen.has(k)) return false; seen.add(k); return true; });
+    return json({ ok: true, questions });
+  } catch (e) {
+    return json({ error: String(e) }, 500);
+  }
+});
+
+const FOCUS = ['member aktif dan generasi', 'single, album, center, dan lagu', 'setlist teater, tim, kapten, sejarah', 'alumni, sister group 48, event, julukan, asal kota, fakta unik', 'lirik dan judul lagu populer', 'campuran acak mudah sampai susah'];
+
+async function gen(body: any, count: number, b: number): Promise<{ questions?: any[]; error?: string; status?: number }> {
+  try {
+    const topic = `${String(body.topic || 'JKT48 umum').slice(0, 200)}; fokus kelompok ini: ${FOCUS[b % FOCUS.length]}`;
     const lyrics = body.game_type === 'lyrics';
     const userMsg = lyrics
       ? `Buat ${count} soal "Tebak Lagu" JKT48 dengan topik: ${topic}. prompt = potongan lirik pendek (1-2 baris, maksimal 15 kata, boleh parafrase) dari lagu JKT48 yang benar-benar ada; answer = judul lagu resmi; choices = 3 judul lagu JKT48 (salah satunya jawaban).`
@@ -40,13 +69,14 @@ Deno.serve(async (req) => {
         tool_choice: { type: 'function', function: { name: 'soal' } },
       }),
     });
-    if (res.status === 429) return json({ error: 'Terlalu banyak permintaan, coba lagi sebentar.' }, 429);
-    if (res.status === 402) return json({ error: 'Kredit AI habis.' }, 402);
+    if (res.status === 429) return { error: 'Terlalu banyak permintaan, coba lagi sebentar.', status: 429 };
+    if (res.status === 402) return { error: 'Kredit AI habis.', status: 402 };
+    if (!res.ok) return { error: `AI error ${res.status}`, status: 500 };
     const data = await res.json();
     const args = data?.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments;
     const parsed = args ? JSON.parse(args) : { questions: [] };
-    return json({ ok: true, questions: parsed.questions || [] });
+    return { questions: parsed.questions || [] };
   } catch (e) {
-    return json({ error: String(e) }, 500);
+    return { error: String(e), status: 500 };
   }
-});
+}

@@ -93,13 +93,13 @@ export default function GameAdmin() {
     setEntries((data || []).map((e: any) => ({ ...e, who: (profs || []).find((p: any) => p.user_id === e.user_id) })));
   };
 
-  const genAi = async () => {
+  const genAi = async (replace = false) => {
     setBusy(true);
-    const { data, error } = await supabase.functions.invoke('game-ai-questions', { body: { topic: aiTopic, count: 25, game_type: edit?.game_type || 'quiz' } });
+    const { data, error } = await supabase.functions.invoke('game-ai-questions', { body: { topic: aiTopic, count: 100, game_type: edit?.game_type || 'quiz' } });
     setBusy(false);
     if (error || data?.error) { toast({ title: 'AI gagal', description: data?.error || error?.message, variant: 'destructive' }); return; }
-    const add = (data.questions || []).map((q: any) => ({ ...blankQ(), prompt: q.prompt, answer: q.answer, alt_answers: (q.alt_answers || []).join(', '), choices: (q.choices || []).join(' | ') }));
-    setSugg((cur) => [...add, ...cur]);
+    const add = (data.questions || []).map((q: any) => ({ ...blankQ(), prompt: q.prompt, answer: q.answer, alt_answers: (q.alt_answers || []).join(', '), choices: (q.choices || []).join(' | '), image_url: q.image_url || '' }));
+    setSugg((cur) => replace ? add : [...add, ...cur]);
     toast({ title: `${add.length} soal AI siap dipilih — periksa kebenarannya dulu` });
   };
 
@@ -178,14 +178,15 @@ export default function GameAdmin() {
 
           <div className="space-y-2">
             <p className="font-semibold text-sm">Soal ({qs.length}) — user harus benar semua untuk menang</p>
-            <div className="flex gap-2"><Input value={aiTopic} onChange={(e) => setAiTopic(e.target.value)} placeholder="Topik soal AI" /><Button size="sm" disabled={busy} onClick={genAi}><Sparkles className="w-4 h-4 mr-1" />Soal AI</Button></div>
+            <div className="flex gap-2"><Input value={aiTopic} onChange={(e) => setAiTopic(e.target.value)} placeholder="Topik soal AI" /><Button size="sm" disabled={busy} onClick={() => genAi(false)}><Sparkles className="w-4 h-4 mr-1" />Soal AI</Button></div>
+            <Button size="sm" variant="secondary" className="w-full" disabled={busy} onClick={() => genAi(true)}><Sparkles className="w-4 h-4 mr-1" />{busy ? 'Membuat soal…' : edit.game_type === 'blur' ? 'Tambah Soal JKT48 Otomatis (foto member acak)' : edit.game_type === 'lyrics' ? 'Tambah Soal JKT48 Otomatis (100 lirik acak)' : 'Tambah Soal JKT48 Otomatis (100 soal acak)'}</Button>
             {sugg.length > 0 && (
               <div className="border border-dashed border-primary/50 rounded-md p-2 space-y-1 max-h-96 overflow-y-auto">
                 <div className="flex items-center justify-between gap-2"><p className="text-xs font-semibold">Pilihan soal AI ({sugg.length}) — klik Tambah untuk memakai</p>
-                  <Button size="sm" variant="ghost" onClick={() => setSugg([])}>Bersihkan</Button></div>
+                  <div className="flex gap-1"><Button size="sm" variant="ghost" disabled={busy} onClick={() => genAi(true)}>Refresh</Button><Button size="sm" variant="ghost" onClick={() => setSugg([])}>Bersihkan</Button></div></div>
                 {sugg.map((q, i) => (
                   <div key={i} className="flex gap-2 items-start border-t border-border pt-1">
-                    <div className="flex-1 min-w-0 text-xs"><p className="font-medium whitespace-pre-line">{q.prompt}</p><p className="text-primary">✓ {q.answer}</p>{q.choices && <p className="text-muted-foreground">{q.choices}</p>}</div>
+                    <div className="flex-1 min-w-0 text-xs"><p className="font-medium whitespace-pre-line">{q.prompt}</p>{q.image_url && <img src={q.image_url} alt="" className="w-12 h-12 object-cover rounded my-1" />}<p className="text-primary">✓ {q.answer}</p>{q.choices && <p className="text-muted-foreground">{q.choices}</p>}</div>
                     <Button size="sm" variant="outline" onClick={() => { setQs((cur) => [...cur.filter((x) => x.prompt.trim()), q]); setSugg((cur) => cur.filter((_, j) => j !== i)); }}><Plus className="w-3 h-3 mr-1" />Tambah</Button>
                   </div>
                 ))}
