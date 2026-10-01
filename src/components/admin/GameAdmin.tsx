@@ -31,7 +31,7 @@ function ImageField({ value, onChange, placeholder }: { value: string; onChange:
   );
 }
 
-type Prize = { kind: 'coins' | 'show' | 'bundle'; coins?: number; weight: number };
+type Prize = { kind: 'coins' | 'show' | 'bundle'; coins?: number; weight: number; quota?: number | null };
 type Q = { id?: string; prompt: string; image_url: string; answer: string; alt_answers: string; choices: string; reveal_image_url: string };
 type Round = { id?: string; title: string; description: string; game_type: string; prize_seconds: number; starts_at: string; ends_at: string; is_published: boolean; prizes: Prize[] };
 
@@ -159,18 +159,21 @@ export default function GameAdmin() {
           <label className="flex items-center gap-2 text-sm"><Switch checked={edit.is_published} onCheckedChange={(v) => setEdit({ ...edit, is_published: v })} />Tampilkan ke user</label>
 
           <div className="space-y-2">
-            <p className="font-semibold text-sm">Hadiah acak (peluang = bobot)</p>
+            <p className="font-semibold text-sm">Hadiah acak (peluang = bobot, kuota = jumlah hadiah tersedia)</p>
+            <p className="text-xs text-muted-foreground">Kuota kosong = tanpa batas. Kuota 0 atau tanpa hadiah sama sekali = pemenang melihat pesan "Hadiah habis".</p>
             {edit.prizes.map((p, i) => (
-              <div key={i} className="flex gap-2 items-center">
+              <div key={i} className="flex flex-wrap gap-2 items-center">
                 <select className="h-9 rounded-md border border-input bg-background px-2 text-sm" value={p.kind} onChange={(e) => setP(i, { kind: e.target.value as Prize['kind'] })}>
                   <option value="coins">Koin</option><option value="show">Show gratis (dipilih server)</option><option value="bundle">Bundel show</option>
                 </select>
-                {p.kind === 'coins' && <Input type="number" className="w-20" value={p.coins ?? 0} onChange={(e) => setP(i, { coins: Number(e.target.value) })} />}
-                <Input type="number" className="w-20" title="Bobot" value={p.weight} onChange={(e) => setP(i, { weight: Number(e.target.value) })} />
+                {p.kind === 'coins' && <Input type="number" className="w-20" title="Jumlah koin" placeholder="Koin" value={p.coins ?? 0} onChange={(e) => setP(i, { coins: Number(e.target.value) })} />}
+                <Input type="number" className="w-20" title="Bobot" placeholder="Bobot" value={p.weight} onChange={(e) => setP(i, { weight: Number(e.target.value) })} />
+                <Input type="number" min={0} className="w-24" title="Kuota" placeholder="Kuota ∞" value={p.quota ?? ''} onChange={(e) => setP(i, { quota: e.target.value === '' ? null : Math.max(0, Number(e.target.value)) })} />
                 <Button size="icon" variant="ghost" onClick={() => setEdit({ ...edit, prizes: edit.prizes.filter((_, j) => j !== i) })}><Trash2 className="w-4 h-4" /></Button>
               </div>
             ))}
             <Button size="sm" variant="outline" onClick={() => setEdit({ ...edit, prizes: [...edit.prizes, { kind: 'coins', coins: 1, weight: 1 }] })}><Plus className="w-4 h-4 mr-1" />Hadiah</Button>
+            <Button size="sm" variant="ghost" onClick={() => setEdit({ ...edit, prizes: [] })}>Tanpa hadiah (0)</Button>
           </div>
 
           <div className="space-y-2">
