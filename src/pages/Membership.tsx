@@ -185,15 +185,26 @@ export default function Membership() {
         setPaid(false);
         setPayOpen(true);
         pollRef.current && clearInterval(pollRef.current);
+        let done = false;
         pollRef.current = setInterval(async () => {
-          const { data: row } = await supabase.from('membership_orders').select('status').eq('id', r.order_id).maybeSingle();
-          if (row?.status === 'paid') {
-            setPaid(true);
-            clearInterval(pollRef.current);
-            toast.success('Pembayaran berhasil! Cek WhatsApp.');
-          }
-          try { await supabase.functions.invoke('check-pakasir-status', { body: { order_id: r.order_id } }); } catch { /* ignore */ }
-        }, 2500);
+          if (done) return;
+          try {
+            const { data: st } = await supabase.functions.invoke('check-pakasir-status', { body: { order_id: r.order_id } });
+            const s: any = st;
+            if (s?.status === 'paid' && !done) {
+              if (s.token) {
+                saveMembershipCredentials(s.token, s.password || '');
+                setSuccessToken(s.token); setSuccessPassword(s.password || '');
+                setSuccessLink(`${window.location.origin}${s.link || ''}`);
+              }
+              done = true;
+              setPaid(true);
+              clearInterval(pollRef.current);
+              refreshMembership();
+              toast.success('Pembayaran berhasil! Membership aktif.');
+            }
+          } catch { /* ignore, coba lagi */ }
+        }, 3000);
       }
     } catch (err: any) {
       const msg = err?.message || String(err);
@@ -408,8 +419,17 @@ export default function Membership() {
             <div className="text-center space-y-3 py-4">
               <CheckCircle2 className="w-12 h-12 text-green-500 mx-auto" />
               <p className="font-semibold">Pembayaran berhasil!</p>
-              <p className="text-xs text-muted-foreground">Cek WhatsApp Anda untuk link akses membership.</p>
-              <Button className="w-full" onClick={() => { setPayOpen(false); refreshMembership(); navigate('/live'); }}>Buka Live Sekarang</Button>
+              <p className="text-xs text-muted-foreground">Membership sudah aktif di perangkat ini. Link juga dikirim ke WhatsApp.</p>
+              {successLink && (
+                <div className="flex gap-1">
+                  <Input readOnly value={successLink} className="text-xs" />
+                  <Button size="icon" variant="outline" onClick={() => { navigator.clipboard.writeText(successLink); toast.success('Link disalin'); }}>
+                    <Copy className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
+              )}
+              <Button className="w-full" onClick={() => { setPayOpen(false); refreshMembership(); navigate(successToken ? `/live?mtoken=${encodeURIComponent(successToken)}&mp=${encodeURIComponent(successPassword)}` : '/live'); }}>Tonton Live</Button>
+              <Button variant="outline" className="w-full" onClick={() => { setPayOpen(false); refreshMembership(); navigate('/'); }}>Tonton Replay</Button>
             </div>
           )}
         </DialogContent>
