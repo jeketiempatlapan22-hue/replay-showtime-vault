@@ -437,12 +437,13 @@ Deno.serve(async (req) => {
       '👑 *MEMBERSHIP AKTIF*\n\n📦 *{package_name}*\n📅 Berlaku hingga: {expires_at}\n\n🔗 *Link Akses:*\n{link}\n\n🎬 *Link Replay:* realtime48stream.my.id\n\n{replay_info_block}👤 Berlaku untuk *{max_devices} perangkat*.\n\n— *ReplayTime* 💖';
     const { data: mOrders } = await admin
       .from('membership_orders').select('*')
-      .in('status', ['reserved', 'paid'])
+      .in('status', ['reserved', 'paid', 'expired'])
       .eq('kind', 'qris')
       .not('pakasir_order_id', 'is', null)
       .gte('created_at', pendingSince)
-      .order('created_at', { ascending: false }).limit(40);
+      .order('created_at', { ascending: false }).limit(120);
     for (const mo of mOrders ?? []) {
+      if (Date.now() - startedAt > 45_000) { memResults.push({ skipped: 'time_budget_reached' }); break; }
       try {
         // Skip jika sudah punya token & WA sudah pernah sukses (idempotent guard).
         if (mo.membership_token_id && mo.wa_sent_at) {
@@ -450,7 +451,7 @@ Deno.serve(async (req) => {
         }
         // Skip jika melewati batas percobaan.
         const attempts = Number(mo.wa_attempts || 0);
-        if (attempts >= MAX_WA_ATTEMPTS) {
+        if (attempts >= MAX_WA_ATTEMPTS && mo.membership_token_id) {
           memResults.push({ id: mo.id, skipped: 'max_attempts' }); continue;
         }
         // Hormati backoff window.

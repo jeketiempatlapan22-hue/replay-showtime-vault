@@ -461,7 +461,8 @@ export default function Membership() {
                 </Button>
               </div>
             </div>
-            <Button className="w-full" onClick={() => { setSuccessOpen(false); refreshMembership(); navigate('/live'); }}>Buka Live Sekarang</Button>
+            <Button className="w-full" onClick={() => { setSuccessOpen(false); refreshMembership(); navigate('/live'); }}>Tonton Live</Button>
+            <Button variant="outline" className="w-full" onClick={() => { setSuccessOpen(false); refreshMembership(); navigate('/'); }}>Tonton Replay</Button>
           </div>
         </DialogContent>
       </Dialog>
