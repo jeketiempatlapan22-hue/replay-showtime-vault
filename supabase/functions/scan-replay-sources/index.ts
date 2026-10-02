@@ -2,7 +2,7 @@
 // Replay yang videonya dihapus/di-ban/embed diblokir otomatis ditandai is_offline
 // sehingga hilang dari daftar replay user dan masuk menu "Replay Off" di admin.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { isYouTubeVideoPlayable } from '../_shared/yt-check.ts';
+import { isYouTubeVideoPlayable, isStreamUrlAlive, extractYouTubeId } from '../_shared/yt-check.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -41,31 +41,43 @@ Deno.serve(async (req) => {
 
     const { data: replays, error } = await admin
       .from('replays')
-      .select('id, title, youtube_id, m3u8_url, sources, source_type, is_offline')
+      .select('id, title, youtube_id, youtube_alt_id, m3u8_url, sources, source_type, is_offline')
       .eq('is_offline', false)
-      .limit(500);
+      .limit(1000);
     if (error) return json({ error: error.message }, 500);
 
     const flagged: { id: string; title: string; reason: string }[] = [];
     let checked = 0;
 
-    for (const r of replays || []) {
-      const sources = Array.isArray(r.sources) ? (r.sources as any[]) : [];
-      const hasAltSource =
-        sources.length > 0 || String(r.m3u8_url || '').trim() !== '';
-      const ytId = String(r.youtube_id || '').trim();
-
-      // Tidak ada sumber sama sekali -> langsung off
-      if (!hasAltSource && !ytId) {
-        flagged.push({ id: r.id, title: r.title, reason: 'Sumber video kosong / tidak tersedia' });
-        continue;
+    // Kumpulkan semua sumber per replay. Replay dianggap off hanya jika SEMUA sumbernya gagal.
+    const checkOne = async (r: any) => {
+      const list: { kind: 'yt' | 'url'; v: string }[] = [];
+      const add = (kind: 'yt' | 'url', v: string) => { v = String(v || '').trim(); if (v && !list.some((x) => x.v === v)) list.push({ kind, v }); };
+      if (r.youtube_id) add('yt', r.youtube_id);
+      if (r.youtube_alt_id) add('yt', r.youtube_alt_id);
+      if (r.m3u8_url) add('url', r.m3u8_url);
+      for (const s of Array.isArray(r.sources) ? r.sources : []) {
+        const u = String(s?.url || '').trim();
+        if (!u) continue;
+        if (s?.type === 'youtube' || extractYouTubeId(u) && !/^https?:\/\//.test(u) || /youtu\.?be/.test(u)) add('yt', u);
+        else add('url', u);
       }
-      // Punya sumber alternatif (m3u8/playlist) -> jangan diganggu
-      if (hasAltSource) continue;
-
+      if (!list.length) return { ok: false, reason: 'Sumber video kosong / tidak tersedia' };
       checked++;
-      const res = await isYouTubeVideoPlayable(ytId);
-      if (!res.ok) flagged.push({ id: r.id, title: r.title, reason: res.reason });
+      const reasons: string[] = [];
+      for (const s of list) {
+        const res = s.kind === 'yt' ? await isYouTubeVideoPlayable(s.v) : await isStreamUrlAlive(s.v);
+        if (res.ok) return { ok: true, reason: '' };
+        reasons.push(res.reason);
+      }
+      return { ok: false, reason: reasons[0] + (reasons.length > 1 ? ` (+${reasons.length - 1} sumber lain juga gagal)` : '') };
+    };
+
+    const rows = replays || [];
+    for (let i = 0; i < rows.length; i += 8) {
+      const chunk = rows.slice(i, i + 8);
+      const res = await Promise.all(chunk.map(checkOne));
+      res.forEach((x, j) => { if (!x.ok) flagged.push({ id: chunk[j].id, title: chunk[j].title, reason: x.reason }); });
     }
 
     for (const f of flagged) {
