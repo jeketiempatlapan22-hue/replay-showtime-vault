@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, useRef, useCallback, memo, lazy, Suspense } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { readMembershipCredentials } from '@/lib/membershipAccess';
+import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Loader2, Users, Eye, PictureInPicture2, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -135,6 +136,20 @@ const ScheduleCountdown = memo(function ScheduleCountdown({ title, showDate, sho
 });
 
 export default function Live() {
+  const [sp] = useSearchParams();
+  if (!sp.get('mtoken') && !sp.get('t') && sp.get('admin_monitor') !== '1') {
+    const creds = readMembershipCredentials();
+    if (creds?.token) {
+      const next = new URLSearchParams(sp);
+      next.set('mtoken', creds.token);
+      if (creds.password) next.set('mp', creds.password);
+      return <Navigate to={`/live?${next.toString()}`} replace />;
+    }
+  }
+  return <LiveInner />;
+}
+
+function LiveInner() {
   const navigate = useNavigate();
   const [search] = useSearchParams();
   const [status, setStatus] = useState<LiveStatus | null>(null);

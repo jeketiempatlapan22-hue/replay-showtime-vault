@@ -3,7 +3,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import {
   MEMBERSHIP_UPDATED_EVENT,
-  clearMembershipCredentials,
   readMembershipCredentials,
   saveMembershipCredentials,
 } from '@/lib/membershipAccess';
@@ -86,11 +85,20 @@ async function loadMembership(userId: string | undefined, force = false): Promis
   if (!force && cached !== undefined && Date.now() - lastFetchAt < 30_000) return cached ?? null;
   inFlight = (async () => {
     const m = await fetchMembership();
+    let value = m;
     if (m) saveMembershipCredentials(m.token, m.password);
-    else clearMembershipCredentials();
+    else {
+      // Membership dibeli tanpa akun / dari link: tetap pakai yang tersimpan di perangkat.
+      const local = readMembershipCredentials();
+      value = local ? {
+        token: local.token, password: local.password, expires_at: null,
+        package_name: 'Membership', max_devices: 1, includes_replays: true,
+        starts_at: null, duration_days: null, replay_info: '', days_remaining: null,
+      } : null;
+    }
     lastFetchAt = Date.now();
-    notify(m);
-    return m;
+    notify(value);
+    return value;
   })().finally(() => { inFlight = null; });
   return inFlight;
 }
