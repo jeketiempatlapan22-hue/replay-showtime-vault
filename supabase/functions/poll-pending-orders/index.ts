@@ -429,7 +429,7 @@ Deno.serve(async (req) => {
   const MAX_WA_ATTEMPTS = 5;
   const BACKOFF_MIN = [0, 1, 5, 15, 60, 360]; // index = attempts done
   const memResults: any[] = [];
-  if (Date.now() - startedAt > 10_000) {
+  if (Date.now() - startedAt > 35_000) {
     memResults.push({ skipped: 'time_budget_reached' });
   } else try {
     const memTpl = (await admin.from('site_settings').select('value').eq('key', 'wa_membership_template').maybeSingle())
