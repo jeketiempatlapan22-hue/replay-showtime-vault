@@ -147,6 +147,16 @@ async function isFonntePaused(admin: ReturnType<typeof createClient>, windowMs =
   return timeoutFails >= 3 && !hasRecentSent;
 }
 
+async function memCreds(admin: any, orderId: string) {
+  try {
+    const { data: o } = await admin.from('membership_orders').select('membership_token_id').eq('id', orderId).maybeSingle();
+    if (!o?.membership_token_id) return {};
+    const { data: t } = await admin.from('membership_tokens').select('token,password,expires_at').eq('id', o.membership_token_id).maybeSingle();
+    if (!t) return {};
+    return { token: t.token, password: t.password, expires_at: t.expires_at, link: `/live?mtoken=${encodeURIComponent(t.token)}&mp=${encodeURIComponent(t.password)}` };
+  } catch { return {}; }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
@@ -172,7 +182,7 @@ Deno.serve(async (req) => {
     if (mOrder) {
       // Already finalized + WA sent → return as-is
       if (mOrder.status === 'paid' && mOrder.membership_token_id && mOrder.wa_sent_at) {
-        return new Response(JSON.stringify({ ok: true, status: 'paid', already: true, membership: true }), {
+        return new Response(JSON.stringify({ ok: true, status: 'paid', already: true, membership: true, ...(await memCreds(admin, mOrder.id)) }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
@@ -226,7 +236,7 @@ Deno.serve(async (req) => {
         .update({ wa_last_attempt_at: claimAt })
         .eq('id', mOrder.id).is('wa_sent_at', null).select('id');
       if (!claimed || claimed.length === 0) {
-        return new Response(JSON.stringify({ ok: true, status: 'paid', membership: true, already_sent: true }), {
+        return new Response(JSON.stringify({ ok: true, status: 'paid', membership: true, ...(await memCreds(admin, mOrder.id)), already_sent: true }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
@@ -253,12 +263,12 @@ Deno.serve(async (req) => {
       // Telegram: jalur alternatif (kebal gangguan Fonnte).
       await sendTelegramByPhone(admin, mOrder.phone, mmsg);
       if (await isFonntePaused(admin)) {
-        return new Response(JSON.stringify({ ok: true, status: 'paid', membership: true, sent: false, retry_delayed: true, reason: 'fonnte_timeout_pause' }), {
+        return new Response(JSON.stringify({ ok: true, status: 'paid', membership: true, ...(await memCreds(admin, mOrder.id)), sent: false, retry_delayed: true, reason: 'fonnte_timeout_pause' }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
       if (await shouldDelayWaRetry(admin, mOrder.id)) {
-        return new Response(JSON.stringify({ ok: true, status: 'paid', membership: true, sent: false, retry_delayed: true }), {
+        return new Response(JSON.stringify({ ok: true, status: 'paid', membership: true, ...(await memCreds(admin, mOrder.id)), sent: false, retry_delayed: true }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
@@ -282,7 +292,7 @@ Deno.serve(async (req) => {
           source: 'pakasir', requested_by: 'check-pakasir-status-membership',
         });
       }
-      return new Response(JSON.stringify({ ok: true, status: 'paid', membership: true, sent: sentM.ok }), {
+      return new Response(JSON.stringify({ ok: true, status: 'paid', membership: true, ...(await memCreds(admin, mOrder.id)), sent: sentM.ok }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
