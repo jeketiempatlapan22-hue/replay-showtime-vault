@@ -57,7 +57,7 @@ async function verifyMembership(supabase: any, mtoken: string, mpassword: string
   if (!(await membershipPasswordOk(supabase, t, mpassword))) return { ok: false, reason: "bad_membership_password" };
   const now = Date.now();
   if (t.expires_at && new Date(t.expires_at).getTime() < now) return { ok: false, reason: "expired" };
-  if (t.starts_at && new Date(t.starts_at).getTime() > now) return { ok: false, reason: "not_started" };
+  // Tanggal mulai di masa depan tidak lagi memblokir akses live (member boleh langsung masuk).
   // Per-package pause check
   if (t.package_id) {
     const { data: pkg } = await supabase

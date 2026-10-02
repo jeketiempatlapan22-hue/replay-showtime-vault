@@ -149,11 +149,11 @@ export default function MembershipPackagesAdmin() {
         || prev.includes_replays !== payload.includes_replays
         || (prev.fixed_starts_at || null) !== payload.fixed_starts_at
         || (prev.fixed_expires_at || null) !== payload.fixed_expires_at;
-      if (changed && window.confirm('Terapkan durasi/pengaturan baru ini ke member AKTIF yang sudah membeli paket ini? (tanggal berakhir dihitung ulang dari tanggal mulai masing-masing member)')) {
-        const includeExpired = window.confirm('Termasuk member yang sudah kedaluwarsa? OK = ya, Batal = hanya yang masih aktif.');
+      if (changed) {
+        // Otomatis terapkan ke semua member aktif paket ini agar durasi & akses live langsung ikut berubah.
         const { data: n, error: syncErr } = await (supabase as any).rpc('admin_sync_package_duration', {
           _package_id: editingId,
-          _include_expired: includeExpired,
+          _include_expired: false,
         });
         if (syncErr) toast.error(`Gagal sinkron member: ${syncErr.message}`);
         else toast.success(`${Number(n) || 0} membership diperbarui`);
@@ -234,12 +234,12 @@ export default function MembershipPackagesAdmin() {
           <div className="sm:col-span-2">
             <Label className="text-xs">Tipe Durasi</Label>
             <div className="flex flex-wrap gap-1.5 mt-1 mb-2">
-              <Button type="button" size="sm" variant={form.duration_days === 31 ? 'default' : 'outline'} onClick={() => setForm({ ...form, duration_days: 31 })}>Otomatis 1 Bulan (31 hari)</Button>
-              <Button type="button" size="sm" variant={form.duration_days === 62 ? 'default' : 'outline'} onClick={() => setForm({ ...form, duration_days: 62 })}>Otomatis 2 Bulan (62 hari)</Button>
+              <Button type="button" size="sm" variant={form.duration_days === 31 ? 'default' : 'outline'} onClick={() => setForm({ ...form, duration_days: 31, fixed_starts_at: '', fixed_expires_at: '' })}>Otomatis 1 Bulan (31 hari)</Button>
+              <Button type="button" size="sm" variant={form.duration_days === 62 ? 'default' : 'outline'} onClick={() => setForm({ ...form, duration_days: 62, fixed_starts_at: '', fixed_expires_at: '' })}>Otomatis 2 Bulan (62 hari)</Button>
               <Button type="button" size="sm" variant={form.duration_days !== 31 && form.duration_days !== 62 ? 'default' : 'outline'} onClick={() => setForm({ ...form, duration_days: form.duration_days === 31 || form.duration_days === 62 ? 30 : form.duration_days })}>Durasi Admin (manual)</Button>
             </div>
             <Label className="text-xs">Durasi (hari)</Label>
-            <Input type="number" min={1} value={form.duration_days} onChange={(e) => setForm({ ...form, duration_days: Number(e.target.value) || 0 })} />
+            <Input type="number" min={1} value={form.duration_days} onChange={(e) => setForm({ ...form, duration_days: Number(e.target.value) || 0, fixed_starts_at: '', fixed_expires_at: '' })} />
           </div>
           <div>
             <Label className="text-xs">Kuota Total</Label>
