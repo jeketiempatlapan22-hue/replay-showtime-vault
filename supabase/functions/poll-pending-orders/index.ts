@@ -401,7 +401,7 @@ Deno.serve(async (req) => {
 
   const results: any[] = [];
   const startedAt = Date.now();
-  const TIME_BUDGET_MS = 45_000;
+  const TIME_BUDGET_MS = 25_000;
   for (const o of orders ?? []) {
     if (Date.now() - startedAt > TIME_BUDGET_MS) {
       results.push({ skipped: 'time_budget_reached' });
@@ -443,7 +443,7 @@ Deno.serve(async (req) => {
       .gte('created_at', pendingSince)
       .order('created_at', { ascending: false }).limit(120);
     for (const mo of mOrders ?? []) {
-      if (Date.now() - startedAt > 45_000) { memResults.push({ skipped: 'time_budget_reached' }); break; }
+      if (Date.now() - startedAt > 50_000) { memResults.push({ skipped: 'time_budget_reached' }); break; }
       try {
         // Skip jika sudah punya token & WA sudah pernah sukses (idempotent guard).
         if (mo.membership_token_id && mo.wa_sent_at) {
