@@ -35,7 +35,7 @@ export async function isYouTubeVideoPlayable(id: string): Promise<{ ok: boolean;
     const m = html.match(/"playabilityStatus":\{"status":"([A-Z_]+)"(?:,"reason":"([^"]*)")?/);
     if (m) {
       const st = m[1];
-      if (st === "ERROR" || st === "UNPLAYABLE") return { ok: false, reason: `Video YouTube tidak bisa diputar${m[2] ? `: ${m[2]}` : " (banned/dihapus)"}` };
+      if (st === "ERROR" || (st === "UNPLAYABLE" && !/country|negara|wilayah|bot/i.test(m[2] || ""))) return { ok: false, reason: `Video YouTube tidak bisa diputar${m[2] ? `: ${m[2]}` : " (banned/dihapus)"}` };
       if (st === "LOGIN_REQUIRED" && /private|pribadi/i.test(m[2] || "")) return { ok: false, reason: `Video YouTube private / butuh login${m[2] ? `: ${m[2]}` : ""}` };
     }
     if (/"playableInEmbed":false/.test(html)) return { ok: false, reason: "Video YouTube tidak boleh di-embed" };
