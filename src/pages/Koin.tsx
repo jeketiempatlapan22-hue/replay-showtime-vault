@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { rememberPendingOrder } from '@/lib/purchaseSync';
 
 interface Pkg { id: string; label: string; price_idr: number; coins: number; }
 interface Tx { id: string; delta: number; reason: string; created_at: string; }
@@ -71,6 +72,7 @@ export default function Koin() {
       const r: any = data;
       if (!r?.ok) throw new Error(r?.error || 'gagal');
       setOrderId(r.order_id);
+      rememberPendingOrder(r.order_id, { kind: 'coin_topup', showId: null, replayId: null });
       const url = await QRCode.toDataURL(r.qr_string, { width: 512, margin: 1 });
       setQrDataUrl(url);
       // Poll
