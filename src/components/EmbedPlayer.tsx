@@ -261,7 +261,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
     hideTimerRef.current = setTimeout(() => {
       // Only hide while actually playing
       setShowControls(prev => (isPlayingRef.current ? false : prev));
-    }, 5000);
+    }, 2000);
   }, []);
 
   const isPlayingRef = useRef(false);
@@ -279,6 +279,24 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
   useEffect(() => {
     resetHideTimer();
     return () => { if (hideTimerRef.current) clearTimeout(hideTimerRef.current); };
+  }, [resetHideTimer]);
+
+  // Saat video mulai/berlanjut, kontrol tampil sebentar lalu hilang dalam 2 detik.
+  useEffect(() => { if (isPlaying) resetHideTimer(); }, [isPlaying, resetHideTimer]);
+
+  // Ketukan di atas iframe (lintas domain) tidak sampai ke container. Iframe yang
+  // menerima fokus memicu window 'blur' — pakai itu untuk memunculkan kontrol lagi,
+  // lalu kembalikan fokus agar ketukan berikutnya juga terdeteksi.
+  useEffect(() => {
+    const onBlur = () => {
+      const root = containerRef.current;
+      const active = document.activeElement;
+      if (!root || !active || active.tagName !== 'IFRAME' || !root.contains(active)) return;
+      resetHideTimer();
+      window.setTimeout(() => { try { (active as HTMLElement).blur(); window.focus(); } catch { /* ignore */ } }, 150);
+    };
+    window.addEventListener('blur', onBlur);
+    return () => window.removeEventListener('blur', onBlur);
   }, [resetHideTimer]);
 
   const ytId = type === 'youtube' ? extractYoutubeId(source) : '';
@@ -1174,7 +1192,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
         </div>
       )}
 
-      {showHint && !plainMode && (
+      {showHint && !plainMode && (showControls || !isPlaying) && (
         <button
           onClick={(e) => { e.stopPropagation(); activateSound(); resetHideTimer(); }}
           className="absolute top-3 left-1/2 -translate-x-1/2 z-20 px-4 py-2 rounded-full bg-primary text-primary-foreground text-xs font-semibold shadow-lg animate-fade-in"
@@ -1198,7 +1216,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
       {/* Controls */}
       <div
         className={`absolute inset-x-0 bottom-0 z-10 px-2 sm:px-3 pb-2 sm:pb-3 pt-8 bg-gradient-to-t from-black/80 to-transparent transition-opacity duration-300 ${
-          plainMode ? 'hidden' : type === 'youtube' || showControls || !isPlaying ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+          plainMode ? 'hidden' : showControls || !isPlaying ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
         }`}
 
         style={{ touchAction: 'manipulation' }}
