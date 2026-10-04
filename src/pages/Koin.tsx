@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { rememberPendingOrder, syncPurchases } from '@/lib/purchaseSync';
+import { rememberPendingOrder } from '@/lib/purchaseSync';
 
 interface Pkg { id: string; label: string; price_idr: number; coins: number; }
 interface Tx { id: string; delta: number; reason: string; created_at: string; }
