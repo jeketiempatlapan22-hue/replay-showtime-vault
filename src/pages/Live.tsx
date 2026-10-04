@@ -312,8 +312,8 @@ function LiveInner() {
         const params = new URLSearchParams();
         params.set('mtoken', String(data.membership_token));
         params.set('mp', String(data.membership_password || ''));
-        if (!silent) setSubmitting(false);
-        navigate(`/live?${params.toString()}`, { replace: true });
+        // Muat ulang penuh agar alur link membership berjalan dari awal.
+        window.location.replace(`/live?${params.toString()}`);
         return;
       }
       if (data?.valid) {
