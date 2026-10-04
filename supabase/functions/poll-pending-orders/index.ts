@@ -396,27 +396,31 @@ Deno.serve(async (req) => {
   const error = paidErr || pendingErr;
   if (error) return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: corsHeaders });
   const seen = new Set<string>();
-  const orders = [...(paidUnsent ?? []), ...(pendingOrders ?? [])].filter((o) => !seen.has(o.id) && seen.add(o.id));
-  console.log(`[poll] scanning ${orders.length} orders (${paidUnsent?.length ?? 0} paid-unsent, ${pendingOrders?.length ?? 0} pending)`);
+  // Konfirmasi pembayaran (pending → paid, kredit koin, token) DIDAHULUKAN, lalu baru
+  // pengiriman ulang WA. Dulu 100 order "paid-unsent" diproses lebih dulu dan menghabiskan
+  // batas waktu, sehingga pembayaran baru (mis. top-up koin) tidak pernah dicek.
+  const orders = [...(pendingOrders ?? []), ...(paidUnsent ?? [])].filter((o) => !seen.has(o.id) && seen.add(o.id));
+  console.log(`[poll] scanning ${orders.length} orders (${pendingOrders?.length ?? 0} pending first, ${paidUnsent?.length ?? 0} paid-unsent)`);
 
   const results: any[] = [];
   const startedAt = Date.now();
-  const TIME_BUDGET_MS = 25_000;
-  for (const o of orders ?? []) {
+  const TIME_BUDGET_MS = 30_000;
+  const CONCURRENCY = 6;
+  for (let i = 0; i < orders.length; i += CONCURRENCY) {
     if (Date.now() - startedAt > TIME_BUDGET_MS) {
-      results.push({ skipped: 'time_budget_reached' });
+      results.push({ skipped: 'time_budget_reached', remaining: orders.length - i });
       break;
     }
-    if (o.status === 'paid' && o.token_sent_at && await hasSentWa(admin, o.id)) {
-      results.push({ id: o.id, skipped: 'already_delivered' });
-      continue;
-    }
-    try {
-      const r = await processOrder(admin, o, apiKey, slug, origin, tpl, showTpl);
-      results.push(r);
-    } catch (e) {
-      results.push({ id: o.id, error: String(e) });
-    }
+    const batch = orders.slice(i, i + CONCURRENCY);
+    const out = await Promise.all(batch.map(async (o) => {
+      try {
+        if (o.status === 'paid' && o.token_sent_at && await hasSentWa(admin, o.id)) return { id: o.id, skipped: 'already_delivered' };
+        return await processOrder(admin, o, apiKey, slug, origin, tpl, showTpl);
+      } catch (e) {
+        return { id: o.id, error: String(e) };
+      }
+    }));
+    results.push(...out);
   }
 
   // === MEMBERSHIP ORDERS (reserved QRIS yang webhook-nya tidak sampai) ===
