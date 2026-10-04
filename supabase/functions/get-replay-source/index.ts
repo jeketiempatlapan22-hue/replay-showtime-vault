@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { bundlePasswordValidForReplay } from "../_shared/bundle.ts";
+import { findMembershipByPassword, membershipReplayPasswordOk } from "../_shared/membership-password.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -41,6 +42,7 @@ Deno.serve(async (req) => {
     if (!replay) return json({ valid: false }, 404);
 
     let valid = false;
+    let memberCred: { token: string; password: string } | null = null;
 
     if (access_token) {
       // 1) master public token on replay
@@ -179,6 +181,27 @@ Deno.serve(async (req) => {
           .in("month", [...months]);
         valid = (masters || []).some((m: any) => m.paused !== true && m.password === password);
       }
+      if (!valid) {
+        // Sandi membership per user (admin/reseller/QRIS) — lama maupun baru.
+        let viaMember = await membershipReplayPasswordOk(supabase, password, replay.date);
+        const mt = await findMembershipByPassword(supabase, password);
+        if (mt && mt.includes_replays) {
+          const startsAt = mt.starts_at ? new Date(mt.starts_at).getTime() : 0;
+          const expiresAt = mt.expires_at ? new Date(mt.expires_at).getTime() : Number.POSITIVE_INFINITY;
+          const replayTime = new Date(`${replay.date}T12:00:00+07:00`).getTime();
+          const inPeriod = Number.isFinite(replayTime)
+            && replayTime >= (startsAt ? startsAt - 24 * 3600 * 1000 : 0)
+            && replayTime <= expiresAt + 24 * 3600 * 1000;
+          if (inPeriod) viaMember = true;
+          // Simpan kredensial di perangkat agar live & replay lain terbuka otomatis.
+          memberCred = { token: String(mt.token), password: String(password).trim().toUpperCase() };
+        }
+        valid = viaMember;
+        if (!valid && memberCred) {
+          await supabase.rpc('record_login_attempt', { _identifier: lockId, _success: true });
+          return json({ valid: false, reason: "outside_membership_period", membership: memberCred }, 403);
+        }
+      }
     }
 
     if (!valid) {
@@ -219,6 +242,7 @@ Deno.serve(async (req) => {
       m3u8_url: replay.m3u8_url || "",
       source_type: replay.source_type || "youtube",
       sources: Array.isArray(replay.sources) ? replay.sources : [],
+      ...(memberCred ? { membership: memberCred } : {}),
     });
 
   } catch {
