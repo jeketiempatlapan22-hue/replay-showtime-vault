@@ -61,6 +61,15 @@ async function readFunctionErrorBody(error: unknown): Promise<any | null> {
   return null;
 }
 
+// Sandi membership per user yang diketik di player/kartu: simpan kredensialnya di
+// perangkat agar live & replay lain langsung terbuka tanpa mengetik sandi lagi.
+function rememberMembership(m: any) {
+  if (!m?.token) return;
+  void import('@/lib/membershipAccess').then(({ saveMembershipCredentials }) => {
+    saveMembershipCredentials(String(m.token), String(m.password || ''));
+  }).catch(() => undefined);
+}
+
 export async function getReplaySource(
   replayId: string,
   opts: { password?: string; accessToken?: string },
@@ -78,8 +87,10 @@ export async function getReplaySource(
     const { data, error } = await supabase.functions.invoke('get-replay-source', { body });
     if (error) {
       const errBody = await readFunctionErrorBody(error);
+      rememberMembership(errBody?.membership);
       return { data: null, reason: errBody?.reason };
     }
+    rememberMembership(data?.membership);
     if (!data?.valid) return { data: null, reason: data?.reason };
     return {
       data: {
@@ -166,8 +177,10 @@ export async function verifyPasswordDetailed(
     });
     if (error) {
       const body = await readFunctionErrorBody(error);
+      rememberMembership(body?.membership);
       return { valid: false, reason: body?.reason, seconds_remaining: body?.seconds_remaining };
     }
+    rememberMembership(data?.membership);
     return { valid: data?.valid === true, reason: data?.reason };
   } catch {
     return { valid: false };

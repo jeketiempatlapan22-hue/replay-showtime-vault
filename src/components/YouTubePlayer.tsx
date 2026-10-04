@@ -16,6 +16,7 @@ import EmbedPlayer from '@/components/EmbedPlayer';
 import DeviceResetButton from '@/components/DeviceResetButton';
 import { prefetchM3U8, prefetchYouTube, prefetchCloudflare } from '@/lib/prefetch';
 import { useAutoHideOnInteraction } from '@/hooks/useAutoHideOnInteraction';
+import { readMembershipCredentials } from '@/lib/membershipAccess';
 import { getReplayPurchase, getAllShowPurchases } from '@/lib/purchases';
 import { castMediaDetailed, isGoogleCastCapable } from '@/lib/cast';
 
@@ -113,6 +114,8 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
       const bought = getReplayPurchase(replay.id);
       pushToken(bought?.token);
       if (!password && bought?.password) password = bought.password;
+      // Membership tersimpan di perangkat (link/sandi member pernah dipakai) → langsung buka.
+      pushToken(readMembershipCredentials()?.token);
       const url = new URL(window.location.href);
       pushToken(url.searchParams.get('token'));
     } catch { /* ignore */ }

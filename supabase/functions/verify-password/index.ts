@@ -1,6 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { bundlePasswordValidForReplay } from "../_shared/bundle.ts";
-import { membershipPasswordOk } from "../_shared/membership-password.ts";
+import { findMembershipByPassword, membershipPasswordOk, membershipReplayPasswordOk } from "../_shared/membership-password.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -62,7 +62,6 @@ Deno.serve(async (req) => {
       if (!t.includes_replays) return json({ valid: false, reason: "scope" });
       const now = Date.now();
       if (t.expires_at && new Date(t.expires_at).getTime() < now) return json({ valid: false, reason: "expired" });
-      if (t.starts_at && new Date(t.starts_at).getTime() > now) return json({ valid: false, reason: "not_started" });
       const bind = await bindMembershipDevice(supabase, t, browser_id);
       if (!bind.ok) return json({ valid: false, reason: bind.reason });
       return json({
@@ -89,18 +88,25 @@ Deno.serve(async (req) => {
       return json({ valid: true, via: 'bundle' });
     }
 
-    // Sandi membership per user: tetap berlaku 1 tahun untuk replay dalam periode membership,
+    // Sandi membership per user (lama & baru): berlaku untuk replay dalam periode membership,
     // walau link token sudah terhapus karena kadaluarsa.
-    if (replay.date) {
-      const rd = new Date(`${replay.date}T12:00:00+07:00`);
-      const { data: mp } = await supabase.from("membership_replay_passwords")
-        .select("id").eq("password", String(password).trim())
-        .gt("valid_until", new Date().toISOString())
-        .lte("starts_at", new Date(rd.getTime() + 86400000).toISOString())
-        .gte("membership_expires_at", rd.toISOString()).limit(1).maybeSingle();
-      if (mp) {
+    {
+      const mt = await findMembershipByPassword(supabase, password);
+      const cred = mt ? { token: String(mt.token), password: String(password).trim().toUpperCase() } : null;
+      let ok = await membershipReplayPasswordOk(supabase, password, replay.date);
+      if (!ok && mt && mt.includes_replays && replay.date) {
+        const rt = new Date(`${replay.date}T12:00:00+07:00`).getTime();
+        const st = mt.starts_at ? new Date(mt.starts_at).getTime() - 86400000 : 0;
+        const et = mt.expires_at ? new Date(mt.expires_at).getTime() + 86400000 : Number.POSITIVE_INFINITY;
+        ok = rt >= st && rt <= et;
+      }
+      if (ok) {
         await supabase.rpc('record_login_attempt', { _identifier: lockId, _success: true });
-        return json({ valid: true, via: 'membership_password' });
+        return json({ valid: true, via: 'membership_password', ...(cred ? { membership: cred } : {}) });
+      }
+      if (cred) {
+        await supabase.rpc('record_login_attempt', { _identifier: lockId, _success: true });
+        return json({ valid: false, reason: 'outside_membership_period', membership: cred });
       }
     }
 

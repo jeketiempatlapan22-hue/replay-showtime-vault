@@ -1,3 +1,4 @@
+import { saveMembershipCredentials } from '@/lib/membershipAccess';
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Lock, Loader2, ShoppingBag, MessageCircle } from 'lucide-react';
@@ -69,6 +70,14 @@ export default function Kunci() {
       const { data } = await supabase.functions.invoke('unlock-live', {
         body: { password: pwInput.trim(), browser_id: getBrowserId(), show_id: showId || undefined },
       });
+      if (data?.membership_token) {
+        // Sandi membership: simpan di perangkat lalu buka live lewat jalur membership.
+        saveMembershipCredentials(String(data.membership_token), String(data.membership_password || ''));
+        const params = new URLSearchParams({ mtoken: String(data.membership_token), mp: String(data.membership_password || '') });
+        setSubmitting(false);
+        navigate(`/live?${params.toString()}`, { replace: true });
+        return;
+      }
       if (data?.valid) {
         // Simpan grant & idn_show_id agar pemutar Hanabira/IDN (yang membutuhkan
         // signed grant) langsung siap di /live tanpa "Sesi akses belum siap".
