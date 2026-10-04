@@ -315,7 +315,7 @@ export default function ActiveShowCard({ show, index = 0 }: { show: ActiveShow; 
           ) : purchasedToken ? (
             !isLiveNow && (
               <Button className="w-full gap-2" variant="secondary" onClick={goLive}>
-                <Play className="w-4 h-4" /> Tonton Show
+                <Radio className="w-4 h-4" /> Tonton Live
               </Button>
             )
           ) : showBuyable ? (
