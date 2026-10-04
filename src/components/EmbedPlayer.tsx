@@ -1111,6 +1111,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
       onContextMenu={(e) => e.preventDefault()}
       onMouseMove={resetHideTimer}
       onTouchStart={resetHideTimer}
+      onTouchMove={resetHideTimer}
     >
       {!inView ? (
         <div className="absolute inset-0 bg-muted/20 animate-pulse" aria-hidden />
