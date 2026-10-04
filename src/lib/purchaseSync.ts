@@ -5,6 +5,48 @@ import { getShowPurchase, setShowPurchase, getReplayPurchase, setReplayPurchase 
 
 let lastRun = 0;
 
+// Pesanan QRIS yang belum terkonfirmasi di perangkat ini. Dicek ulang ke Pakasir
+// (lewat server) setiap sinkronisasi agar pembayaran tidak terlewat walau dialog ditutup.
+const PENDING_KEY = 'replaytime-pending-orders';
+interface PendingOrder { id: string; kind: string; showId: string | null; replayId: string | null; at: number }
+
+function readPending(): PendingOrder[] {
+  try { const v = JSON.parse(localStorage.getItem(PENDING_KEY) || '[]'); return Array.isArray(v) ? v : []; } catch { return []; }
+}
+function writePending(list: PendingOrder[]) {
+  try { localStorage.setItem(PENDING_KEY, JSON.stringify(list.slice(-20))); } catch { /* ignore */ }
+}
+export function rememberPendingOrder(id: string, o: { kind: string; showId: string | null; replayId: string | null }) {
+  if (!id) return;
+  writePending([...readPending().filter((p) => p.id !== id), { id, ...o, at: Date.now() }]);
+}
+
+async function checkPendingOrders(): Promise<boolean> {
+  const cutoff = Date.now() - 2 * 24 * 3600_000;
+  const list = readPending().filter((p) => p.at > cutoff);
+  const keep: PendingOrder[] = [];
+  let changed = false;
+  for (const p of list) {
+    try {
+      const { data } = await supabase.functions.invoke('check-pakasir-status', { body: { order_id: p.id } });
+      const c = data as any;
+      if (c?.status === 'paid' && c?.access_token) {
+        if (p.kind === 'replay_only' && p.replayId) setReplayPurchase(p.replayId, { token: c.access_token, paidAt: Date.now() });
+        else if (p.showId) {
+          setShowPurchase(p.showId, { token: c.access_token, kind: p.kind === 'replay' ? 'replay' : 'show', paidAt: Date.now() });
+          if (p.replayId) setReplayPurchase(p.replayId, { token: c.access_token, paidAt: Date.now() });
+        }
+        changed = true;
+        continue;
+      }
+      if (['expired', 'canceled', 'cancelled', 'failed'].includes(String(c?.status || ''))) continue;
+    } catch { /* coba lagi nanti */ }
+    keep.push(p);
+  }
+  writePending(keep);
+  return changed;
+}
+
 /** Nomor WhatsApp terakhir yang dipakai membeli (dipakai untuk user anon). */
 export function getSyncPhone(): string {
   const keys = ['replaytime-phone', 'replaytime-last-phone', 'replaytime-wa'];
@@ -29,10 +71,11 @@ export async function syncPurchases(force = false): Promise<void> {
   lastRun = now;
 
   const phone = getSyncPhone();
+  const pendingChanged = await checkPendingOrders();
 
   const { data: sessionData } = await supabase.auth.getSession();
   const hasSession = !!sessionData?.session;
-  if (!hasSession && !phone) return;
+  if (!hasSession && !phone) { if (pendingChanged) { try { window.dispatchEvent(new Event('replaytime-purchases-updated')); } catch { /* ignore */ } } return; }
 
   try {
     const { data, error } = await supabase.functions.invoke('my-purchases', { body: { phone } });
