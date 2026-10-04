@@ -11,6 +11,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { Loader2, CheckCircle2, Copy, Smartphone, ExternalLink, MessageCircle, AlertTriangle, Coins, Lock, Upload, Play } from 'lucide-react';
 import { setShowPurchase, setReplayPurchase } from '@/lib/purchases';
+import { rememberPendingOrder } from '@/lib/purchaseSync';
 import MembershipProofUpload from '@/components/MembershipProofUpload';
 import { adminWaNumber } from '@/lib/adminWa';
 import AccessInfoCard from '@/components/AccessInfoCard';
@@ -255,6 +256,7 @@ export default function BuyShowDialog({ open, onOpenChange, showId = '', showTit
       const r = data as any;
       if (!r?.ok) throw new Error(r?.error || 'Gagal membuat order');
       setOrderId(r.order_id);
+      rememberPendingOrder(r.order_id, { kind, showId: showId || null, replayId: replayId || null });
       setPakasirOrderId(r.pakasir_order_id);
       setQrUrl(r.qr_url || '');
       setQrString(r.qr_string || '');

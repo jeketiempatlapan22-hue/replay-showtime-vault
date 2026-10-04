@@ -10,7 +10,7 @@ import HlsPlayer from '@/components/HlsPlayer';
 import EmbedPlayer from '@/components/EmbedPlayer';
 import { type ActiveShow, getShowDateTime } from '@/lib/activeShows';
 import { useNavigate } from 'react-router-dom';
-import { getShowPurchase, setShowPurchase } from '@/lib/purchases';
+import { getShowPurchase, setShowPurchase, getReplayPurchase, setReplayPurchase } from '@/lib/purchases';
 import { MEMBERSHIP_UPDATED_EVENT, readMembershipCredentials } from '@/lib/membershipAccess';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -87,6 +87,10 @@ export default function ActiveShowCard({ show, index = 0 }: { show: ActiveShow; 
         const purchase = getShowPurchase(show.id);
         const membership = readMembershipCredentials();
         setPurchasedToken(purchase?.token || '');
+        // Show sudah jadi replay: token show juga membuka replay-nya.
+        if (purchase?.token && show.replay_id && !getReplayPurchase(show.replay_id)) {
+          setReplayPurchase(show.replay_id, { token: purchase.token, paidAt: Date.now() });
+        }
         setMembershipToken(membership?.token || '');
         setMembershipPassword(membership?.password || '');
         setHasAccess(sess || !!purchase?.token || !!membership?.token);
@@ -103,7 +107,7 @@ export default function ActiveShowCard({ show, index = 0 }: { show: ActiveShow; 
       window.removeEventListener('replaytime-purchases-updated', refresh);
       window.removeEventListener(MEMBERSHIP_UPDATED_EVENT, refresh);
     };
-  }, [show.id]);
+  }, [show.id, show.replay_id]);
 
   // Cross-device sync: if user is logged in, fetch their paid orders for this show
   useEffect(() => {
@@ -270,7 +274,7 @@ export default function ActiveShowCard({ show, index = 0 }: { show: ActiveShow; 
 
         {/* Action buttons */}
         <div className="pt-2 space-y-2">
-          {isLiveNow && (
+          {isLiveNow && !(replayMode && (purchasedToken || membershipToken)) && (
             hasAccess ? (
               <Button className="w-full gap-2 bg-red-600 hover:bg-red-700 text-white" onClick={goLive}>
                 <Radio className="w-4 h-4" /> Tonton Live
