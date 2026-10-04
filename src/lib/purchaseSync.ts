@@ -30,6 +30,12 @@ async function checkPendingOrders(): Promise<boolean> {
     try {
       const { data } = await supabase.functions.invoke('check-pakasir-status', { body: { order_id: p.id } });
       const c = data as any;
+      if (c?.status === 'paid' && p.kind === 'coin_topup') {
+        // Server sudah mengkredit koin saat cek status; cukup beri tahu halaman.
+        try { window.dispatchEvent(new Event('replaytime-coins-updated')); } catch { /* ignore */ }
+        changed = true;
+        continue;
+      }
       if (c?.status === 'paid' && c?.access_token) {
         if (p.kind === 'replay_only' && p.replayId) setReplayPurchase(p.replayId, { token: c.access_token, paidAt: Date.now() });
         else if (p.showId) {
