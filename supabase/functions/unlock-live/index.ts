@@ -1,6 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { GRANT_TTL_FREE, signGrant } from "../_shared/stream-grant.ts";
-import { membershipPasswordOk } from "../_shared/membership-password.ts";
+import { findMembershipByPassword, membershipPasswordOk } from "../_shared/membership-password.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -75,7 +75,9 @@ async function verifyMembership(supabase: any, mtoken: string, mpassword: string
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   try {
-    const { token, password, browser_id, show_id, mtoken, mpassword, silent, admin_monitor } = await req.json().catch(() => ({} as any));
+    const body = await req.json().catch(() => ({} as any));
+    const { token, password, browser_id, show_id, silent, admin_monitor } = body;
+    let { mtoken, mpassword } = body;
     const isSilent = silent === true;
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -88,12 +90,23 @@ Deno.serve(async (req) => {
       if (blk) return json({ valid: false, reason: "blocked" });
     }
 
+    // Sandi membership per user diketik langsung (tanpa link): ubah jadi jalur token membership.
+    let memberCred: { membership_token: string; membership_password: string } | null = null;
+    if (!mtoken && !token && password && admin_monitor !== true) {
+      const mt = await findMembershipByPassword(supabase, String(password));
+      if (mt) {
+        mtoken = String(mt.token);
+        mpassword = String(password).trim().toUpperCase();
+        memberCred = { membership_token: mtoken, membership_password: mpassword };
+      }
+    }
+
     // ===== Priority: Membership token verification (works regardless of whether a live show is currently running) =====
     // This ensures every membership link (admin/reseller/QRIS/coin) is accepted as long as the token itself is valid.
     if (mtoken) {
       const r = await verifyMembership(supabase, mtoken, mpassword || "", browser_id || "", isSilent);
       if (!r.ok) {
-        return json({ valid: false, reason: r.reason, pause_message: (r as any).pause_message, package_name: (r as any).package_name });
+        return json({ valid: false, reason: r.reason, pause_message: (r as any).pause_message, package_name: (r as any).package_name, ...(memberCred || {}) });
       }
       // Try to enrich with the currently-live show; otherwise fall back to nearest upcoming/active show; otherwise legacy live_config_private.
       let payload: any = null;
@@ -157,7 +170,7 @@ Deno.serve(async (req) => {
         kind: "membership",
         tid: String(r.token?.id || ""),
       });
-      return json({ ...payload, grant: mGrant, watermark: `MB-${String(mtoken).slice(-4).toUpperCase()}`, membership: membershipInfo(r.token), soft: r.soft });
+      return json({ ...payload, ...(memberCred || {}), grant: mGrant, watermark: `MB-${String(mtoken).slice(-4).toUpperCase()}`, membership: membershipInfo(r.token), soft: r.soft });
     }
 
 

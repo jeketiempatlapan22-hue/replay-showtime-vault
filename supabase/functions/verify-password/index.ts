@@ -62,7 +62,6 @@ Deno.serve(async (req) => {
       if (!t.includes_replays) return json({ valid: false, reason: "scope" });
       const now = Date.now();
       if (t.expires_at && new Date(t.expires_at).getTime() < now) return json({ valid: false, reason: "expired" });
-      if (t.starts_at && new Date(t.starts_at).getTime() > now) return json({ valid: false, reason: "not_started" });
       const bind = await bindMembershipDevice(supabase, t, browser_id);
       if (!bind.ok) return json({ valid: false, reason: bind.reason });
       return json({
