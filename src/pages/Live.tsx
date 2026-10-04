@@ -305,6 +305,17 @@ function LiveInner() {
       const { data } = await supabase.functions.invoke('unlock-live', {
         body: { ...opts, browser_id: getBrowserId(), show_id: showId || undefined, silent },
       });
+      // Sandi membership per user diketik langsung: simpan & pindah ke jalur link membership
+      // agar perangkat ini selalu otomatis masuk live/replay tanpa sandi lagi.
+      if (!opts.mtoken && data?.membership_token) {
+        saveMembershipCredentials(String(data.membership_token), String(data.membership_password || ''));
+        const params = new URLSearchParams();
+        params.set('mtoken', String(data.membership_token));
+        params.set('mp', String(data.membership_password || ''));
+        if (!silent) setSubmitting(false);
+        navigate(`/live?${params.toString()}`, { replace: true });
+        return;
+      }
       if (data?.valid) {
         // Membership selalu mengikuti show live terbaru yang di-resolve server.
         // Link lama dari admin/reseller bisa masih membawa ?show= milik show lama;
