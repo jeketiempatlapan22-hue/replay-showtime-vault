@@ -13,6 +13,7 @@ import {
 import { toast } from '@/hooks/use-toast';
 import { Copy, LogOut, RefreshCw, Search, Loader2, Radio, Film, Link2, Crown, Wallet, QrCode, KeyRound, Ban, ShieldOff, Trash2, Pencil, Check, RotateCcw } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
+import { getShowBundle, type ShowBundle } from '@/lib/bundle';
 
 type Session = { phone: string; pin: string; label: string };
 type ShowRow = { id: string; title: string; show_date: string; show_time: string; image_url: string; category: string; is_live: boolean; is_active: boolean };
@@ -645,6 +646,7 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
   const [creatingId, setCreatingId] = useState<string | null>(null);
   const [result, setResult] = useState<{ link: string; message: string; title: string; extra?: string; kind: 'show' | 'replay' | 'membership'; targetId: string; targetTitle: string; regenerate?: () => Promise<{ link: string; message: string; extra?: string } | null> } | null>(null);
   const [statsMap, setStatsMap] = useState<Map<string, number>>(new Map());
+  const [bundle, setBundle] = useState<ShowBundle | null>(null);
 
   const loadStats = async () => {
     const { data } = await supabase.rpc('reseller_copy_stats', { _phone: session.phone, _pin: session.pin });
@@ -673,7 +675,7 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
     setLoadingR(false);
   };
 
-  useEffect(() => { loadShows(); loadStats(); /* eslint-disable-next-line */ }, []);
+  useEffect(() => { loadShows(); loadStats(); void getShowBundle().then(setBundle); /* eslint-disable-next-line */ }, []);
   useEffect(() => { loadReplays(); /* eslint-disable-next-line */ }, [page]);
 
   // Optimistically bump counter, lalu sync server.
@@ -687,7 +689,7 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
     await logCopy(session, kind, targetId, targetTitle);
   };
 
-  const requestToken = async (kind: 'show' | 'replay', id: string) => {
+  const requestToken = async (kind: 'show' | 'replay' | 'bundle', id: string) => {
     const { data, error } = await supabase.functions.invoke('reseller-create-token', {
       body: { phone: session.phone, pin: session.pin, kind, target_id: id },
     });
@@ -737,6 +739,28 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
     }
   };
 
+  const createBundle = async () => {
+    if (!bundle) return;
+    setCreatingId(bundle.id);
+    try {
+      const d = await requestToken('bundle', bundle.id);
+      try { await navigator.clipboard.writeText(d.message); } catch { /* ignore */ }
+      const title = `🎁 Bundel • ${d.title || bundle.name}`;
+      await bumpStats('show', bundle.id, title);
+      setResult({
+        link: d.link, message: d.message, title, extra: `Semua show bundel · 1 device per show · Sandi replay sama seperti pembelian bundel`,
+        kind: 'show', targetId: bundle.id, targetTitle: title,
+        regenerate: async () => {
+          try { const n = await requestToken('bundle', bundle.id); return { link: n.link, message: n.message }; }
+          catch (e) { toast({ title: 'Gagal membuat link baru', description: e instanceof Error ? e.message : 'gagal', variant: 'destructive' }); return null; }
+        },
+      });
+    } catch (err) {
+      const m = err instanceof Error ? err.message : 'gagal';
+      toast({ title: 'Gagal membuat link bundel', description: m === 'bundle_inactive' ? 'Bundel sedang tidak dijual' : m, variant: 'destructive' });
+    } finally { setCreatingId(null); }
+  };
+
   const currentCount = result ? (statsMap.get(`${result.kind}:${result.targetId}`) ?? 0) : 0;
 
   return (
@@ -769,6 +793,15 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
                 <RefreshCw className={`w-4 h-4 mr-1 ${loadingS ? 'animate-spin' : ''}`} />Muat ulang
               </Button>
             </div>
+            {bundle?.is_active && bundle.show_count > 0 && (
+              <div className="rounded-lg border border-primary/40 bg-primary/5 p-3 space-y-2">
+                <p className="font-semibold text-sm">🎁 {bundle.name}</p>
+                <p className="text-xs text-muted-foreground">{bundle.show_count} show · 1 link untuk semua show + sandi replay bundel</p>
+                <Button size="sm" className="w-full" disabled={creatingId === bundle.id} onClick={createBundle}>
+                  {creatingId === bundle.id ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Link2 className="w-4 h-4 mr-1" />}Buat Link Bundel
+                </Button>
+              </div>
+            )}
             <p className="text-[11px] text-muted-foreground italic">
               ⏳ Token show berlaku sampai akhir jadwal show (jadwal + 8 jam) & terkunci ke show tersebut.
             </p>
