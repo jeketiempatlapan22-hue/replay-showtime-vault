@@ -1,4 +1,5 @@
 // Admin: buat link token BARU (show / replay / membership 1-2 bulan). Tidak pernah menyalin token lama.
+import { createBundleLink } from '../_shared/bundle.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { genShortPassword } from '../_shared/membership-password.ts';
 
@@ -34,7 +35,7 @@ Deno.serve(async (req) => {
 
   let body: any = {};
   try { body = await req.json(); } catch { return json({ error: 'bad_json' }, 400); }
-  const kind = ['show', 'replay', 'membership'].includes(body.kind) ? body.kind : null;
+  const kind = ['show', 'replay', 'membership', 'bundle'].includes(body.kind) ? body.kind : null;
   const targetId = String(body.target_id || '');
   const label = String(body.label || '').slice(0, 80) || 'admin';
   if (!kind) return json({ error: 'missing_fields' }, 400);
@@ -42,6 +43,13 @@ Deno.serve(async (req) => {
   const { data: settings } = await admin.from('site_settings').select('key,value').in('key', ['site_origin']);
   const origin = String(settings?.[0]?.value || 'https://realtime48stream.my.id').replace(/\/+$/, '');
   const siteOnly = origin.replace(/^https?:\/\//, '');
+
+  if (kind === 'bundle') {
+    const r = await createBundleLink(admin, { label: `admin:${label}`, origin });
+    if (!('ok' in r)) return json({ error: r.error }, 400);
+    await admin.from('token_deliveries').insert({ phone: '', replay_id: null, replay_title: `Bundel • ${r.title}`, access_token: r.token, link: r.link, source: 'admin', requested_by: 'admin' });
+    return json({ ok: true, token: r.token, password: r.password, link: r.link, message: r.message, title: r.title, expires_at: null });
+  }
 
   if (kind === 'membership') {
     const days = body.days === 62 ? 62 : 31;
