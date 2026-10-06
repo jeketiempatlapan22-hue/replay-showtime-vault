@@ -39,7 +39,19 @@ const db = supabase as any;
 const toLocal = (iso: string) => { const d = new Date(iso); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 16); };
 const blank = (): Round => ({ title: '', description: '', game_type: 'quiz', prize_seconds: 20, starts_at: new Date().toISOString(), ends_at: new Date(Date.now() + 86400000).toISOString(), is_published: false,
   prizes: [{ kind: 'coins', coins: 3, weight: 5 }, { kind: 'show', weight: 2 }, { kind: 'bundle', weight: 1 }] });
-const parseChoices = (q: Q) => q.choices.split('|').map((s) => s.trim()).filter(Boolean).slice(0, 6);
+// Pilihan A/B/C selalu dipastikan memuat jawaban benar (perbaikan otomatis, tanpa membuat admin gagal simpan).
+const parseChoices = (q: Q) => {
+  const raw = q.choices.split('|').map((s) => s.trim()).filter(Boolean);
+  const ans = q.answer.trim();
+  if (!raw.length || !ans) return raw.slice(0, 6);
+  const low = (s: string) => s.toLowerCase().replace(/\s+/g, ' ');
+  const alts = [ans, ...q.alt_answers.split(',').map((s) => s.trim()).filter(Boolean)].map(low);
+  let idx = raw.findIndex((c) => alts.includes(low(c)));
+  if (idx < 0) idx = raw.findIndex((c) => low(c).includes(low(ans)) || low(ans).includes(low(c)));
+  const out = [...raw];
+  if (idx >= 0) out[idx] = ans; else out.splice(Math.min(out.length, 2), out.length >= 3 ? 1 : 0, ans);
+  return Array.from(new Set(out)).slice(0, 6);
+};
 const blankQ = (): Q => ({ prompt: '', image_url: '', answer: '', alt_answers: '', choices: '', reveal_image_url: '' });
 
 export default function GameAdmin() {

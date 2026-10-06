@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createBundleLink } from '../_shared/bundle.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -46,9 +47,9 @@ Deno.serve(async (req) => {
 
   const phone = normalizePhone(body.phone || '');
   const pin = String(body.pin || '').trim();
-  const kind = body.kind === 'show' ? 'show' : body.kind === 'replay' ? 'replay' : null;
+  const kind = body.kind === 'show' ? 'show' : body.kind === 'replay' ? 'replay' : body.kind === 'bundle' ? 'bundle' : null;
   const targetId = String(body.target_id || '');
-  if (!phone || !pin || !kind || !targetId) return json({ error: 'missing_fields' }, 400);
+  if (!phone || !pin || !kind || (!targetId && kind !== 'bundle')) return json({ error: 'missing_fields' }, 400);
 
   // Verifikasi reseller setiap request
   const { data: vrows } = await admin.rpc('reseller_verify', { _phone: phone, _pin: pin });
@@ -69,6 +70,21 @@ Deno.serve(async (req) => {
   const fmtId = (d: Date) => d.toLocaleString('id-ID', {
     day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta',
   });
+
+  if (kind === 'bundle') {
+    const r = await createBundleLink(admin, { label: `reseller:${phone}`, origin });
+    if (!('ok' in r)) return json({ error: r.error }, 400);
+    await admin.from('token_deliveries').insert({
+      phone, replay_id: null, replay_title: `Bundel • ${r.title}`, access_token: r.token, link: r.link,
+      source: 'bot', requested_by: phone,
+    });
+    await admin.from('reseller_audit_log').insert({
+      reseller_phone: phone, reseller_label: resellerLabel,
+      kind: 'show', target_id: null, target_title: `🎁 Bundel • ${r.title}`,
+      token: r.token, expires_at: null, meta: { bundle: true, show_ids: r.show_ids },
+    });
+    return json({ ok: true, token: r.token, link: r.link, message: r.message, title: r.title, expires_at: null });
+  }
 
   if (kind === 'replay') {
     const { data: r } = await admin.from('replays').select('id,title,date,password').eq('id', targetId).maybeSingle();

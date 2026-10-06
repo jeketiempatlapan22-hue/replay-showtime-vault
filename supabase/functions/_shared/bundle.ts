@@ -190,15 +190,25 @@ export async function bundlePasswordValidForReplay(
   const { data: pw } = await admin
     .from('show_bundle_passwords')
     .select('bundle_id')
-    .eq('password', password)
+    .ilike('password', String(password).trim())
     .limit(1)
     .maybeSingle();
-  if (!pw) return false;
 
   const { data: shows } = await admin
     .from('active_shows').select('id').eq('replay_id', replayId);
   const ids = (shows || []).map((s: any) => String(s.id));
   if (!ids.length) return false;
+
+  // Snapshot pembeli: sandi pada token bundel yang memuat show ini tetap berlaku
+  // walau show kemudian dikeluarkan dari bundel.
+  const { data: tk } = await admin
+    .from('show_bundle_tokens')
+    .select('id')
+    .ilike('password', String(password).trim())
+    .overlaps('show_ids', ids)
+    .limit(1);
+  if (tk?.length) return true;
+  if (!pw) return false;
 
   const { data: item } = await admin
     .from('show_bundle_items')
@@ -209,4 +219,28 @@ export async function bundlePasswordValidForReplay(
     .limit(1)
     .maybeSingle();
   return !!item;
+}
+
+/** Buat link bundel untuk reseller/admin (aturan sandi sama seperti pembelian di website). */
+export async function createBundleLink(admin: any, opts: { label: string; origin: string }) {
+  const bundle = await getBundle(admin);
+  if (!bundle) return { error: 'bundle_not_found' as const };
+  if (!bundle.is_active) return { error: 'bundle_inactive' as const };
+  if (!bundle.show_ids.length) return { error: 'bundle_empty' as const };
+  const issued = await issueBundleToken(admin, { label: opts.label });
+  if (!issued) return { error: 'create_failed' as const };
+  const siteOnly = opts.origin.replace(/^https?:\/\//, '');
+  const link = `${opts.origin}/shows?bt=${issued.token}`;
+  const { data: shows } = await admin.from('active_shows')
+    .select('id,title,show_date,show_time').in('id', issued.show_ids)
+    .order('show_date').order('show_time');
+  const list = (shows || []).map((s: any) => `• ${s.title} (${s.show_date} ${String(s.show_time).slice(0, 5)})`);
+  const message = [
+    '🎁 *BUNDEL SHOW*', '', `📦 *${bundle.name}*`, `🎤 ${list.length} show:`, ...list, '',
+    '🔗 *Link Live:*', link, '',
+    '🎬 *Link Replay:*', siteOnly, '',
+    `🔐 Sandi Replay: *${issued.password}*`, '',
+    '👤 Hanya untuk *1 perangkat pertama* per show.', '', '— *ReplayTime* 💖',
+  ].join('\n');
+  return { ok: true as const, token: issued.token, password: issued.password, link, message, title: bundle.name, show_ids: issued.show_ids };
 }

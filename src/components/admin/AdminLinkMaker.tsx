@@ -3,7 +3,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from '@/hooks/use-toast';
-import { Copy, Link2 } from 'lucide-react';
+import { Copy, Gift, Link2 } from 'lucide-react';
+import { getShowBundle, type ShowBundle } from '@/lib/bundle';
 
 type Item = { id: string; title: string; sub: string };
 type Result = { title: string; link: string; message: string; password?: string };
@@ -15,8 +16,10 @@ export default function AdminLinkMaker() {
   const [label, setLabel] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
   const [results, setResults] = useState<Result[]>([]);
+  const [bundle, setBundle] = useState<ShowBundle | null>(null);
 
   useEffect(() => {
+    void getShowBundle().then(setBundle);
     supabase.from('active_shows').select('id,title,show_date,show_time').eq('is_active', true)
       .order('show_date', { ascending: false }).then(({ data }) =>
         setShows((data ?? []).map((s) => ({ id: s.id, title: s.title, sub: `${s.show_date} ${String(s.show_time).slice(0, 5)}` }))));
@@ -74,6 +77,12 @@ export default function AdminLinkMaker() {
           <Button disabled={!!busy} onClick={() => create('membership', undefined, 31)}>Membership 1 Bulan (31 hari)</Button>
           <Button disabled={!!busy} onClick={() => create('membership', undefined, 62)}>Membership 2 Bulan (62 hari)</Button>
         </div>
+      </section>
+      <section className="space-y-2">
+        <h3 className="font-semibold">Bundel Show</h3>
+        {bundle?.is_active && bundle.show_count > 0 ? (
+          <Button disabled={!!busy} onClick={() => create('bundle', bundle.id)}><Gift className="w-4 h-4 mr-1" />{busy === `bundle-${bundle.id}` ? '...' : `Buat Link ${bundle.name} (${bundle.show_count} show)`}</Button>
+        ) : <p className="text-xs text-muted-foreground">Bundel belum aktif. Aktifkan di menu Bundel Show.</p>}
       </section>
       <section className="space-y-2">
         <h3 className="font-semibold">Show</h3>
