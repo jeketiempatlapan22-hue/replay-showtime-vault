@@ -670,39 +670,6 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
     return () => window.removeEventListener('keydown', onKey);
   }, [pseudoFs]);
 
-  // Suara otomatis: bila user sudah pernah menyalakan suara di sesi ini, coba
-  // unmute sendiri saat player siap. Kalau browser menolak (kebijakan autoplay),
-  // player tetap berjalan bisu dan petunjuk tap ditampilkan kembali.
-  useEffect(() => {
-    if (type === 'youtube') return;
-    let wanted = false;
-    try { wanted = sessionStorage.getItem(SOUND_ON_KEY) === '1'; } catch { /* ignore */ }
-    if (!wanted || userUnmutedRef.current) return;
-
-    const vol = volumeRef.current > 0 ? volumeRef.current : 1;
-    const t = setTimeout(() => {
-      const p = ytPlayerRef.current;
-      try {
-        p?.setVolume?.(Math.round(vol * 100));
-        p?.unMute?.();
-      } catch { /* ignore */ }
-      // Verifikasi: hanya anggap berhasil bila player benar-benar tidak bisu.
-      setTimeout(() => {
-        let stillMuted = true;
-        try { stillMuted = ytPlayerRef.current?.isMuted?.() ?? true; } catch { /* ignore */ }
-        if (stillMuted) return;
-        userUnmutedRef.current = true;
-        mutedRef.current = false;
-        volumeRef.current = vol;
-        setMuted(false);
-        setVolume(vol);
-        setShowHint(false);
-      }, 400);
-    }, 600);
-    return () => clearTimeout(t);
-  }, [type, ready, ytId, plainMode]);
-
-
   // Poll YT time/duration — berhenti sementara hanya selama jari benar-benar
   // menahan timeline. Global pointer/touch end memastikan status selalu pulih.
   // membuat polling tertimbun antrian ketika tab kembali aktif.
