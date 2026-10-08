@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import EmbedPlayer from './EmbedPlayer';
 
@@ -37,13 +37,15 @@ describe('native YouTube controls', () => {
     expect(config.host).toBe('https://www.youtube-nocookie.com');
     expect(config.playerVars).toMatchObject({ controls: 1, fs: 1, disablekb: 0, playsinline: 1, iv_load_policy: 3 });
     fireEvent(window, new Event('focus'));
-    config.events.onReady();
-    config.events.onStateChange({ data: 2 });
+    act(() => {
+      config.events.onReady();
+      config.events.onStateChange({ data: 2 });
+    });
     await waitFor(() => {
       expect(view.queryByRole('button', { name: 'Putar' })).not.toBeInTheDocument();
       expect(view.queryByText('🔊 Tap untuk aktifkan suara')).not.toBeInTheDocument();
     });
-    expect(view.container.querySelector('[data-player-root] .absolute.inset-x-0.bottom-0')).toHaveClass('hidden');
+    expect(view.container.querySelector('[data-player-root] .absolute.inset-x-0.bottom-0')).toBeNull();
     const pairing = view.getByRole('button', { name: 'Hubungkan ke TV / Proyektor' });
     expect(view.container.querySelector('[data-player-root]')?.contains(pairing)).toBe(false);
     fireEvent.click(pairing);

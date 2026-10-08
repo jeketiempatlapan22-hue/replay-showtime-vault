@@ -1010,7 +1010,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
       )}
 
       {/* Controls */}
-      <div
+      {type !== 'youtube' && <div
         className={`absolute inset-x-0 bottom-0 z-10 px-2 sm:px-3 pb-2 sm:pb-3 pt-8 bg-gradient-to-t from-black/80 to-transparent transition-opacity duration-300 ${
           type === 'youtube' || plainMode ? 'hidden' : showControls || !isPlaying ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
         }`}
@@ -1140,7 +1140,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
             {isFullscreen || pseudoFs ? <Minimize className="w-5 h-5 landscape:w-6 landscape:h-6" /> : <Maximize className="w-5 h-5 landscape:w-6 landscape:h-6" />}
           </button>
         </div>
-      </div>
+      </div>}
     </div>
     {type === 'youtube' && onTvClick && (
       <div className="flex justify-end pt-2">
