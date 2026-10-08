@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { isFullscreenActive, onFullscreenChange, requestFs, exitFs, lockLandscape, neutralizeFsAncestors } from '@/lib/fullscreen';
 import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, SkipBack, SkipForward, Cast } from 'lucide-react';
 import LiveWatermark from '@/components/LiveWatermark';
+import { Button } from '@/components/ui/button';
 
 interface Props {
   type: 'youtube' | 'cloudflare';
@@ -41,11 +42,6 @@ interface YoutubePlayerApi {
   unloadModule?: (module: string) => void;
   setOption?: (module: string, option: string, value: unknown) => void;
 }
-
-// Ladder kualitas YouTube dari tertinggi ke terendah.
-// Dipakai untuk: (1) mengunci default ke resolusi tertinggi yang tersedia,
-// (2) menurunkan satu tingkat saat user mengalami buffering berulang.
-const YT_QUALITY_LADDER = ['highres', 'hd2160', 'hd1440', 'hd1080', 'hd720', 'large', 'medium', 'small', 'tiny'];
 
 interface YoutubeWindow extends Window {
   YT?: { Player: new (element: HTMLElement, options: Record<string, unknown>) => YoutubePlayerApi };
@@ -197,59 +193,6 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
   const plainModeRef = useRef(false);
 
 
-  // Adaptive quality (replay only): mulai dari tertinggi yang tersedia,
-  // turun satu tingkat hanya jika user kena buffering berulang dalam window pendek.
-  const qualityCapIdxRef = useRef(0); // 0 = tertinggi di ladder yang tersedia
-  const availableQualitiesRef = useRef<string[]>([]);
-  const bufferEventsRef = useRef<number[]>([]);
-  const lastDowngradeAtRef = useRef(0);
-
-  const applyQualityCap = useCallback(() => {
-    const p = ytPlayerRef.current;
-    if (!p?.setPlaybackQuality) return;
-    const avail = availableQualitiesRef.current;
-    // Saat daftar belum siap, tetap minta level tertinggi. YouTube akan memilih
-    // level tertinggi yang benar-benar tersedia untuk video/perangkat tersebut.
-    if (!avail.length) {
-      try { p.setPlaybackQuality('highres'); } catch { /* ignore */ }
-      return;
-    }
-    const ordered = YT_QUALITY_LADDER.filter(q => avail.includes(q));
-    if (!ordered.length) return;
-    const idx = Math.min(qualityCapIdxRef.current, ordered.length - 1);
-    const target = ordered[idx];
-    try { p.setPlaybackQuality(target); } catch { /* ignore */ }
-    // Sebagian build YT hanya menghormati setPlaybackQualityRange.
-    try {
-      (p as unknown as { setPlaybackQualityRange?: (a: string, b: string) => void })
-        .setPlaybackQualityRange?.(target, target);
-    } catch { /* ignore */ }
-  }, []);
-
-  const refreshAvailableQualities = useCallback(() => {
-    const p = ytPlayerRef.current;
-    if (!p?.getAvailableQualityLevels) return;
-    try {
-      const levels = p.getAvailableQualityLevels() || [];
-      if (levels.length) {
-        availableQualitiesRef.current = levels;
-        applyQualityCap();
-      }
-    } catch { /* ignore */ }
-  }, [applyQualityCap]);
-
-
-
-  // Matikan subtitle YouTube (captions) — dipanggil di beberapa titik karena YT
-  // kadang mereload modul caption setelah quality switch / play.
-  const disableCaptions = useCallback(() => {
-    const p = ytPlayerRef.current;
-    if (!p) return;
-    try { p.unloadModule?.('captions'); } catch { /* ignore */ }
-    try { p.unloadModule?.('cc'); } catch { /* ignore */ }
-    try { p.setOption?.('captions', 'track', {}); } catch { /* ignore */ }
-  }, []);
-
   const markReady = useCallback((value: boolean) => {
     readyRef.current = value;
     setReady(value);
@@ -283,21 +226,6 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
 
   // Saat video mulai/berlanjut, kontrol tampil sebentar lalu hilang dalam 2 detik.
   useEffect(() => { if (isPlaying) resetHideTimer(); }, [isPlaying, resetHideTimer]);
-
-  // Ketukan di atas iframe (lintas domain) tidak sampai ke container. Iframe yang
-  // menerima fokus memicu window 'blur' — pakai itu untuk memunculkan kontrol lagi,
-  // lalu kembalikan fokus agar ketukan berikutnya juga terdeteksi.
-  useEffect(() => {
-    const onBlur = () => {
-      const root = containerRef.current;
-      const active = document.activeElement;
-      if (!root || !active || active.tagName !== 'IFRAME' || !root.contains(active)) return;
-      resetHideTimer();
-      window.setTimeout(() => { try { (active as HTMLElement).blur(); window.focus(); } catch { /* ignore */ } }, 150);
-    };
-    window.addEventListener('blur', onBlur);
-    return () => window.removeEventListener('blur', onBlur);
-  }, [resetHideTimer]);
 
   const ytId = type === 'youtube' ? extractYoutubeId(source) : '';
   const cfUid = type === 'cloudflare' ? extractCloudflareUid(source) : '';
@@ -346,12 +274,6 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
     liveEndedRef.current = false;
     plainModeRef.current = false;
     setPlainMode(false);
-
-    // Reset adaptive-quality state untuk source baru.
-    qualityCapIdxRef.current = 0;
-    availableQualitiesRef.current = [];
-    bufferEventsRef.current = [];
-    lastDowngradeAtRef.current = 0;
 
     setDuration(0);
     setCurrentTime(0);
@@ -417,13 +339,12 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
           playsinline: 1,
           autoplay: 1,
           mute: 1,
-          controls: 0,
-          fs: 0,
+          controls: 1,
+          fs: 1,
           iv_load_policy: 3,
           cc_load_policy: 0,
-          vq: 'highres',
           hl: 'id',
-          disablekb: 1,
+          disablekb: 0,
           enablejsapi: 1,
           ...(safeOrigin ? { origin: safeOrigin } : {}),
         },
@@ -464,51 +385,13 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
                   if (d > 0) setDuration(d);
                 } catch { /* ignore */ }
               }, 600);
-              // Matikan subtitle di replay (jangan sentuh Live).
-              if (!isLive) {
-                disableCaptions();
-                setTimeout(disableCaptions, 1500);
-                setTimeout(disableCaptions, 4000);
-              }
-              // Coba kunci ke resolusi tertinggi (hanya untuk replay, bukan live).
-              if (!isLive) {
-                refreshAvailableQualities();
-                // Available levels sering baru terisi beberapa detik setelah ready.
-                setTimeout(refreshAvailableQualities, 1500);
-                setTimeout(refreshAvailableQualities, 4000);
-              }
             } catch { /* ignore */ }
-          },
-          onPlaybackQualityChange: () => {
-            // Re-cek list — kadang baru terisi setelah quality pertama dipilih.
-            if (!isLive) { refreshAvailableQualities(); disableCaptions(); }
           },
           onStateChange: (e: { data: number }) => {
             if (e.data === 1 || e.data === 3) markReady(true);
             setIsPlaying(e.data === 1 || e.data === 3);
-            // Setiap kali mulai PLAYING di replay, matikan captions lagi
-            // (YT kadang me-reload modul caption saat transisi).
-            if (e.data === 1 && !isLive) disableCaptions();
-            // Adaptive downgrade: state 3 = BUFFERING. Hitung kejadian buffering
-            // dalam 30 detik terakhir; jika ≥3 → turunkan 1 tingkat resolusi.
-            // Hanya berlaku untuk replay (bukan live) agar tidak ganggu Live.
-            if (e.data === 3 && !isLive) {
-              const now = Date.now();
-              const recent = bufferEventsRef.current.filter(t => now - t < 30000);
-              recent.push(now);
-              bufferEventsRef.current = recent;
-              const cooldownOk = now - lastDowngradeAtRef.current > 15000;
-              if (recent.length >= 3 && cooldownOk) {
-                const avail = availableQualitiesRef.current;
-                const ordered = YT_QUALITY_LADDER.filter(q => avail.includes(q));
-                if (ordered.length && qualityCapIdxRef.current < ordered.length - 1) {
-                  qualityCapIdxRef.current += 1;
-                  lastDowngradeAtRef.current = now;
-                  bufferEventsRef.current = [];
-                  applyQualityCap();
-                }
-              }
-            }
+            // Native pause must never be undone by an autoplay retry.
+            userPausedRef.current = e.data === 2 || e.data === 0;
           },
           onError: (e?: { data?: number }) => {
             if (cancelled) return;
@@ -539,7 +422,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
       ytPlayerRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ytId, type, inView, markReady, isLive, refreshAvailableQualities, applyQualityCap, disableCaptions]);
+  }, [ytId, type, inView, markReady, isLive]);
 
   // Cloudflare via Stream SDK postMessage (basic play/pause/volume via iframe contentWindow)
   const cfPost = (event: string, value?: number) => {
@@ -787,83 +670,6 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
     return () => window.removeEventListener('keydown', onKey);
   }, [pseudoFs]);
 
-  // Kunci resolusi (replay saja): YouTube sering menurunkan kualitas sendiri.
-  // Setiap 5 detik kita cek kualitas aktif; bila lebih rendah dari cap saat ini,
-  // paksa kembali ke cap. Cap hanya turun lewat logika buffering di onStateChange.
-  useEffect(() => {
-    if (type !== 'youtube' || isLive || !ready) return;
-    const id = setInterval(() => {
-      const p = ytPlayerRef.current;
-      if (!p) return;
-      if (!availableQualitiesRef.current.length) { refreshAvailableQualities(); return; }
-      const ordered = YT_QUALITY_LADDER.filter(q => availableQualitiesRef.current.includes(q));
-      if (!ordered.length) return;
-      const targetIdx = Math.min(qualityCapIdxRef.current, ordered.length - 1);
-      let current = '';
-      try { current = p.getPlaybackQuality?.() || ''; } catch { /* ignore */ }
-      const currentIdx = ordered.indexOf(current);
-      if (current && currentIdx > targetIdx) applyQualityCap();
-    }, 5000);
-    return () => clearInterval(id);
-  }, [type, isLive, ready, applyQualityCap, refreshAvailableQualities]);
-
-  // Autoplay guard (YouTube): sebagian browser/TV mengabaikan autoplay pertama
-  // sehingga video diam di frame awal. Setelah player siap, pastikan playback
-  // benar-benar berjalan — kecuali user memang menekan pause.
-  useEffect(() => {
-    if (type !== 'youtube' || !ready || !ytId) return;
-    let tries = 0;
-    const kick = () => {
-      if (userPausedRef.current) return;
-      let state: number | undefined;
-      try { state = ytPlayerRef.current?.getPlayerState?.(); } catch { /* ignore */ }
-      // 1 = playing, 3 = buffering (sudah jalan)
-      if (state === 1 || state === 3) { setIsPlaying(true); isPlayingRef.current = true; return; }
-      ytCommand('playVideo');
-    };
-    const id = setInterval(() => {
-      tries += 1;
-      kick();
-      if (tries >= 6) clearInterval(id);
-    }, 700);
-    kick();
-    return () => clearInterval(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [type, ready, ytId, plainMode]);
-
-  // Suara otomatis: bila user sudah pernah menyalakan suara di sesi ini, coba
-  // unmute sendiri saat player siap. Kalau browser menolak (kebijakan autoplay),
-  // player tetap berjalan bisu dan petunjuk tap ditampilkan kembali.
-  useEffect(() => {
-    if (type !== 'youtube' || !ready || !ytId || plainMode) return;
-    let wanted = false;
-    try { wanted = sessionStorage.getItem(SOUND_ON_KEY) === '1'; } catch { /* ignore */ }
-    if (!wanted || userUnmutedRef.current) return;
-
-    const vol = volumeRef.current > 0 ? volumeRef.current : 1;
-    const t = setTimeout(() => {
-      const p = ytPlayerRef.current;
-      try {
-        p?.setVolume?.(Math.round(vol * 100));
-        p?.unMute?.();
-      } catch { /* ignore */ }
-      // Verifikasi: hanya anggap berhasil bila player benar-benar tidak bisu.
-      setTimeout(() => {
-        let stillMuted = true;
-        try { stillMuted = ytPlayerRef.current?.isMuted?.() ?? true; } catch { /* ignore */ }
-        if (stillMuted) return;
-        userUnmutedRef.current = true;
-        mutedRef.current = false;
-        volumeRef.current = vol;
-        setMuted(false);
-        setVolume(vol);
-        setShowHint(false);
-      }, 400);
-    }, 600);
-    return () => clearTimeout(t);
-  }, [type, ready, ytId, plainMode]);
-
-
   // Poll YT time/duration — berhenti sementara hanya selama jari benar-benar
   // menahan timeline. Global pointer/touch end memastikan status selalu pulih.
   // membuat polling tertimbun antrian ketika tab kembali aktif.
@@ -1066,7 +872,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
       return /^https?:\/\/[^/]+$/.test(o) ? o : '';
     } catch { return ''; }
   })();
-  const ytBaseParams = 'rel=0&modestbranding=1&playsinline=1&autoplay=1&mute=1&controls=0&fs=0&iv_load_policy=3&cc_load_policy=0&hl=id&disablekb=1';
+  const ytBaseParams = 'rel=0&modestbranding=1&playsinline=1&autoplay=1&mute=1&controls=1&fs=1&iv_load_policy=3&cc_load_policy=0&hl=id&disablekb=0';
   const ytPlainParams = 'rel=0&modestbranding=1&playsinline=1&autoplay=1&mute=1&controls=1&fs=1&iv_load_policy=3&cc_load_policy=0&hl=id&enablejsapi=1';
   const ytEmbedUrl = ytId
     ? plainMode
@@ -1088,11 +894,12 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
   );
 
   return (
+    <>
     <div
       ref={containerRef}
       data-player-root
 
-      className={`relative overflow-hidden bg-black select-none ${isFullscreen || pseudoFs ? 'rounded-none' : 'rounded-xl'} ${pseudoFs ? 'fixed z-[9999]' : 'w-full'} ${pseudoFs && !rotateFs ? 'inset-0 w-screen' : ''} ${showControls || !isPlaying ? '' : 'cursor-none'}`}
+      className={`relative overflow-hidden bg-black select-none ${isFullscreen || pseudoFs ? 'rounded-none' : 'rounded-xl'} ${pseudoFs ? 'fixed z-[9999]' : 'w-full'} ${pseudoFs && !rotateFs ? 'inset-0 w-screen' : ''} ${type !== 'youtube' && !showControls && isPlaying ? 'cursor-none' : ''}`}
       style={{
         paddingBottom: isFullscreen || pseudoFs ? '0' : '56.25%',
         height: rotateFs ? '100vw' : (isFullscreen || pseudoFs ? '100dvh' : undefined),
@@ -1108,7 +915,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
       }}
 
 
-      onContextMenu={(e) => e.preventDefault()}
+      onContextMenu={type === 'youtube' ? undefined : (e) => e.preventDefault()}
       onMouseMove={resetHideTimer}
       onTouchStart={resetHideTimer}
       onTouchMove={resetHideTimer}
@@ -1170,7 +977,7 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
 
 
       {/* Tombol putar besar di tengah saat video belum berjalan. */}
-      {!plainMode && ready && !isPlaying && (
+      {type !== 'youtube' && !plainMode && ready && !isPlaying && (
         <button
           type="button"
           aria-label="Putar"
@@ -1186,14 +993,14 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
 
       {watermark && <LiveWatermark code={watermark} />}
 
-      {showSpinner && (
+      {showSpinner && type !== 'youtube' && (
         <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-black/70 backdrop-blur-sm animate-fade-in pointer-events-none">
           <div className="w-12 h-12 rounded-full border-4 border-white/20 border-t-primary animate-spin" />
           <div className="text-white/90 text-xs font-medium tracking-wide">Menghubungkan ke pemutar…</div>
         </div>
       )}
 
-      {showHint && !plainMode && (showControls || !isPlaying) && (
+      {type !== 'youtube' && showHint && !plainMode && (showControls || !isPlaying) && (
         <button
           onClick={(e) => { e.stopPropagation(); activateSound(); resetHideTimer(); }}
           className="absolute top-3 left-1/2 -translate-x-1/2 z-20 px-4 py-2 rounded-full bg-primary text-primary-foreground text-xs font-semibold shadow-lg animate-fade-in"
@@ -1202,22 +1009,10 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
         </button>
       )}
 
-      {soundStuck && type === 'youtube' && !liveActive && (ytId || altYoutubeId) && (
-        <a
-          href={`https://www.youtube.com/watch?v=${extractYoutubeId(altYoutubeId) || altYoutubeId || ytId}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={(e) => e.stopPropagation()}
-          className="absolute top-3 left-1/2 -translate-x-1/2 z-30 px-4 py-2 rounded-full bg-red-600 text-white text-xs font-semibold shadow-lg animate-fade-in"
-        >
-          ▶ Video terjeda? Tonton di YouTube
-        </a>
-      )}
-
       {/* Controls */}
-      <div
+      {Boolean(type !== 'youtube') && <div
         className={`absolute inset-x-0 bottom-0 z-10 px-2 sm:px-3 pb-2 sm:pb-3 pt-8 bg-gradient-to-t from-black/80 to-transparent transition-opacity duration-300 ${
-          plainMode ? 'hidden' : showControls || !isPlaying ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+          type === 'youtube' || plainMode ? 'hidden' : showControls || !isPlaying ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
         }`}
 
         style={{ touchAction: 'manipulation' }}
@@ -1345,7 +1140,15 @@ export default function EmbedPlayer({ type, source, title, watermark, hideSeekBu
             {isFullscreen || pseudoFs ? <Minimize className="w-5 h-5 landscape:w-6 landscape:h-6" /> : <Maximize className="w-5 h-5 landscape:w-6 landscape:h-6" />}
           </button>
         </div>
-      </div>
+      </div>}
     </div>
+    {type === 'youtube' && onTvClick && (
+      <div className="flex justify-end pt-2">
+        <Button type="button" variant="ghost" size="icon" aria-label="Hubungkan ke TV / Proyektor" title="Hubungkan ke TV / Proyektor" onClick={onTvClick}>
+          <Cast className="h-5 w-5" />
+        </Button>
+      </div>
+    )}
+    </>
   );
 }
