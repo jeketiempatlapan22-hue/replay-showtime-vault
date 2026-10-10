@@ -386,17 +386,10 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
             ? { back: 18, max: 48, maxMax: 90, size: 65 * 1000 * 1000 }
             : { back: 24, max: 60, maxMax: 120, size: 90 * 1000 * 1000 };
 
-    const seekToLiveEdgeOnce = (syncPosition?: number | null) => {
-      if (initialLiveEdgeSyncRef.current) return;
-      const seekable = video.seekable;
-      const fallbackEdge = seekable.length ? seekable.end(seekable.length - 1) : NaN;
-      const edge = Number.isFinite(syncPosition || NaN) ? Number(syncPosition) : fallbackEdge;
-      if (!Number.isFinite(edge) || edge <= 0) return;
+    // Tidak lagi melompat mundur manual: playlist live pendek (~20 detik) membuat
+    // lompatan 22–30 detik jatuh di luar segmen → buffer macet. Biarkan hls.js.
+    const seekToLiveEdgeOnce = (_syncPosition?: number | null) => {
       initialLiveEdgeSyncRef.current = true;
-      const target = Math.max(0, edge - liveStartDelay);
-      if (Math.abs(video.currentTime - target) > 2) {
-        try { video.currentTime = target; } catch { /* ignore */ }
-      }
     };
 
     const startStallWatchdog = () => {

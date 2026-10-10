@@ -164,8 +164,10 @@ function LiveInner() {
   const [resetting, setResetting] = useState(false);
   const [chatReady, setChatReady] = useState(false);
   const navVisible = useAutoHideOnInteraction(!!unlocked, 3000);
+  // Selalu mulai dari server pertama saat masuk; jangan ingat server cadangan yang gagal.
   const [sourceIdx, setSourceIdx] = useState<number>(() => {
-    try { return Math.max(0, Number(sessionStorage.getItem(SS_SRC_KEY) || '0')); } catch { return 0; }
+    try { sessionStorage.removeItem(SS_SRC_KEY); } catch { /* ignore */ }
+    return 0;
   });
   const playerRef = useRef<HlsPlayerHandle | null>(null);
   const chatHostRef = useRef<HTMLDivElement | null>(null);
@@ -745,16 +747,15 @@ function LiveInner() {
   // player terjebak di memuat. Redirect ke domain canonical agar playback jalan.
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const src = allSources[Math.min(sourceIdx, Math.max(0, allSources.length - 1))];
-    if (!src?.url?.startsWith('idn://')) return;
     const host = window.location.hostname;
     const CANONICAL = 'realtime48stream.my.id';
     if (host === CANONICAL) return;
-    // Biarkan dev lokal apa adanya (tidak akan playback IDN, tapi jangan loop redirect).
+    // Biarkan dev lokal & preview editor apa adanya (jangan loop redirect).
     if (host === 'localhost' || host === '127.0.0.1' || host.endsWith('.local')) return;
+    if (host.startsWith('id-preview--') || host.endsWith('.lovableproject.com')) return;
     const target = `https://${CANONICAL}${window.location.pathname}${window.location.search}${window.location.hash}`;
     window.location.replace(target);
-  }, [allSources, sourceIdx]);
+  }, []);
 
 
   const safeIdx = Math.min(sourceIdx, Math.max(0, allSources.length - 1));
@@ -865,7 +866,6 @@ function LiveInner() {
 
   const selectSource = (i: number) => {
     setSourceIdx(i);
-    try { sessionStorage.setItem(SS_SRC_KEY, String(i)); } catch { /* ignore */ }
   };
 
   const handleSourceFatalError = () => {
@@ -874,6 +874,20 @@ function LiveInner() {
     const next = allSources.findIndex((source, index) => index !== safeIdx && !failedSourceKeys.includes(sourceKey(source, index)));
     if (next >= 0) selectSource(next);
   };
+
+  // IDN butuh header kustom (hanya lewat hls.js/MSE). iPhone tanpa MSE atau token
+  // yang tak kunjung siap dalam 5 detik → otomatis pindah ke server lain.
+  const idnReady = !!idnResolved && idnResolved.key === `idn:${activeSourceUrl.slice('idn://'.length)}`;
+  useEffect(() => {
+    if (!liveOn || !activeSourceUrl.startsWith('idn://') || allSources.length < 2) return;
+    const w = window as unknown as { MediaSource?: unknown; ManagedMediaSource?: unknown };
+    if (!w.MediaSource && !w.ManagedMediaSource) { handleSourceFatalError(); return; }
+    if (idnError) { handleSourceFatalError(); return; }
+    if (idnReady) return;
+    const t = window.setTimeout(() => handleSourceFatalError(), 5000);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSourceUrl, idnReady, idnError, liveOn, allSources.length]);
 
 
   // ON AIR hanya saat admin manual mengaktifkan toggle is_live di admin panel.
