@@ -768,6 +768,8 @@ function LiveInner() {
   const [idnResolved, setIdnResolved] = useState<{ key: string; url: string; headers: Record<string, string> } | null>(null);
   const [idnError, setIdnError] = useState<string>('');
   const [idnRetryNonce, setIdnRetryNonce] = useState(0);
+  const idnAuthRefreshRef = useRef<(() => void) | null>(null);
+  const handleIdnAuthError = useCallback(() => { idnAuthRefreshRef.current?.(); }, []);
   const idnGrant = unlocked?.grant || '';
   const liveOn = status ? !!status.enabled : !!unlocked?.enabled;
   useEffect(() => {
@@ -845,10 +847,22 @@ function LiveInner() {
 
     };
     void refreshIdnToken(true);
-    refreshTimer = window.setInterval(() => { void refreshIdnToken(false); }, IDN_TOKEN_REFRESH_MS);
+    // Aturan HANABIRA48: token 90 detik → rotasi tiap 60 detik. HP sering
+    // memperlambat timer saat layar mati/tab di belakang, jadi juga perbarui
+    // saat kembali ke tab dan saat pemutar menerima 401/403.
+    let lastRefresh = Date.now();
+    const doRefresh = () => { lastRefresh = Date.now(); void refreshIdnToken(false); };
+    refreshTimer = window.setInterval(doRefresh, IDN_TOKEN_REFRESH_MS);
+    const onVis = () => {
+      if (document.visibilityState === 'visible' && Date.now() - lastRefresh > 20_000) doRefresh();
+    };
+    document.addEventListener('visibilitychange', onVis);
+    idnAuthRefreshRef.current = () => { if (Date.now() - lastRefresh > 4_000) doRefresh(); };
     return () => {
       cancelled = true;
       if (refreshTimer) window.clearInterval(refreshTimer);
+      document.removeEventListener('visibilitychange', onVis);
+      idnAuthRefreshRef.current = null;
     };
   }, [activeSourceUrl, idnRetryNonce, idnGrant, liveOn, showId]);
 
