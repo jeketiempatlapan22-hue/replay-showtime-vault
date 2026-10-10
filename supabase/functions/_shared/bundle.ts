@@ -244,3 +244,30 @@ export async function createBundleLink(admin: any, opts: { label: string; origin
   ].join('\n');
   return { ok: true as const, token: issued.token, password: issued.password, link, message, title: bundle.name, show_ids: issued.show_ids };
 }
+
+/** Sandi bundel valid untuk menonton LIVE show ini? (snapshot pembeli atau bundel aktif) */
+export async function bundlePasswordValidForShow(
+  admin: any,
+  showId: string,
+  password: string,
+): Promise<boolean> {
+  const pw = String(password || '').trim();
+  if (!pw || !showId) return false;
+  const { data: tk } = await admin
+    .from('show_bundle_tokens')
+    .select('id')
+    .eq('revoked', false)
+    .ilike('password', pw)
+    .contains('show_ids', [showId])
+    .limit(1);
+  if (tk?.length) return true;
+  const { data: pws } = await admin
+    .from('show_bundle_passwords').select('bundle_id').ilike('password', pw).limit(5);
+  const bundleIds = (pws || []).map((r: any) => r.bundle_id);
+  if (!bundleIds.length) return false;
+  const { data: item } = await admin
+    .from('show_bundle_items').select('id')
+    .in('bundle_id', bundleIds).eq('excluded', false).eq('show_id', showId)
+    .limit(1).maybeSingle();
+  return !!item;
+}
