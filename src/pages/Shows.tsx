@@ -31,9 +31,20 @@ export default function Shows() {
   useEffect(() => {
     const bt = new URLSearchParams(window.location.search).get('bt');
     if (!bt) return;
-    void claimBundleToken(bt).then((res) => {
-      if (res) toast.success(`Bundel aktif: ${res.shows.length} show terbuka`);
-      else toast.error('Link bundel tidak valid atau sudah dicabut');
+    void claimBundleToken(bt).then(async (res) => {
+      if (!res) { toast.error('Link bundel tidak valid atau sudah dicabut'); return; }
+      toast.success(`Bundel aktif: ${res.shows.length} show terbuka`);
+      // Langsung buka player: show bundel yang sedang live, kalau tidak ada → show terdekat.
+      const ids = res.shows.map((s) => s.id).filter(Boolean);
+      if (!ids.length) return;
+      const { data } = await supabase.from('active_shows')
+        .select('id,is_live,replay_id,show_date,show_time,is_active')
+        .in('id', ids).eq('is_active', true).is('replay_id', null)
+        .order('show_date', { ascending: true }).order('show_time', { ascending: true });
+      const list = (data || []) as { id: string; is_live: boolean }[];
+      const pick = list.find((s) => s.is_live) || list[0];
+      const tok = pick ? res.shows.find((s) => s.id === pick.id)?.token : '';
+      if (pick && tok) navigate(`/live?show=${pick.id}&t=${tok}`, { replace: true });
     });
   }, []);
 
