@@ -4,7 +4,7 @@
 export const X_TOKEN_ID = '114e0e89-f8b4-44ee-9354-bb06805cc02f';
 export const X_SEC_KEY = '49c647f3-c84b-4b93-9b84-9d1ad158428e';
 export const PARTNER_SECRET = Deno.env.get('HANABIRA_PARTNER_SECRET') || 'Hanabirastream2026';
-export const PLAYBACK_URL = 'https://idn.mediastream48.workers.dev/api/proxy/playback';
+export const PLAYBACK_URL = 'https://idn.mediastream48.workers.dev/playback';
 
 function b64url(bytes: Uint8Array): string {
   let bin = '';
@@ -18,7 +18,10 @@ function toHex(bytes: Uint8Array): string {
   return Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-export async function generateApiToken(showId: string, ttlSec = 7200): Promise<string> {
+// Aturan HANABIRA48: umur token maksimal 90 detik, frontend rotasi tiap 60 detik.
+export const API_TOKEN_TTL = 90;
+export async function generateApiToken(showId: string, _ttlSec = API_TOKEN_TTL): Promise<string> {
+  const ttlSec = API_TOKEN_TTL;
   // Step A: JWT secret = HEX(SHA256(secKey:tokenId:partnerSecret))
   const seed = `${X_SEC_KEY}:${X_TOKEN_ID}:${PARTNER_SECRET}`;
   const seedHash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(seed));
@@ -26,7 +29,7 @@ export async function generateApiToken(showId: string, ttlSec = 7200): Promise<s
 
   const now = Math.floor(Date.now() / 1000);
   const header = { alg: 'HS256', typ: 'JWT' };
-  const payload = { sid: showId, tid: X_TOKEN_ID, exp: now + ttlSec };
+  const payload = { tid: X_TOKEN_ID, sid: String(showId), iat: now, exp: now + ttlSec };
   const signingInput = `${b64urlStr(JSON.stringify(header))}.${b64urlStr(JSON.stringify(payload))}`;
 
   const key = await crypto.subtle.importKey(

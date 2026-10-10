@@ -53,7 +53,7 @@ const SS_SRC_KEY = 'replaytime-live-source-idx';
   // menghindari tear-down player. URL playback worker dibuat stabil; refresh
   // berikutnya HANYA memperbarui headers supaya manifest live dan potongan .ts
   // tetap terotorisasi tanpa restart player.
-const IDN_TOKEN_REFRESH_MS = 25 * 60 * 1000;
+const IDN_TOKEN_REFRESH_MS = 60 * 1000; // aturan HANABIRA48: token 90 detik, rotasi detik ke-60
 
 const typeLabel = (t: string) => t === 'youtube' ? 'YouTube' : t === 'cloudflare' ? 'Cloudflare' : 'M3U8 / HLS';
 
@@ -867,6 +867,12 @@ function LiveInner() {
   const selectSource = (i: number) => {
     setSourceIdx(i);
   };
+  // Pilihan manual penonton: beri kesempatan ulang walau server itu sempat gagal.
+  const pickSource = (i: number) => {
+    const s = allSources[i];
+    if (s) { const k = sourceKey(s, i); setFailedSourceKeys(prev => prev.filter(x => x !== k)); }
+    setSourceIdx(i);
+  };
 
   const handleSourceFatalError = () => {
     const failedKey = activeSource ? sourceKey(activeSource, safeIdx) : '';
@@ -875,19 +881,19 @@ function LiveInner() {
     if (next >= 0) selectSource(next);
   };
 
-  // IDN butuh header kustom (hanya lewat hls.js/MSE). iPhone tanpa MSE atau token
-  // yang tak kunjung siap dalam 5 detik → otomatis pindah ke server lain.
+  // IDN butuh header kustom (hanya lewat hls.js/MSE). iPhone tanpa MSE → langsung
+  // pindah. Hitungan 5 detik baru dimulai setelah sesi akses (grant) siap, dan
+  // proses perbarui akses tidak dianggap gagal.
   const idnReady = !!idnResolved && idnResolved.key === `idn:${activeSourceUrl.slice('idn://'.length)}`;
   useEffect(() => {
     if (!liveOn || !activeSourceUrl.startsWith('idn://') || allSources.length < 2) return;
     const w = window as unknown as { MediaSource?: unknown; ManagedMediaSource?: unknown };
     if (!w.MediaSource && !w.ManagedMediaSource) { handleSourceFatalError(); return; }
-    if (idnError) { handleSourceFatalError(); return; }
-    if (idnReady) return;
+    if (!idnGrant || idnReady) return;
     const t = window.setTimeout(() => handleSourceFatalError(), 5000);
     return () => window.clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeSourceUrl, idnReady, idnError, liveOn, allSources.length]);
+  }, [activeSourceUrl, idnReady, idnGrant, liveOn, allSources.length]);
 
 
   // ON AIR hanya saat admin manual mengaktifkan toggle is_live di admin panel.
@@ -1080,7 +1086,7 @@ function LiveInner() {
                       <button
                         key={`${s.type}-${s.url}-${i}`}
                         type="button"
-                        onClick={() => selectSource(i)}
+                        onClick={() => pickSource(i)}
                         className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
                           i === safeIdx ? 'bg-primary text-primary-foreground border-primary' : 'bg-card text-foreground border-border hover:bg-secondary'
                         }`}
