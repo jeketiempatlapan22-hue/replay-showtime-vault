@@ -1086,7 +1086,7 @@ function LiveInner() {
                       <button
                         key={`${s.type}-${s.url}-${i}`}
                         type="button"
-                        onClick={() => selectSource(i)}
+                        onClick={() => pickSource(i)}
                         className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
                           i === safeIdx ? 'bg-primary text-primary-foreground border-primary' : 'bg-card text-foreground border-border hover:bg-secondary'
                         }`}
