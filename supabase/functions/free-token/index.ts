@@ -83,7 +83,7 @@ Deno.serve(async (req) => {
       expires_at: expiresAt,
     });
 
-    const xApiToken = await generateApiToken(idn, GRANT_TTL_FREE);
+    const xApiToken = await generateApiToken(idn);
     return json({
       title: show.title,
       xShowId: idn,

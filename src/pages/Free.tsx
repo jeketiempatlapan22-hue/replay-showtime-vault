@@ -70,7 +70,7 @@ const REASONS: Record<string, string> = {
 };
 
 // Rotasi kredensial tiap 28 menit (token gratis berlaku 30 menit) agar tayangan tidak terputus.
-const ROTATE_MS = 28 * 60 * 1000;
+const ROTATE_MS = 60 * 1000; // aturan HANABIRA48: rotasi kunci tiap 60 detik
 
 function PlayerFallback() {
   return (

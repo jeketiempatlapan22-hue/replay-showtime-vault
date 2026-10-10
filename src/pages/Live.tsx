@@ -53,7 +53,7 @@ const SS_SRC_KEY = 'replaytime-live-source-idx';
   // menghindari tear-down player. URL playback worker dibuat stabil; refresh
   // berikutnya HANYA memperbarui headers supaya manifest live dan potongan .ts
   // tetap terotorisasi tanpa restart player.
-const IDN_TOKEN_REFRESH_MS = 25 * 60 * 1000;
+const IDN_TOKEN_REFRESH_MS = 60 * 1000; // aturan HANABIRA48: token 90 detik, rotasi detik ke-60
 
 const typeLabel = (t: string) => t === 'youtube' ? 'YouTube' : t === 'cloudflare' ? 'Cloudflare' : 'M3U8 / HLS';
 

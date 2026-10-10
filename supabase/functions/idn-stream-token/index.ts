@@ -88,7 +88,7 @@ Deno.serve(async (req) => {
       xSecKey: X_SEC_KEY,
       xApiToken,
       playbackUrl: PLAYBACK_URL,
-      expiresIn: 7200,
+      expiresIn: 90,
     });
   } catch (e) {
     return json({ error: (e as Error).message }, 500);
