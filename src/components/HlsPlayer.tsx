@@ -13,6 +13,8 @@ interface Props {
   title: string;
   watermark?: string;
   onFatalError?: () => void;
+  /** Dipanggil saat server menolak kunci (401/403) — minta kunci baru tanpa ganti server. */
+  onAuthError?: () => void;
   onPipChange?: (active: boolean) => void;
   hideSeekButtons?: boolean;
   /** Optional custom HTTP headers attached to ALL HLS requests (manifest + segments). */
@@ -48,7 +50,7 @@ interface QualityLevel {
   bitrate?: number;
 }
 
-const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, onFatalError, onPipChange, hideSeekButtons = false, headers, overlay, showId = '', replayTvPayload = null }, ref) => {
+const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, onFatalError, onAuthError, onPipChange, hideSeekButtons = false, headers, overlay, showId = '', replayTvPayload = null }, ref) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const hideControlsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -60,6 +62,8 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
   const lastProgressRef = useRef({ time: 0, checkedAt: Date.now(), recoveries: 0 });
   const lastBufferingStateRef = useRef(false);
   const onFatalErrorRef = useRef(onFatalError);
+  const onAuthErrorRef = useRef(onAuthError);
+  const authErrorsRef = useRef(0);
   const initialLiveEdgeSyncRef = useRef(false);
   const headersRef = useRef<Record<string, string> | undefined>(headers);
   const abrGuardRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -276,10 +280,13 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
 
   useEffect(() => {
     onFatalErrorRef.current = onFatalError;
-  }, [onFatalError]);
+    onAuthErrorRef.current = onAuthError;
+  }, [onFatalError, onAuthError]);
 
   useEffect(() => {
     headersRef.current = headers;
+    // Kunci baru diterima → beri jatah percobaan ulang lagi.
+    authErrorsRef.current = 0;
   }, [headers]);
 
   useEffect(() => {
@@ -709,6 +716,18 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
       }, 5000);
 
       hls.on(Hls.Events.ERROR, (_, data) => {
+        // Kunci IDN kedaluwarsa (token 90 detik): minta kunci baru & coba lagi
+        // di server yang sama, jangan langsung pindah server.
+        const code = Number(data.response?.code || 0);
+        if ((code === 401 || code === 403) && onAuthErrorRef.current && headersRef.current && authErrorsRef.current < 6) {
+          authErrorsRef.current += 1;
+          onAuthErrorRef.current();
+          if (data.fatal) {
+            const h = hls;
+            setTimeout(() => { try { h?.startLoad(isLiveRef.current ? -1 : resumePosition()); } catch { /* ignore */ } }, 1500);
+          }
+          return;
+        }
         if (data.details === Hls.ErrorDetails.MANIFEST_LOAD_ERROR && data.response?.code && data.response.code >= 400) {
           setError('Sumber video tidak dapat diakses. Mencoba player lain…');
           setLoading(false);

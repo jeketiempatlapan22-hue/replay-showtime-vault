@@ -1,6 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { GRANT_TTL_FREE, signGrant } from "../_shared/stream-grant.ts";
 import { findMembershipByPassword, membershipPasswordOk } from "../_shared/membership-password.ts";
+import { bundlePasswordValidForShow } from "../_shared/bundle.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -323,6 +324,10 @@ Deno.serve(async (req) => {
           const { data: masters } = await supabase
             .from("master_passwords").select("password,paused,month").in("month", [...months]);
           valid = (masters || []).some((m: any) => m.paused !== true && m.password === password);
+        }
+        if (!valid) {
+          // Sandi bundel show (huruf besar/kecil sama) untuk show yang ada di bundelnya.
+          valid = await bundlePasswordValidForShow(supabase, String(show.id), String(password));
         }
         await supabase.rpc('record_login_attempt', { _identifier: lockId, _success: valid });
         if (!valid) return json({ valid: false, reason: "bad_password" });
