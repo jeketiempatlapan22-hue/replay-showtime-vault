@@ -1,3 +1,4 @@
+import { pakasirCreateQrisCompat } from '../_shared/pakasir.ts';
 // Create a Pakasir QRIS order to top-up coins for the authenticated user.
 // kind='coin_topup' so webhook/poll credit coins instead of issuing a token.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
@@ -53,10 +54,7 @@ Deno.serve(async (req) => {
     const qrUrl = `https://app.pakasir.com/pay/${slug}/${orderId}?amount=${amount}&qris_only=1`;
     let qrString = ''; let totalPayment = amount; let expiredAt = '';
     try {
-      const pres = await fetch('https://app.pakasir.com/api/transactioncreate/qris', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ project: slug, order_id: orderId, amount, api_key: apiKey }),
-      });
+      const pres = await pakasirCreateQrisCompat(slug, orderId, amount, apiKey);
       const pjson: any = await pres.json().catch(() => ({}));
       const p = pjson?.payment || {};
       qrString = String(p.payment_number || '');

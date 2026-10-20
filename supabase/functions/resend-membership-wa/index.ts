@@ -1,3 +1,4 @@
+import { verifyPakasirPaidStrict } from '../_shared/pakasir.ts';
 // Admin-only: kirim ulang notifikasi WA membership (token + link + replay info).
 // Bisa satu order atau bulk. Untuk order yang masih 'reserved' tapi sebenarnya
 // sudah dibayar di Pakasir, fungsi ini akan cek status dulu lalu finalize.
@@ -70,12 +71,8 @@ async function pakasirIsPaid(orderId: string, amount: number): Promise<boolean> 
   const slug = Deno.env.get('PAKASIR_PROJECT_SLUG');
   if (!apiKey || !slug || !orderId) return false;
   try {
-    const url = `https://app.pakasir.com/api/transactiondetail?project=${encodeURIComponent(slug)}&amount=${amount}&order_id=${encodeURIComponent(orderId)}&api_key=${encodeURIComponent(apiKey)}`;
-    const res = await fetch(url);
-    const j: any = await res.json().catch(() => ({}));
-    const tx = j?.transaction || j?.payment || {};
-    const s = String(tx.status || j?.status || '').toLowerCase();
-    return s === 'completed' || s === 'paid' || s === 'success';
+    const v = await verifyPakasirPaidStrict(apiKey, slug, orderId, Number(amount));
+    return v.paid;
   } catch { return false; }
 }
 

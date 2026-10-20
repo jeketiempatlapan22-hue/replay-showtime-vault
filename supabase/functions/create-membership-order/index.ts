@@ -1,3 +1,4 @@
+import { pakasirCreateQrisCompat } from '../_shared/pakasir.ts';
 // Reserve sebuah slot membership lalu buat QRIS pakasir. Guest OK untuk QRIS (login opsional).
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -70,11 +71,7 @@ Deno.serve(async (req) => {
     // Call Pakasir
     let qrString = ''; let totalPayment = amount; let expiredAt = '';
     try {
-      const pres = await fetch('https://app.pakasir.com/api/transactioncreate/qris', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ project: slug, order_id: orderId, amount, api_key: apiKey }),
-      });
+      const pres = await pakasirCreateQrisCompat(slug, orderId, amount, apiKey);
       const pjson: any = await pres.json().catch(() => ({}));
       const p = pjson?.payment || {};
       qrString = String(p.payment_number || '');
