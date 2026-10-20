@@ -1,3 +1,4 @@
+import { verifyPakasirPaidStrict } from '../_shared/pakasir.ts';
 // Polls Pakasir for a reseller bill. If paid, marks bill paid + wipes copy log.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -39,12 +40,9 @@ Deno.serve(async (req) => {
       });
     }
 
-    const purl = `https://app.pakasir.com/api/transactiondetail?project=${encodeURIComponent(slug)}&amount=${bill.amount}&order_id=${encodeURIComponent(bill.pakasir_order_id)}&api_key=${encodeURIComponent(apiKey)}`;
-    const pres = await fetch(purl);
-    const pjson: any = await pres.json().catch(() => ({}));
-    const tx = pjson?.transaction || pjson?.payment || {};
-    const ps = String(tx.status || pjson?.status || '').toLowerCase();
-    const paid = ps === 'completed' || ps === 'paid' || ps === 'success';
+    const v = await verifyPakasirPaidStrict(apiKey, slug, bill.pakasir_order_id, Number(bill.amount));
+    const ps = v.status;
+    const paid = v.paid;
 
     if (!paid) {
       return new Response(JSON.stringify({ ok: true, status: ps || 'pending' }), {

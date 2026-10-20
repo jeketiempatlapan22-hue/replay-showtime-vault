@@ -85,7 +85,7 @@ Deno.serve(async (req) => {
   let pakasirReach = { ok: false, status: 0, body: '' };
   if (apiKey && slug) {
     try {
-      const r = await fetch(`https://app.pakasir.com/api/transactiondetail?project=${encodeURIComponent(slug)}&amount=1&order_id=selftest&api_key=${encodeURIComponent(apiKey)}`);
+      const r = await fetch(`https://app.pakasir.com/api/v2/transaction-status/${encodeURIComponent(slug)}/selftest`, { headers: { 'X-Api-Key': apiKey } });
       const txt = (await r.text()).slice(0, 200);
       pakasirReach = { ok: r.ok || r.status === 404, status: r.status, body: txt };
     } catch (e) {
