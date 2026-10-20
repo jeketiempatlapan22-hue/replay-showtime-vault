@@ -1,3 +1,4 @@
+import { pakasirCreateQrisCompat } from '../_shared/pakasir.ts';
 // Create a Pakasir dynamic QRIS order for an active show purchase.
 // Each call creates a NEW order_id; webhook will deliver token via WhatsApp.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
@@ -128,11 +129,7 @@ Deno.serve(async (req) => {
     let totalPayment = amount;
     let expiredAt = '';
     try {
-      const pres = await fetch(`https://app.pakasir.com/api/transactioncreate/qris`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ project: slug, order_id: orderId, amount, api_key: apiKey }),
-      });
+      const pres = await pakasirCreateQrisCompat(slug, orderId, amount, apiKey);
       const pjson: any = await pres.json().catch(() => ({}));
       const p = pjson?.payment || {};
       qrString = String(p.payment_number || '');

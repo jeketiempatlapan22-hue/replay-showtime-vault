@@ -1,3 +1,4 @@
+import { pakasirCreateQrisCompat } from '../_shared/pakasir.ts';
 // Creates a Pakasir QRIS invoice for a reseller's outstanding bill.
 // Bill must already exist via reseller_create_bill_intent.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
@@ -50,10 +51,7 @@ Deno.serve(async (req) => {
       orderId = genOrderId();
       qrUrl = `https://app.pakasir.com/pay/${slug}/${orderId}?amount=${amount}&qris_only=1`;
       try {
-        const pres = await fetch('https://app.pakasir.com/api/transactioncreate/qris', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ project: slug, order_id: orderId, amount, api_key: apiKey }),
-        });
+        const pres = await pakasirCreateQrisCompat(slug, orderId, amount, apiKey);
         const pjson: any = await pres.json().catch(() => ({}));
         const p = pjson?.payment || {};
         qrString = String(p.payment_number || '');
@@ -71,8 +69,7 @@ Deno.serve(async (req) => {
     } else {
       // Re-query existing QR to refresh string
       try {
-        const purl = `https://app.pakasir.com/api/transactiondetail?project=${encodeURIComponent(slug)}&amount=${amount}&order_id=${encodeURIComponent(orderId!)}&api_key=${encodeURIComponent(apiKey)}`;
-        const pres = await fetch(purl);
+        const pres = await pakasirCreateQrisCompat(slug, orderId!, amount, apiKey);
         const pjson: any = await pres.json().catch(() => ({}));
         const tx = pjson?.transaction || pjson?.payment || {};
         qrString = String(tx.payment_number || '');
