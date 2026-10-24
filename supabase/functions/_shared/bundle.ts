@@ -136,9 +136,17 @@ export async function issueBundleToken(
   const bundle = await getBundle(admin);
   if (!bundle) return null;
 
-  const existing = await findBundleToken(admin, {
+  const found = await findBundleToken(admin, {
     bundleId: bundle.id, userId: opts.userId, phone: opts.phone, orderId: opts.orderId,
   });
+  // Token lama hanya dipakai ulang bila pesanan sama, atau isinya sudah mencakup
+  // semua show bundel saat ini. Bundel berisi show baru => token baru.
+  const covers = (ids: string[]) => {
+    const own = new Set((ids || []).map(String));
+    return bundle.show_ids.every((id) => own.has(id));
+  };
+  const existing = found && ((opts.orderId && found.order_id === opts.orderId) || covers(found.show_ids))
+    ? found : null;
   if (existing) {
     return {
       token: existing.token,

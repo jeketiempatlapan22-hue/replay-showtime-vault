@@ -159,7 +159,7 @@ export default function BuyShowDialog({ open, onOpenChange, showId = '', showTit
   const persistPaid = (token: string, showTokens?: Record<string, string>) => {
     if (!token) return;
     if (kind === 'bundle') {
-      rememberBundleToken(token);
+      rememberBundleToken(token, showTokens ? Object.keys(showTokens) : undefined);
       if (showTokens && Object.keys(showTokens).length) persistBundleShowTokens(showTokens);
       else void claimBundleToken(token);
     } else if (kind === 'replay_only' && replayId) {

@@ -4,18 +4,18 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import BuyShowDialog from '@/components/BuyShowDialog';
 import AccessInfoCard from '@/components/AccessInfoCard';
-import { getShowBundle, getBundleToken, bundleTheme, type ShowBundle } from '@/lib/bundle';
+import { getShowBundle, getOwnedBundleFor, bundleTheme, type ShowBundle } from '@/lib/bundle';
 
 export default function ShowBundleCard() {
   const [bundle, setBundle] = useState<ShowBundle | null>(null);
   const [buyOpen, setBuyOpen] = useState(false);
   const [method, setMethod] = useState<'qris' | 'coin'>('qris');
-  const [owned, setOwned] = useState(getBundleToken());
+  const [tick, setTick] = useState(0);
 
   useEffect(() => {
     const refresh = () => { void getShowBundle().then(setBundle); };
     refresh();
-    const onUpdate = () => setOwned(getBundleToken());
+    const onUpdate = () => setTick((n) => n + 1);
     // Harga bundel bisa berubah saat admin mengubah show; segarkan agar nominal
     // pada kartu selalu sama dengan QRIS yang nanti dibuat.
     const onFocus = () => refresh();
@@ -31,6 +31,9 @@ export default function ShowBundleCard() {
 
   if (!bundle || !bundle.is_active || bundle.show_count < 2) return null;
 
+  // Hanya "aktif" bila pembelian tersimpan mencakup semua show bundel saat ini.
+  void tick;
+  const owned = getOwnedBundleFor(bundle.show_ids);
   const t = bundleTheme(bundle.theme);
   const rupiah = (n: number) => `Rp${n.toLocaleString('id-ID')}`;
   const open = (m: 'qris' | 'coin') => { setMethod(m); setBuyOpen(true); };
