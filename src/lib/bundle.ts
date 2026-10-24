@@ -40,13 +40,38 @@ export async function getShowBundle(): Promise<ShowBundle | null> {
   };
 }
 
-export function rememberBundleToken(token: string) {
+export const BUNDLE_TOKENS_KEY = 'replaytime-bundle-tokens';
+
+/** Peta token bundel -> daftar show yang dicakup (bisa banyak pembelian). */
+export function getBundleTokenMap(): Record<string, string[]> {
+  try { return JSON.parse(localStorage.getItem(BUNDLE_TOKENS_KEY) || '{}') || {}; } catch { return {}; }
+}
+
+export function rememberBundleToken(token: string, showIds?: string[]) {
   if (!token) return;
-  try { localStorage.setItem(BUNDLE_TOKEN_KEY, token); } catch { /* ignore */ }
+  try {
+    localStorage.setItem(BUNDLE_TOKEN_KEY, token);
+    if (showIds && showIds.length) {
+      const map = getBundleTokenMap();
+      map[token] = Array.from(new Set([...(map[token] || []), ...showIds.map(String)]));
+      localStorage.setItem(BUNDLE_TOKENS_KEY, JSON.stringify(map));
+    }
+  } catch { /* ignore */ }
 }
 
 export function getBundleToken(): string {
   try { return localStorage.getItem(BUNDLE_TOKEN_KEY) || ''; } catch { return ''; }
+}
+
+/** Token bundel yang mencakup SEMUA show bundel saat ini, atau '' bila belum punya. */
+export function getOwnedBundleFor(showIds: string[]): string {
+  if (!showIds?.length) return '';
+  const map = getBundleTokenMap();
+  for (const [token, ids] of Object.entries(map)) {
+    const own = new Set(ids);
+    if (showIds.every((id) => own.has(String(id)))) return token;
+  }
+  return '';
 }
 
 /** Simpan sub-token bundel per show supaya tiap kartu show langsung "Tonton". */
@@ -79,7 +104,7 @@ export async function claimBundleToken(token: string): Promise<BundleAccess | nu
     if (!d?.ok || !d?.bundle) return null;
     const shows = (d.shows || []) as BundleAccess['shows'];
     persistBundleShowTokens(Object.fromEntries(shows.map((s) => [s.id, s.token])));
-    rememberBundleToken(token);
+    rememberBundleToken(token, shows.map((s) => s.id));
     return { ok: true, token, password: String(d.password || ''), link: String(d.link || ''), shows };
   } catch {
     return null;
