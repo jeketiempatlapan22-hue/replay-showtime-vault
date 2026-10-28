@@ -299,6 +299,21 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
     setBuffering(next);
   }, []);
 
+  // Penjaga awal: kalau video tidak pernah mulai jalan dalam 18 detik
+  // (mis. server IDN menggantung tanpa error), pindah ke server lain.
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !src) return;
+    let done = false;
+    const ok = () => { done = true; };
+    video.addEventListener('playing', ok);
+    const t = setTimeout(() => {
+      if (done || video.currentTime > 0.5) return;
+      onFatalErrorRef.current?.();
+    }, 18_000);
+    return () => { clearTimeout(t); video.removeEventListener('playing', ok); };
+  }, [src]);
+
   // Setup HLS with optimized config
   useEffect(() => {
     const video = videoRef.current;
@@ -362,8 +377,8 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
     const deviceMem = (navigator as Navigator & { deviceMemory?: number }).deviceMemory || 4;
     const lowMem = deviceMem <= 2;
     const liveStartDelay = isVeryWeak ? 30 : isWeak ? 22 : 12;
-    const liveSyncCount = isVeryWeak ? 7 : isWeak ? 6 : 5;
-    const liveMaxLatencyCount = isVeryWeak ? 24 : isWeak ? 20 : 16;
+    const liveSyncCount = isVeryWeak ? 6 : isWeak ? 5 : 4;
+    const liveMaxLatencyCount = isVeryWeak ? 12 : isWeak ? 11 : 10;
     const stallRecoveryMs = isWeak ? 7000 : 6000;
     // Estimasi bandwidth awal: pakai pengukuran nyata dari sesi sebelumnya bila ada,
     // supaya sesi baru langsung mulai pada level yang realistis (bukan tebakan statis).
@@ -411,8 +426,8 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
           // Tertinggal jauh dari siaran (mis. setelah layar mati) → lompat ke potongan terbaru.
           if (isLiveRef.current && video.seekable.length) {
             const edge = video.seekable.end(video.seekable.length - 1);
-            if (Number.isFinite(edge) && edge - current > 40) {
-              try { video.currentTime = Math.max(0, edge - 10); } catch { /* ignore */ }
+            if (Number.isFinite(edge) && edge - current > 26) {
+              try { video.currentTime = Math.max(0, edge - 8); } catch { /* ignore */ }
             }
           }
           return;
@@ -432,7 +447,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
               const latency = Number.isFinite(edge) ? edge - current : 0;
               // Kalau benar-benar jauh tertinggal, lompat lembut mendekati live edge.
               // Kalau tidak, cukup lanjutkan loading supaya tidak terlihat refresh.
-              if (latency > 40) video.currentTime = Math.max(0, edge - 10);
+              if (latency > 26) video.currentTime = Math.max(0, edge - 8);
               hlsInstance.startLoad(-1);
             } else {
               hlsInstance.startLoad(resumePosition());
@@ -518,7 +533,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
         liveSyncDurationCount: liveSyncCount,
         liveMaxLatencyDurationCount: liveMaxLatencyCount,
         // Kejar live edge halus dengan sedikit mempercepat video (tanpa lompat).
-        maxLiveSyncPlaybackRate: 1.05,
+        maxLiveSyncPlaybackRate: 1,
         progressive: true,
       });
       hlsRef.current = hls;
@@ -570,7 +585,9 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
           const best = manifestLevels
             .map((lvl, i) => ({ i, h: lvl.height || 0 }))
             .sort((a, b) => b.h - a.h)[0];
-          if (best && best.h > 0) {
+          // Live (worker lambat ~3 detik/permintaan): biarkan ABR memilih level awal
+          // sesuai bandwidth nyata agar tidak tersendat di menit pertama.
+          if (best && best.h > 0 && !manifestLevels.some(l => l.details?.live)) {
             try { hls.startLevel = best.i; hls.nextLevel = best.i; } catch { /* ignore */ }
           }
         }
@@ -736,7 +753,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
         // Kunci IDN kedaluwarsa (token 90 detik): minta kunci baru & coba lagi
         // di server yang sama, jangan langsung pindah server.
         const code = Number(data.response?.code || 0);
-        if ((code === 401 || code === 403) && onAuthErrorRef.current && headersRef.current && authErrorsRef.current < 6) {
+        if ((code === 401 || code === 403) && onAuthErrorRef.current && headersRef.current && authErrorsRef.current < 2) {
           authErrorsRef.current += 1;
           onAuthErrorRef.current();
           if (data.fatal) {

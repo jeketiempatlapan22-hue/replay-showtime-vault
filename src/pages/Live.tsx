@@ -909,6 +909,15 @@ function LiveInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSourceUrl, idnReady, idnGrant, liveOn, allSources.length]);
 
+  // Gagal mengambil kunci IDN (bukan sekadar perbarui akses) → langsung pindah server.
+  useEffect(() => {
+    if (!liveOn || !activeSourceUrl.startsWith('idn://') || allSources.length < 2) return;
+    if (!idnError || /Memuat ulang akses/i.test(idnError)) return;
+    const t = window.setTimeout(() => handleSourceFatalError(), 2500);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [idnError, activeSourceUrl, liveOn, allSources.length]);
+
 
   // ON AIR hanya saat admin manual mengaktifkan toggle is_live di admin panel.
   // Sumber kebenaran adalah baris `active_shows` terbaru (status). Cache unlock
@@ -1059,7 +1068,7 @@ function LiveInner() {
                         <Loader2 className="w-8 h-8 text-primary animate-spin" />
                       </div>
                     ) : (
-                      <HlsPlayer ref={playerRef} key={`idn-${idnResolved.key}`} src={idnResolved.url} headers={idnResolved.headers} title={unlocked.title} watermark={unlocked.watermark} onFatalError={handleSourceFatalError} onPipChange={handlePipChange} hideSeekButtons showId={effectiveShowId} />
+                      <HlsPlayer ref={playerRef} key={`idn-${idnResolved.key}`} src={idnResolved.url} headers={idnResolved.headers} title={unlocked.title} watermark={unlocked.watermark} onFatalError={handleSourceFatalError} onAuthError={() => idnAuthRefreshRef.current?.()} onPipChange={handlePipChange} hideSeekButtons showId={effectiveShowId} />
                     )
                   ) : activeSource.type === 'm3u8'
                     ? <HlsPlayer ref={playerRef} key={`m3u8-${safeIdx}`} src={activeSource.url} title={unlocked.title} watermark={unlocked.watermark} onFatalError={handleSourceFatalError} onPipChange={handlePipChange} hideSeekButtons showId={effectiveShowId} />
