@@ -299,6 +299,21 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
     setBuffering(next);
   }, []);
 
+  // Penjaga awal: kalau video tidak pernah mulai jalan dalam 18 detik
+  // (mis. server IDN menggantung tanpa error), pindah ke server lain.
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !src) return;
+    let done = false;
+    const ok = () => { done = true; };
+    video.addEventListener('playing', ok);
+    const t = setTimeout(() => {
+      if (done || video.currentTime > 0.5) return;
+      onFatalErrorRef.current?.();
+    }, 18_000);
+    return () => { clearTimeout(t); video.removeEventListener('playing', ok); };
+  }, [src]);
+
   // Setup HLS with optimized config
   useEffect(() => {
     const video = videoRef.current;
