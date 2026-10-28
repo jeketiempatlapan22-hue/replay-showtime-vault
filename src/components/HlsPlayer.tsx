@@ -307,11 +307,15 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
     let done = false;
     const ok = () => { done = true; };
     video.addEventListener('playing', ok);
+    video.addEventListener('loadeddata', ok);
+    // Worker lambat (~4 detik per permintaan) butuh waktu lebih lama untuk
+    // potongan pertama. Hanya pindah server bila BELUM ADA data video sama
+    // sekali — video yang sudah termuat tapi tertahan autoplay bukan gagal.
     const t = setTimeout(() => {
-      if (done || video.currentTime > 0.5) return;
+      if (done || video.currentTime > 0.5 || video.readyState >= 2 || video.buffered.length > 0) return;
       onFatalErrorRef.current?.();
-    }, 18_000);
-    return () => { clearTimeout(t); video.removeEventListener('playing', ok); };
+    }, 35_000);
+    return () => { clearTimeout(t); video.removeEventListener('playing', ok); video.removeEventListener('loadeddata', ok); };
   }, [src]);
 
   // Setup HLS with optimized config
