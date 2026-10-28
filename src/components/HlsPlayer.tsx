@@ -408,6 +408,13 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
         const current = video.currentTime;
         if (Math.abs(current - last.time) > 0.25) {
           lastProgressRef.current = { time: current, checkedAt: now, recoveries: 0 };
+          // Tertinggal jauh dari siaran (mis. setelah layar mati) → lompat ke potongan terbaru.
+          if (isLiveRef.current && video.seekable.length) {
+            const edge = video.seekable.end(video.seekable.length - 1);
+            if (Number.isFinite(edge) && edge - current > 18) {
+              try { video.currentTime = Math.max(0, edge - 5); } catch { /* ignore */ }
+            }
+          }
           return;
         }
         // Only act after a true stall to avoid interrupting normal playback.
