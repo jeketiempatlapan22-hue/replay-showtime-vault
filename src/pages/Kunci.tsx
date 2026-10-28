@@ -21,7 +21,9 @@ const reasonMessage = (reason?: string): string => {
     case 'expired': return 'Membership Anda telah berakhir.';
     case 'not_started': return 'Membership belum aktif.';
     case 'rate_limited': return 'Terlalu banyak percobaan. Tunggu beberapa menit lalu coba lagi.';
-    case 'off': return 'Live belum aktif.';
+    case 'off': return 'Live show ini belum aktif atau sudah selesai. Jika sudah jadi replay, buka menu Replay dan masukkan sandi yang sama.';
+    case 'password_or_token_required': return 'Sandi wajib diisi.';
+    case 'outside_membership_period': return 'Sandi membership ini tidak berlaku untuk show tersebut.';
     case 'multi_device_no_reset': return 'Membership multi-device/publik tidak dapat direset manual.';
     case 'quota_exhausted': return 'Kuota reset manual sudah habis.';
     default: return 'Gagal membuka akses live.';
@@ -67,9 +69,15 @@ export default function Kunci() {
     if (!pwInput.trim()) { setPwError('Sandi wajib diisi.'); return; }
     setSubmitting(true); setPwError('');
     try {
-      const { data } = await supabase.functions.invoke('unlock-live', {
+      const { data: d0, error: invErr } = await supabase.functions.invoke('unlock-live', {
         body: { password: pwInput.trim(), browser_id: getBrowserId(), show_id: showId || undefined },
       });
+      let data = d0;
+      if (!data && invErr) {
+        // Jawaban error dari server tetap dibaca agar alasan sebenarnya tampil.
+        try { data = await (invErr as any).context?.json?.(); } catch { /* ignore */ }
+        if (!data) { setPwError('Gagal terhubung ke server. Periksa koneksi lalu coba lagi.'); setSubmitting(false); return; }
+      }
       if (data?.membership_token) {
         // Sandi membership: simpan di perangkat lalu buka live lewat jalur membership.
         saveMembershipCredentials(String(data.membership_token), String(data.membership_password || ''));

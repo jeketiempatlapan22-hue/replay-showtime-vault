@@ -94,6 +94,38 @@ function ProtectedShell({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+// Tampilan saat halaman sedang diunduh. Dulu hanya layar gelap kosong, sehingga
+// di laptop/HP lambat penonton mengira website rusak (layar hitam).
+function PageLoading() {
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    const t = window.setTimeout(() => setSlow(true), 12000);
+    return () => window.clearTimeout(t);
+  }, []);
+  const hardReload = async () => {
+    try {
+      if ('caches' in window) {
+        const keys = await caches.keys();
+        await Promise.all(keys.filter((k) => k.startsWith('app-code-') || k.startsWith('html-nav-')).map((k) => caches.delete(k)));
+      }
+    } finally { window.location.reload(); }
+  };
+  return (
+    <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-4 px-6 text-center">
+      <div className="h-10 w-10 rounded-full border-4 border-primary/30 border-t-primary animate-spin" />
+      <p className="text-sm text-muted-foreground">Memuat halaman…</p>
+      {slow && (
+        <div className="space-y-2">
+          <p className="text-xs text-muted-foreground">Koneksi lambat atau browser menyimpan versi lama.</p>
+          <button onClick={hardReload} className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">
+            Muat ulang
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -103,7 +135,7 @@ const App = () => (
         <ErrorBoundary>
           <PurchaseSync />
           <ProtectedShell>
-            <Suspense fallback={<div className="min-h-screen bg-background" />}>
+            <Suspense fallback={<PageLoading />}>
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/live" element={<Live />} />

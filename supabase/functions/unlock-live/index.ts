@@ -201,7 +201,7 @@ Deno.serve(async (req) => {
     if (resolvedShowId) {
       const { data: show } = await supabase
         .from("active_shows")
-        .select("id,title,is_live,live_auto_schedule,live_url,live_type,live_sources,live_password,live_require_password,show_date,show_time,is_active,idn_show_id")
+        .select("id,title,is_live,live_auto_schedule,live_url,live_type,live_sources,live_password,live_require_password,show_date,show_time,is_active,idn_show_id,replay_id")
         .eq("id", resolvedShowId).maybeSingle();
       if (!show || !show.is_active) {
         if (show_id) return json({ valid: false, reason: "off" });
@@ -312,7 +312,14 @@ Deno.serve(async (req) => {
         const { data: lock } = await supabase.rpc('check_login_lock', { _identifier: lockId });
         const lockRow = Array.isArray(lock) ? lock[0] : lock;
         if (lockRow?.locked) return json({ valid: false, reason: 'rate_limited', seconds_remaining: lockRow.seconds_remaining });
-        let valid = !!show.live_password && show.live_password === password;
+        const pwNorm = String(password).trim().toUpperCase();
+        const same = (a: unknown) => !!a && String(a).trim().toUpperCase() === pwNorm;
+        let valid = same(show.live_password);
+        if (!valid && (show as any).replay_id) {
+          // Sandi replay buatan admin untuk show ini juga membuka live show yang sama.
+          const { data: rp } = await supabase.from("replays").select("password").eq("id", (show as any).replay_id).maybeSingle();
+          valid = same(rp?.password);
+        }
         if (!valid) {
           // Sandi master bulanan: terima master bulan show DAN master bulan berjalan.
           const months = new Set<string>();
@@ -323,7 +330,7 @@ Deno.serve(async (req) => {
           addMonth(new Date(Date.now() + 7 * 3600 * 1000));
           const { data: masters } = await supabase
             .from("master_passwords").select("password,paused,month").in("month", [...months]);
-          valid = (masters || []).some((m: any) => m.paused !== true && m.password === password);
+          valid = (masters || []).some((m: any) => m.paused !== true && same(m.password));
         }
         if (!valid) {
           // Sandi bundel show (huruf besar/kecil sama) untuk show yang ada di bundelnya.
