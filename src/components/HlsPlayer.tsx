@@ -362,9 +362,9 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
     const deviceMem = (navigator as Navigator & { deviceMemory?: number }).deviceMemory || 4;
     const lowMem = deviceMem <= 2;
     const liveStartDelay = isVeryWeak ? 30 : isWeak ? 22 : 12;
-    const liveSyncCount = isVeryWeak ? 10 : isWeak ? 7 : 4;
-    const liveMaxLatencyCount = isVeryWeak ? 36 : isWeak ? 28 : 16;
-    const stallRecoveryMs = isWeak ? 9000 : 14000;
+    const liveSyncCount = isVeryWeak ? 6 : isWeak ? 5 : 3;
+    const liveMaxLatencyCount = isVeryWeak ? 11 : isWeak ? 10 : 8;
+    const stallRecoveryMs = isWeak ? 7000 : 6000;
     // Estimasi bandwidth awal: pakai pengukuran nyata dari sesi sebelumnya bila ada,
     // supaya sesi baru langsung mulai pada level yang realistis (bukan tebakan statis).
     const profileEstimate = isVeryWeak ? 220_000 : isWeak ? 450_000 : 900_000;
@@ -408,6 +408,13 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
         const current = video.currentTime;
         if (Math.abs(current - last.time) > 0.25) {
           lastProgressRef.current = { time: current, checkedAt: now, recoveries: 0 };
+          // Tertinggal jauh dari siaran (mis. setelah layar mati) → lompat ke potongan terbaru.
+          if (isLiveRef.current && video.seekable.length) {
+            const edge = video.seekable.end(video.seekable.length - 1);
+            if (Number.isFinite(edge) && edge - current > 18) {
+              try { video.currentTime = Math.max(0, edge - 5); } catch { /* ignore */ }
+            }
+          }
           return;
         }
         // Only act after a true stall to avoid interrupting normal playback.
@@ -425,7 +432,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
               const latency = Number.isFinite(edge) ? edge - current : 0;
               // Kalau benar-benar jauh tertinggal, lompat lembut mendekati live edge.
               // Kalau tidak, cukup lanjutkan loading supaya tidak terlihat refresh.
-              if (latency > Math.max(45, liveStartDelay * 3)) video.currentTime = Math.max(0, edge - liveStartDelay);
+              if (latency > 15) video.currentTime = Math.max(0, edge - 5);
               hlsInstance.startLoad(-1);
             } else {
               hlsInstance.startLoad(resumePosition());
@@ -510,11 +517,21 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
         // absorb jitter and avoid repeated rebuffer while switching fragments.
         liveSyncDurationCount: liveSyncCount,
         liveMaxLatencyDurationCount: liveMaxLatencyCount,
+        // Kejar live edge halus dengan sedikit mempercepat video (tanpa lompat).
+        maxLiveSyncPlaybackRate: 1.08,
         progressive: true,
       });
       hlsRef.current = hls;
       hls.loadSource(src);
       hls.attachMedia(video);
+      hls.on(Hls.Events.LEVEL_LOADED, (_e, d) => {
+        // Live: simpan hanya potongan terbaru, buang potongan lama dari memori.
+        if (d?.details?.live && hls) {
+          hls.config.backBufferLength = 4;
+          hls.config.maxBufferLength = Math.min(hls.config.maxBufferLength, 16);
+          hls.config.maxMaxBufferLength = Math.min(hls.config.maxMaxBufferLength, 24);
+        }
+      });
       hls.on(Hls.Events.MANIFEST_PARSED, (_, data) => {
         setLoading(false);
         const manifestLevels = (data.levels || []) as Array<{ details?: { live?: boolean }; height?: number; bitrate?: number }>;
