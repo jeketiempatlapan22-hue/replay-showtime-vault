@@ -747,7 +747,6 @@ Deno.serve(async (req) => {
               '',
               '🎬 *Link Replay:*',
               'realtimestream.my.id',
-              'realtime48stream.my.id',
               livePwd ? `🗝️ Sandi: *${livePwd}*` : null,
               '',
               access,
