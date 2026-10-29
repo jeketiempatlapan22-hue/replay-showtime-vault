@@ -748,7 +748,7 @@ function LiveInner() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const host = window.location.hostname;
-    const CANONICAL = 'realtime48stream.my.id';
+    const CANONICAL = 'realtimestream.my.id';
     if (host === CANONICAL) return;
     // Biarkan dev lokal & preview editor apa adanya (jangan loop redirect).
     if (host === 'localhost' || host === '127.0.0.1' || host.endsWith('.local')) return;

@@ -4,15 +4,27 @@ import "./index.css";
 import { registerServiceWorker } from "./lib/pwa";
 
 // Redirect ke domain utama (mempertahankan path + query + hash supaya token tetap berfungsi)
-const PRIMARY_HOST = 'realtime48stream.my.id';
+const PRIMARY_HOST = 'realtimestream.my.id';
+const OLD_HOST = 'realtime48stream.my.id';
 const REDIRECT_HOSTS = new Set([
   'replaytime.lovable.app',
-  'www.realtime48stream.my.id',
+  'www.realtimestream.my.id',
+  OLD_HOST,
+  `www.${OLD_HOST}`,
 ]);
 if (typeof window !== 'undefined' && REDIRECT_HOSTS.has(window.location.hostname)) {
   const { pathname, search, hash } = window.location;
   window.location.replace(`https://${PRIMARY_HOST}${pathname}${search}${hash}`);
 }
+// Tulis ulang link tersimpan di perangkat yang masih memakai domain lama
+try {
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (!k) continue;
+    const v = localStorage.getItem(k);
+    if (v && v.includes(OLD_HOST)) localStorage.setItem(k, v.split(OLD_HOST).join(PRIMARY_HOST));
+  }
+} catch { /* ignore */ }
 
 // Suppress DOM reconciliation errors globally (prevents Chrome blank screen)
 window.addEventListener('error', (event) => {

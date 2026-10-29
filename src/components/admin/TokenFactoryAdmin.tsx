@@ -29,7 +29,7 @@ type MbRow = {
   created_by: string; created_at: string; status: string;
 };
 
-const SITE = (typeof window !== 'undefined' ? window.location.origin : 'https://realtime48stream.my.id');
+const SITE = (typeof window !== 'undefined' ? window.location.origin : 'https://realtimestream.my.id');
 
 function copy(text: string, label: string) {
   navigator.clipboard.writeText(text).then(
