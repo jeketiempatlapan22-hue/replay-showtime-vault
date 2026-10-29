@@ -4,7 +4,7 @@
 export const X_TOKEN_ID = '114e0e89-f8b4-44ee-9354-bb06805cc02f';
 export const X_SEC_KEY = '49c647f3-c84b-4b93-9b84-9d1ad158428e';
 export const PARTNER_SECRET = Deno.env.get('HANABIRA_PARTNER_SECRET') || 'Hanabirastream2026';
-export const PLAYBACK_URL = 'https://idn.mediastream48.workers.dev/playback';
+export const PLAYBACK_URL = 'https://rt.mediastream48.workers.dev/playback';
 
 function b64url(bytes: Uint8Array): string {
   let bin = '';
