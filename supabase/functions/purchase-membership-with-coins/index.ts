@@ -54,7 +54,7 @@ export function buildMembershipMessage(tpl: string, vars: Record<string, string>
 }
 
 const DEFAULT_MEMBERSHIP_TPL =
-  '👑 *MEMBERSHIP AKTIF*\n\n📦 *{package_name}*\n📅 Berlaku hingga: {expires_at}\n\n🔗 *Link Akses:*\n{link}\n\n🎬 *Link Replay:* realtime48stream.my.id\n\n{replay_info_block}👤 Berlaku untuk *{max_devices} perangkat*.\n\n— *ReplayTime* 💖';
+  '👑 *MEMBERSHIP AKTIF*\n\n📦 *{package_name}*\n📅 Berlaku hingga: {expires_at}\n\n🔗 *Link Akses:*\n{link}\n\n🎬 *Link Replay:* realtimestream.my.id\n\n{replay_info_block}👤 Berlaku untuk *{max_devices} perangkat*.\n\n— *ReplayTime* 💖';
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -123,7 +123,7 @@ Deno.serve(async (req) => {
     // WA message
     const { data: settings } = await admin.from('site_settings').select('key,value').in('key', ['site_origin','wa_membership_template']);
     const sm = new Map((settings ?? []).map((s) => [s.key, s.value]));
-    const origin = (sm.get('site_origin') || 'https://realtime48stream.my.id').replace(/\/+$/, '');
+    const origin = (sm.get('site_origin') || 'https://realtimestream.my.id').replace(/\/+$/, '');
     const tpl = sm.get('wa_membership_template') || DEFAULT_MEMBERSHIP_TPL;
     const link = `${origin}/live?mtoken=${encodeURIComponent(tok.token)}&mp=${encodeURIComponent(tok.password)}`;
     const expiresStr = new Date(tok.expires_at).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
