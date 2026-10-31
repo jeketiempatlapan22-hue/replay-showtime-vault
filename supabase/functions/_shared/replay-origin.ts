@@ -32,7 +32,8 @@ export async function primeReplayHost(): Promise<string> {
 export function rewriteReplay(text: string, pathArg?: string): string {
   const path = pathArg ?? cache?.path ?? '';
   if (!path || !text || !/Link Replay/i.test(text)) return text;
-  return text.replace(/Link Replay[\s\S]*?(?=\n\s*\n|$)/gi, (seg) =>
-    seg.replace(PRIMARY_RE, (_m, scheme) => `${scheme ? 'https://' : ''}realtimestream.my.id/${path}`),
-  );
+  return text.replace(/Link Replay[\s\S]*?(?=\n\s*\n|$)/gi, (seg) => {
+    if (seg.includes(`realtimestream.my.id/${path}`)) return seg; // sudah diarahkan
+    return seg.replace(PRIMARY_RE, (_m, scheme) => `${scheme ? 'https://' : ''}realtimestream.my.id/${path}`);
+  });
 }
