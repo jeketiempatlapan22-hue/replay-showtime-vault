@@ -29,16 +29,15 @@ export default function MaintenanceGate({ children }: { children: React.ReactNod
   const [mode, setMode] = useState(false);
   const [msg, setMsg] = useState('');
   const [userBlocked, setUserBlocked] = useState(false);
-  const [secretHost, setSecretHost] = useState(false);
+  const [secretPath, setSecretPath] = useState('rply');
 
   useEffect(() => {
     const loadSettings = async () => {
-      const { data } = await supabase.from('site_settings').select('key,value').in('key', ['maintenance_mode', 'maintenance_message', 'replay_origin']);
+      const { data } = await supabase.from('site_settings').select('key,value').in('key', ['maintenance_mode', 'maintenance_message', 'replay_path']);
       const m = Object.fromEntries((data || []).map((r) => [r.key, r.value]));
       setMode(m.maintenance_mode === 'true');
       setMsg(m.maintenance_message || '');
-      const rh = normHost(m.replay_origin || '');
-      setSecretHost(!!rh && (window.location.hostname === rh || window.location.hostname === `www.${rh}`));
+      setSecretPath(normPath(m.replay_path || '') || 'rply');
     };
     const checkUser = async () => {
       const { data: s } = await supabase.auth.getSession();
