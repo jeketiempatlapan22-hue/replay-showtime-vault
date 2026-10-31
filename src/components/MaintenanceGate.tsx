@@ -4,8 +4,11 @@ import { Wrench } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
 // Halaman yang tetap bisa dibuka saat Mode Perbaikan aktif.
-const LIVE_PATHS = ['/live', '/kunci', '/free', '/tv'];
+const LIVE_PATHS = ['/live', '/kunci', '/free', '/tv', '/reseller'];
 const ALWAYS_OPEN = ['/adpan', '/auth', '/reset-password'];
+// Domain utama & preview: tunduk pada Mode Perbaikan. Host lain yang cocok dengan
+// site_settings.replay_origin = Domain Replay Rahasia (selalu terbuka).
+const normHost = (v: string) => String(v || '').trim().replace(/^https?:\/\//i, '').replace(/\/.*$/, '').toLowerCase();
 
 export function MaintenanceScreen({ message }: { message?: string }) {
   return (
