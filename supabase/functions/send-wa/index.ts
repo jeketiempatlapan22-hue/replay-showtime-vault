@@ -1,3 +1,4 @@
+import { primeReplayHost, rewriteReplay } from '../_shared/replay-origin.ts';
 // Send WhatsApp message via Fonnte. Admin-only.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -13,7 +14,8 @@ function normalizePhone(raw: string) {
   return d;
 }
 
-export async function sendFonnte(phone: string, message: string): Promise<{ ok: boolean; data: unknown }> {
+export async function sendFonnte(phone: string, message: string): Promise<{
+  message = rewriteReplay(message); ok: boolean; data: unknown }> {
   const token = Deno.env.get('FONNTE_TOKEN');
   if (!token) return { ok: false, data: { error: 'FONNTE_TOKEN not configured' } };
   const target = normalizePhone(phone);
@@ -48,6 +50,7 @@ export async function sendFonnte(phone: string, message: string): Promise<{ ok: 
 }
 
 Deno.serve(async (req) => {
+  await primeReplayHost();
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   try {
     const authHeader = req.headers.get('Authorization');

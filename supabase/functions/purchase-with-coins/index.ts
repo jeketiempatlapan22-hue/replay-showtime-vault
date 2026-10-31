@@ -1,3 +1,4 @@
+import { primeReplayHost, rewriteReplay } from '../_shared/replay-origin.ts';
 // Spend coins to purchase a show or replay. Authenticated only. Atomic debit + token issuance + WhatsApp delivery.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { getBundle, findBundleToken, issueBundleToken, bundleShowTokens } from '../_shared/bundle.ts';
@@ -31,6 +32,7 @@ async function sendFonnteOnce(phone: string, message: string) {
   } catch (e) { return { ok: false, data: { error: String(e) } }; }
 }
 async function sendFonnte(phone: string, message: string) {
+  message = rewriteReplay(message);
   // Jangan tahan transaksi koin terlalu lama; token tetap dikembalikan di website,
   // WA gagal bisa dikirim ulang dari admin/poller.
   const delays = [0];
@@ -44,6 +46,7 @@ async function sendFonnte(phone: string, message: string) {
 }
 
 Deno.serve(async (req) => {
+  await primeReplayHost();
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   try {
     const authHeader = req.headers.get('Authorization') || '';

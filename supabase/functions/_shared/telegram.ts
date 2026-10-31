@@ -1,3 +1,4 @@
+import { rewriteReplay } from './replay-origin.ts';
 // Helper Telegram bersama: kirim pesan lewat connector gateway Lovable.
 // Dipakai oleh telegram-webhook, poll-pending-orders, dan pakasir-webhook.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
@@ -96,7 +97,8 @@ export function telegramConfigured(): boolean {
 }
 
 /** Kirim pesan Telegram ke chat_id. Markdown WA (*bold*) kompatibel dengan parse_mode Markdown. */
-export async function sendTelegram(chatId: number | string, text: string): Promise<{ ok: boolean; data: unknown }> {
+export async function sendTelegram(chatId: number | string, text: string): Promise<{
+  text = rewriteReplay(text); ok: boolean; data: unknown }> {
   const headers = gatewayHeaders();
   if (!headers) return { ok: false, data: { error: 'telegram_not_configured' } };
   try {

@@ -1,3 +1,4 @@
+import { primeReplayHost, rewriteReplay } from '../_shared/replay-origin.ts';
 // Pakasir webhook: konfirmasi pembayaran QRIS dinamis, lalu kirim token via Fonnte.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { waDedupKey, claimWaSend, markWaSent } from '../_shared/wa-guard.ts';
@@ -96,6 +97,7 @@ async function sendFonnteOnce(phone: string, message: string, timeoutMs: number)
 }
 
 async function sendFonnte(phone: string, message: string) {
+  message = rewriteReplay(message);
   // Guard anti-spam: hanya satu proses yang boleh mengirim pesan identik ke
   // nomor yang sama dalam 15 menit (webhook + polling bisa jalan bersamaan).
   const dedupKey = await waDedupKey(phone, message);
@@ -136,6 +138,7 @@ async function isFonntePaused(admin: ReturnType<typeof createClient>, windowMs =
 }
 
 Deno.serve(async (req) => {
+  await primeReplayHost();
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
   const expectedKey = Deno.env.get('PAKASIR_API_KEY');

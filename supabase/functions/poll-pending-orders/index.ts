@@ -1,3 +1,4 @@
+import { primeReplayHost, rewriteReplay } from '../_shared/replay-origin.ts';
 // Background poller: scans pending orders, queries Pakasir, marks paid + delivers WA.
 // Triggered by pg_cron every minute. Idempotent — safe to re-run.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
@@ -100,6 +101,7 @@ async function sendFonnteOnce(phone: string, message: string, timeoutMs: number)
 }
 
 async function sendFonnte(phone: string, message: string) {
+  message = rewriteReplay(message);
   // Guard anti-spam: hanya satu proses yang boleh mengirim pesan identik ke
   // nomor yang sama dalam 15 menit (webhook + polling bisa jalan bersamaan).
   const dedupKey = await waDedupKey(phone, message);
@@ -339,6 +341,7 @@ async function processOrder(admin: ReturnType<typeof createClient>, order: any, 
 }
 
 Deno.serve(async (req) => {
+  await primeReplayHost();
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
   // Auth: invoked by pg_cron (anon-key bearer) or service-role/admin tooling.

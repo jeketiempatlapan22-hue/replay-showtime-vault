@@ -1,3 +1,4 @@
+import { primeReplayHost, rewriteReplay } from '../_shared/replay-origin.ts';
 // Tukar koin untuk membership. Wajib login. Atomic: reserve → debit → finalize → kirim WA.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -30,6 +31,7 @@ async function sendFonnteOnce(phone: string, message: string) {
   } catch (e) { return { ok: false, data: { error: String(e) } }; }
 }
 async function sendFonnte(phone: string, message: string) {
+  message = rewriteReplay(message);
   const delays = [0, 1000, 3000];
   let last: any = { ok: false, data: { error: 'no_attempt' } };
   for (let i = 0; i < delays.length; i++) {
@@ -57,6 +59,7 @@ const DEFAULT_MEMBERSHIP_TPL =
   '👑 *MEMBERSHIP AKTIF*\n\n📦 *{package_name}*\n📅 Berlaku hingga: {expires_at}\n\n🔗 *Link Akses:*\n{link}\n\n🎬 *Link Replay:* realtimestream.my.id\n\n{replay_info_block}👤 Berlaku untuk *{max_devices} perangkat*.\n\n— *ReplayTime* 💖';
 
 Deno.serve(async (req) => {
+  await primeReplayHost();
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   try {
     const auth = req.headers.get('Authorization') || '';
