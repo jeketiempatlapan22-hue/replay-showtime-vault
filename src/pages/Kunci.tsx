@@ -13,6 +13,7 @@ const SS_KEY_BASE = 'replaytime-live-unlocked';
 const reasonMessage = (reason?: string): string => {
   switch (reason) {
     case 'blocked': return 'Perangkat ini telah diblokir oleh admin.';
+    case 'maintenance': return 'Website dalam perbaikan.';
     case 'device_limit': return 'Token ini sudah terikat ke perangkat lain.';
     case 'no_device': return 'ID perangkat tidak terdeteksi. Aktifkan penyimpanan browser lalu muat ulang.';
     case 'bad_password': return 'Sandi yang dimasukkan salah. Coba lagi.';

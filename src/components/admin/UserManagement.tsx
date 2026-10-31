@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { toast } from 'sonner';
+import UserBlockAdmin from './UserBlockAdmin';
 import { Search, Coins, Plus, Minus, KeyRound, RefreshCw, User as UserIcon, Mail, Phone, Save, Copy } from 'lucide-react';
 
 interface UserRow {
@@ -118,6 +119,7 @@ export default function UserManagement() {
 
   return (
     <div className="space-y-4">
+      <UserBlockAdmin />
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">

@@ -1,6 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { bundlePasswordValidForReplay } from "../_shared/bundle.ts";
 import { findMembershipByPassword, membershipReplayPasswordOk } from "../_shared/membership-password.ts";
+import { isRequestBlocked } from "../_shared/user-block.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -24,6 +25,10 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
+
+    if (await isRequestBlocked(supabase, req, { tokens: [access_token], password })) {
+      return json({ valid: false, reason: "maintenance", message: "Website dalam perbaikan" }, 403);
+    }
 
     // Brute-force lockout for password attempts (per replay+device)
     const lockId = `replaysrc:${replay_id}:${browser_id || 'anon'}`;
