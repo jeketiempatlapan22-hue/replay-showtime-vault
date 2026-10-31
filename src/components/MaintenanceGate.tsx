@@ -56,7 +56,8 @@ export default function MaintenanceGate({ children }: { children: React.ReactNod
 
   const open = ALWAYS_OPEN.some((p) => pathname.startsWith(p));
   const isLive = LIVE_PATHS.some((p) => pathname.startsWith(p));
+  const isSecretReplay = normPath(pathname) === secretPath;
   if (!open && userBlocked) return <MaintenanceScreen />;
-  if (!open && !isLive && !secretHost && mode) return <MaintenanceScreen message={msg} />;
+  if (!open && !isLive && !isSecretReplay && mode) return <MaintenanceScreen message={msg} />;
   return <>{children}</>;
 }

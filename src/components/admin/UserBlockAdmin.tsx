@@ -22,9 +22,9 @@ export default function UserBlockAdmin() {
   const [busy, setBusy] = useState(false);
 
   const loadAll = async () => {
-    const { data } = await supabase.from('site_settings').select('key,value').in('key', ['maintenance_mode', 'maintenance_message', 'replay_origin']);
+    const { data } = await supabase.from('site_settings').select('key,value').in('key', ['maintenance_mode', 'maintenance_message', 'replay_path']);
     const m = Object.fromEntries((data || []).map((r) => [r.key, r.value]));
-    setMode(m.maintenance_mode === 'true'); setMsg(m.maintenance_message || ''); setReplayHost(m.replay_origin || '');
+    setMode(m.maintenance_mode === 'true'); setMsg(m.maintenance_message || ''); setReplayHost(m.replay_path || 'rply');
     const { data: b } = await supabase.from('blocked_users').select('id,user_id,phone,email,reason,created_at').eq('active', true).order('created_at', { ascending: false });
     setBlocked((b || []) as BlockedRow[]);
   };
