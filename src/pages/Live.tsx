@@ -407,7 +407,7 @@ function LiveInner() {
       } else if (silent) {
         // Only kick on hard security reasons. Other transient/server errors must NOT log user out.
         const reason = data?.reason;
-        if (reason === 'revoked' || reason === 'blocked') {
+        if (reason === 'revoked' || reason === 'blocked' || reason === 'maintenance') {
           setUnlocked(null);
           setMembership(null);
           if (reason === 'revoked') clearMembershipCredentials();
