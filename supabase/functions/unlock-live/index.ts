@@ -2,6 +2,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { GRANT_TTL_FREE, signGrant } from "../_shared/stream-grant.ts";
 import { findMembershipByPassword, membershipPasswordOk } from "../_shared/membership-password.ts";
 import { bundlePasswordValidForShow } from "../_shared/bundle.ts";
+import { isRequestBlocked } from "../_shared/user-block.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -89,6 +90,10 @@ Deno.serve(async (req) => {
       const { data: blk } = await supabase
         .from("blocked_browsers").select("id,unblocked").eq("browser_id", browser_id).eq("unblocked", false).maybeSingle();
       if (blk) return json({ valid: false, reason: "blocked" });
+    }
+
+    if (admin_monitor !== true && await isRequestBlocked(supabase, req, { tokens: [token, mtoken], password: password || mpassword })) {
+      return json({ valid: false, reason: "maintenance", message: "Website dalam perbaikan" });
     }
 
     // Sandi membership per user diketik langsung (tanpa link): ubah jadi jalur token membership.
