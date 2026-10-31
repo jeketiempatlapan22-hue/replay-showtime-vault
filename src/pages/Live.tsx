@@ -280,6 +280,7 @@ function LiveInner() {
   const reasonMessage = (reason?: string): string => {
     switch (reason) {
       case 'blocked': return 'Perangkat ini telah diblokir oleh admin.';
+      case 'maintenance': return 'Website dalam perbaikan.';
       case 'device_limit': return 'Token ini sudah terikat ke perangkat lain. Pakai link/sandi ulang di perangkat lama, atau hubungi admin untuk reset.';
       case 'no_device': return 'ID perangkat tidak terdeteksi. Aktifkan penyimpanan browser lalu muat ulang halaman.';
       case 'bad_password': return 'Sandi yang dimasukkan salah. Coba lagi.';
