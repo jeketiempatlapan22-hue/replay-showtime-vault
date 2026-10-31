@@ -22,9 +22,9 @@ export default function UserBlockAdmin() {
   const [busy, setBusy] = useState(false);
 
   const loadAll = async () => {
-    const { data } = await supabase.from('site_settings').select('key,value').in('key', ['maintenance_mode', 'maintenance_message', 'replay_origin']);
+    const { data } = await supabase.from('site_settings').select('key,value').in('key', ['maintenance_mode', 'maintenance_message', 'replay_path']);
     const m = Object.fromEntries((data || []).map((r) => [r.key, r.value]));
-    setMode(m.maintenance_mode === 'true'); setMsg(m.maintenance_message || ''); setReplayHost(m.replay_origin || '');
+    setMode(m.maintenance_mode === 'true'); setMsg(m.maintenance_message || ''); setReplayHost(m.replay_path || 'rply');
     const { data: b } = await supabase.from('blocked_users').select('id,user_id,phone,email,reason,created_at').eq('active', true).order('created_at', { ascending: false });
     setBlocked((b || []) as BlockedRow[]);
   };
@@ -81,13 +81,13 @@ export default function UserBlockAdmin() {
             <Button variant="outline" onClick={async () => { if (await setSetting('maintenance_message', msg)) toast.success('Pesan disimpan'); }}>Simpan</Button>
           </div>
           <div className="space-y-1 pt-2 border-t border-border">
-            <p className="text-sm font-medium text-foreground">Domain Replay Rahasia</p>
-            <p className="text-xs text-muted-foreground">Selalu terbuka walau Mode Perbaikan aktif, dan dipakai untuk "Link Replay" di semua pesan. Kosongkan untuk memakai domain utama.</p>
+            <p className="text-sm font-medium text-foreground">Path Replay Rahasia</p>
+            <p className="text-xs text-muted-foreground">Halaman daftar replay di realtimestream.my.id/&lt;path&gt; — selalu terbuka walau Mode Perbaikan aktif, hanya bisa diakses lewat link. Dipakai untuk "Link Replay" di semua pesan. Halaman utama (/) tetap tertutup saat Mode Perbaikan.</p>
             <div className="flex gap-2">
-              <Input placeholder="contoh: replay-rahasia.my.id" value={replayHost} onChange={(e) => setReplayHost(e.target.value)} />
+              <Input placeholder="contoh: rply" value={replayHost} onChange={(e) => setReplayHost(e.target.value)} />
               <Button variant="outline" onClick={async () => {
-                const v = replayHost.trim().replace(/^https?:\/\//i, '').replace(/\/.*$/, '').toLowerCase();
-                if (await setSetting('replay_origin', v)) { setReplayHost(v); toast.success('Domain replay disimpan'); }
+                const v = replayHost.trim().replace(/^https?:\/\//i, '').replace(/^[a-z0-9.-]+\//i, '').replace(/^\/+|\/+$/g, '').replace(/[^a-z0-9-]/gi, '').toLowerCase() || 'rply';
+                if (await setSetting('replay_path', v)) { setReplayHost(v); toast.success(`Path replay disimpan: realtimestream.my.id/${v}`); }
               }}>Simpan</Button>
             </div>
           </div>

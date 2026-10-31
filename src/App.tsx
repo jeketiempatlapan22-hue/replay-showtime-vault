@@ -35,6 +35,38 @@ const Game = lazy(() => import("./pages/Game"));
 
 const queryClient = new QueryClient();
 
+// Path Replay Rahasia (site_settings.replay_path, default "rply"): halaman daftar
+// replay yang selalu terbuka walau Mode Perbaikan aktif — hanya bisa diakses lewat link.
+let replayPathCache: { path: string; at: number } | null = null;
+async function getReplayPath(): Promise<string> {
+  if (replayPathCache && Date.now() - replayPathCache.at < 60_000) return replayPathCache.path;
+  try {
+    const { data } = await supabase.from('site_settings').select('value').eq('key', 'replay_path').maybeSingle();
+    const p = String(data?.value || '').trim().replace(/^\/+|\/+$/g, '').replace(/[^a-z0-9-]/gi, '').toLowerCase();
+    replayPathCache = { path: p || 'rply', at: Date.now() };
+  } catch {
+    replayPathCache = { path: replayPathCache?.path || 'rply', at: Date.now() };
+  }
+  return replayPathCache.path;
+}
+
+function SecretReplayRoute() {
+  const location = useLocation();
+  const [state, setState] = useState<'loading' | 'replay' | 'notfound'>('loading');
+  useEffect(() => {
+    let alive = true;
+    setState('loading');
+    getReplayPath().then((p) => {
+      if (!alive) return;
+      const seg = location.pathname.replace(/^\/+|\/+$/g, '').toLowerCase();
+      setState(seg === p ? 'replay' : 'notfound');
+    });
+    return () => { alive = false; };
+  }, [location.pathname]);
+  if (state === 'loading') return <PageLoading />;
+  return state === 'replay' ? <Index /> : <NotFound />;
+}
+
 function PurchaseSync() {
   const location = useLocation();
   useEffect(() => {
@@ -156,7 +188,7 @@ const App = () => (
               <Route path="/panduan" element={<Panduan />} />
               <Route path="/tv" element={<TvPage />} />
               <Route path="/game" element={<Game />} />
-              <Route path="*" element={<NotFound />} />
+              <Route path="*" element={<SecretReplayRoute />} />
             </Routes>
             </Suspense>
             </MaintenanceGate>
