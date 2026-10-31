@@ -327,6 +327,42 @@ export type Database = {
         }
         Relationships: []
       }
+      blocked_users: {
+        Row: {
+          active: boolean
+          created_at: string
+          created_by: string | null
+          email: string
+          id: string
+          phone: string
+          reason: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          created_by?: string | null
+          email?: string
+          id?: string
+          phone?: string
+          reason?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          created_by?: string | null
+          email?: string
+          id?: string
+          phone?: string
+          reason?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       bot_admins: {
         Row: {
           created_at: string
@@ -2374,6 +2410,10 @@ export type Database = {
         Args: { _kind: string; _token_id: string }
         Returns: number
       }
+      admin_block_user: {
+        Args: { _phone: string; _reason: string; _user_id: string }
+        Returns: undefined
+      }
       admin_bulk_delete_expired_tokens: {
         Args: { _ids?: string[]; _kind: string }
         Returns: number
@@ -2809,6 +2849,18 @@ export type Database = {
         Returns: boolean
       }
       admin_rotate_bundle_password: { Args: never; Returns: string }
+      admin_search_users_by_phone: {
+        Args: { _q: string }
+        Returns: {
+          block_reason: string
+          blocked: boolean
+          created_at: string
+          email: string
+          phone: string
+          user_id: string
+          username: string
+        }[]
+      }
       admin_set_bundle_active: {
         Args: { _active: boolean }
         Returns: undefined
@@ -2843,6 +2895,7 @@ export type Database = {
         Args: { _kind: string; _token_id: string }
         Returns: number
       }
+      admin_unblock_user: { Args: { _id: string }; Returns: undefined }
       admin_update_bundle_style: {
         Args: {
           _description?: string
@@ -2866,6 +2919,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      am_i_blocked: { Args: never; Returns: boolean }
       auto_live_sync: { Args: never; Returns: undefined }
       check_login_lock: {
         Args: { _identifier: string }
@@ -3022,6 +3076,7 @@ export type Database = {
         Returns: undefined
       }
       mark_wa_sent: { Args: { _key: string }; Returns: undefined }
+      norm_phone: { Args: { _p: string }; Returns: string }
       phone_exists: { Args: { _phone: string }; Returns: boolean }
       prune_old_logs: { Args: never; Returns: undefined }
       prune_proofs_and_storage: { Args: never; Returns: number }
