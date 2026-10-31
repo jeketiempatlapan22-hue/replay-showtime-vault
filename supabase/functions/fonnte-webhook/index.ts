@@ -34,8 +34,8 @@ function uniquePhones(values: string[]) {
   return Array.from(new Set(values.map(normalizePhone).filter(Boolean)));
 }
 
-async function sendFonnte(phone: string, message: string, inboxId = ''): Promise<{
-  message = rewriteReplay(message); ok: boolean; data?: unknown; error?: string }> {
+async function sendFonnte(phone: string, message: string, inboxId = ''): Promise<{ ok: boolean; data?: unknown; error?: string }> {
+  message = rewriteReplay(message);
   const token = Deno.env.get('FONNTE_TOKEN');
   if (!token) return { ok: false, error: 'FONNTE_TOKEN not configured' };
   const buildForm = (withInbox: boolean) => {

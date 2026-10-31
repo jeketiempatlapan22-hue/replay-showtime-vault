@@ -97,8 +97,8 @@ export function telegramConfigured(): boolean {
 }
 
 /** Kirim pesan Telegram ke chat_id. Markdown WA (*bold*) kompatibel dengan parse_mode Markdown. */
-export async function sendTelegram(chatId: number | string, text: string): Promise<{
-  text = rewriteReplay(text); ok: boolean; data: unknown }> {
+export async function sendTelegram(chatId: number | string, text: string): Promise<{ ok: boolean; data: unknown }> {
+  text = rewriteReplay(text);
   const headers = gatewayHeaders();
   if (!headers) return { ok: false, data: { error: 'telegram_not_configured' } };
   try {

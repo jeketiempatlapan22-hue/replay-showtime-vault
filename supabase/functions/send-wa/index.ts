@@ -14,8 +14,8 @@ function normalizePhone(raw: string) {
   return d;
 }
 
-export async function sendFonnte(phone: string, message: string): Promise<{
-  message = rewriteReplay(message); ok: boolean; data: unknown }> {
+export async function sendFonnte(phone: string, message: string): Promise<{ ok: boolean; data: unknown }> {
+  message = rewriteReplay(message);
   const token = Deno.env.get('FONNTE_TOKEN');
   if (!token) return { ok: false, data: { error: 'FONNTE_TOKEN not configured' } };
   const target = normalizePhone(phone);
