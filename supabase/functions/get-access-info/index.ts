@@ -1,3 +1,4 @@
+import { primeReplayHost, rewriteReplay } from '../_shared/replay-origin.ts';
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { membershipPasswordOk, currentMembershipPassword } from "../_shared/membership-password.ts";
 import { bundleShowTokens } from "../_shared/bundle.ts";
@@ -7,7 +8,8 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const json = (b: unknown, status = 200) =>
+const json = (b: unknown, status = 200) => _json(b && typeof (b as any).message === 'string' ? { ...(b as any), message: rewriteReplay((b as any).message) } : b, status);
+const _json = (b: unknown, status = 200) =>
   new Response(JSON.stringify(b), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
 function buildMessage(o: {
@@ -28,6 +30,7 @@ function buildMessage(o: {
 }
 
 Deno.serve(async (req) => {
+  await primeReplayHost();
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   try {
     const body = await req.json().catch(() => ({} as any));

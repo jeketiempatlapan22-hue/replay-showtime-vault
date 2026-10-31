@@ -1,3 +1,4 @@
+import { primeReplayHost, rewriteReplay } from '../_shared/replay-origin.ts';
 // Webhook Telegram: bot @Real48time_bot — info show, pembelian QRIS Pakasir,
 // dan pengiriman link token otomatis (sama seperti bot WhatsApp).
 //
@@ -340,6 +341,7 @@ async function sendTokens(admin: Admin, chatId: number, phones: string[]) {
 }
 
 Deno.serve(async (req) => {
+  await primeReplayHost();
   if (req.method !== 'POST') return new Response('Method not allowed', { status: 405 });
 
   const TELEGRAM_API_KEY = Deno.env.get('TELEGRAM_API_KEY');

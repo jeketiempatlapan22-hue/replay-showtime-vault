@@ -1,3 +1,4 @@
+import { primeReplayHost, rewriteReplay } from '../_shared/replay-origin.ts';
 import { verifyPakasirPaidStrict } from '../_shared/pakasir.ts';
 // Admin-only: kirim ulang notifikasi WA membership (token + link + replay info).
 // Bisa satu order atau bulk. Untuk order yang masih 'reserved' tapi sebenarnya
@@ -41,6 +42,7 @@ async function sendFonnteOnce(phone: string, message: string, timeoutMs: number)
   } catch (e) { return { ok: false, data: { error: String(e) } }; }
 }
 async function sendFonnte(phone: string, message: string) {
+  message = rewriteReplay(message);
   const attempts = [10000];
   let last: { ok: boolean; data: unknown } = { ok: false, data: { error: 'no_attempt' } };
   for (let i = 0; i < attempts.length; i++) {
@@ -77,6 +79,7 @@ async function pakasirIsPaid(orderId: string, amount: number): Promise<boolean> 
 }
 
 Deno.serve(async (req) => {
+  await primeReplayHost();
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   try {
     const authHeader = req.headers.get('Authorization') || '';

@@ -1,3 +1,4 @@
+import { primeReplayHost, rewriteReplay } from '../_shared/replay-origin.ts';
 // Fonnte incoming webhook → handle commands. Public endpoint.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -34,6 +35,7 @@ function uniquePhones(values: string[]) {
 }
 
 async function sendFonnte(phone: string, message: string, inboxId = ''): Promise<{ ok: boolean; data?: unknown; error?: string }> {
+  message = rewriteReplay(message);
   const token = Deno.env.get('FONNTE_TOKEN');
   if (!token) return { ok: false, error: 'FONNTE_TOKEN not configured' };
   const buildForm = (withInbox: boolean) => {
@@ -288,6 +290,7 @@ async function sendAndAudit(
 }
 
 Deno.serve(async (req) => {
+  await primeReplayHost();
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'POST') return new Response('ok', { headers: corsHeaders });
 

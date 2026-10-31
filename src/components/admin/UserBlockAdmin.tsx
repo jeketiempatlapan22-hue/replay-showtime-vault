@@ -14,6 +14,7 @@ type BlockedRow = { id: string; user_id: string | null; phone: string; email: st
 export default function UserBlockAdmin() {
   const [mode, setMode] = useState(false);
   const [msg, setMsg] = useState('');
+  const [replayHost, setReplayHost] = useState('');
   const [q, setQ] = useState('');
   const [found, setFound] = useState<Found[]>([]);
   const [reason, setReason] = useState('');
@@ -21,9 +22,9 @@ export default function UserBlockAdmin() {
   const [busy, setBusy] = useState(false);
 
   const loadAll = async () => {
-    const { data } = await supabase.from('site_settings').select('key,value').in('key', ['maintenance_mode', 'maintenance_message']);
+    const { data } = await supabase.from('site_settings').select('key,value').in('key', ['maintenance_mode', 'maintenance_message', 'replay_origin']);
     const m = Object.fromEntries((data || []).map((r) => [r.key, r.value]));
-    setMode(m.maintenance_mode === 'true'); setMsg(m.maintenance_message || '');
+    setMode(m.maintenance_mode === 'true'); setMsg(m.maintenance_message || ''); setReplayHost(m.replay_origin || '');
     const { data: b } = await supabase.from('blocked_users').select('id,user_id,phone,email,reason,created_at').eq('active', true).order('created_at', { ascending: false });
     setBlocked((b || []) as BlockedRow[]);
   };
@@ -78,6 +79,17 @@ export default function UserBlockAdmin() {
           <div className="flex gap-2">
             <Input placeholder="Pesan untuk pengunjung (opsional)" value={msg} onChange={(e) => setMsg(e.target.value)} />
             <Button variant="outline" onClick={async () => { if (await setSetting('maintenance_message', msg)) toast.success('Pesan disimpan'); }}>Simpan</Button>
+          </div>
+          <div className="space-y-1 pt-2 border-t border-border">
+            <p className="text-sm font-medium text-foreground">Domain Replay Rahasia</p>
+            <p className="text-xs text-muted-foreground">Selalu terbuka walau Mode Perbaikan aktif, dan dipakai untuk "Link Replay" di semua pesan. Kosongkan untuk memakai domain utama.</p>
+            <div className="flex gap-2">
+              <Input placeholder="contoh: replay-rahasia.my.id" value={replayHost} onChange={(e) => setReplayHost(e.target.value)} />
+              <Button variant="outline" onClick={async () => {
+                const v = replayHost.trim().replace(/^https?:\/\//i, '').replace(/\/.*$/, '').toLowerCase();
+                if (await setSetting('replay_origin', v)) { setReplayHost(v); toast.success('Domain replay disimpan'); }
+              }}>Simpan</Button>
+            </div>
           </div>
         </CardContent>
       </Card>

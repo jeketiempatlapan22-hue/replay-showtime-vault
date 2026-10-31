@@ -4,8 +4,11 @@ import { Wrench } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
 // Halaman yang tetap bisa dibuka saat Mode Perbaikan aktif.
-const LIVE_PATHS = ['/live', '/kunci', '/free', '/tv'];
+const LIVE_PATHS = ['/live', '/kunci', '/free', '/tv', '/reseller'];
 const ALWAYS_OPEN = ['/adpan', '/auth', '/reset-password'];
+// Domain utama & preview: tunduk pada Mode Perbaikan. Host lain yang cocok dengan
+// site_settings.replay_origin = Domain Replay Rahasia (selalu terbuka).
+const normHost = (v: string) => String(v || '').trim().replace(/^https?:\/\//i, '').replace(/\/.*$/, '').toLowerCase();
 
 export function MaintenanceScreen({ message }: { message?: string }) {
   return (
@@ -26,13 +29,16 @@ export default function MaintenanceGate({ children }: { children: React.ReactNod
   const [mode, setMode] = useState(false);
   const [msg, setMsg] = useState('');
   const [userBlocked, setUserBlocked] = useState(false);
+  const [secretHost, setSecretHost] = useState(false);
 
   useEffect(() => {
     const loadSettings = async () => {
-      const { data } = await supabase.from('site_settings').select('key,value').in('key', ['maintenance_mode', 'maintenance_message']);
+      const { data } = await supabase.from('site_settings').select('key,value').in('key', ['maintenance_mode', 'maintenance_message', 'replay_origin']);
       const m = Object.fromEntries((data || []).map((r) => [r.key, r.value]));
       setMode(m.maintenance_mode === 'true');
       setMsg(m.maintenance_message || '');
+      const rh = normHost(m.replay_origin || '');
+      setSecretHost(!!rh && (window.location.hostname === rh || window.location.hostname === `www.${rh}`));
     };
     const checkUser = async () => {
       const { data: s } = await supabase.auth.getSession();
@@ -52,6 +58,6 @@ export default function MaintenanceGate({ children }: { children: React.ReactNod
   const open = ALWAYS_OPEN.some((p) => pathname.startsWith(p));
   const isLive = LIVE_PATHS.some((p) => pathname.startsWith(p));
   if (!open && userBlocked) return <MaintenanceScreen />;
-  if (!open && !isLive && mode) return <MaintenanceScreen message={msg} />;
+  if (!open && !isLive && !secretHost && mode) return <MaintenanceScreen message={msg} />;
   return <>{children}</>;
 }

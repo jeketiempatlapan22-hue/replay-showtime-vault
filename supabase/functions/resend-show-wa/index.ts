@@ -1,3 +1,4 @@
+import { primeReplayHost, rewriteReplay } from '../_shared/replay-origin.ts';
 // Admin-only: kirim ulang notifikasi WA untuk pembelian SHOW / REPLAY / COIN TOPUP
 // yang gagal (misal karena Fonnte sedang disconnect). Membaca ulang template
 // dari site_settings dan membangun pesan persis seperti pakasir-webhook.
@@ -41,6 +42,7 @@ async function sendFonnteOnce(phone: string, message: string, timeoutMs: number)
   } catch (e) { return { ok: false, data: { error: String(e) } }; }
 }
 async function sendFonnte(phone: string, message: string) {
+  message = rewriteReplay(message);
   const attempts = [10000, 20000, 32000];
   let last: { ok: boolean; data: unknown } = { ok: false, data: { error: 'no_attempt' } };
   for (let i = 0; i < attempts.length; i++) {
@@ -158,6 +160,7 @@ async function buildMessage(admin: any, order: any) {
 }
 
 Deno.serve(async (req) => {
+  await primeReplayHost();
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   try {
     const authHeader = req.headers.get('Authorization') || '';
