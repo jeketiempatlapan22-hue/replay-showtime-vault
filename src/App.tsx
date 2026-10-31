@@ -11,6 +11,7 @@ import { getBrowserId } from "@/lib/browserId";
 import { supabase } from "@/integrations/supabase/client";
 import { syncPurchases } from "@/lib/purchaseSync";
 import BottomNav from "./components/BottomNav";
+import MaintenanceGate from "./components/MaintenanceGate";
 import GuestOnboardBanner from "./components/GuestOnboardBanner";
 
 
@@ -135,6 +136,7 @@ const App = () => (
         <ErrorBoundary>
           <PurchaseSync />
           <ProtectedShell>
+            <MaintenanceGate>
             <Suspense fallback={<PageLoading />}>
             <Routes>
               <Route path="/" element={<Index />} />
@@ -157,6 +159,7 @@ const App = () => (
               <Route path="*" element={<NotFound />} />
             </Routes>
             </Suspense>
+            </MaintenanceGate>
             <BottomNav />
             <GuestOnboardBanner />
 
