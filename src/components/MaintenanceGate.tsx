@@ -6,9 +6,9 @@ import { supabase } from '@/integrations/supabase/client';
 // Halaman yang tetap bisa dibuka saat Mode Perbaikan aktif.
 const LIVE_PATHS = ['/live', '/kunci', '/free', '/tv', '/reseller'];
 const ALWAYS_OPEN = ['/adpan', '/auth', '/reset-password'];
-// Domain utama & preview: tunduk pada Mode Perbaikan. Host lain yang cocok dengan
-// site_settings.replay_origin = Domain Replay Rahasia (selalu terbuka).
-const normHost = (v: string) => String(v || '').trim().replace(/^https?:\/\//i, '').replace(/\/.*$/, '').toLowerCase();
+// Path Replay Rahasia (site_settings.replay_path, default "rply"): selalu terbuka
+// walau Mode Perbaikan aktif — halaman utama (/) tetap tertutup.
+const normPath = (v: string) => String(v || '').trim().replace(/^\/+|\/+$/g, '').replace(/[^a-z0-9-]/gi, '').toLowerCase();
 
 export function MaintenanceScreen({ message }: { message?: string }) {
   return (

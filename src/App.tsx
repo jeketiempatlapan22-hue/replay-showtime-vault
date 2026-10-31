@@ -188,7 +188,7 @@ const App = () => (
               <Route path="/panduan" element={<Panduan />} />
               <Route path="/tv" element={<TvPage />} />
               <Route path="/game" element={<Game />} />
-              <Route path="*" element={<NotFound />} />
+              <Route path="*" element={<SecretReplayRoute />} />
             </Routes>
             </Suspense>
             </MaintenanceGate>
