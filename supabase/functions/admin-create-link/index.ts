@@ -95,15 +95,20 @@ Deno.serve(async (req) => {
     return json({ ok: true, token, link, message, title: r.title, expires_at: expiresAt.toISOString() });
   }
 
-  const { data: s } = await admin.from('active_shows').select('id,title,show_date,show_time,live_password').eq('id', targetId).maybeSingle();
+  const { data: s } = await admin.from('active_shows').select('id,title,show_date,show_time,live_password,replay_info,replay_id').eq('id', targetId).maybeSingle();
   if (!s) return json({ error: 'show_not_found' }, 404);
+  let replayPassword = String(s.live_password || '');
+  if (!replayPassword && s.replay_id) {
+    const { data: replay } = await admin.from('replays').select('password').eq('id', s.replay_id).maybeSingle();
+    replayPassword = String(replay?.password || '');
+  }
   const showStart = new Date(`${s.show_date}T${String(s.show_time).slice(0, 8)}+07:00`);
   const expiresAt = new Date(showStart.getTime() + 8 * 3600000);
   const { error } = await admin.from('active_show_tokens').insert({ show_id: s.id, token, kind: 'personal', max_devices: 1, label: `admin:${label}`, expires_at: expiresAt.toISOString() });
   if (error) return json({ error: 'create_failed', detail: error.message }, 500);
   const link = `${origin}/live?show=${s.id}&t=${token}`;
   const message = ['🔐 *TOKEN LIVE*', '', `🎤 *${s.title}*`, `📅 ${s.show_date} ${String(s.show_time).slice(0, 5)}`, `⏳ Berlaku sampai: *${fmtId(expiresAt)}*`, '',
-    '🔗 *Link Live:*', link, '', '🎬 *Link Replay:*', siteOnly, ...(s.live_password ? ['', `🔐 Sandi Replay: *${s.live_password}*`] : []), '', '— *ReplayTime* 💖'].join('\n');
+    '🔗 *Link Live:*', link, '', '🎬 *Link Replay:*', siteOnly, ...(replayPassword ? ['', `🔐 Sandi Replay: *${replayPassword}*`] : []), ...(s.replay_info ? ['', '🎞️ *Info Replay*', s.replay_info] : []), '', '— *ReplayTime* 💖'].join('\n');
   await admin.from('token_deliveries').insert({ phone: '', replay_id: null, replay_title: s.title, access_token: token, link, source: 'admin', requested_by: 'admin' });
-  return json({ ok: true, token, link, message, title: s.title, expires_at: expiresAt.toISOString() });
+  return json({ ok: true, token, link, message, password: replayPassword, replay_info: s.replay_info || '', title: s.title, expires_at: expiresAt.toISOString() });
 });

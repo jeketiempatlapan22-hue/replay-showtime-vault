@@ -13,7 +13,7 @@ const _json = (b: unknown, status = 200) =>
   new Response(JSON.stringify(b), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
 function buildMessage(o: {
-  title: string; date: string; link: string; password: string; replayInfo: string; kindLabel: string;
+  title: string; date: string; link: string; password: string; replayInfo: string; kindLabel: string; replayLink?: string;
 }) {
   const lines: string[] = [
     "🎬 *RealTime48*",
@@ -23,6 +23,7 @@ function buildMessage(o: {
   ];
   if (o.date) lines.push(`📅 ${o.date}`);
   lines.push("", `🔗 *${o.kindLabel}*`, o.link);
+  if (o.replayLink) lines.push('', '🎬 *Link Replay:*', o.replayLink);
   if (o.password) lines.push("", `🗝️ *Sandi Replay:* ${o.password}`);
   if (o.replayInfo) lines.push("", "🎞️ *Info Replay*", o.replayInfo);
   lines.push("", "━━━━━━━━━━━━━━", "✨ Selamat menonton! 💖");
@@ -71,7 +72,7 @@ Deno.serve(async (req) => {
         link,
         password,
         replay_info: replayInfo,
-        message: buildMessage({ title: t.label || "Membership", date, link, password, replayInfo, kindLabel: "Link Membership" }),
+        message: buildMessage({ title: t.label || "Membership", date, link, password, replayInfo, kindLabel: "Link Membership", replayLink: t.includes_replays ? origin : undefined }),
       });
     }
 
@@ -216,7 +217,7 @@ Deno.serve(async (req) => {
       password,
       replay_info: replayInfo,
       group_link: show?.group_link_enabled ? String(show?.group_link || "") : "",
-      message: buildMessage({ title, date, link, password, replayInfo, kindLabel: "Link Akses" }),
+      message: buildMessage({ title, date, link, password, replayInfo, kindLabel: "Link Akses", replayLink: origin }),
     });
   } catch (e) {
     return json({ ok: false, reason: "error", error: String((e as Error)?.message || e) }, 200);

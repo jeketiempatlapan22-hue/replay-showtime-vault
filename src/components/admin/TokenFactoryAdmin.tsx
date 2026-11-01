@@ -9,6 +9,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Copy, RotateCcw, Trash2, Search, RefreshCw, Lock, Unlock, Link2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { copyToClipboard } from '@/lib/clipboard';
+import AccessInfoCard from '@/components/AccessInfoCard';
 
 type Kind = 'show' | 'membership';
 type Status = 'active' | 'expired';
@@ -29,13 +31,11 @@ type MbRow = {
   created_by: string; created_at: string; status: string;
 };
 
-const SITE = (typeof window !== 'undefined' ? window.location.origin : 'https://realtimestream.my.id');
+const SITE = 'https://realtimestream.my.id';
 
-function copy(text: string, label: string) {
-  navigator.clipboard.writeText(text).then(
-    () => toast({ title: `${label} disalin` }),
-    () => toast({ title: 'Gagal menyalin', variant: 'destructive' })
-  );
+async function copy(text: string, label: string) {
+  const copied = await copyToClipboard(text);
+  toast({ title: copied ? `${label} disalin` : 'Gagal menyalin', variant: copied ? 'default' : 'destructive' });
 }
 
 function TokenTable({ kind, status }: { kind: Kind; status: Status }) {
@@ -69,7 +69,7 @@ function TokenTable({ kind, status }: { kind: Kind; status: Status }) {
   }, [rows, q]);
 
   const linkFor = (r: any) => kind === 'show'
-    ? `${SITE}/live?t=${encodeURIComponent(r.token)}`
+    ? `${SITE}/live?${r.show_id ? `show=${encodeURIComponent(r.show_id)}&` : ''}t=${encodeURIComponent(r.token)}`
     : `${SITE}/live?mtoken=${encodeURIComponent(r.token)}`;
 
   const doReset = async (id: string) => {
@@ -193,6 +193,11 @@ function TokenTable({ kind, status }: { kind: Kind; status: Status }) {
                   <div>🕒 Dibuat: {new Date(r.created_at).toLocaleString('id-ID')}</div>
                   <div>⏳ Berakhir: {r.expires_at ? new Date(r.expires_at).toLocaleString('id-ID') : '—'}</div>
                 </div>
+                {status === 'active' && (
+                  <div className="mt-2">
+                    <AccessInfoCard token={kind === 'show' ? r.token : undefined} showId={kind === 'show' ? r.show_id || undefined : undefined} mtoken={kind === 'membership' ? r.token : undefined} mpassword={kind === 'membership' ? r.password : undefined} compact />
+                  </div>
+                )}
                 <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-1.5 mt-2">
                   <Button size="sm" variant="outline" onClick={() => copy(r.token, 'Token')}><Copy className="w-3.5 h-3.5 mr-1" />Token</Button>
                   <Button size="sm" variant="outline" onClick={() => copy(linkFor(r), 'Link')}><Link2 className="w-3.5 h-3.5 mr-1" />Link</Button>
