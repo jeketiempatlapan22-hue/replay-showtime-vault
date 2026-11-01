@@ -108,6 +108,7 @@ export type Database = {
           category: string
           created_at: string
           description: string
+          featured_member: string
           group_link: string
           group_link_enabled: boolean
           group_link_label: string
@@ -148,6 +149,7 @@ export type Database = {
           category?: string
           created_at?: string
           description?: string
+          featured_member?: string
           group_link?: string
           group_link_enabled?: boolean
           group_link_label?: string
@@ -188,6 +190,7 @@ export type Database = {
           category?: string
           created_at?: string
           description?: string
+          featured_member?: string
           group_link?: string
           group_link_enabled?: boolean
           group_link_label?: string
@@ -2484,6 +2487,7 @@ export type Database = {
           category: string
           created_at: string
           description: string
+          featured_member: string
           group_link: string
           group_link_enabled: boolean
           group_link_label: string
@@ -2533,6 +2537,7 @@ export type Database = {
           category: string
           created_at: string
           description: string
+          featured_member: string
           group_link: string
           group_link_enabled: boolean
           group_link_label: string

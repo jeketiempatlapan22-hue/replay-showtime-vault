@@ -1,5 +1,9 @@
 # Roadmap
 
+- [ ] Repair live/admin link copying and complete token replay messages.
+- [ ] Show the birthday/graduating member on active-show cards.
+- [ ] Verify the affected flows and tests.
+
 - [x] Add TV/projector connection controls to replay players, matching live behavior.
 - [x] Standardize non-admin live-chat username and comment colors.
 - [x] Improve pinned-message prominence without obscuring chat.
