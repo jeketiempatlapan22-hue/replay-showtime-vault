@@ -26,7 +26,7 @@ export default function LiveMonitorAdmin() {
     <div className="space-y-6">
       <section className="space-y-3">
       <div className="flex gap-2 items-center">
-        <select className="flex-1 h-10 rounded-md border border-input bg-background px-2 text-sm" value={sel} onChange={(e) => setSel(e.target.value)}>
+        <select className="flex-1 min-w-0 h-10 rounded-md border border-input bg-background px-2 text-sm" value={sel} onChange={(e) => setSel(e.target.value)}>
           {shows.map((s) => <option key={s.id} value={s.id}>{s.is_live ? '🔴 LIVE • ' : ''}{s.title} ({s.show_date} {String(s.show_time).slice(0, 5)})</option>)}
         </select>
         <Button variant="outline" size="icon" onClick={() => setNonce((n) => n + 1)} aria-label="Muat ulang"><RefreshCw className="w-4 h-4" /></Button>

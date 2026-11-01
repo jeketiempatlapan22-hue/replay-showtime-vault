@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { copyToClipboard } from '@/lib/clipboard';
 
 type Delivery = {
   id: string;
@@ -48,16 +49,15 @@ export default function TokenHistoryAdmin() {
     setItems(prev => prev.filter(i => i.id !== id));
   };
 
-  const copy = (text: string) => {
-    navigator.clipboard.writeText(text);
-    toast({ title: 'Disalin' });
+  const copy = async (text: string) => {
+    const copied = await copyToClipboard(text);
+    toast({ title: copied ? 'Disalin' : 'Gagal menyalin', variant: copied ? 'default' : 'destructive' });
   };
 
   const copyAllPhones = () => {
     const list = [...new Set(filtered.map(i => i.phone).filter(Boolean))].join('\n');
     if (!list) return toast({ title: 'Tidak ada nomor', variant: 'destructive' });
-    navigator.clipboard.writeText(list);
-    toast({ title: `${list.split('\n').length} nomor disalin` });
+    void copy(list);
   };
 
   return (

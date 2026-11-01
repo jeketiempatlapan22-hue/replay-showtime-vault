@@ -138,8 +138,8 @@ export default function Admin() {
 
   // Active shows state
   const [activeShows, setActiveShows] = useState<ActiveShow[]>([]);
-  const [showForm, setShowForm] = useState<{ id?: string; title: string; show_date: string; show_time: string; lineup: string; category: string; description: string; image_url: string; sort_order: number; is_active: boolean; is_special: boolean; price_show: number; price_replay: number; price_show_coins: number; price_replay_coins: number; pakasir_amount: number; replay_id: string; replay_enabled: boolean; admin_alias: string }>({
-    title: '', show_date: '', show_time: '19:00', lineup: '', category: 'reguler', description: '', image_url: '', sort_order: 0, is_active: true, is_special: false,
+  const [showForm, setShowForm] = useState<{ id?: string; title: string; show_date: string; show_time: string; lineup: string; category: string; featured_member: string; description: string; image_url: string; sort_order: number; is_active: boolean; is_special: boolean; price_show: number; price_replay: number; price_show_coins: number; price_replay_coins: number; pakasir_amount: number; replay_id: string; replay_enabled: boolean; admin_alias: string }>({
+    title: '', show_date: '', show_time: '19:00', lineup: '', category: 'reguler', featured_member: '', description: '', image_url: '', sort_order: 0, is_active: true, is_special: false,
     price_show: 0, price_replay: 0, price_show_coins: 0, price_replay_coins: 0, pakasir_amount: 0, replay_id: '', replay_enabled: false, admin_alias: '',
   });
   const [showEditing, setShowEditing] = useState(false);
@@ -147,7 +147,7 @@ export default function Admin() {
   const refreshActiveShows = () => getActiveShows(true).then(setActiveShows);
 
   const resetShowForm = () => {
-    setShowForm({ title: '', show_date: '', show_time: '19:00', lineup: '', category: 'reguler', description: '', image_url: '', sort_order: 0, is_active: true, is_special: false, price_show: 0, price_replay: 0, price_show_coins: 0, price_replay_coins: 0, pakasir_amount: 0, replay_id: '', replay_enabled: false, admin_alias: '' });
+    setShowForm({ title: '', show_date: '', show_time: '19:00', lineup: '', category: 'reguler', featured_member: '', description: '', image_url: '', sort_order: 0, is_active: true, is_special: false, price_show: 0, price_replay: 0, price_show_coins: 0, price_replay_coins: 0, pakasir_amount: 0, replay_id: '', replay_enabled: false, admin_alias: '' });
     setShowEditing(false);
   };
 
@@ -164,6 +164,7 @@ export default function Admin() {
         show_time: showForm.show_time || '19:00',
         lineup: showForm.lineup.split(',').map(s => s.trim()).filter(Boolean),
         category: showForm.category,
+        featured_member: showForm.featured_member.trim(),
         description: showForm.description.trim(),
         image_url: showForm.image_url.trim(),
         sort_order: Number(showForm.sort_order) || 0,
@@ -190,6 +191,7 @@ export default function Admin() {
     setShowForm({
       id: s.id, title: s.title, show_date: s.show_date, show_time: s.show_time,
       lineup: s.lineup.join(', '), category: s.category, description: s.description,
+      featured_member: s.featured_member || '',
       image_url: s.image_url, sort_order: s.sort_order, is_active: s.is_active, is_special: !!(s as any).is_special,
       price_show: s.price_show ?? 0, price_replay: s.price_replay ?? 0,
       price_show_coins: (s as any).price_show_coins ?? 0, price_replay_coins: (s as any).price_replay_coins ?? 0,
@@ -886,6 +888,12 @@ export default function Admin() {
                     {CRITERIA_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                   </select>
                 </div>
+                {(showForm.category === 'sts' || showForm.category === 'last_show') && (
+                  <div>
+                    <Label htmlFor="show-featured-member">{showForm.category === 'sts' ? 'Member yang Ulang Tahun' : 'Member yang Graduate'}</Label>
+                    <Input id="show-featured-member" list="member-names" value={showForm.featured_member} onChange={e => setShowForm({ ...showForm, featured_member: e.target.value })} placeholder="Nama member" />
+                  </div>
+                )}
                 <div>
                   <Label>Lineup Member (pisahkan dengan koma)</Label>
                   <Input value={showForm.lineup} onChange={e => setShowForm({ ...showForm, lineup: e.target.value })} placeholder="Freya, Christy, Gracia" />

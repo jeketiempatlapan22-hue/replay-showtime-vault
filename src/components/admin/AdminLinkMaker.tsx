@@ -5,6 +5,8 @@ import { Input } from '@/components/ui/input';
 import { toast } from '@/hooks/use-toast';
 import { Copy, Gift, Link2 } from 'lucide-react';
 import { getShowBundle, type ShowBundle } from '@/lib/bundle';
+import { copyToClipboard } from '@/lib/clipboard';
+import { Textarea } from '@/components/ui/textarea';
 
 type Item = { id: string; title: string; sub: string };
 type Result = { title: string; link: string; message: string; password?: string };
@@ -34,16 +36,20 @@ export default function AdminLinkMaker() {
     setBusy(null);
     if (error || !data?.ok) { toast({ title: 'Gagal membuat link', description: data?.error || error?.message, variant: 'destructive' }); return; }
     setResults((r) => [{ title: data.title, link: data.link, message: data.message, password: data.password }, ...r]);
-    try { await navigator.clipboard.writeText(data.message); toast({ title: 'Link baru dibuat & pesan disalin' }); } catch { toast({ title: 'Link baru dibuat' }); }
+    const copied = await copyToClipboard(data.message || data.link);
+    toast({ title: copied ? 'Link baru dibuat & pesan disalin' : 'Link baru dibuat', description: copied ? undefined : 'Pesan lengkap tersedia di bawah untuk disalin manual.' });
   };
 
-  const copy = async (t: string) => { try { await navigator.clipboard.writeText(t); toast({ title: 'Disalin' }); } catch { /* ignore */ } };
+  const copy = async (t: string) => {
+    const copied = await copyToClipboard(t);
+    toast({ title: copied ? 'Disalin' : 'Tidak bisa menyalin otomatis', description: copied ? undefined : 'Pilih dan salin pesan lengkap di bawah.', variant: copied ? 'default' : 'destructive' });
+  };
   const f = (list: Item[]) => list.filter((i) => !q || i.title.toLowerCase().includes(q.toLowerCase()));
 
   const Row = ({ it, kind }: { it: Item; kind: string }) => (
     <div className="flex items-center justify-between gap-2 border border-border rounded-md p-2">
-      <div className="min-w-0"><p className="text-sm font-medium truncate">{it.title}</p><p className="text-xs text-muted-foreground">{it.sub}</p></div>
-      <Button size="sm" disabled={!!busy} onClick={() => create(kind, it.id)}><Link2 className="w-4 h-4 mr-1" />{busy === `${kind}-${it.id}` ? '...' : 'Buat'}</Button>
+      <div className="flex-1 min-w-0"><p className="text-sm font-medium break-words">{it.title}</p><p className="text-xs text-muted-foreground">{it.sub}</p></div>
+      <Button className="shrink-0" size="sm" disabled={!!busy} onClick={() => create(kind, it.id)}><Link2 className="w-4 h-4 mr-1" />{busy === `${kind}-${it.id}` ? '...' : 'Buat'}</Button>
     </div>
   );
 
@@ -62,7 +68,8 @@ export default function AdminLinkMaker() {
             <div key={i} className="rounded-md border border-primary/40 bg-primary/5 p-2 space-y-1">
               <p className="text-sm font-medium">{r.title}{r.password ? ` • Sandi ${r.password}` : ''}</p>
               <p className="text-xs break-all text-muted-foreground">{r.link}</p>
-              <div className="flex gap-2">
+              <Textarea readOnly aria-label={`Pesan token ${r.title}`} value={r.message || r.link} className="min-h-48 text-xs" />
+              <div className="flex flex-wrap gap-2">
                 <Button size="sm" variant="outline" onClick={() => copy(r.link)}><Copy className="w-3 h-3 mr-1" />Link</Button>
                 <Button size="sm" variant="outline" onClick={() => copy(r.message)}><Copy className="w-3 h-3 mr-1" />Pesan</Button>
               </div>

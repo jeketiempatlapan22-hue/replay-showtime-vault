@@ -7,6 +7,7 @@ export interface ActiveShow {
   show_time: string;
   lineup: string[];
   category: string;
+  featured_member?: string;
   description: string;
   image_url: string;
   sort_order: number;
@@ -62,7 +63,7 @@ export async function getActiveShows(adminMode = false): Promise<ActiveShow[]> {
     return (data || []) as unknown as ActiveShow[];
   }
   const { data, error } = await supabase.from('active_shows').select(
-    'id,title,show_date,show_time,lineup,category,description,image_url,sort_order,is_active,is_special,created_at,updated_at,price_show,price_replay,pakasir_amount,replay_id,replay_enabled,is_live,live_auto_schedule,live_hold_until,live_type,live_require_password,replay_mode,admin_alias,price_show_coins,price_replay_coins,idn_show_id'
+    'id,title,show_date,show_time,lineup,category,featured_member,description,image_url,sort_order,is_active,is_special,created_at,updated_at,price_show,price_replay,pakasir_amount,replay_id,replay_enabled,is_live,live_auto_schedule,live_hold_until,live_type,live_require_password,replay_mode,admin_alias,price_show_coins,price_replay_coins,idn_show_id'
   )
     .eq('is_active', true)
     .order('is_special', { ascending: false })

@@ -7,6 +7,8 @@ import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { Plus, Trash2, Copy, Ban, RotateCcw, Smartphone, ShieldOff, ShieldCheck, Search, X } from 'lucide-react';
+import { copyToClipboard } from '@/lib/clipboard';
+import AccessInfoCard from '@/components/AccessInfoCard';
 
 type Token = {
   id: string;
@@ -131,8 +133,9 @@ export default function ShowLiveTokensDialog({ open, onOpenChange, showId, showT
   };
 
   const copyLink = async (token: string) => {
-    const url = `${window.location.origin}/live?show=${showId}&t=${token}`;
-    try { await navigator.clipboard.writeText(url); toast({ title: 'Link tersalin' }); } catch { /* ignore */ }
+    const url = `https://realtimestream.my.id/live?show=${showId}&t=${token}`;
+    const copied = await copyToClipboard(url);
+    toast({ title: copied ? 'Link tersalin' : 'Tidak bisa menyalin otomatis', description: copied ? undefined : 'Buka info akses di bawah untuk menyalin manual.' });
   };
 
   return (
@@ -220,7 +223,7 @@ export default function ShowLiveTokensDialog({ open, onOpenChange, showId, showT
                       {t.label || '(tanpa label)'}
                       <span className="ml-1 text-[10px] text-muted-foreground uppercase">· {t.kind}</span>
                     </p>
-                    <code className="text-[10px] text-muted-foreground break-all">{t.token.slice(0, 16)}…</code>
+                    <code className="block text-[10px] text-muted-foreground break-all select-text">{t.token}</code>
                     <p className="text-[10px] text-muted-foreground">Dibuat: {new Date(t.created_at).toLocaleString('id-ID')}</p>
                   </div>
                   <Badge variant={t.revoked ? 'destructive' : 'secondary'} className="text-[10px]">
@@ -244,6 +247,7 @@ export default function ShowLiveTokensDialog({ open, onOpenChange, showId, showT
                     <Trash2 className="w-3 h-3 mr-1" />Hapus
                   </Button>
                 </div>
+                {!t.revoked && <AccessInfoCard token={t.token} showId={showId} compact />}
                 {isOpen && (
                   <div className="border-t border-border pt-2 space-y-1">
                     {devs.length === 0 ? (
