@@ -170,6 +170,14 @@ export default function ActiveShowCard({ show, index = 0 }: { show: ActiveShow; 
       )}
 
       <div className="p-3 space-y-2">
+        {(show.category === 'sts' || show.category === 'last_show') && show.featured_member?.trim() && (
+          <p className="text-sm font-semibold text-primary break-words">
+            {show.category === 'sts' ? '🎂' : '🎓'} {show.featured_member}
+          </p>
+        )}
+        {show.description?.trim() && (
+          <p className="text-sm text-muted-foreground whitespace-pre-wrap break-words">{show.description}</p>
+        )}
         {!show.image_url && (
           <h3 className="text-lg font-semibold text-foreground line-clamp-2 font-sans">{show.title}</h3>
         )}
