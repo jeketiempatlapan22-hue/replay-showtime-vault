@@ -8,6 +8,13 @@
       "when": 1793427542020,
       "tag": "0000_blocked_users",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1793518100257,
+      "tag": "0001_active_show_featured_member",
+      "breakpoints": true
     }
   ]
 }
