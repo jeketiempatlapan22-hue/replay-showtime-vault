@@ -16,6 +16,9 @@ export default function UserBlockAdmin() {
   const [msg, setMsg] = useState('');
   const [replayHost, setReplayHost] = useState('');
   const [liveOrigin, setLiveOrigin] = useState('');
+  const [mainOrigin, setMainOrigin] = useState('');
+  const [replayOrigin, setReplayOrigin] = useState('');
+  const [linkOrigin, setLinkOrigin] = useState('');
   const [q, setQ] = useState('');
   const [found, setFound] = useState<Found[]>([]);
   const [reason, setReason] = useState('');
@@ -23,9 +26,9 @@ export default function UserBlockAdmin() {
   const [busy, setBusy] = useState(false);
 
   const loadAll = async () => {
-    const { data } = await supabase.from('site_settings').select('key,value').in('key', ['maintenance_mode', 'maintenance_message', 'replay_path', 'live_origin']);
+    const { data } = await supabase.from('site_settings').select('key,value').in('key', ['maintenance_mode', 'maintenance_message', 'replay_path', 'live_origin', 'main_origin', 'replay_origin', 'link_origin']);
     const m = Object.fromEntries((data || []).map((r) => [r.key, r.value]));
-    setMode(m.maintenance_mode === 'true'); setMsg(m.maintenance_message || ''); setReplayHost(m.replay_path || 'rply'); setLiveOrigin(m.live_origin || '');
+    setMode(m.maintenance_mode === 'true'); setMsg(m.maintenance_message || ''); setReplayHost(m.replay_path || 'rply'); setLiveOrigin(m.live_origin || ''); setMainOrigin(m.main_origin || ''); setReplayOrigin(m.replay_origin || ''); setLinkOrigin(m.link_origin || '');
     const { data: b } = await supabase.from('blocked_users').select('id,user_id,phone,email,reason,created_at').eq('active', true).order('created_at', { ascending: false });
     setBlocked((b || []) as BlockedRow[]);
   };
@@ -92,20 +95,32 @@ export default function UserBlockAdmin() {
               }}>Simpan</Button>
             </div>
           </div>
-          <div className="space-y-1 pt-2 border-t border-border">
-            <p className="text-sm font-medium text-foreground">Domain Website Live (Domain B)</p>
-            <p className="text-xs text-muted-foreground">Jika diisi, semua link token tetap memakai realtimestream.my.id, tapi saat dibuka penonton langsung dialihkan ke domain ini. Kosongkan agar live tetap tayang di website ini. Jika domain live terkena suspend, cukup ganti di sini.</p>
-            <div className="flex gap-2">
-              <Input placeholder="https://live-domain-b.com" value={liveOrigin} onChange={(e) => setLiveOrigin(e.target.value)} />
-              <Button variant="outline" onClick={async () => {
-                let v = liveOrigin.trim();
-                if (v) {
-                  if (!/^https?:\/\//i.test(v)) v = 'https://' + v;
-                  try { v = 'https://' + new URL(v).host.toLowerCase(); } catch { return toast.error('Domain tidak valid'); }
-                }
-                if (await setSetting('live_origin', v)) { setLiveOrigin(v); toast.success(v ? `Live dialihkan ke ${v}` : 'Live kembali tayang di website ini'); }
-              }}>Simpan</Button>
-            </div>
+          <div className="space-y-2 pt-2 border-t border-border">
+            <p className="text-sm font-medium text-foreground">Pengaturan Domain Website A / B</p>
+            <p className="text-xs text-muted-foreground">Website A dan B memakai data yang sama. Isi alamat website tujuan untuk tiap fungsi; pengunjung otomatis dipindahkan ke sana beserta token/sandinya. Kosongkan = tetap di website yang sedang dibuka. Admin dan reseller tidak dipindahkan.</p>
+            {([
+              ['main_origin', 'Website Pembayaran & halaman utama', mainOrigin, setMainOrigin],
+              ['live_origin', 'Website Live (halaman Live & TV)', liveOrigin, setLiveOrigin],
+              ['replay_origin', 'Website Replay (path replay rahasia)', replayOrigin, setReplayOrigin],
+              ['link_origin', 'Domain yang tertulis di pesan (WA/Telegram/link)', linkOrigin, setLinkOrigin],
+            ] as const).map(([key, label, val, set]) => (
+              <div key={key} className="space-y-1">
+                <p className="text-xs font-medium text-foreground">{label}</p>
+                <div className="flex gap-2">
+                  <Input placeholder="https://domain.com (kosong = tidak dialihkan)" value={val} onChange={(e) => set(e.target.value)} />
+                  <Button variant="outline" onClick={async () => {
+                    let v = val.trim();
+                    if (v) {
+                      if (!/^https?:\/\//i.test(v)) v = 'https://' + v;
+                      try { v = 'https://' + new URL(v).host.toLowerCase(); } catch { return toast.error('Domain tidak valid'); }
+                    }
+                    if (key === 'link_origin' && v) v = v.replace(/^https:\/\//, '');
+                    if (await setSetting(key, v)) { set(v); toast.success(v ? `${label}: ${v}` : `${label}: tidak dialihkan`); }
+                  }}>Simpan</Button>
+                </div>
+              </div>
+            ))}
+            <p className="text-xs text-muted-foreground">Catatan: domain di pesan hanya mengganti alamat; pastikan domain itu sudah tersambung ke website A atau B.</p>
           </div>
         </CardContent>
       </Card>
