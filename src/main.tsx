@@ -4,7 +4,7 @@ import "./index.css";
 import { registerServiceWorker } from "./lib/pwa";
 
 // Redirect ke domain utama (mempertahankan path + query + hash supaya token tetap berfungsi)
-const PRIMARY_HOST = 'realtimestream.my.id';
+const PRIMARY_HOST = 'realtime48show.my.id';
 const OLD_HOST = 'realtime48stream.my.id';
 // Website B: only the retired old host is forced to the primary domain;
 // cross-site routing is handled by DomainRouter in App.tsx.
