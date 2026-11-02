@@ -50,25 +50,40 @@ async function getReplayPath(): Promise<string> {
   return replayPathCache.path;
 }
 
-// Domain Live (site_settings.live_origin): jika diisi admin, halaman /live di domain
-// ini langsung dialihkan ke website live (Domain B) beserta token/query-nya.
-function LiveDomainRedirect({ children }: { children: React.ReactNode }) {
+// Pengalihan antar website (site_settings): live_origin untuk /live & /tv,
+// replay_origin untuk path replay rahasia, main_origin untuk halaman pembayaran/lainnya.
+// Admin & reseller tidak dialihkan. Website A dan B memakai data yang sama, jadi
+// pengaturan yang sama berlaku di keduanya (tanpa loop karena host dibandingkan).
+const cleanOrigin = (v: unknown) => {
+  const raw = String(v || '').trim().replace(/\/+$/, '');
+  return /^https:\/\/[a-z0-9.-]+$/i.test(raw) ? raw.toLowerCase() : '';
+};
+const bareHost = (h: string) => h.toLowerCase().replace(/^www\./, '');
+function DomainRouter({ children }: { children: React.ReactNode }) {
+  const location = useLocation();
   const [ready, setReady] = useState(false);
   useEffect(() => {
     let alive = true;
     (async () => {
+      const path = location.pathname.toLowerCase();
+      if (/^\/(adpan|reseller)/.test(path) || /^(localhost|127\.)/.test(window.location.hostname) || window.location.hostname.endsWith('lovable.app')) { if (alive) setReady(true); return; }
       try {
-        const { data } = await supabase.from('site_settings').select('value').eq('key', 'live_origin').maybeSingle();
-        const raw = String(data?.value || '').trim().replace(/\/+$/, '');
-        if (raw && /^https:\/\/[a-z0-9.-]+$/i.test(raw) && new URL(raw).host !== window.location.host) {
-          window.location.replace(raw + '/live' + window.location.search + window.location.hash);
+        const { data } = await supabase.from('site_settings').select('key,value').in('key', ['live_origin', 'replay_origin', 'main_origin', 'replay_path']);
+        const m = Object.fromEntries((data || []).map((r) => [r.key, r.value]));
+        const rp = String(m.replay_path || 'rply').toLowerCase();
+        const seg = path.replace(/^\/+|\/+$/g, '');
+        const target = /^\/(live|tv)(\/|$)/.test(path) ? cleanOrigin(m.live_origin)
+          : seg === rp ? cleanOrigin(m.replay_origin)
+          : cleanOrigin(m.main_origin);
+        if (target && bareHost(new URL(target).host) !== bareHost(window.location.host)) {
+          window.location.replace(target + location.pathname + location.search + location.hash);
           return;
         }
-      } catch { /* fallback: tetap tayang di sini */ }
+      } catch { /* tetap tampil di sini */ }
       if (alive) setReady(true);
     })();
     return () => { alive = false; };
-  }, []);
+  }, [location.pathname]);
   return ready ? <>{children}</> : <PageLoading />;
 }
 
@@ -190,11 +205,12 @@ const App = () => (
         <ErrorBoundary>
           <PurchaseSync />
           <ProtectedShell>
+            <DomainRouter>
             <MaintenanceGate>
             <Suspense fallback={<PageLoading />}>
             <Routes>
               <Route path="/" element={<Index />} />
-              <Route path="/live" element={<LiveDomainRedirect><Live /></LiveDomainRedirect>} />
+              <Route path="/live" element={<Live />} />
               <Route path="/free" element={<Free />} />
               <Route path="/kunci" element={<Kunci />} />
               <Route path="/auth" element={<Auth />} />
@@ -214,6 +230,7 @@ const App = () => (
             </Routes>
             </Suspense>
             </MaintenanceGate>
+            </DomainRouter>
             <BottomNav />
             <GuestOnboardBanner />
 
