@@ -4,7 +4,18 @@ import { Wrench } from 'lucide-react';
 import { supabase } from '@/integrations/backend';
 
 // Halaman yang tetap bisa dibuka saat Mode Perbaikan aktif.
-const LIVE_PATHS = ['/live', '/kunci', '/free', '/tv', '/reseller'];
+const LIVE_PATHS = ['/live', '/kunci', '/free', '/tv', '/reseller', '/akses'];
+// Link token (live/replay/membership/bundel) tetap terbuka saat Mode Perbaikan;
+// diingat per tab agar navigasi lanjutan (daftar replay, player) tidak tertutup.
+const TOKEN_PARAMS = ['token', 'mtoken', 'btoken', 'replay', 't'];
+const BYPASS_KEY = 'maint_token_bypass';
+function hasTokenAccess(search: string): boolean {
+  try {
+    const q = new URLSearchParams(search);
+    if (TOKEN_PARAMS.some((k) => (q.get(k) || '').trim())) { sessionStorage.setItem(BYPASS_KEY, '1'); return true; }
+    return sessionStorage.getItem(BYPASS_KEY) === '1';
+  } catch { return false; }
+}
 const ALWAYS_OPEN = ['/adpan', '/auth', '/reset-password'];
 // Path Replay Rahasia (site_settings.replay_path, default "rply"): selalu terbuka
 // walau Mode Perbaikan aktif — halaman utama (/) tetap tertutup.
@@ -25,7 +36,7 @@ export function MaintenanceScreen({ message }: { message?: string }) {
 }
 
 export default function MaintenanceGate({ children }: { children: React.ReactNode }) {
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
   const [mode, setMode] = useState(false);
   const [msg, setMsg] = useState('');
   const [userBlocked, setUserBlocked] = useState(false);
@@ -58,6 +69,7 @@ export default function MaintenanceGate({ children }: { children: React.ReactNod
   const isLive = LIVE_PATHS.some((p) => pathname.startsWith(p));
   const isSecretReplay = normPath(pathname) === secretPath;
   if (!open && userBlocked) return <MaintenanceScreen />;
-  if (!open && !isLive && !isSecretReplay && mode) return <MaintenanceScreen message={msg} />;
+  const tokenAccess = hasTokenAccess(search);
+  if (!open && !isLive && !isSecretReplay && !tokenAccess && mode) return <MaintenanceScreen message={msg} />;
   return <>{children}</>;
 }
