@@ -15,6 +15,7 @@ export default function UserBlockAdmin() {
   const [mode, setMode] = useState(false);
   const [msg, setMsg] = useState('');
   const [replayHost, setReplayHost] = useState('');
+  const [liveOrigin, setLiveOrigin] = useState('');
   const [q, setQ] = useState('');
   const [found, setFound] = useState<Found[]>([]);
   const [reason, setReason] = useState('');
@@ -22,9 +23,9 @@ export default function UserBlockAdmin() {
   const [busy, setBusy] = useState(false);
 
   const loadAll = async () => {
-    const { data } = await supabase.from('site_settings').select('key,value').in('key', ['maintenance_mode', 'maintenance_message', 'replay_path']);
+    const { data } = await supabase.from('site_settings').select('key,value').in('key', ['maintenance_mode', 'maintenance_message', 'replay_path', 'live_origin']);
     const m = Object.fromEntries((data || []).map((r) => [r.key, r.value]));
-    setMode(m.maintenance_mode === 'true'); setMsg(m.maintenance_message || ''); setReplayHost(m.replay_path || 'rply');
+    setMode(m.maintenance_mode === 'true'); setMsg(m.maintenance_message || ''); setReplayHost(m.replay_path || 'rply'); setLiveOrigin(m.live_origin || '');
     const { data: b } = await supabase.from('blocked_users').select('id,user_id,phone,email,reason,created_at').eq('active', true).order('created_at', { ascending: false });
     setBlocked((b || []) as BlockedRow[]);
   };
@@ -88,6 +89,21 @@ export default function UserBlockAdmin() {
               <Button variant="outline" onClick={async () => {
                 const v = replayHost.trim().replace(/^https?:\/\//i, '').replace(/^[a-z0-9.-]+\//i, '').replace(/^\/+|\/+$/g, '').replace(/[^a-z0-9-]/gi, '').toLowerCase() || 'rply';
                 if (await setSetting('replay_path', v)) { setReplayHost(v); toast.success(`Path replay disimpan: realtimestream.my.id/${v}`); }
+              }}>Simpan</Button>
+            </div>
+          </div>
+          <div className="space-y-1 pt-2 border-t border-border">
+            <p className="text-sm font-medium text-foreground">Domain Website Live (Domain B)</p>
+            <p className="text-xs text-muted-foreground">Jika diisi, semua link token tetap memakai realtimestream.my.id, tapi saat dibuka penonton langsung dialihkan ke domain ini. Kosongkan agar live tetap tayang di website ini. Jika domain live terkena suspend, cukup ganti di sini.</p>
+            <div className="flex gap-2">
+              <Input placeholder="https://live-domain-b.com" value={liveOrigin} onChange={(e) => setLiveOrigin(e.target.value)} />
+              <Button variant="outline" onClick={async () => {
+                let v = liveOrigin.trim();
+                if (v) {
+                  if (!/^https?:\/\//i.test(v)) v = 'https://' + v;
+                  try { v = 'https://' + new URL(v).host.toLowerCase(); } catch { return toast.error('Domain tidak valid'); }
+                }
+                if (await setSetting('live_origin', v)) { setLiveOrigin(v); toast.success(v ? `Live dialihkan ke ${v}` : 'Live kembali tayang di website ini'); }
               }}>Simpan</Button>
             </div>
           </div>

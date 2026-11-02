@@ -50,6 +50,28 @@ async function getReplayPath(): Promise<string> {
   return replayPathCache.path;
 }
 
+// Domain Live (site_settings.live_origin): jika diisi admin, halaman /live di domain
+// ini langsung dialihkan ke website live (Domain B) beserta token/query-nya.
+function LiveDomainRedirect({ children }: { children: React.ReactNode }) {
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const { data } = await supabase.from('site_settings').select('value').eq('key', 'live_origin').maybeSingle();
+        const raw = String(data?.value || '').trim().replace(/\/+$/, '');
+        if (raw && /^https:\/\/[a-z0-9.-]+$/i.test(raw) && new URL(raw).host !== window.location.host) {
+          window.location.replace(raw + '/live' + window.location.search + window.location.hash);
+          return;
+        }
+      } catch { /* fallback: tetap tayang di sini */ }
+      if (alive) setReady(true);
+    })();
+    return () => { alive = false; };
+  }, []);
+  return ready ? <>{children}</> : <PageLoading />;
+}
+
 function SecretReplayRoute() {
   const location = useLocation();
   const [state, setState] = useState<'loading' | 'replay' | 'notfound'>('loading');
@@ -172,7 +194,7 @@ const App = () => (
             <Suspense fallback={<PageLoading />}>
             <Routes>
               <Route path="/" element={<Index />} />
-              <Route path="/live" element={<Live />} />
+              <Route path="/live" element={<LiveDomainRedirect><Live /></LiveDomainRedirect>} />
               <Route path="/free" element={<Free />} />
               <Route path="/kunci" element={<Kunci />} />
               <Route path="/auth" element={<Auth />} />
