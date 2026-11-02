@@ -749,8 +749,10 @@ function LiveInner() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const host = window.location.hostname;
-    const CANONICAL = 'realtimestream.my.id';
+    const CANONICAL = 'realtime48show.my.id';
     if (host === CANONICAL) return;
+    // Domain Website B sendiri tidak dialihkan ke Website A.
+    if (/(^|\.)(realtim48show|realtime48sshow)\.my\.id$/.test(host)) return;
     // Biarkan dev lokal & preview editor apa adanya (jangan loop redirect).
     if (host === 'localhost' || host === '127.0.0.1' || host.endsWith('.local')) return;
     if (host.startsWith('id-preview--') || host.endsWith('.lovableproject.com')) return;
