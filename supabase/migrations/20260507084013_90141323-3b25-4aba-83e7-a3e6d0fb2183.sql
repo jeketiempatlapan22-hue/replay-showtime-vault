@@ -1,1 +1,0 @@
-ALTER TABLE public.master_passwords ADD COLUMN IF NOT EXISTS paused boolean NOT NULL DEFAULT false;

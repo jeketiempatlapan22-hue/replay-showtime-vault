@@ -1,1 +1,0 @@
-ALTER TABLE public.active_shows ADD COLUMN IF NOT EXISTS idn_show_id text NOT NULL DEFAULT '';

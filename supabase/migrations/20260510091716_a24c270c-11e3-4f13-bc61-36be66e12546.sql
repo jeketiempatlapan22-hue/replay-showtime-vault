@@ -1,1 +1,0 @@
-ALTER TABLE public.membership_token_devices DROP CONSTRAINT IF EXISTS membership_token_devices_token_unique;

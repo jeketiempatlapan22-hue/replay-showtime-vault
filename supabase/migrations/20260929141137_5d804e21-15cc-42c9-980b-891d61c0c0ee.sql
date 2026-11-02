@@ -1,1 +1,0 @@
-ALTER TABLE public.game_rounds ADD COLUMN IF NOT EXISTS prize_seconds integer NOT NULL DEFAULT 20;

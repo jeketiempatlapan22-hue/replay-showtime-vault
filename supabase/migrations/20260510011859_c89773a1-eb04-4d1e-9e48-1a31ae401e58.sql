@@ -1,1 +1,0 @@
-GRANT SELECT ON public.replays TO anon, authenticated;

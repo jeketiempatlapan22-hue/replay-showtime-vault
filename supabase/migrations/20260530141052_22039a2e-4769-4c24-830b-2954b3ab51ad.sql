@@ -1,1 +1,0 @@
-DELETE FROM public.login_attempts WHERE identifier LIKE 'reseller:%';
