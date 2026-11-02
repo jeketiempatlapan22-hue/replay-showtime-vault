@@ -13,7 +13,7 @@ import { useNavigate } from 'react-router-dom';
 import { getShowPurchase, setShowPurchase, getReplayPurchase, setReplayPurchase } from '@/lib/purchases';
 import { MEMBERSHIP_UPDATED_EVENT, readMembershipCredentials } from '@/lib/membershipAccess';
 import { useAuth } from '@/hooks/useAuth';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/backend';
 import { thumbUrl } from '@/lib/imageUrl';
 import AccessInfoCard from '@/components/AccessInfoCard';
 import AnonReplayPassword from '@/components/AnonReplayPassword';

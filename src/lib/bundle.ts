@@ -1,5 +1,5 @@
 // Bundel Show: satu link + satu sandi untuk semua show yang tersedia.
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/backend';
 import { setShowPurchase } from '@/lib/purchases';
 
 export interface ShowBundle {

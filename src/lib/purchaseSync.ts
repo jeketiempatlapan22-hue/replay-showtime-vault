@@ -1,6 +1,6 @@
 // Sinkronisasi pembelian (QRIS / koin / approval admin) dari server ke localStorage.
 // Berlaku untuk user login maupun anonim (dicocokkan lewat nomor WhatsApp terakhir).
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/backend';
 import { getShowPurchase, setShowPurchase, getReplayPurchase, setReplayPurchase } from '@/lib/purchases';
 
 let lastRun = 0;

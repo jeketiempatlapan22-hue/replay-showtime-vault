@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/backend';
 import { useAuth } from '@/hooks/useAuth';
 import {
   MEMBERSHIP_UPDATED_EVENT,

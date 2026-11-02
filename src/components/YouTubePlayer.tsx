@@ -6,7 +6,7 @@ import { useState, useRef, useCallback, useEffect, useMemo, lazy, Suspense } fro
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { type ReplayRow, getReplaySource, type ReplaySource, type PlaylistSource } from '@/lib/store';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/backend';
 import RatingStars from '@/components/RatingStars';
 // CommentSection lazy-loaded — chunk komentar baru dimuat saat user scroll/buka.
 const CommentSection = lazy(() => import('@/components/CommentSection'));

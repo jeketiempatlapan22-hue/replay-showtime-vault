@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Tv, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/backend';
 import { saveTvSession } from '@/lib/tvSession';
 
 const HlsPlayer = lazy(() => import('@/components/HlsPlayer'));

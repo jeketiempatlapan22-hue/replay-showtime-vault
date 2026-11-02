@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Copy, KeyRound, Loader2, AlertTriangle, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/backend';
 import { copyToClipboard } from '@/lib/clipboard';
 import { Textarea } from '@/components/ui/textarea';
 

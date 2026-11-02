@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 const { invoke } = vi.hoisted(() => ({ invoke: vi.fn().mockResolvedValue({ data: { ok: true }, error: null }) }));
-vi.mock('@/integrations/supabase/client', () => ({ supabase: { functions: { invoke } } }));
+vi.mock('@/integrations/backend', () => ({ supabase: { functions: { invoke } } }));
 import { upsertActiveShow } from './activeShows';
 
 describe('special-show member persistence', () => {

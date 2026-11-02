@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Loader2, RefreshCw, Trash2, CheckCircle2, ExternalLink, Save, Phone, Send, Copy } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/backend';
 import { adminWaNumber } from '@/lib/adminWa';
 import { toast } from '@/hooks/use-toast';
 

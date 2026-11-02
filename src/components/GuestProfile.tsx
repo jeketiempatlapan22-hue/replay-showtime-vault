@@ -8,7 +8,7 @@ import AccessInfoCard from '@/components/AccessInfoCard';
 import PurchaseHistoryList from '@/components/PurchaseHistoryList';
 import { getAllReplayPurchases, getAllShowPurchases } from '@/lib/purchases';
 import { clearGuestAccount, type GuestAccount } from '@/lib/guest';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/backend';
 import { toast } from 'sonner';
 
 interface Item {

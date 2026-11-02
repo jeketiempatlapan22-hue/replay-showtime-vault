@@ -13,7 +13,7 @@ const GUIDE_LINKS = [
   { id: 'tips', label: 'Token Belum Diterima?' },
 ];
 import { Link, useNavigate } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/backend';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/hooks/use-toast';

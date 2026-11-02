@@ -1,4 +1,4 @@
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/backend';
 import { compressImage } from '@/lib/imageUrl';
 
 export interface Member {

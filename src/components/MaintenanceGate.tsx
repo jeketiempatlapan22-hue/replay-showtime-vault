@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Wrench } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/backend';
 
 // Halaman yang tetap bisa dibuka saat Mode Perbaikan aktif.
 const LIVE_PATHS = ['/live', '/kunci', '/free', '/tv', '/reseller'];

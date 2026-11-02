@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Loader2, PlayCircle, ShieldCheck, Lock, Calendar, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/backend';
 import ThemedBackground from '@/components/ThemedBackground';
 import DeviceResetButton from '@/components/DeviceResetButton';
 
