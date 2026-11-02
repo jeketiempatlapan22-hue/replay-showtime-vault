@@ -94,7 +94,7 @@ export default function LiveChat({ lite = false, showId = '' }: LiveChatProps) {
 
   useEffect(() => {
     refresh();
-    const ch = supabase.channel(`live-chat-realtime${showId ? `:${showId}` : ''}`)
+    const ch = supabase.channel(`live-chat-${showId || 'umum'}-${Math.random().toString(36).slice(2)}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'live_messages' }, (payload) => {
         const m = payload.new as Msg;
         if (!inScope(m)) return;
@@ -135,8 +135,12 @@ export default function LiveChat({ lite = false, showId = '' }: LiveChatProps) {
           setBlockedSet(new Set(((data || []) as { browser_id: string }[]).map(b => b.browser_id)));
         }
       )
-      .subscribe();
-    return () => { supabase.removeChannel(ch); };
+      .subscribe((status) => { if (status === 'SUBSCRIBED') refresh(); });
+    // Cadangan bila koneksi realtime terputus: segarkan chat berkala & saat tab aktif lagi.
+    const poll = setInterval(() => { if (document.visibilityState === 'visible') refresh(); }, 15000);
+    const onVis = () => { if (document.visibilityState === 'visible') refresh(); };
+    document.addEventListener('visibilitychange', onVis);
+    return () => { clearInterval(poll); document.removeEventListener('visibilitychange', onVis); supabase.removeChannel(ch); };
   }, [isAdmin, messageLimit, myBrowserId, refresh, showId, inScope]);
 
   const handleScroll = () => {
@@ -250,6 +254,13 @@ export default function LiveChat({ lite = false, showId = '' }: LiveChatProps) {
       recordSent(msg);
       setText('');
       setReplyTo(null);
+      // Tampilkan langsung walau event realtime terlambat.
+      refresh();
+    } else {
+      try {
+        const { toast } = await import('@/hooks/use-toast');
+        toast({ title: 'Pesan gagal terkirim', description: 'Periksa koneksi lalu coba lagi.', variant: 'destructive' });
+      } catch { /* ignore */ }
     }
     setSending(false);
   };
