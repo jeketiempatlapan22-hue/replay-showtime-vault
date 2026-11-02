@@ -1,7 +1,7 @@
 // Sesi TV: menjaga tayangan di browser TV tetap hidup (rotasi grant tiap 28 menit),
 // dan menyiapkan alamat sementara untuk Chromecast.
 
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/backend';
 
 export const SS_UNLOCK_BASE = 'replaytime-live-unlocked';
 const SS_TV_SESSION = 'replaytime-tv-session';

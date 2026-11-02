@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { RotateCcw, Loader2, AlertTriangle, Users, ShieldX } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/backend';
 import { getBrowserId } from '@/lib/browserId';
 
 type Props =

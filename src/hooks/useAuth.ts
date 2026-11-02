@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/backend';
 
 const REMEMBER_KEY = 'auth_remember';
 const ALIVE_KEY = 'auth_session_alive';

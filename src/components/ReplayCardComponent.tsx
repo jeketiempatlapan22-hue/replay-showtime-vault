@@ -17,7 +17,7 @@ import { thumbUrl } from '@/lib/imageUrl';
 import AccessInfoCard from '@/components/AccessInfoCard';
 import { setReplayPurchase } from '@/lib/purchases';
 import { useAuth } from '@/hooks/useAuth';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/backend';
 
 
 

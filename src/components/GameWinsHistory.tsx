@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { Trophy, Copy, Radio } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/backend';
 import { toast } from 'sonner';
 
 type Win = { id: string; round_title: string; kind: string; prize: any; created_at: string };

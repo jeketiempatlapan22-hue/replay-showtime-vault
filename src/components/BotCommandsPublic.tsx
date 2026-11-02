@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/backend';
 import { Bot } from 'lucide-react';
 
 type Cmd = { trigger: string; description: string };

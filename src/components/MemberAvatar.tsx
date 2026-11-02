@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/backend';
 import { thumbUrl } from '@/lib/imageUrl';
 
 interface Cache { [name: string]: string | null }

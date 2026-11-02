@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Sparkles } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/backend';
 import { getActiveShows, type ActiveShow } from '@/lib/activeShows';
 import ActiveShowCard from './ActiveShowCard';
 

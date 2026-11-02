@@ -42,7 +42,7 @@ import ImagePicker from '@/components/ImagePicker';
 import YouTubeIdInput from '@/components/admin/YouTubeIdInput';
 import { parseYouTubeId } from '@/lib/youtube';
 import { toast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/backend';
 import { adminWaNumber } from '@/lib/adminWa';
 
 const CRITERIA_OPTIONS = [

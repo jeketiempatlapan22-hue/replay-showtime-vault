@@ -3,7 +3,7 @@ import { ShieldAlert, MessageCircle, Copy, Check, RefreshCw } from 'lucide-react
 import { Button } from '@/components/ui/button';
 import { getBrowserId } from '@/lib/browserId';
 import { getSettings } from '@/lib/store';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/backend';
 
 export default function BlockedScreen() {
   const [waNumber, setWaNumber] = useState('');

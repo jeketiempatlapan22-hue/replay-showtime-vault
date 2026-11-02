@@ -13,7 +13,7 @@ import ActiveShowsSection from '@/components/ActiveShowsSection';
 const YouTubePlayer = lazy(() => import('@/components/YouTubePlayer'));
 import { getReplays, getSettings } from '@/lib/store';
 import { type ReplayRow } from '@/lib/store';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/backend';
 import { toast } from '@/hooks/use-toast';
 import { useAutoHideOnInteraction } from '@/hooks/useAutoHideOnInteraction';
 import { useActiveMembership } from '@/hooks/useActiveMembership';

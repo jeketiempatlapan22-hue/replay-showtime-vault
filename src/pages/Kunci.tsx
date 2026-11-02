@@ -4,7 +4,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Lock, Loader2, ShoppingBag, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/backend';
 import { getBrowserId } from '@/lib/browserId';
 import { normalizeWa } from '@/lib/adminWa';
 

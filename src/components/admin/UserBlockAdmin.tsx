@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/backend';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
@@ -86,12 +86,12 @@ export default function UserBlockAdmin() {
           </div>
           <div className="space-y-1 pt-2 border-t border-border">
             <p className="text-sm font-medium text-foreground">Path Replay Rahasia</p>
-            <p className="text-xs text-muted-foreground">Halaman daftar replay di realtimestream.my.id/&lt;path&gt; — selalu terbuka walau Mode Perbaikan aktif, hanya bisa diakses lewat link. Dipakai untuk "Link Replay" di semua pesan. Halaman utama (/) tetap tertutup saat Mode Perbaikan.</p>
+            <p className="text-xs text-muted-foreground">Halaman daftar replay di {window.location.host}/&lt;path&gt; — selalu terbuka walau Mode Perbaikan aktif, hanya bisa diakses lewat link. Dipakai untuk "Link Replay" di semua pesan. Halaman utama (/) tetap tertutup saat Mode Perbaikan.</p>
             <div className="flex gap-2">
               <Input placeholder="contoh: rply" value={replayHost} onChange={(e) => setReplayHost(e.target.value)} />
               <Button variant="outline" onClick={async () => {
                 const v = replayHost.trim().replace(/^https?:\/\//i, '').replace(/^[a-z0-9.-]+\//i, '').replace(/^\/+|\/+$/g, '').replace(/[^a-z0-9-]/gi, '').toLowerCase() || 'rply';
-                if (await setSetting('replay_path', v)) { setReplayHost(v); toast.success(`Path replay disimpan: realtimestream.my.id/${v}`); }
+                if (await setSetting('replay_path', v)) { setReplayHost(v); toast.success(`Path replay disimpan: ${window.location.host}/${v}`); }
               }}>Simpan</Button>
             </div>
           </div>

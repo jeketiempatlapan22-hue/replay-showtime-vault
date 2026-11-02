@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Star } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/backend';
 
 function getBrowserId(): string {
   let id = localStorage.getItem('replaytime-browser-id');

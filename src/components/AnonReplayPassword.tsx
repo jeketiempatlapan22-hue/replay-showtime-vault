@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Copy, KeyRound, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/backend';
 
 /**
  * Kolom sandi replay yang selalu terlihat untuk user anon (tanpa akun).

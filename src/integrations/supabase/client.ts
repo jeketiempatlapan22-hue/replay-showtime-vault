@@ -32,7 +32,7 @@ function createSupabaseFetch(supabaseKey: string): typeof fetch {
 }
 
 // Import the supabase client like this:
-// import { supabase } from "@/integrations/supabase/client";
+// import { supabase } from "@/integrations/backend";
 
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   global: {

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Sparkles, Calendar } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/backend';
 import { getActiveShows, type ActiveShow } from '@/lib/activeShows';
 import ActiveShowCard from '@/components/ActiveShowCard';
 import ShowBundleCard from '@/components/ShowBundleCard';

@@ -1,5 +1,5 @@
 import { slugifyName, type GalleryItem } from '@/lib/showImageMatch';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/backend';
 import type { Tables } from '@/integrations/supabase/types';
 import { compressImage } from '@/lib/imageUrl';
 

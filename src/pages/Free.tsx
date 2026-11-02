@@ -1,7 +1,7 @@
 import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Loader2, Gift, RefreshCw, Link as LinkIcon, Timer, Users } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/backend';
 import { Button } from '@/components/ui/button';
 import { getDeviceFingerprint } from '@/lib/fingerprint';
 import FreeScreenWatermark from '@/components/FreeScreenWatermark';

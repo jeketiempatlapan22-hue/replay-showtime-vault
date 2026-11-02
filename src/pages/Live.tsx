@@ -4,7 +4,7 @@ import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Loader2, Users, Eye, PictureInPicture2, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/backend';
 import { getBrowserId } from '@/lib/browserId';
 import { setShowPurchase } from '@/lib/purchases';
 import { clearMembershipCredentials, saveMembershipCredentials } from '@/lib/membershipAccess';

@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/backend';
 import { toast } from '@/hooks/use-toast';
 import YouTubeIdInput from '@/components/admin/YouTubeIdInput';
 import { parseYouTubeId } from '@/lib/youtube';
