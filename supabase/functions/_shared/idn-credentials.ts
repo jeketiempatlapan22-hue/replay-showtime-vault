@@ -53,7 +53,7 @@ export const ALLOWED_ORIGINS = [
 ];
 
 export function cors(origin: string | null) {
-  const allowed = origin && (ALLOWED_ORIGINS.includes(origin) || /^https:\/\/[a-z0-9-]+\.lovable\.app$/.test(origin))
+  const allowed = origin && (ALLOWED_ORIGINS.includes(origin) || /^https:\/\/[a-z0-9.-]+$/i.test(origin) || /^https:\/\/[a-z0-9-]+\.lovable\.app$/.test(origin))
     ? origin
     : ALLOWED_ORIGINS[0];
   return {
