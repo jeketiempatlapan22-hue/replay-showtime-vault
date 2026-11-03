@@ -33,7 +33,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger } from '@/components/ui/sheet';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { addReplay, deleteReplay, updateReplay, getReplaysAdmin, getAllMasterPasswords, setMasterPassword, setMasterPasswordPaused, deleteMasterPassword, getSettings, setSetting, setReplayAccessToken, type ReplayRow, type MasterPasswordRow, type PlaylistSource } from '@/lib/store';
@@ -43,6 +43,7 @@ import YouTubeIdInput from '@/components/admin/YouTubeIdInput';
 import { parseYouTubeId } from '@/lib/youtube';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/backend';
+import logoImg from '@/assets/logo.png';
 import { adminWaNumber } from '@/lib/adminWa';
 
 const CRITERIA_OPTIONS = [
@@ -707,7 +708,13 @@ export default function Admin() {
           </SheetTrigger>
           <SheetContent side="left" className="w-[82vw] max-w-xs p-0 flex flex-col">
             <SheetHeader className="p-4 border-b border-border shrink-0">
-              <SheetTitle>Admin Panel</SheetTitle>
+              <div className="flex items-center gap-3">
+                <img src={logoImg} alt="LiveTime" className="w-9 h-9 rounded-full object-cover ring-2 ring-primary/50" />
+                <div className="min-w-0 text-left">
+                  <SheetTitle className="text-lg leading-tight">LiveTime</SheetTitle>
+                  <SheetDescription className="text-xs">Admin Panel</SheetDescription>
+                </div>
+              </div>
             </SheetHeader>
             <nav className="flex-1 overflow-y-auto overscroll-contain p-2 pb-6">
               {[
