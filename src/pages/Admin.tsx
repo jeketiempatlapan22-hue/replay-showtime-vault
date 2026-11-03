@@ -707,7 +707,13 @@ export default function Admin() {
           </SheetTrigger>
           <SheetContent side="left" className="w-[82vw] max-w-xs p-0 flex flex-col">
             <SheetHeader className="p-4 border-b border-border shrink-0">
-              <SheetTitle>Admin Panel</SheetTitle>
+              <div className="flex items-center gap-3">
+                <img src={logoImg} alt="LiveTime" className="w-9 h-9 rounded-full object-cover ring-2 ring-primary/50" />
+                <div className="min-w-0 text-left">
+                  <SheetTitle className="text-lg leading-tight">LiveTime</SheetTitle>
+                  <SheetDescription className="text-xs">Admin Panel</SheetDescription>
+                </div>
+              </div>
             </SheetHeader>
             <nav className="flex-1 overflow-y-auto overscroll-contain p-2 pb-6">
               {[
