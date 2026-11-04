@@ -1,4 +1,4 @@
-import { stashLivePassword } from '@/lib/siteRedirect';
+const stashLivePassword = (pw: string) => { try { sessionStorage.setItem('rt-handoff-pw', pw); } catch { /* ignore */ } };
 import { saveMembershipCredentials } from '@/lib/membershipAccess';
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
