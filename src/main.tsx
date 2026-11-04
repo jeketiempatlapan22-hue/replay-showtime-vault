@@ -12,6 +12,11 @@ const REDIRECT_HOSTS = new Set([
   OLD_HOST,
   `www.${OLD_HOST}`,
 ]);
+// Website B: www → tanpa www (path, query/token, hash dipertahankan)
+if (typeof window !== 'undefined' && window.location.hostname === 'www.realtim48show.my.id') {
+  const { pathname, search, hash } = window.location;
+  window.location.replace(`https://realtim48show.my.id${pathname}${search}${hash}`);
+}
 if (typeof window !== 'undefined' && REDIRECT_HOSTS.has(window.location.hostname)) {
   const { pathname, search, hash } = window.location;
   window.location.replace(`https://${PRIMARY_HOST}${pathname}${search}${hash}`);

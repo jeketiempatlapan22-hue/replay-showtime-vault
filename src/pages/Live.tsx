@@ -41,7 +41,7 @@ interface PublicSource { label: string; type: SrcType }
 interface PrivateSource extends PublicSource { url: string }
 interface MembershipInfo { expires_at?: string; resets_used: number; resets_max: number; remaining: number; includes_replays?: boolean; max_devices?: number }
 interface LiveStatus { enabled: boolean; title: string; type: string; require_password: boolean; sources: PublicSource[]; lineup: string[]; show_date?: string; show_time?: string; image_url?: string; idn_show_id?: string; group_link?: string; group_link_enabled?: boolean; group_link_label?: string; group_link_note?: string }
-interface UnlockedConfig { title: string; type: SrcType; url: string; sources: PrivateSource[]; watermark: string; enabled: boolean; idn_show_id?: string; grant?: string }
+interface UnlockedConfig { title: string; type: SrcType; url: string; sources: PrivateSource[]; watermark: string; enabled: boolean; idn_show_id?: string; server2_url?: string; server3_url?: string; grant?: string }
 type SourceLike = Partial<Record<keyof PrivateSource, unknown>>;
 interface IdnTokenResponse { error?: string; xApiToken?: string; xSecKey?: string; xTokenId?: string; xShowId?: string; playbackUrl?: string }
 type PiPDocument = Document & { pictureInPictureEnabled?: boolean; pictureInPictureElement?: Element | null; exitPictureInPicture?: () => Promise<void> };
@@ -353,6 +353,8 @@ function LiveInner() {
           watermark: adminMonitor ? '' : (data.watermark || ''),
           enabled: !!data.enabled,
           idn_show_id: data.idn_show_id || '',
+          server2_url: data.server2_url || '',
+          server3_url: data.server3_url || '',
           grant: data.grant || '',
         };
         // For silent revalidation, NEVER overwrite the existing player URL/sources.
@@ -369,17 +371,21 @@ function LiveInner() {
             if (!prev) return cfg;
             const next = { ...prev, enabled: cfg.enabled, title: cfg.title, type: cfg.type };
             if (cfg.idn_show_id) next.idn_show_id = cfg.idn_show_id;
+            next.server2_url = cfg.server2_url || '';
+            next.server3_url = cfg.server3_url || '';
             if (cfg.grant) next.grant = cfg.grant;
-            if (!prev.url && cfg.url) next.url = cfg.url;
+            // URL player utama mengikuti admin: dikosongkan → tombol hilang.
+            if (!cfg.url) next.url = '';
+            else if (!prev.url) next.url = cfg.url;
             // Merge playlist sources by URL: keep existing entries (so the
             // active player tidak remount), append baru, dan refresh label.
             // Hasilnya playlist baru yang ditambah admin langsung muncul
             // sebagai chip tambahan secara realtime tanpa memutus live.
             const prevSrcs = Array.isArray(prev.sources) ? prev.sources : [];
             const newSrcs = Array.isArray(cfg.sources) ? cfg.sources : [];
-            if (newSrcs.length) {
+            {
               const byUrl = new Map(newSrcs.map(s => [s.url, s]));
-              const merged = prevSrcs.map(s => {
+              const merged = prevSrcs.filter(s => byUrl.has(s.url)).map(s => {
                 const fresh = byUrl.get(s.url);
                 return fresh ? { ...s, label: fresh.label || s.label, type: fresh.type || s.type } : s;
               });
@@ -508,6 +514,13 @@ function LiveInner() {
     const tParam = search.get('t');
     const mtParam = search.get('mtoken');
     if (adminMonitor && showId) { void doUnlock({ admin_monitor: true }, true); return; }
+    // Sandi dibawa dari Website A (halaman Kunci) saat pindah domain.
+    const pwParam = search.get('pw');
+    if (pwParam && !tParam && !mtParam) {
+      const next = new URLSearchParams(search); next.delete('pw');
+      window.history.replaceState({}, '', `/live${next.toString() ? `?${next}` : ''}`);
+      void doUnlock({ password: pwParam });
+    }
     let cached: string | null = null;
     try {
       cached = sessionStorage.getItem(`${SS_KEY_BASE}${showId?'-'+showId:''}`);
@@ -733,6 +746,12 @@ function LiveInner() {
     if (mainIsDirect) list.push(main);
     // IDN/hanabira tetap tersedia sebagai sumber (aturan tidak diubah).
     if (idnShowId) list.push({ label: 'IDN', type: 'm3u8', url: `idn://${idnShowId}` });
+    // Server 2: link m3u8 langsung dari admin, diputar tanpa proxy/token.
+    const s2 = (unlocked.server2_url || '').trim();
+    if (/^https?:\/\//i.test(s2)) list.push({ label: 'Server 2', type: 'm3u8', url: s2 });
+    // Server 3: master-final SForge (cadangan), juga langsung tanpa proxy.
+    const s3 = (unlocked.server3_url || '').trim();
+    if (/^https?:\/\//i.test(s3) && s3 !== s2) list.push({ label: 'Server 3', type: 'm3u8', url: s3 });
     if (main.url && !mainIsDirect) list.push(main);
     list.push(...(unlocked.sources || []).filter(s => s.url));
     return list;
@@ -742,23 +761,6 @@ function LiveInner() {
     setFailedSourceKeys([]);
   }, [unlocked?.url, unlocked?.sources]);
 
-  // CORS guard: the IDN/hanabira worker only whitelists `realtime48stream.my.id`
-  // (tanpa www, tanpa preview, tanpa replaytime.lovable.app). Saat player IDN
-  // aktif dan user membuka via origin lain, browser memblokir preflight →
-  // player terjebak di memuat. Redirect ke domain canonical agar playback jalan.
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const host = window.location.hostname;
-    const CANONICAL = 'realtime48show.my.id';
-    if (host === CANONICAL) return;
-    // Domain Website B sendiri tidak dialihkan ke Website A.
-    if (/(^|\.)(realtim48show|realtime48sshow)\.my\.id$/.test(host)) return;
-    // Biarkan dev lokal & preview editor apa adanya (jangan loop redirect).
-    if (host === 'localhost' || host === '127.0.0.1' || host.endsWith('.local')) return;
-    if (host.startsWith('id-preview--') || host.endsWith('.lovableproject.com')) return;
-    const target = `https://${CANONICAL}${window.location.pathname}${window.location.search}${window.location.hash}`;
-    window.location.replace(target);
-  }, []);
 
 
   const safeIdx = Math.min(sourceIdx, Math.max(0, allSources.length - 1));
@@ -1075,7 +1077,9 @@ function LiveInner() {
                     )
                   ) : activeSource.type === 'm3u8'
                     ? <HlsPlayer ref={playerRef} key={`m3u8-${safeIdx}`} src={activeSource.url} title={unlocked.title} watermark={unlocked.watermark} onFatalError={handleSourceFatalError} onPipChange={handlePipChange} hideSeekButtons showId={effectiveShowId} />
-                    : <EmbedPlayer key={`em-${safeIdx}-${activeSource.type}`} type={activeSource.type} source={activeSource.url} title={unlocked.title} watermark={unlocked.watermark} hideSeekButtons isLive />}
+                    : activeSource.type === 'youtube'
+                      ? <div className="live-yt-frame"><EmbedPlayer key={`em-${safeIdx}-${activeSource.type}`} type={activeSource.type} source={activeSource.url} title={unlocked.title} watermark={unlocked.watermark} hideSeekButtons isLive /></div>
+                      : <EmbedPlayer key={`em-${safeIdx}-${activeSource.type}`} type={activeSource.type} source={activeSource.url} title={unlocked.title} watermark={unlocked.watermark} hideSeekButtons isLive />}
                 </Suspense>
 
                 <div className="flex items-center justify-between flex-wrap gap-2 px-1">

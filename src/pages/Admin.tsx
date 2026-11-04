@@ -1,3 +1,4 @@
+import { abbreviateTitle } from '@/lib/abbrev';
 import LiveMonitorAdmin from '@/components/admin/LiveMonitorAdmin';
 import GameAdmin from '@/components/admin/GameAdmin';
 import { useState, useEffect } from 'react';
@@ -34,6 +35,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger } from '@/components/ui/sheet';
+import logoImg from '@/assets/logo.png';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { addReplay, deleteReplay, updateReplay, getReplaysAdmin, getAllMasterPasswords, setMasterPassword, setMasterPasswordPaused, deleteMasterPassword, getSettings, setSetting, setReplayAccessToken, type ReplayRow, type MasterPasswordRow, type PlaylistSource } from '@/lib/store';
@@ -43,7 +45,6 @@ import YouTubeIdInput from '@/components/admin/YouTubeIdInput';
 import { parseYouTubeId } from '@/lib/youtube';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/backend';
-import logoImg from '@/assets/logo.png';
 import { adminWaNumber } from '@/lib/adminWa';
 
 const CRITERIA_OPTIONS = [
@@ -82,7 +83,7 @@ export default function Admin() {
   const [editingReplay, setEditingReplay] = useState<ReplayRow | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ReplayRow | null>(null);
 
-  const [form, setForm] = useState({ title: '', showName: '', date: '', showTime: '19:00', criteria: 'reguler', featuredMember: '', lineup: '', password: '', adminAlias: '', youtubeId: '', youtubeAltId: '', imageUrl: '', sourceType: 'youtube', m3u8Url: '', sources: [] as PlaylistSource[], priceCoins: 1, priceIdr: 2000, imageFit: 'contain' });
+  const [form, setForm] = useState({ title: '', showName: '', date: '', showTime: '19:00', criteria: 'reguler', featuredMember: '', lineup: '', password: '', adminAlias: '', youtubeId: '', youtubeAltId: '', imageUrl: '', sourceType: 'youtube', m3u8Url: '', sources: [] as PlaylistSource[], priceCoins: 1, priceIdr: 2000, imageFit: 'contain', shortTitle: '' });
   const [liveChatEnabled, setLiveChatEnabled] = useState(true);
 
   const [mpYear, setMpYear] = useState(String(new Date().getFullYear()));
@@ -139,16 +140,16 @@ export default function Admin() {
 
   // Active shows state
   const [activeShows, setActiveShows] = useState<ActiveShow[]>([]);
-  const [showForm, setShowForm] = useState<{ id?: string; title: string; show_date: string; show_time: string; lineup: string; category: string; featured_member: string; description: string; image_url: string; sort_order: number; is_active: boolean; is_special: boolean; price_show: number; price_replay: number; price_show_coins: number; price_replay_coins: number; pakasir_amount: number; replay_id: string; replay_enabled: boolean; admin_alias: string }>({
+  const [showForm, setShowForm] = useState<{ id?: string; title: string; show_date: string; show_time: string; lineup: string; category: string; featured_member: string; description: string; image_url: string; sort_order: number; is_active: boolean; is_special: boolean; price_show: number; price_replay: number; price_show_coins: number; price_replay_coins: number; pakasir_amount: number; replay_id: string; replay_enabled: boolean; admin_alias: string; short_title: string; server2_url?: string; server3_url?: string }>({
     title: '', show_date: '', show_time: '19:00', lineup: '', category: 'reguler', featured_member: '', description: '', image_url: '', sort_order: 0, is_active: true, is_special: false,
-    price_show: 0, price_replay: 0, price_show_coins: 0, price_replay_coins: 0, pakasir_amount: 0, replay_id: '', replay_enabled: false, admin_alias: '',
+    price_show: 0, price_replay: 0, price_show_coins: 0, price_replay_coins: 0, pakasir_amount: 0, replay_id: '', replay_enabled: false, admin_alias: '', short_title: '',
   });
   const [showEditing, setShowEditing] = useState(false);
 
   const refreshActiveShows = () => getActiveShows(true).then(setActiveShows);
 
   const resetShowForm = () => {
-    setShowForm({ title: '', show_date: '', show_time: '19:00', lineup: '', category: 'reguler', featured_member: '', description: '', image_url: '', sort_order: 0, is_active: true, is_special: false, price_show: 0, price_replay: 0, price_show_coins: 0, price_replay_coins: 0, pakasir_amount: 0, replay_id: '', replay_enabled: false, admin_alias: '' });
+    setShowForm({ title: '', show_date: '', show_time: '19:00', lineup: '', category: 'reguler', featured_member: '', description: '', image_url: '', sort_order: 0, is_active: true, is_special: false, price_show: 0, price_replay: 0, price_show_coins: 0, price_replay_coins: 0, pakasir_amount: 0, replay_id: '', replay_enabled: false, admin_alias: '', short_title: '' });
     setShowEditing(false);
   };
 
@@ -179,8 +180,12 @@ export default function Admin() {
         replay_id: showForm.replay_id || null,
         replay_enabled: showForm.replay_enabled,
         admin_alias: showForm.admin_alias.trim().toLowerCase() || null,
+        short_title: (showForm.short_title.trim() || abbreviateTitle(showForm.title)).toUpperCase(),
+        ...(showForm.server2_url !== undefined ? { server2_url: showForm.server2_url.trim() } : {}),
+        ...(showForm.server3_url !== undefined ? { server3_url: showForm.server3_url.trim() } : {}),
       } as any);
       toast({ title: showForm.id ? 'Show diperbarui' : 'Show ditambahkan' });
+      supabase.functions.invoke('manage-live', { body: { action: 'sforge_sync' } }).catch(() => {});
       resetShowForm();
       refreshActiveShows();
     } catch (e: any) {
@@ -199,6 +204,9 @@ export default function Admin() {
       pakasir_amount: s.pakasir_amount ?? 0, replay_id: s.replay_id ?? '',
       replay_enabled: s.replay_enabled ?? false,
       admin_alias: (s as any).admin_alias ?? '',
+      short_title: (s as any).short_title ?? '',
+      server2_url: (s as any).server2_url,
+      server3_url: (s as any).server3_url,
     });
     setShowEditing(true);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -387,7 +395,7 @@ export default function Admin() {
   const handleLogout = async () => { await supabase.auth.signOut(); setIsLoggedIn(false); };
 
   const resetForm = () => {
-    setForm({ title: '', showName: '', date: '', showTime: '19:00', criteria: 'reguler', featuredMember: '', lineup: '', password: '', adminAlias: '', youtubeId: '', youtubeAltId: '', imageUrl: '', sourceType: 'youtube', m3u8Url: '', sources: [], priceCoins: 1, priceIdr: 2000, imageFit: 'contain' });
+    setForm({ title: '', showName: '', date: '', showTime: '19:00', criteria: 'reguler', featuredMember: '', lineup: '', password: '', adminAlias: '', youtubeId: '', youtubeAltId: '', imageUrl: '', sourceType: 'youtube', m3u8Url: '', sources: [], priceCoins: 1, priceIdr: 2000, imageFit: 'contain', shortTitle: '' });
     setEditingReplay(null);
   };
 
@@ -421,6 +429,7 @@ export default function Admin() {
       const payload = {
         title: form.title, show_name: form.showName, date: form.date, show_time: form.showTime + ':00', criteria: form.criteria,
         featured_member: showFeaturedMember ? form.featuredMember : '',
+        short_title: form.shortTitle.trim().toUpperCase(),
         lineup: lineupArr, password: form.password,
         admin_alias: form.adminAlias.trim(),
         youtube_id: normalizedYoutubeId,
@@ -460,6 +469,7 @@ export default function Admin() {
       priceCoins: ((r as any).price_coins ?? 1),
       priceIdr: ((r as any).price_idr ?? 2000),
       imageFit: ((r as any).image_fit as string) || 'contain',
+      shortTitle: ((r as any).short_title as string) || '',
     });
     setShowAddDialog(true);
   };
@@ -908,6 +918,27 @@ export default function Admin() {
                 <div>
                   <Label>Deskripsi</Label>
                   <Input value={showForm.description} onChange={e => setShowForm({ ...showForm, description: e.target.value })} placeholder="Deskripsi singkat show" />
+                </div>
+                <div>
+                  <Label>Singkatan Judul (kartu replay ringkas)</Label>
+                  <Input value={showForm.short_title} onChange={e => setShowForm({ ...showForm, short_title: e.target.value.toUpperCase().slice(0, 12) })} placeholder={abbreviateTitle(showForm.title) || 'contoh: PJMD'} />
+                  <p className="text-[11px] text-muted-foreground mt-1">Kosongkan = otomatis ({abbreviateTitle(showForm.title) || '-'}). Ikut ke replay saat show dijadikan replay.</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button type="button" size="sm" variant="outline" onClick={async () => {
+                    const { data, error } = await supabase.functions.invoke('manage-live', { body: { action: 'sforge_sync' } });
+                    if (error) { toast({ title: 'Sinkron SForge gagal', variant: 'destructive' }); return; }
+                    toast({ title: `SForge: ${data?.updated?.length || 0} show diisi otomatis`, description: `${data?.total_sforge || 0} show tersedia di SForge` });
+                    refreshActiveShows();
+                  }}>🔄 Sinkronkan SForge (Server 2 & 3)</Button>
+                </div>
+                <div>
+                  <Label>Link Server 2 (m3u8 langsung, tanpa proxy)</Label>
+                  <Input value={showForm.server2_url ?? ''} onChange={e => setShowForm({ ...showForm, server2_url: e.target.value })} placeholder={showForm.id && showForm.server2_url === undefined ? 'Biarkan kosong = tidak diubah' : 'https://.../playlist.m3u8'} />
+                </div>
+                <div>
+                  <Label>Link Server 3 (m3u8 cadangan, tanpa proxy)</Label>
+                  <Input value={showForm.server3_url ?? ''} onChange={e => setShowForm({ ...showForm, server3_url: e.target.value })} placeholder={showForm.id && showForm.server3_url === undefined ? 'Biarkan kosong = tidak diubah' : 'Kosong = diisi otomatis dari SForge'} />
                 </div>
                 <div>
                   <Label>Alias Admin (untuk command bot)</Label>
@@ -1534,6 +1565,7 @@ export default function Admin() {
           </DialogHeader>
           <div className="space-y-4">
             <div><Label>Judul *</Label><Input placeholder="Judul replay" value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} /></div>
+            <div><Label>Singkatan Judul (kartu ringkas)</Label><Input placeholder={`Otomatis: ${abbreviateTitle(form.title) || 'PJMD'}`} value={form.shortTitle} onChange={e => setForm(f => ({ ...f, shortTitle: e.target.value }))} /><p className="text-xs text-muted-foreground mt-1">Kosongkan untuk singkatan otomatis.</p></div>
             <div><Label>Nama Show</Label><Input placeholder="Contoh: Pajama Drive" value={form.showName} onChange={e => setForm(f => ({ ...f, showName: e.target.value }))} /></div>
             <div>
               <Label>Kriteria</Label>

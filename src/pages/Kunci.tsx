@@ -1,3 +1,4 @@
+import { stashLivePassword } from '@/lib/siteRedirect';
 import { saveMembershipCredentials } from '@/lib/membershipAccess';
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -98,9 +99,13 @@ export default function Kunci() {
           watermark: data.watermark || '',
           enabled: !!data.enabled,
           idn_show_id: data.idn_show_id || '',
+          server2_url: data.server2_url || '',
+          server3_url: data.server3_url || '',
           grant: data.grant || '',
         };
         try { sessionStorage.setItem(ssKey, JSON.stringify(cfg)); } catch { /* ignore */ }
+        // Dibawa ke Website B bila halaman live ada di domain lain.
+        stashLivePassword(pwInput.trim());
         navigate(`/live${showId ? `?show=${showId}` : ''}`, { replace: true });
       } else {
         setPwError(reasonMessage(data?.reason));
