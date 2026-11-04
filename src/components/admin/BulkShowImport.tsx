@@ -1,3 +1,5 @@
+import { supabase } from '@/integrations/backend';
+import { abbreviateTitle } from '@/lib/abbrev';
 import { useEffect, useMemo, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -119,6 +121,7 @@ export default function BulkShowImport({ onImported }: Props) {
           show_time: s.show_time,
           lineup: s.lineup,
           admin_alias: s.admin_alias || null,
+          short_title: ((s as any).short_title?.trim() || abbreviateTitle(s.title)).toUpperCase(),
           live_password: s.live_password || '',
           price_show: s.price_show || 0,
           price_replay: s.price_replay || 0,
@@ -133,6 +136,7 @@ export default function BulkShowImport({ onImported }: Props) {
           replay_id: null,
           replay_enabled: false,
           idn_show_id: s.idn_show_id || '',
+          server2_url: s.server2_url || '',
           live_auto_schedule: !!s.live_auto_schedule,
           live_url: s.player_url || '',
           live_type: s.player_url ? s.player_type : 'm3u8',
@@ -145,6 +149,7 @@ export default function BulkShowImport({ onImported }: Props) {
         fail++;
       }
     }
+    supabase.functions.invoke('manage-live', { body: { action: 'sforge_sync' } }).catch(() => {});
     setSaving(false);
     toast({ title: `Import selesai`, description: `Berhasil: ${ok}, Gagal: ${fail}` });
     if (ok > 0) {
@@ -229,6 +234,13 @@ export default function BulkShowImport({ onImported }: Props) {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-sm truncate">{s.title}</p>
+                      <Input
+                        value={(s as any).short_title ?? abbreviateTitle(s.title)}
+                        onChange={e => updateRow(idx, { short_title: e.target.value.toUpperCase().slice(0, 12) } as any)}
+                        placeholder="Singkatan"
+                        className="h-7 w-28 text-[11px] mt-1"
+                        aria-label="Singkatan judul"
+                      />
                       <p className="text-xs text-muted-foreground">
                         📅 {s.show_date} · 🕒 {s.show_time.slice(0, 5)}
                         {s.lineup.length > 0 && ` · 👥 ${s.lineup.length}`}
@@ -291,6 +303,11 @@ export default function BulkShowImport({ onImported }: Props) {
                       <Label className="text-[10px]">ID Hanabira (idn code)</Label>
                       <Input className="h-8 text-xs" placeholder="SHC980" value={s.idn_show_id}
                         onChange={e => updateRow(idx, { idn_show_id: e.target.value.trim() })} />
+                    </div>
+                    <div className="col-span-2">
+                      <Label className="text-[10px]">Link Server 2 (m3u8 langsung)</Label>
+                      <Input className="h-8 text-xs" placeholder="https://.../playlist.m3u8" value={s.server2_url || ''}
+                        onChange={e => updateRow(idx, { server2_url: e.target.value.trim() })} />
                     </div>
                     <div className="col-span-2">
                       <Label className="text-[10px]">Catatan (STS / Ultah / Graduation / Last Show)</Label>
