@@ -8,3 +8,4 @@
 - Rewrite only "Link Replay" blocks to site_settings.replay_path (secret path on the primary domain, default "rply") via _shared/replay-origin.ts at send/return points, so live links stay on the primary domain root while the secret replay path can change without code edits.
 - Route pages across sites via DomainRouter using site_settings main_origin/live_origin/replay_origin (admin & reseller never redirected), and swap message domains via link_origin in _shared/replay-origin.ts, so twin sites sharing one backend can trade roles without reissuing links.
 - Website B (this remix) imports the client from src/integrations/backend.ts pointing at Website A's backend and never deploys supabase/functions, so tokens, payments and stream keys stay shared with Website A.
+- Keep DVR buffer/jump policy and replay source selection in the shared playback policy module, so live controls and replay fallback use testable rules without altering access validation.
