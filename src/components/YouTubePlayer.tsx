@@ -5,7 +5,8 @@ import { isFullscreenActive, isVideoFullscreen, onFullscreenChange, requestFs, e
 import { useState, useRef, useCallback, useEffect, useMemo, lazy, Suspense } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { type ReplayRow, getReplaySource, type ReplaySource, type PlaylistSource } from '@/lib/store';
+import { type ReplayRow, getReplaySource, type ReplaySource } from '@/lib/store';
+import { buildReplaySources, nextReplaySource } from '@/lib/playbackPolicy';
 import { supabase } from '@/integrations/backend';
 import RatingStars from '@/components/RatingStars';
 // CommentSection lazy-loaded — chunk komentar baru dimuat saat user scroll/buka.
@@ -26,32 +27,6 @@ interface Props {
   onBack: () => void;
 }
 
-function buildSources(source: ReplaySource | null, replay: ReplayRow): PlaylistSource[] {
-  if (!source) return [];
-  const list: PlaylistSource[] = Array.isArray(source.sources) ? [...source.sources] : [];
-  // Always append legacy fields as additional sources if they aren't already present
-  if (source.m3u8_url && !list.some(s => s.type === 'm3u8' && s.url === source.m3u8_url)) {
-    list.push({
-      id: 'legacy-m3u8',
-      label: list.length === 0 ? 'M3U8' : `M3U8 ${list.filter(s => s.type === 'm3u8').length + 1}`,
-      type: 'm3u8',
-      url: source.m3u8_url,
-      is_default: list.length === 0,
-    });
-  }
-  if (source.youtube_id && !list.some(s => s.type === 'youtube' && s.url === source.youtube_id)) {
-    list.push({
-      id: 'legacy-yt',
-      label: list.length === 0 ? 'YouTube' : `YouTube ${list.filter(s => s.type === 'youtube').length + 1}`,
-      type: 'youtube',
-      url: source.youtube_id,
-      is_default: list.length === 0,
-    });
-  }
-  return list;
-}
-
-
 export default function YouTubePlayer({ replay, onBack }: Props) {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showTvMenu, setShowTvMenu] = useState(false);
@@ -64,6 +39,7 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
 
   const [viewCount, setViewCount] = useState(replay.view_count ?? 0);
   const [hlsFailed, setHlsFailed] = useState(false);
+  const failedSourceIds = useRef<string[]>([]);
   const [source, setSource] = useState<ReplaySource | null>(null);
   const [sourceLoading, setSourceLoading] = useState(true);
   const [sourceError] = useState<string | null>(null);
@@ -91,6 +67,7 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
     setSource(null);
     setSourceLoading(true);
     setHlsFailed(false);
+    failedSourceIds.current = [];
     setNeedsPassword(false);
     setDeviceLimit(false);
     setLockedToken('');
@@ -184,7 +161,7 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
 
   }, [replay.id]);
 
-  const sources = useMemo(() => buildSources(source, replay), [source, replay]);
+  const sources = useMemo(() => buildReplaySources(source), [source]);
 
   // Pick default active source when sources arrive
   useEffect(() => {
@@ -325,8 +302,8 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
   const handleHlsFatalError = useCallback(() => {
     // Try to switch to next source automatically
     if (!activeSource) return;
-    const idx = sources.findIndex(s => s.id === activeSource.id);
-    const next = sources.find((s, i) => i !== idx);
+    failedSourceIds.current = [...new Set([...failedSourceIds.current, activeSource.id])];
+    const next = nextReplaySource(sources, activeSource.id, failedSourceIds.current);
     if (next) {
       setActiveSourceId(next.id);
       setHlsFailed(false);
@@ -463,7 +440,7 @@ export default function YouTubePlayer({ replay, onBack }: Props) {
                     type="button"
                     onPointerEnter={warm}
                     onFocus={warm}
-                    onClick={() => { setHlsFailed(false); setActiveSourceId(s.id); }}
+                    onClick={() => { failedSourceIds.current = []; setHlsFailed(false); setActiveSourceId(s.id); }}
                     className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
                       active
                         ? 'bg-primary text-primary-foreground border-primary shadow-md'
