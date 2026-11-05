@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/backend';
+import { MAINT_KEY, MAINT_MSG_KEY } from '@/lib/siteKeys';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
@@ -26,9 +27,9 @@ export default function UserBlockAdmin() {
   const [busy, setBusy] = useState(false);
 
   const loadAll = async () => {
-    const { data } = await supabase.from('site_settings').select('key,value').in('key', ['maintenance_mode', 'maintenance_message', 'replay_path', 'live_origin', 'main_origin', 'replay_origin', 'link_origin']);
+    const { data } = await supabase.from('site_settings').select('key,value').in('key', [MAINT_KEY, MAINT_MSG_KEY, 'replay_path', 'live_origin', 'main_origin', 'replay_origin', 'link_origin']);
     const m = Object.fromEntries((data || []).map((r) => [r.key, r.value]));
-    setMode(m.maintenance_mode === 'true'); setMsg(m.maintenance_message || ''); setReplayHost(m.replay_path || 'rply'); setLiveOrigin(m.live_origin || ''); setMainOrigin(m.main_origin || ''); setReplayOrigin(m.replay_origin || ''); setLinkOrigin(m.link_origin || '');
+    setMode(m[MAINT_KEY] === 'true'); setMsg(m[MAINT_MSG_KEY] || ''); setReplayHost(m.replay_path || 'rply'); setLiveOrigin(m.live_origin || ''); setMainOrigin(m.main_origin || ''); setReplayOrigin(m.replay_origin || ''); setLinkOrigin(m.link_origin || '');
     const { data: b } = await supabase.from('blocked_users').select('id,user_id,phone,email,reason,created_at').eq('active', true).order('created_at', { ascending: false });
     setBlocked((b || []) as BlockedRow[]);
   };
@@ -44,7 +45,7 @@ export default function UserBlockAdmin() {
   };
 
   const toggleMode = async (v: boolean) => {
-    if (await setSetting('maintenance_mode', v ? 'true' : 'false')) {
+    if (await setSetting(MAINT_KEY, v ? 'true' : 'false')) {
       setMode(v); toast.success(v ? 'Mode Perbaikan aktif (kecuali halaman Live)' : 'Mode Perbaikan dimatikan');
     }
   };
@@ -82,7 +83,7 @@ export default function UserBlockAdmin() {
           </div>
           <div className="flex gap-2">
             <Input placeholder="Pesan untuk pengunjung (opsional)" value={msg} onChange={(e) => setMsg(e.target.value)} />
-            <Button variant="outline" onClick={async () => { if (await setSetting('maintenance_message', msg)) toast.success('Pesan disimpan'); }}>Simpan</Button>
+            <Button variant="outline" onClick={async () => { if (await setSetting(MAINT_MSG_KEY, msg)) toast.success('Pesan disimpan'); }}>Simpan</Button>
           </div>
           <div className="space-y-1 pt-2 border-t border-border">
             <p className="text-sm font-medium text-foreground">Path Replay Rahasia</p>

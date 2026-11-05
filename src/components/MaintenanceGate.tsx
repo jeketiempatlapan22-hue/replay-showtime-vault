@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Wrench } from 'lucide-react';
 import { supabase } from '@/integrations/backend';
+import { MAINT_KEY, MAINT_MSG_KEY } from '@/lib/siteKeys';
 
 // Halaman yang tetap bisa dibuka saat Mode Perbaikan aktif.
 const LIVE_PATHS = ['/live', '/kunci', '/free', '/tv', '/reseller', '/akses'];
@@ -44,10 +45,10 @@ export default function MaintenanceGate({ children }: { children: React.ReactNod
 
   useEffect(() => {
     const loadSettings = async () => {
-      const { data } = await supabase.from('site_settings').select('key,value').in('key', ['maintenance_mode', 'maintenance_message', 'replay_path']);
+      const { data } = await supabase.from('site_settings').select('key,value').in('key', [MAINT_KEY, MAINT_MSG_KEY, 'replay_path']);
       const m = Object.fromEntries((data || []).map((r) => [r.key, r.value]));
-      setMode(m.maintenance_mode === 'true');
-      setMsg(m.maintenance_message || '');
+      setMode(m[MAINT_KEY] === 'true');
+      setMsg(m[MAINT_MSG_KEY] || '');
       setSecretPath(normPath(m.replay_path || '') || 'rply');
     };
     const checkUser = async () => {

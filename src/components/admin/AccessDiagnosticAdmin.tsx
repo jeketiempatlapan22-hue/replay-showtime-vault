@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/backend';
+import { MAINT_KEY } from '@/lib/siteKeys';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -58,8 +59,9 @@ export default function AccessDiagnosticAdmin() {
     const push = (s: DiagStep) => { out.push(s); setSteps([...out]); };
     try {
       const { data } = await supabase.from('site_settings').select('key,value')
-        .in('key', ['maintenance_mode', 'main_origin', 'live_origin', 'replay_origin', 'replay_path']);
+        .in('key', [MAINT_KEY, 'main_origin', 'live_origin', 'replay_origin', 'replay_path']);
       const m = Object.fromEntries((data || []).map((r) => [r.key, r.value])) as Record<string, string>;
+      m.maintenance_mode = m[MAINT_KEY] || 'false';
       push({ label: 'Mode Perbaikan', status: m.maintenance_mode === 'true' ? 'ok' : 'info', detail: m.maintenance_mode === 'true' ? 'AKTIF — pengujian berjalan dalam kondisi perbaikan.' : 'Tidak aktif. Hasil tetap berlaku, tapi aktifkan untuk uji kondisi sebenarnya.' });
 
       const r = diagnoseLinkRouting(input, m, replays.map((x) => x.id));
