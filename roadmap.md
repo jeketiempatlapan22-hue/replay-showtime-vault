@@ -1,7 +1,8 @@
 # Roadmap
 
-- [ ] Complete document audit and Server 3 DVR/replay selection with tests.
-- [ ] Verify shared Website A SForge configuration (requires Website A access).
+- [x] Complete document audit, Server 3 DVR/replay selection, and bulk Server 3 import with tests.
+- [ ] Verify deployed Website A SForge columns/privacy, sync secret and replay conversion; blocked by Website A backend access from this project.
+- [ ] Verify real paid-token live/replay playback; requires a valid Website A test token and active SForge show.
 
 - [x] Repair live/admin link copying and complete token replay messages.
 - [x] Show the birthday/graduating member on active-show cards.
