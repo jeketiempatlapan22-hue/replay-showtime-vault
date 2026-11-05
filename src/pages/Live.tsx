@@ -357,8 +357,7 @@ function LiveInner() {
           server3_url: data.server3_url || '',
           grant: data.grant || '',
         };
-        // For silent revalidation, NEVER overwrite the existing player URL/sources.
-        // Doing so would change the React key on the player and remount it, restarting the live stream from the beginning.
+        // Reconcile authoritative sources; unchanged player URLs remain mounted.
         if (silent && showSwitched) {
           // Show berganti (misal admin memulai live show berikutnya): pakai
           // konfigurasi baru sepenuhnya supaya membership langsung ikut live terbaru.
@@ -370,13 +369,12 @@ function LiveInner() {
           setUnlocked(prev => {
             if (!prev) return cfg;
             const next = { ...prev, enabled: cfg.enabled, title: cfg.title, type: cfg.type };
-            if (cfg.idn_show_id) next.idn_show_id = cfg.idn_show_id;
+            next.idn_show_id = cfg.idn_show_id;
             next.server2_url = cfg.server2_url || '';
             next.server3_url = cfg.server3_url || '';
             if (cfg.grant) next.grant = cfg.grant;
             // URL player utama mengikuti admin: dikosongkan → tombol hilang.
-            if (!cfg.url) next.url = '';
-            else if (!prev.url) next.url = cfg.url;
+            next.url = cfg.url;
             // Merge playlist sources by URL: keep existing entries (so the
             // active player tidak remount), append baru, dan refresh label.
             // Hasilnya playlist baru yang ditambah admin langsung muncul

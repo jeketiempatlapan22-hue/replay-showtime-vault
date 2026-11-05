@@ -15,6 +15,7 @@ export interface ParsedShow {
   category: string;
   idn_show_id: string;
   server2_url?: string;
+  server3_url?: string;
   description: string;
 }
 
@@ -117,6 +118,11 @@ export function parseServer2Url(line: string): string {
   return m ? m[1].trim() : '';
 }
 
+export function parseServer3Url(line: string): string {
+  const m = line.match(/\b(?:server\s*3|s3)\s*[:=]\s*(https?:\/\/\S+)/i);
+  return m ? m[1].trim() : '';
+}
+
 export function slugAlias(title: string, date: string, time: string): string {
   const base = stripEmoji(title).toLowerCase().replace(/[^a-z0-9]+/g, '').slice(0, 6);
   const d = date.replace(/-/g, '').slice(4);
@@ -215,6 +221,7 @@ export function parseBulkText(text: string): ParseResult {
     const detectedStatuses: string[] = [];
     let idn = '';
     let server2 = '';
+    let server3 = '';
     let endIdx = dateIdx;
 
     for (let j = dateIdx + 1; j < lines.length; j++) {
@@ -224,6 +231,8 @@ export function parseBulkText(text: string): ParseResult {
       if (TITLE_EMOJI.test(ln) || /^`/.test(ln)) break;
       const s2 = parseServer2Url(ln);
       if (s2) { server2 = s2; endIdx = j; continue; }
+      const s3 = parseServer3Url(ln);
+      if (s3) { server3 = s3; endIdx = j; continue; }
       if (!isDetailLine(ln)) {
         if (isNoiseLine(ln)) { endIdx = j; continue; }
         break;
@@ -280,6 +289,7 @@ export function parseBulkText(text: string): ParseResult {
         category: 'reguler',
         idn_show_id: idn,
         server2_url: server2,
+        server3_url: server3,
         description: detectedStatuses.join(' • '),
       });
     }
