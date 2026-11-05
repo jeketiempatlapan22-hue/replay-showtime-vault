@@ -6,6 +6,8 @@ import LiveWatermark from '@/components/LiveWatermark';
 import { castMedia, isGoogleCastCapable, requestWakeLock, showNativePicker, stopCastSession } from '@/lib/cast';
 import { readUnlockPayload, requestCastUrl } from '@/lib/tvSession';
 import TvConnectDialog from '@/components/TvConnectDialog';
+import { Button } from '@/components/ui/button';
+import { liveBufferPolicy, shouldJumpToLive } from '@/lib/playbackPolicy';
 
 
 interface Props {
@@ -17,6 +19,8 @@ interface Props {
   onAuthError?: () => void;
   onPipChange?: (active: boolean) => void;
   hideSeekButtons?: boolean;
+  /** Preserve live history and let viewers explicitly return to the live edge. */
+  dvr?: boolean;
   /** Optional custom HTTP headers attached to ALL HLS requests (manifest + segments). */
   headers?: Record<string, string>;
   /** Optional overlay rendered inside the player container (visible in fullscreen too). */
@@ -50,7 +54,7 @@ interface QualityLevel {
   bitrate?: number;
 }
 
-const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, onFatalError, onAuthError, onPipChange, hideSeekButtons = false, headers, overlay, showId = '', replayTvPayload = null }, ref) => {
+const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, onFatalError, onAuthError, onPipChange, hideSeekButtons = false, dvr = false, headers, overlay, showId = '', replayTvPayload = null }, ref) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const hideControlsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -330,6 +334,9 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
     setCurrentQuality(-1);
     setAutoActiveLabel('');
     setIsLiveStream(false);
+    setCurrentTime(0);
+    setDuration(0);
+    setSeekRange({ start: 0, end: 0 });
     recoveryAttemptsRef.current = 0;
     isLiveRef.current = false;
     initialLiveEdgeSyncRef.current = false;
@@ -428,7 +435,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
         if (Math.abs(current - last.time) > 0.25) {
           lastProgressRef.current = { time: current, checkedAt: now, recoveries: 0 };
           // Tertinggal jauh dari siaran (mis. setelah layar mati) → lompat ke potongan terbaru.
-          if (isLiveRef.current && video.seekable.length) {
+          if (!dvr && isLiveRef.current && video.seekable.length) {
             const edge = video.seekable.end(video.seekable.length - 1);
             if (Number.isFinite(edge) && edge - current > 26) {
               try { video.currentTime = Math.max(0, edge - 8); } catch { /* ignore */ }
@@ -446,12 +453,12 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
         const hlsInstance = hlsRef.current;
         if (hlsInstance) {
           try {
-            if (isLiveRef.current) {
+            if (isLiveRef.current && !dvr) {
               const edge = video.seekable.length ? video.seekable.end(video.seekable.length - 1) : NaN;
               const latency = Number.isFinite(edge) ? edge - current : 0;
               // Kalau benar-benar jauh tertinggal, lompat lembut mendekati live edge.
               // Kalau tidak, cukup lanjutkan loading supaya tidak terlihat refresh.
-              if (latency > 26) video.currentTime = Math.max(0, edge - 8);
+              if (shouldJumpToLive(dvr, true, latency)) video.currentTime = Math.max(0, edge - 8);
               hlsInstance.startLoad(-1);
             } else {
               hlsInstance.startLoad(resumePosition());
@@ -485,7 +492,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
         // Prefer smooth playback over ultra-low latency; chasing the live edge is a common cause of rebuffering.
         lowLatencyMode: false,
         // Buffer tuning adaptif berdasarkan profil perangkat & jaringan.
-        backBufferLength: bufferProfile.back,
+        ...liveBufferPolicy(dvr, bufferProfile.back, liveMaxLatencyCount),
         maxBufferLength: bufferProfile.max,
         maxMaxBufferLength: bufferProfile.maxMax,
         maxBufferSize: bufferProfile.size,
@@ -535,7 +542,6 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
         // Stable live: weak networks intentionally stay farther behind edge to
         // absorb jitter and avoid repeated rebuffer while switching fragments.
         liveSyncDurationCount: liveSyncCount,
-        liveMaxLatencyDurationCount: liveMaxLatencyCount,
         // Kejar live edge halus dengan sedikit mempercepat video (tanpa lompat).
         maxLiveSyncPlaybackRate: 1,
         progressive: true,
@@ -546,7 +552,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
       hls.on(Hls.Events.LEVEL_LOADED, (_e, d) => {
         // Live: simpan hanya potongan terbaru, buang potongan lama dari memori.
         if (d?.details?.live && hls) {
-          hls.config.backBufferLength = 8;
+          hls.config.backBufferLength = liveBufferPolicy(dvr, 8, liveMaxLatencyCount).backBufferLength;
           hls.config.maxBufferLength = Math.max(hls.config.maxBufferLength, 30);
           hls.config.maxMaxBufferLength = Math.max(hls.config.maxMaxBufferLength, 45);
         }
@@ -762,7 +768,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
           onAuthErrorRef.current();
           if (data.fatal) {
             const h = hls;
-            setTimeout(() => { try { h?.startLoad(isLiveRef.current ? -1 : resumePosition()); } catch { /* ignore */ } }, 1500);
+            setTimeout(() => { try { h?.startLoad(isLiveRef.current && !dvr ? -1 : resumePosition()); } catch { /* ignore */ } }, 1500);
           }
           return;
         }
@@ -786,7 +792,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
 
           if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
             try {
-              hls?.startLoad(isLiveRef.current ? -1 : resumePosition());
+              hls?.startLoad(isLiveRef.current && !dvr ? -1 : resumePosition());
               if (wasPlaying) video.play().catch(() => {});
               return;
             } catch { /* ignore */ }
@@ -795,7 +801,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
               hls?.recoverMediaError();
               // Restore the user's position after recovery (recoverMediaError can reset to 0)
               const restore = () => {
-                if (!isLiveRef.current && resumeTime > 0 && Math.abs(video.currentTime - resumeTime) > 1) {
+                if ((!isLiveRef.current || dvr) && resumeTime > 0 && Math.abs(video.currentTime - resumeTime) > 1) {
                   try { video.currentTime = resumeTime; } catch { /* ignore */ }
                 }
                 if (wasPlaying) video.play().catch(() => {});
@@ -850,7 +856,7 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
       // Reset native source to prevent leaked playback when switching providers
       try { video.removeAttribute('src'); video.load(); } catch { /* ignore */ }
     };
-  }, [src, setBufferingState]);
+  }, [src, dvr, setBufferingState]);
 
   const selectQuality = (levelIndex: number) => {
     const hls = hlsRef.current;
@@ -1208,14 +1214,21 @@ const HlsPlayer = forwardRef<HlsPlayerHandle, Props>(({ src, title, watermark, o
                 appearance: 'none',
               }}
             />
-            <span className="w-12 sm:w-16 text-right shrink-0 tabular-nums">{isLiveStream ? 'LIVE' : formatTime(seekSpan || duration)}</span>
+            {isLiveStream && dvr ? (
+              <Button type="button" variant="secondary" size="sm" disabled={!canSeek}
+                aria-label="Kembali ke siaran terbaru" title="Kembali ke siaran terbaru"
+                onClick={() => applySeek(seekEnd - 3)}
+                className="h-6 w-24 shrink-0 px-1 text-[10px] tabular-nums">
+                {seekEnd - currentTime > 6 ? `LIVE −${formatTime(seekEnd - currentTime)}` : 'LIVE'}
+              </Button>
+            ) : <span className="w-12 sm:w-16 text-right shrink-0 tabular-nums">{isLiveStream ? 'LIVE' : formatTime(seekSpan || duration)}</span>}
           </div>
 
           <div className="flex items-center gap-0.5 sm:gap-2 min-w-0">
             <button type="button" onClick={(e) => { e.stopPropagation(); togglePlay(); }} className="p-2 text-white hover:text-primary transition-colors shrink-0" aria-label={isPlaying ? 'Pause' : 'Play'}>
               {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
             </button>
-            {!hideSeekButtons && (
+            {(!hideSeekButtons || dvr) && (
               <>
                 <button type="button" onClick={(e) => { e.stopPropagation(); seek(-10); }} disabled={!canSeek} className="p-2 text-white hover:text-primary transition-colors disabled:opacity-40 disabled:hover:text-current shrink-0" aria-label="Mundur 10 detik" title="Mundur 10 detik">
                   <RotateCcw className="w-5 h-5" />
