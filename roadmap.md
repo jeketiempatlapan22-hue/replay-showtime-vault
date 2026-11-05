@@ -1,5 +1,8 @@
 # Roadmap
 
+- [ ] Complete document audit and Server 3 DVR/replay selection with tests.
+- [ ] Verify shared Website A SForge configuration (requires Website A access).
+
 - [x] Repair live/admin link copying and complete token replay messages.
 - [x] Show the birthday/graduating member on active-show cards.
 - [x] Verify the affected flows and tests.
