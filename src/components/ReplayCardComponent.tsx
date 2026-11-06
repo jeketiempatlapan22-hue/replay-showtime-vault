@@ -215,6 +215,8 @@ function ReplayCardComponent({ replay, isUnlocked, onUnlock, onWatch, onUnlockAn
       }
     } else if (res.reason === 'rate_limited') {
       setError('Terlalu banyak percobaan. Tunggu sebentar lalu coba lagi.');
+    } else if (res.reason === 'expired') {
+      setError('Token sudah hangus.');
     } else {
       setError('Sandi salah! Coba lagi.');
     }
