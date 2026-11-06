@@ -19,6 +19,7 @@ import { Button } from '@/components/ui/button';
 import { toast } from '@/hooks/use-toast';
 import logoImg from '@/assets/logo.png';
 import InstallAppButton from '@/components/InstallAppButton';
+import ResetAllDevicesButton from '@/components/ResetAllDevicesButton';
 
 interface HamburgerMenuProps {
   whatsappNumber: string;
@@ -166,6 +167,8 @@ export default function HamburgerMenu({ whatsappNumber, whatsappLink, lightMode,
           </Link>
 
 
+
+          <ResetAllDevicesButton />
 
           <Link
             to="/tv"

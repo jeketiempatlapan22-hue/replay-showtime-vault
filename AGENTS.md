@@ -10,3 +10,4 @@
 - Website B (this remix) imports the client from src/integrations/backend.ts pointing at Website A's backend and never deploys supabase/functions, so tokens, payments and stream keys stay shared with Website A.
 - Keep DVR buffer/jump policy and replay source selection in the shared playback policy module, so live controls and replay fallback use testable rules without altering access validation.
 - Website B reads/writes its own maintenance keys (src/lib/siteKeys.ts) in the shared site_settings, so toggling maintenance on one site never closes the other.
+- Run "reset all devices" through src/lib/deviceResetAll.ts, which calls the existing per-token self-reset functions on Website A, so Website B adds no backend code and server quotas still apply.

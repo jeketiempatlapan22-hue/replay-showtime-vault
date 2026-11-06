@@ -243,10 +243,15 @@ export default function Index() {
       const params = new URLSearchParams(window.location.search);
       const token = params.get('token');
       const tokenReplay = params.get('replay');
-      if (token && tokenReplay) {
+      // Website A mengirim ?replay=ID&token=… atau ?replay=ID&pw=… (sandi replay/master/membership).
+      const pwParam = params.get('pw');
+      if ((token || pwParam) && tokenReplay) {
         const matched = allReplays.find(r => r.id === tokenReplay);
         if (matched) {
-          try { sessionStorage.setItem(`replaytime-tok-${tokenReplay}`, token); } catch { /* ignore */ }
+          try {
+            if (token) sessionStorage.setItem(`replaytime-tok-${tokenReplay}`, token);
+            else if (pwParam) sessionStorage.setItem(`replaytime-pw-${tokenReplay}`, pwParam);
+          } catch { /* ignore */ }
           setUnlockedIds(prev => prev.has(tokenReplay) ? prev : new Set(prev).add(tokenReplay));
           setDisplayedReplay(matched);
           setWatchingReplay(matched);
