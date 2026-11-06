@@ -562,7 +562,8 @@ function LiveInner() {
     }
 
     // Gate: if no token URL and no cached unlock, send user to the dedicated /kunci page.
-    if (!tParam && !mtParam && !cached) {
+    // Sandi bawaan Website A (?pw=) sedang diperiksa — jangan lempar ke /kunci dulu.
+    if (!tParam && !mtParam && !cached && !pwParam) {
       navigate(`/kunci${showId ? `?show=${showId}` : ''}`, { replace: true });
       return;
     }
