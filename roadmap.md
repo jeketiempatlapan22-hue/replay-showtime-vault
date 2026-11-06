@@ -1,6 +1,7 @@
 # Roadmap
 
-- [ ] Apply Website B chat document: server-side send, role banners, moderation actions, sender details, and verification (no backend or admin-panel copies).
+- [x] Apply Website B chat document: server-side send, role banners, moderation actions, sender details; 8 tests and desktop/mobile dialog checks passed (no backend or admin-panel copies).
+- [ ] Verify real admin/moderator chat actions end-to-end on Website A's shared backend; no authenticated shared-backend session is available here. Endpoint existence and anonymous denial verified.
 
 - [x] Complete document audit, Server 3 DVR/replay selection, and bulk Server 3 import with tests.
 - [ ] Verify deployed Website A SForge columns/privacy, sync secret and replay conversion; blocked by Website A backend access from this project.
