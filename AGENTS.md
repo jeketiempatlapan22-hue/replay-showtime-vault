@@ -11,3 +11,4 @@
 - Keep DVR buffer/jump policy and replay source selection in the shared playback policy module, so live controls and replay fallback use testable rules without altering access validation.
 - Website B reads/writes its own maintenance keys (src/lib/siteKeys.ts) in the shared site_settings, so toggling maintenance on one site never closes the other.
 - Run "reset all devices" through src/lib/deviceResetAll.ts, which calls the existing per-token self-reset functions on Website A, so Website B adds no backend code and server quotas still apply.
+- Send live chat through Website A's live-chat-send and use its authenticated role/moderation RPCs via the local liveChatAccess contracts; sender details never expose phone numbers to moderators or complete tokens.
