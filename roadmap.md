@@ -1,5 +1,7 @@
 # Roadmap
 
+- [ ] Apply Website B chat document: server-side send, role banners, moderation actions, sender details, and verification (no backend or admin-panel copies).
+
 - [x] Complete document audit, Server 3 DVR/replay selection, and bulk Server 3 import with tests.
 - [ ] Verify deployed Website A SForge columns/privacy, sync secret and replay conversion; blocked by Website A backend access from this project.
 - [ ] Verify real paid-token live/replay playback; requires a valid Website A test token and active SForge show.
