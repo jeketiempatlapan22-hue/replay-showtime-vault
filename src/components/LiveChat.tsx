@@ -1,16 +1,21 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Send, Pin, PinOff, Trash2, MessageCircle, ShieldCheck, UserCog, Reply, X, Ban, CheckCircle2 } from 'lucide-react';
+import { Send, Pin, PinOff, Trash2, MessageCircle, UserCog, Reply, X, Ban, CheckCircle2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/backend';
 import { getBrowserId } from '@/lib/browserId';
+import { toast } from '@/hooks/use-toast';
+import { chatBackend, chatPermissions, currentChatAccess, visibleSender, type ChatSender, type ChatRole } from '@/lib/liveChatAccess';
+import ChatSenderDialog from '@/components/ChatSenderDialog';
 
 interface Msg {
   id: string;
   name: string;
   message: string;
   is_admin: boolean;
+  sender_role?: ChatRole;
+  user_id?: string | null;
   pinned: boolean;
   created_at: string;
   browser_id?: string;
@@ -32,6 +37,15 @@ export default function LiveChat({ lite = false, showId = '' }: LiveChatProps) {
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isModerator, setIsModerator] = useState(false);
+  const [selectedMessage, setSelectedMessage] = useState<Msg | null>(null);
+  const [sender, setSender] = useState<ChatSender | null>(null);
+  const [senderLoading, setSenderLoading] = useState(false);
+  const [senderError, setSenderError] = useState('');
+  const [actionBusy, setActionBusy] = useState(false);
+  const senderRequest = useRef(0);
+  const permissions = chatPermissions(isAdmin, isModerator);
+  const canModerate = permissions.moderate;
   const [adminUsername, setAdminUsername] = useState('Admin');
   const [nameModalOpen, setNameModalOpen] = useState(false);
   const [nameInput, setNameInput] = useState('');
@@ -60,13 +74,26 @@ export default function LiveChat({ lite = false, showId = '' }: LiveChatProps) {
   const openChangeName = () => { setNameInput(name); setNameError(''); setNameModalOpen(true); };
 
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (!session) return;
-      const { data } = await supabase.rpc('has_role', { _user_id: session.user.id, _role: 'admin' });
-      setIsAdmin(data === true);
+    let active = true;
+    let roleRequest = 0;
+    const checkRoles = async (userId?: string) => {
+      const request = ++roleRequest;
+      setIsAdmin(false); setIsModerator(false);
+      if (!userId) return;
+      const [admin, moderator] = await Promise.all([
+        chatBackend.rpc('has_role', { _user_id: userId, _role: 'admin' }),
+        chatBackend.rpc('has_role', { _user_id: userId, _role: 'moderator' }),
+      ]);
+      if (!active || request !== roleRequest) return;
+      setIsAdmin(admin.data === true); setIsModerator(moderator.data === true);
+    };
+    supabase.auth.getSession().then(({ data }) => checkRoles(data.session?.user.id));
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setTimeout(() => { if (active) checkRoles(session?.user.id); }, 0);
     });
     supabase.from('site_settings').select('value').eq('key', 'admin_username').maybeSingle()
       .then(({ data }) => { if (data?.value) setAdminUsername(data.value); });
+    return () => { active = false; listener.subscription.unsubscribe(); };
   }, []);
 
   // Chat dipisah per show: hanya pesan milik show ini yang tampil.
@@ -82,7 +109,7 @@ export default function LiveChat({ lite = false, showId = '' }: LiveChatProps) {
       scoped(true),
       scoped(false),
       // Admin perlu daftar lengkap block untuk badge moderasi; viewer biasa cukup cek dirinya sendiri.
-      isAdmin
+      canModerate
         ? supabase.from('chat_blocks').select('browser_id')
         : supabase.from('chat_blocks').select('browser_id').eq('browser_id', myBrowserId),
     ]);
@@ -90,7 +117,7 @@ export default function LiveChat({ lite = false, showId = '' }: LiveChatProps) {
     setMessages(((list || []) as Msg[]).slice().reverse());
     setBlockedSet(new Set(((blocks || []) as { browser_id: string }[]).map(b => b.browser_id)));
     stickToBottomRef.current = true;
-  }, [isAdmin, messageLimit, myBrowserId, showId]);
+  }, [canModerate, messageLimit, myBrowserId, showId]);
 
   useEffect(() => {
     refresh();
@@ -124,11 +151,11 @@ export default function LiveChat({ lite = false, showId = '' }: LiveChatProps) {
       })
       .on(
         'postgres_changes',
-        isAdmin
+        canModerate
           ? { event: '*', schema: 'public', table: 'chat_blocks' }
           : { event: '*', schema: 'public', table: 'chat_blocks', filter: `browser_id=eq.${myBrowserId}` },
         async () => {
-          const q = isAdmin
+          const q = canModerate
             ? supabase.from('chat_blocks').select('browser_id')
             : supabase.from('chat_blocks').select('browser_id').eq('browser_id', myBrowserId);
           const { data } = await q;
@@ -141,7 +168,7 @@ export default function LiveChat({ lite = false, showId = '' }: LiveChatProps) {
     const onVis = () => { if (document.visibilityState === 'visible') refresh(); };
     document.addEventListener('visibilitychange', onVis);
     return () => { clearInterval(poll); document.removeEventListener('visibilitychange', onVis); supabase.removeChannel(ch); };
-  }, [isAdmin, messageLimit, myBrowserId, refresh, showId, inScope]);
+  }, [canModerate, messageLimit, myBrowserId, refresh, showId, inScope]);
 
   const handleScroll = () => {
     const el = listRef.current;
@@ -241,41 +268,86 @@ export default function LiveChat({ lite = false, showId = '' }: LiveChatProps) {
     setSending(true);
     const display = (name.trim() || 'Anonim').slice(0, 40);
     stickToBottomRef.current = true;
-    const { error } = await supabase.from('live_messages').insert({
+    try {
+    const { data, error } = await supabase.functions.invoke('live-chat-send', { body: {
       browser_id: myBrowserId,
       name: isAdmin ? (adminUsername || 'Admin') : display,
       message: msg,
-      is_admin: isAdmin,
-      pinned: false,
       reply_to_id: replyTo?.id ?? null,
       show_id: showId || null,
-    });
-    if (!error) {
+      ...currentChatAccess(),
+    } });
+    if (error || data?.ok !== true || !data?.message?.id) {
+      let description = data?.error || 'Periksa koneksi lalu coba lagi.';
+      if (error && 'context' in error && error.context instanceof Response) {
+        const response = await error.context.clone().json().catch(() => null);
+        description = response?.error || description;
+      }
+      throw new Error(description);
+    }
+    {
       recordSent(msg);
       setText('');
       setReplyTo(null);
       // Tampilkan langsung walau event realtime terlambat.
-      refresh();
-    } else {
-      try {
-        const { toast } = await import('@/hooks/use-toast');
-        toast({ title: 'Pesan gagal terkirim', description: 'Periksa koneksi lalu coba lagi.', variant: 'destructive' });
-      } catch { /* ignore */ }
+      const sent = data.message as Msg;
+      setMessages(prev => [...prev.filter(m => m.id !== sent.id), sent].slice(-messageLimit));
     }
-    setSending(false);
+    } catch (error) {
+      toast({ title: 'Pesan gagal terkirim', description: error instanceof Error ? error.message : 'Periksa koneksi lalu coba lagi.', variant: 'destructive' });
+    } finally { setSending(false); }
   };
 
-  const togglePin = async (m: Msg) => { if (isAdmin) await supabase.from('live_messages').update({ pinned: !m.pinned }).eq('id', m.id); };
-  const remove = async (m: Msg) => { if (isAdmin) await supabase.from('live_messages').delete().eq('id', m.id); };
+  const runAction = async (action: () => PromiseLike<{ error: { message: string } | null; data?: unknown }>) => {
+    if (!canModerate || actionBusy) return false;
+    setActionBusy(true);
+    try {
+      const { error, data } = await action();
+      if (error) throw new Error(error.message);
+      if (data && typeof data === 'object' && 'ok' in data && data.ok === false) throw new Error('Aksi ditolak server.');
+      await refresh();
+      return true;
+    } catch (error) {
+      toast({ title: 'Aksi gagal', description: error instanceof Error ? error.message : 'Coba lagi.', variant: 'destructive' });
+      return false;
+    } finally { setActionBusy(false); }
+  };
+  const togglePin = (m: Msg) => { if (isAdmin) return runAction(() => supabase.from('live_messages').update({ pinned: !m.pinned }).eq('id', m.id)); };
+  const remove = async (m: Msg) => {
+    const ok = await runAction(() => chatBackend.rpc('mod_delete_message', { _message_id: m.id }));
+    if (ok && selectedMessage?.id === m.id) { senderRequest.current++; setSelectedMessage(null); setSender(null); }
+  };
+  const blockUser = async (m: Msg, unblock = false) => {
+    if (!m.browser_id) return;
+    const ok = await runAction(() => unblock
+      ? chatBackend.rpc('mod_unblock_chat', { _browser_id: m.browser_id || '' })
+      : chatBackend.rpc('mod_block_chat', { _browser_id: m.browser_id || '', _name: m.name, _reason: '' }));
+    if (ok) setSender(prev => prev && prev.browser_id === m.browser_id ? { ...prev, is_blocked: !unblock } : prev);
+  };
+  const openSender = async (m: Msg) => {
+    if (!permissions.inspect) return;
+    const request = ++senderRequest.current;
+    setSelectedMessage(m); setSender(null); setSenderError(''); setSenderLoading(true);
+    try {
+      const { data, error } = await chatBackend.rpc('admin_get_chat_sender', { _message_id: m.id });
+      if (error || !data) throw new Error(error?.message || 'Info pengirim belum tersedia untuk pesan ini.');
+      if (senderRequest.current === request) setSender(visibleSender(data, isAdmin));
+    } catch (error) {
+      if (senderRequest.current === request) setSenderError(error instanceof Error ? error.message : 'Info pengirim gagal dimuat.');
+    } finally { if (senderRequest.current === request) setSenderLoading(false); }
+  };
+  const changeModerator = async () => {
+    if (!isAdmin || !sender?.user_id || !selectedMessage) return;
+    const ok = await runAction(() => chatBackend.rpc('admin_set_moderator', { _user_id: sender.user_id || '', _on: !sender.is_moderator }));
+    if (ok) await openSender(selectedMessage);
+  };
 
-  const blockUser = async (m: Msg) => {
-    if (!isAdmin || !m.browser_id) return;
-    await supabase.from('chat_blocks').insert({ browser_id: m.browser_id, last_name: m.name });
-  };
-  const unblockUser = async (m: Msg) => {
-    if (!isAdmin || !m.browser_id) return;
-    await supabase.from('chat_blocks').delete().eq('browser_id', m.browser_id);
-  };
+  const roleBadge = (m: Msg) => (m.sender_role === 'admin' || m.is_admin)
+    ? <span className="text-[9px] bg-primary/15 text-primary px-1 py-0.5 rounded">🛡️ Admin</span>
+    : m.sender_role === 'moderator' ? <span className="text-[9px] chat-moderator-badge px-1 py-0.5 rounded">🔰 Moderator</span> : null;
+  const senderName = (m: Msg) => permissions.inspect
+    ? <Button variant="link" className="h-auto p-0 text-sm font-semibold text-primary whitespace-normal text-left break-words max-w-full" onClick={() => openSender(m)}>{m.name}</Button>
+    : <span className={`font-semibold break-words ${(m.sender_role === 'admin' || m.is_admin) ? 'text-primary' : 'chat-user-name'}`}>{m.name}</span>;
 
   const time = (s: string) => {
     const d = new Date(s);
@@ -303,14 +375,13 @@ export default function LiveChat({ lite = false, showId = '' }: LiveChatProps) {
             <div key={m.id} className="flex items-start gap-2 text-sm leading-snug">
               <Pin className="w-4 h-4 text-primary mt-0.5 shrink-0" />
               <div className="flex-1 min-w-0">
-                <span className="font-semibold text-primary">{m.name}</span>
-                {m.is_admin && <span className="ml-1 text-[9px] uppercase bg-primary text-primary-foreground px-1 rounded">Admin</span>}
+                {senderName(m)} {roleBadge(m)}
                 <span className="ml-1 font-medium text-foreground break-words">{m.message}</span>
               </div>
-              {isAdmin && (
+              {canModerate && (
                 <div className="flex gap-1 shrink-0">
-                  <button onClick={() => togglePin(m)} className="text-muted-foreground hover:text-foreground"><PinOff className="w-3 h-3" /></button>
-                  <button onClick={() => remove(m)} className="text-destructive"><Trash2 className="w-3 h-3" /></button>
+                  {isAdmin && <Button variant="ghost" size="icon" title="Lepas pin" aria-label="Lepas pin" disabled={actionBusy} onClick={() => togglePin(m)} className="h-6 w-6"><PinOff className="w-3 h-3" /></Button>}
+                  <Button variant="ghost" size="icon" title="Hapus pesan" aria-label="Hapus pesan" disabled={actionBusy} onClick={() => remove(m)} className="h-6 w-6 text-destructive"><Trash2 className="w-3 h-3" /></Button>
                 </div>
               )}
             </div>
@@ -324,7 +395,6 @@ export default function LiveChat({ lite = false, showId = '' }: LiveChatProps) {
         {messages.map(m => {
           const isUserBlocked = !!m.browser_id && blockedSet.has(m.browser_id);
           const replied = m.reply_to_id ? messageMap.get(m.reply_to_id) : null;
-          const nameColor = m.is_admin ? 'text-yellow-400' : 'chat-user-name';
           return (
             <div
               id={`chatmsg-${m.id}`}
@@ -343,34 +413,29 @@ export default function LiveChat({ lite = false, showId = '' }: LiveChatProps) {
                 <div className="mb-0.5 pl-2 border-l-2 border-muted text-[10px] text-muted-foreground/70 italic">↪ Pesan tidak tersedia</div>
               )}
               <div className="flex items-baseline gap-1.5 flex-wrap text-sm leading-snug">
-                <span className={`font-semibold ${nameColor}`}>{m.name}</span>
-                {m.is_admin && (
-                  <span className="inline-flex items-center gap-0.5 text-[9px] uppercase bg-red-500/80 text-white px-1 py-0.5 rounded">
-                    <ShieldCheck className="w-2.5 h-2.5" />Admin
-                  </span>
-                )}
+                {senderName(m)} {roleBadge(m)}
                 {isUserBlocked && !m.is_admin && (
                   <span className="text-[9px] uppercase bg-destructive/80 text-destructive-foreground px-1 py-0.5 rounded">Diblokir</span>
                 )}
                 <span className={m.is_admin ? 'text-foreground/95 break-words' : 'text-muted-foreground break-words'}>{m.message}</span>
                 <span className="text-[10px] text-muted-foreground/60 ml-1">{time(m.created_at)}</span>
-                <span className="ml-auto opacity-0 group-hover:opacity-100 flex gap-1.5 items-center">
+                <span className="ml-auto md:opacity-0 group-hover:opacity-100 focus-within:opacity-100 flex gap-1.5 items-center">
                   {!m.is_admin && !iAmBlocked && (
                     <button title="Balas" onClick={() => { setReplyTo(m); }} className="text-muted-foreground hover:text-primary">
                       <Reply className="w-3.5 h-3.5" />
                     </button>
                   )}
-                  {isAdmin && (
+                  {canModerate && (
                     <>
-                      <button title="Pin" onClick={() => togglePin(m)} className="text-muted-foreground hover:text-primary"><Pin className="w-3.5 h-3.5" /></button>
-                      {!m.is_admin && m.browser_id && (
+                      {isAdmin && <Button variant="ghost" size="icon" title="Pin" aria-label="Pin pesan" disabled={actionBusy} onClick={() => togglePin(m)} className="h-6 w-6"><Pin className="w-3.5 h-3.5" /></Button>}
+                      {!m.is_admin && m.sender_role !== 'admin' && m.browser_id && (
                         isUserBlocked ? (
-                          <button title="Buka blokir" onClick={() => unblockUser(m)} className="text-emerald-500 hover:text-emerald-400"><CheckCircle2 className="w-3.5 h-3.5" /></button>
+                          <Button variant="ghost" size="icon" title="Buka blokir" aria-label="Buka blokir" disabled={actionBusy} onClick={() => blockUser(m, true)} className="h-6 w-6 text-primary"><CheckCircle2 className="w-3.5 h-3.5" /></Button>
                         ) : (
-                          <button title="Blokir user" onClick={() => blockUser(m)} className="text-orange-500 hover:text-orange-400"><Ban className="w-3.5 h-3.5" /></button>
+                          <Button variant="ghost" size="icon" title="Blokir user" aria-label="Blokir user" disabled={actionBusy} onClick={() => blockUser(m)} className="h-6 w-6 text-destructive"><Ban className="w-3.5 h-3.5" /></Button>
                         )
                       )}
-                      <button title="Hapus" onClick={() => remove(m)} className="text-destructive hover:opacity-80"><Trash2 className="w-3.5 h-3.5" /></button>
+                      <Button variant="ghost" size="icon" title="Hapus pesan" aria-label="Hapus pesan" disabled={actionBusy} onClick={() => remove(m)} className="h-6 w-6 text-destructive"><Trash2 className="w-3.5 h-3.5" /></Button>
                     </>
                   )}
                 </span>
@@ -419,6 +484,11 @@ export default function LiveChat({ lite = false, showId = '' }: LiveChatProps) {
           </Button>
         </div>
       </div>
+
+      <ChatSenderDialog open={!!selectedMessage && permissions.inspect} loading={senderLoading} busy={actionBusy} error={senderError} sender={sender ? visibleSender(sender, isAdmin) : null} isAdmin={isAdmin}
+        onClose={() => { senderRequest.current++; setSelectedMessage(null); setSender(null); }} onModerator={changeModerator}
+        onDelete={() => { if (selectedMessage) remove(selectedMessage); }}
+        onBlock={() => { if (selectedMessage && sender?.browser_id) blockUser({ ...selectedMessage, browser_id: sender.browser_id }, sender.is_blocked); }} />
 
       {/* Name modal */}
       <Dialog open={nameModalOpen} onOpenChange={(o) => { if (o || name.trim()) setNameModalOpen(o); }}>
