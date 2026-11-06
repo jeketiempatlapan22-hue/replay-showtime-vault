@@ -12,8 +12,10 @@ vi.mock('@/integrations/backend', () => {
     functions: { invoke: mocks.invoke },
     from: (table: string) => {
       const q: Record<string, unknown> = {};
+      let pinned = false;
       for (const key of ['select', 'eq', 'is', 'order', 'limit']) q[key] = () => q;
-      q.then = (resolve: (value: unknown) => unknown) => Promise.resolve({ data: table === 'live_messages' ? mocks.rows : [] }).then(resolve);
+      q.eq = (key: string, value: boolean) => { if (key === 'pinned') pinned = value; return q; };
+      q.then = (resolve: (value: unknown) => unknown) => Promise.resolve({ data: table === 'live_messages' && !pinned ? mocks.rows : [] }).then(resolve);
       q.maybeSingle = async () => ({ data: null });
       return q;
     },
@@ -36,6 +38,7 @@ describe('LiveChat server flow', () => {
   it('sends guest chat via the function and shows the returned message immediately', async () => {
     mocks.invoke.mockResolvedValue({ data: { ok: true, message: { id: 'sent1', name: 'Penonton', message: 'Halo live', pinned: false, is_admin: false, created_at: new Date().toISOString() } }, error: null });
     render(<LiveChat />);
+    await waitFor(() => expect(mocks.rpc).toHaveBeenCalledTimes(2));
     fireEvent.change(screen.getByPlaceholderText('Ketik pesan...'), { target: { value: 'Halo live' } });
     fireEvent.keyDown(screen.getByPlaceholderText('Ketik pesan...'), { key: 'Enter' });
     await waitFor(() => expect(mocks.invoke).toHaveBeenCalledWith('live-chat-send', expect.objectContaining({ body: expect.objectContaining({ message: 'Halo live', browser_id: 'browser-test', reply_to_id: null, show_id: null }) })));
