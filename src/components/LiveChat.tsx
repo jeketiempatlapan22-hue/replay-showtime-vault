@@ -84,8 +84,15 @@ export default function LiveChat({ lite = false, showId = '' }: LiveChatProps) {
         chatBackend.rpc('has_role', { _user_id: userId, _role: 'admin' }),
         chatBackend.rpc('has_role', { _user_id: userId, _role: 'moderator' }),
       ]);
+      // Cadangan: baca peran langsung dari tabel peran (seperti panel admin) bila RPC gagal.
+      let roles: string[] = [];
+      if (admin.error || moderator.error) {
+        const { data: rows } = await chatBackend.from('user_roles').select('role').eq('user_id', userId);
+        roles = ((rows || []) as { role: string }[]).map((r) => r.role);
+      }
       if (!active || request !== roleRequest) return;
-      setIsAdmin(admin.data === true); setIsModerator(moderator.data === true);
+      setIsAdmin(admin.data === true || roles.includes('admin'));
+      setIsModerator(moderator.data === true || roles.includes('moderator'));
     };
     supabase.auth.getSession().then(({ data }) => checkRoles(data.session?.user.id));
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {

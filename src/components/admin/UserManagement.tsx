@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import UserBlockAdmin from './UserBlockAdmin';
+import BulkDeviceResetAdmin from './BulkDeviceResetAdmin';
 import AccessDiagnosticAdmin from './AccessDiagnosticAdmin';
 import { Search, Coins, Plus, Minus, KeyRound, RefreshCw, User as UserIcon, Mail, Phone, Save, Copy } from 'lucide-react';
 
@@ -120,6 +121,7 @@ export default function UserManagement() {
 
   return (
     <div className="space-y-4">
+      <BulkDeviceResetAdmin />
       <UserBlockAdmin />
       <AccessDiagnosticAdmin />
       <Card>
