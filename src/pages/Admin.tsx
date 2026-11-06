@@ -34,6 +34,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import YearlyPasswordsAdmin from '@/components/admin/YearlyPasswordsAdmin';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger } from '@/components/ui/sheet';
 import logoImg from '@/assets/logo.png';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -1478,6 +1479,7 @@ export default function Admin() {
                 )}
               </CardContent>
             </Card>
+            <YearlyPasswordsAdmin />
           </TabsContent>
         </Tabs>
         <datalist id="member-names">

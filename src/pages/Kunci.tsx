@@ -20,7 +20,7 @@ const reasonMessage = (reason?: string): string => {
     case 'bad_password': return 'Sandi yang dimasukkan salah. Coba lagi.';
     case 'bad_membership_password': return 'Sandi membership salah.';
     case 'revoked': return 'Token tidak valid atau telah dicabut.';
-    case 'expired': return 'Membership Anda telah berakhir.';
+    case 'expired': return 'Token sudah hangus.';
     case 'not_started': return 'Membership belum aktif.';
     case 'rate_limited': return 'Terlalu banyak percobaan. Tunggu beberapa menit lalu coba lagi.';
     case 'off': return 'Live show ini belum aktif atau sudah selesai. Jika sudah jadi replay, buka menu Replay dan masukkan sandi yang sama.';

@@ -288,7 +288,7 @@ function LiveInner() {
       case 'revoked': return 'Token sudah dicabut oleh admin dan tidak dapat dipakai lagi.';
       case 'token_not_found': return 'Token tidak ditemukan. Periksa kembali link akses yang Anda terima.';
       case 'wrong_show': return 'Token ini bukan untuk show yang sedang Anda buka. Pakai link sesuai show yang dibeli.';
-      case 'expired': return 'Token sudah kedaluwarsa. Silakan beli ulang atau hubungi admin.';
+      case 'expired': return 'Token sudah hangus.';
       case 'single_use_consumed': return 'Token sekali pakai ini sudah digunakan di perangkat lain dan tidak bisa dipakai lagi di sini.';
       case 'not_started': return 'Membership belum aktif (belum mencapai waktu mulai).';
       case 'scope': return 'Membership ini tidak mencakup akses replay.';
@@ -494,7 +494,7 @@ function LiveInner() {
         const msg = reason === 'multi_device_no_reset' ? 'Token multi-device tidak bisa direset manual.'
           : reason === 'quota_exhausted' ? 'Kuota reset manual sudah habis. Hubungi admin untuk reset.'
           : reason === 'single_use_no_reset' ? 'Token sekali pakai tidak bisa direset.'
-          : reason === 'expired' ? 'Token sudah kedaluwarsa.'
+          : reason === 'expired' ? 'Token sudah hangus.'
           : reason === 'revoked' ? 'Token sudah dicabut.'
           : 'Gagal reset token. Coba lagi atau hubungi admin.';
         setPwError(msg);
