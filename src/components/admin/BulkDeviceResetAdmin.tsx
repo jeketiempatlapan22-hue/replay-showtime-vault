@@ -29,7 +29,7 @@ export default function BulkDeviceResetAdmin() {
     setRunning(true);
     setResult(null);
     try {
-      const { data, error } = await supabase.rpc('admin_bulk_reset_devices', { _kind: k });
+      const { data, error } = await (supabase.rpc as any)('admin_bulk_reset_devices', { _kind: k });
       if (error) {
         toast.error(error.message);
         return;
