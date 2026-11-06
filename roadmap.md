@@ -16,3 +16,7 @@
 - [x] Remove the transparent replay YouTube cover while retaining visible player controls.
 - [x] Combine related admin menus and place link creation below Live Monitor.
 - [x] Rename the main navigation item from Home to Replay with a matching icon.
+
+- [x] Menu button "Reset Semua Perangkat" with 3x/day quota (resets 00:00 WIB).
+- [x] Accept Website A password handoff (?pw=) on Website B live and replay.
+- [ ] Midnight auto-reset of all device bindings + daily quota for show tokens; must be built in Website A's backend.
