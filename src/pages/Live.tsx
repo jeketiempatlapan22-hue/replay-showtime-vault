@@ -48,6 +48,8 @@ type PiPDocument = Document & { pictureInPictureEnabled?: boolean; pictureInPict
 
 
 const SS_KEY_BASE = 'replaytime-live-unlocked';
+// Sandi live yang sudah diterima server (sama dengan kunci di halaman Kunci).
+const PW_KEY = 'rt-handoff-pw';
 const SS_SRC_KEY = 'replaytime-live-source-idx';
   // Token IDN berlaku ~2 jam. Refresh header tiap 25 menit sudah aman dan
   // menghindari tear-down player. URL playback worker dibuat stabil; refresh
@@ -320,6 +322,7 @@ function LiveInner() {
         return;
       }
       if (data?.valid) {
+        if (opts.password) { try { sessionStorage.setItem(PW_KEY, opts.password.trim()); } catch { /* ignore */ } }
         // Membership selalu mengikuti show live terbaru yang di-resolve server.
         // Link lama dari admin/reseller bisa masih membawa ?show= milik show lama;
         // ganti parameter itu tanpa mengubah token/sandi agar tidak tampil "selesai".
