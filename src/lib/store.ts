@@ -171,6 +171,20 @@ export async function verifyPasswordDetailed(
   replayId: string,
   password: string,
 ): Promise<{ valid: boolean; reason?: string; seconds_remaining?: number }> {
+  // Spasi dari salin-tempel WhatsApp sering ikut; sandi live dibaca huruf besar
+  // oleh server, jadi replay dicoba juga dengan huruf besar bila ketikan ditolak.
+  const typed = password.trim();
+  const first = await verifyPasswordOnce(replayId, typed);
+  const upper = typed.toUpperCase();
+  if (first.valid || upper === typed || first.reason === 'rate_limited' || first.reason === 'maintenance') return first;
+  const second = await verifyPasswordOnce(replayId, upper);
+  return second.valid ? second : first;
+}
+
+async function verifyPasswordOnce(
+  replayId: string,
+  password: string,
+): Promise<{ valid: boolean; reason?: string; seconds_remaining?: number }> {
   try {
     const { data, error } = await supabase.functions.invoke('verify-password', {
       body: { replay_id: replayId, password },
