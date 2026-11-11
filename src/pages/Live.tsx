@@ -48,6 +48,8 @@ type PiPDocument = Document & { pictureInPictureEnabled?: boolean; pictureInPict
 
 
 const SS_KEY_BASE = 'replaytime-live-unlocked';
+// Sandi live yang sudah diterima server (sama dengan kunci di halaman Kunci).
+const PW_KEY = 'rt-handoff-pw';
 const SS_SRC_KEY = 'replaytime-live-source-idx';
   // Token IDN berlaku ~2 jam. Refresh header tiap 25 menit sudah aman dan
   // menghindari tear-down player. URL playback worker dibuat stabil; refresh
@@ -320,6 +322,7 @@ function LiveInner() {
         return;
       }
       if (data?.valid) {
+        if (opts.password) { try { sessionStorage.setItem(PW_KEY, opts.password.trim()); } catch { /* ignore */ } }
         // Membership selalu mengikuti show live terbaru yang di-resolve server.
         // Link lama dari admin/reseller bisa masih membawa ?show= milik show lama;
         // ganti parameter itu tanpa mengubah token/sandi agar tidak tampil "selesai".
@@ -517,9 +520,12 @@ function LiveInner() {
     if (pwParam && !tParam && !mtParam) {
       const next = new URLSearchParams(search); next.delete('pw');
       window.history.replaceState({}, '', `/live${next.toString() ? `?${next}` : ''}`);
-      void doUnlock({ password: pwParam });
+      try { sessionStorage.setItem(PW_KEY, pwParam.trim()); } catch { /* ignore */ }
+      void doUnlock({ password: pwParam.trim() });
     }
     let cached: string | null = null;
+    let savedPwEarly = '';
+    try { savedPwEarly = sessionStorage.getItem(PW_KEY) || ''; } catch { /* ignore */ }
     try {
       cached = sessionStorage.getItem(`${SS_KEY_BASE}${showId?'-'+showId:''}`);
       if (cached) setUnlocked(JSON.parse(cached));
@@ -531,12 +537,17 @@ function LiveInner() {
       const mp = search.get('mp') || search.get('mpassword') || '';
       if (mtParam) void doUnlock({ mtoken: mtParam, mpassword: mp }, true);
       else if (tParam) void doUnlock({ token: tParam }, true);
+      else if (savedPwEarly) void doUnlock({ password: savedPwEarly }, true);
     }
 
     // If a token (membership or personal) is provided without a specific show,
     // redirect to the currently-live active show — or, if none is live, to the
     // nearest UPCOMING active show so membership users still see a countdown.
-    if (!showId && (tParam || mtParam)) {
+    // Pengguna sandi (satuan/custom/bulanan) juga diarahkan ke show live yang aktif
+    // supaya status live, chat, dan pemutar mengikuti show yang benar.
+    let savedPw = '';
+    try { savedPw = sessionStorage.getItem(PW_KEY) || ''; } catch { /* ignore */ }
+    if (!showId && (tParam || mtParam || cached || pwParam)) {
       void (async () => {
         const { data: liveRow } = await supabase.from('active_shows')
           .select('id').eq('is_active', true).eq('is_live', true)
@@ -555,7 +566,12 @@ function LiveInner() {
         }
         if (targetId) {
           const params = new URLSearchParams(search);
+          params.delete('pw');
           params.set('show', targetId);
+          try {
+            const cfg = sessionStorage.getItem(SS_KEY_BASE);
+            if (cfg) sessionStorage.setItem(`${SS_KEY_BASE}-${targetId}`, cfg);
+          } catch { /* ignore */ }
           navigate(`/live?${params.toString()}`, { replace: true });
         }
       })();
@@ -634,6 +650,8 @@ function LiveInner() {
       if (document.visibilityState !== 'visible') return;
       if (tParam) void doUnlock({ token: tParam }, true);
       else if (mtParam) void doUnlock({ mtoken: mtParam, mpassword: search.get('mp') || search.get('mpassword') || '' }, true);
+      // Sandi: perbarui izin pemutar (berumur pendek) agar IDN/Hanabira tidak putus.
+      else if (savedPw) void doUnlock({ password: savedPw }, true);
     }, jitter(120000, 60000));
 
     // Status fallback: realtime UPDATE channel already covers admin changes instantly.

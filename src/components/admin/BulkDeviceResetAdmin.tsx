@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { toast } from 'sonner';
+import { runBulkDeviceReset } from '@/lib/bulkDeviceReset';
 import { MonitorSmartphone, RefreshCw, ShieldAlert } from 'lucide-react';
 
 type Kind = 'membership' | 'show' | 'replay' | 'order' | 'reseller' | 'live' | 'all';
@@ -29,15 +30,16 @@ export default function BulkDeviceResetAdmin() {
     setRunning(true);
     setResult(null);
     try {
-      const { data, error } = await (supabase.rpc as any)('admin_bulk_reset_devices', { _kind: k });
-      if (error) {
-        toast.error(error.message);
-        return;
+      const out = await runBulkDeviceReset((fn, args) => (supabase.rpc as any)(fn, args), k);
+      setResult(out.counts);
+      const total = Object.values(out.counts).reduce((a, b) => a + (Number(b) || 0), 0);
+      if (out.pending.length) {
+        toast.warning(`${total} perangkat dilepas. Kategori ${out.pending.map((p) => KIND_LABEL[p as Kind] || p).join(', ')} menunggu perbaikan server Website A.`);
+      } else {
+        toast.success(`Selesai. ${total} ikatan perangkat dilepas.`);
       }
-      const res = (data || {}) as Record<string, number>;
-      setResult(res);
-      const total = Object.values(res).reduce((a, b) => a + (Number(b) || 0), 0);
-      toast.success(`Selesai. ${total} ikatan perangkat dilepas.`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Reset gagal.');
     } finally {
       setRunning(false);
       setConfirm(null);

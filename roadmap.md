@@ -23,3 +23,8 @@
 - [x] Menu button "Reset Semua Perangkat" with 3x/day quota (resets 00:00 WIB).
 - [x] Accept Website A password handoff (?pw=) on Website B live and replay.
 - [ ] Midnight auto-reset of all device bindings + daily quota for show tokens; must be built in Website A's backend.
+
+- [x] Bulk device reset falls back to per-token reset (membership/show) while Website A's bulk function rejects unconditional DELETE.
+- [x] Keep the admin live monitor iframe on the admin domain so admin badge/sender info work.
+- [x] Password users resolve the live show and refresh their short grant; replay retries uppercase password.
+- [ ] Website A: add WHERE to admin_bulk_reset_devices, return show_id for password unlock, normalize replay password compare (see Perintah_Website_A_v3.txt).

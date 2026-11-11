@@ -1,3 +1,4 @@
+import { skipDomainRedirect } from "@/lib/domainRedirect";
 import { Suspense, lazy, useCallback, useEffect, useState } from 'react';
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes, useLocation } from "react-router-dom";
@@ -66,7 +67,7 @@ function DomainRouter({ children }: { children: React.ReactNode }) {
     let alive = true;
     (async () => {
       const path = location.pathname.toLowerCase();
-      if (/^\/(adpan|reseller)/.test(path) || /^(localhost|127\.)/.test(window.location.hostname) || window.location.hostname.endsWith('lovable.app')) { if (alive) setReady(true); return; }
+      if (skipDomainRedirect(path, location.search, window.self !== window.top) || /^(localhost|127\.)/.test(window.location.hostname) || window.location.hostname.endsWith('lovable.app')) { if (alive) setReady(true); return; }
       try {
         const { data } = await supabase.from('site_settings').select('key,value').in('key', ['live_origin', 'replay_origin', 'main_origin', 'replay_path']);
         const m = Object.fromEntries((data || []).map((r) => [r.key, r.value]));
