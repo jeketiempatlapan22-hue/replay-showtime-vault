@@ -27,4 +27,5 @@
 - [x] Bulk device reset falls back to per-token reset (membership/show) while Website A's bulk function rejects unconditional DELETE.
 - [x] Keep the admin live monitor iframe on the admin domain so admin badge/sender info work.
 - [x] Password users resolve the live show and refresh their short grant; replay retries uppercase password.
-- [ ] Website A: add WHERE to admin_bulk_reset_devices, return show_id for password unlock, normalize replay password compare (see Perintah_Website_A_v3.txt).
+- [x] Website A source already has bulk-reset WHERE fix, show_id unlock and monitor fix (snapshot check).
+- [ ] Website A: confirm deployment, build Telegram admin bot (notifications, approve buttons, secret commands) and run tests A–E (see Perintah_Website_A_v4.txt); Website B cannot deploy server code.
